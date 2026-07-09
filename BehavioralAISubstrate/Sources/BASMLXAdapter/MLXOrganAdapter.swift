@@ -1734,22 +1734,34 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// WITHOUT evicting — an app kill after this point warm-starts instead of re-prefilling.
     /// Returns the number of seats snapshotted. Call from idle windows only (persist walks each
     /// session's serial lock; a decoding seat would serialize behind its own turn).
+    /// audit M-h dream-loop — per-seat write-then-guard, EXTRACTED so the H7
+    /// clear-epoch suppression is unit-testable WITHOUT loading a real model
+    /// (the production `write` closure does the Qwen3.5-4B KV persist). Capture
+    /// the clear epoch BEFORE `write`; if a `clearSession`/`clearAllSessions`
+    /// for `key` intervenes during the write await (epoch bumped) OR the seat
+    /// left the pool, delete the just-written file so a cleared conversation
+    /// can't resurrect on disk. Returns whether the seat SURVIVED (counted).
+    /// Byte-identical guard to the pre-extraction inline code.
+    func _snapshotSeat(key: String, write: () async -> URL?) async -> Bool {
+        let epoch = _clearEpoch(key)
+        guard let url = await write() else { return false }
+        if _clearEpoch(key) != epoch || sessions[key] == nil {
+            try? FileManager.default.removeItem(at: url)
+            return false
+        }
+        return true
+    }
+
     public func snapshotWarmSeats() async -> Int {
         guard Self.sessionSpillEnabled else { return 0 }
         var n = 0
         for (key, box) in sessions {
-            // H7: capture the clear epoch BEFORE the write; if clearSession(key) intervenes during
-            // the await, discard the just-written file so a cleared session can't be resurrected.
-            let epoch = _clearEpoch(key)
-            let ok = (try? await Self._persist(box, url: Self._spillURL(forKey: key),
-                                               quantizeKV: false)) != nil
-            if ok {
-                if _clearEpoch(key) != epoch || sessions[key] == nil {
-                    try? FileManager.default.removeItem(at: Self._spillURL(forKey: key))
-                } else {
-                    n += 1
-                }
+            let counted = await _snapshotSeat(key: key) {
+                (try? await Self._persist(box, url: Self._spillURL(forKey: key),
+                                          quantizeKV: false)) != nil
+                    ? Self._spillURL(forKey: key) : nil
             }
+            if counted { n += 1 }
         }
         Self._pruneSpillDir()
         return n
