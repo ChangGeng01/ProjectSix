@@ -191,6 +191,34 @@ public final class BASMLMemoryService: BASMemoryServicing,
 
     // MARK: - Internal helpers
 
+    /// audit orchestration MED-2: a valid dominance order is a PERMUTATION of
+    /// 0..<count — every index in range, no duplicates, exactly `count` of them.
+    /// A corrupt / drifted Rust FFI result must be rejected so the caller falls
+    /// back to the trusted Swift sort instead of crashing / silently dropping.
+    static func isValidDominancePermutation(_ indices: [Int], count: Int) -> Bool {
+        guard indices.count == count else { return false }
+        var seen = Set<Int>()
+        seen.reserveCapacity(count)
+        for i in indices where !(i >= 0 && i < count && seen.insert(i).inserted) {
+            return false
+        }
+        return true
+    }
+
+    /// Apply the Rust dominance order iff it is a valid permutation; otherwise
+    /// fail SAFE to the Swift score-sort. orchestration MED-2: the old inline
+    /// `precondition(i < count)` ABORTED the process on an out-of-bounds FFI
+    /// index (and never checked duplicates), instead of using the live fallback.
+    /// Generic over the payload so it is unit-testable without the private atom.
+    static func orderedByDominance<T>(
+        _ items: [(score: Double, stored: T)], rustIndices: [Int]?
+    ) -> [(score: Double, stored: T)] {
+        if let idxs = rustIndices, isValidDominancePermutation(idxs, count: items.count) {
+            return idxs.map { items[$0] }
+        }
+        return items.sorted { $0.score > $1.score }
+    }
+
     /// Score every stored atom (LRU + frozen) against
     /// the current signal set; return the top-K above
     /// the relevance floor。
@@ -218,24 +246,18 @@ public final class BASMLMemoryService: BASMemoryServicing,
         // truncate by topK stays in Swift。 The Swift sort body
         // is preserved as live FALLBACK per
         // 「依旧 不删除 只 comment」。
-        // chapter 八百四十七 / M2887 — f64 + precondition upgrade
-        let sorted: [(score: Double, stored: StoredAtom)] = {
-            let scoreValues: [Double] = above.map { $0.score }
-            if let indices = BASAutoRouteRanker
-                .dreamLoopDominanceOrderDouble(scores: scoreValues) {
-                return indices.map { idx -> (score: Double, stored: StoredAtom) in
-                    let i = Int(idx)
-                    precondition(i >= 0 && i < above.count,
-                        "Rust dominance_order_f64 returned " +
-                        "out-of-bounds index \(i) for n=" +
-                        "\(above.count)")
-                    return above[i]
-                }
-            }
-            // Swift legacy fallback (V1 implementation,kept active
-            // per 「依旧 不删除 只 comment」 + cross-platform safety)
-            return above.sorted { $0.score > $1.score }
-        }()
+        // chapter 八百四十七 / M2887 — f64 dominance order.
+        // audit orchestration MED-2: validate the Rust indices and fail SAFE to
+        // the live Swift sort on a corrupt/drifted FFI result — was a
+        // `precondition` that ABORTED the process on an out-of-bounds index (and
+        // never checked duplicates). The Swift sort stays the fallback per
+        // 「依旧 不删除 只 comment」 + cross-platform safety.
+        let sorted: [(score: Double, stored: StoredAtom)] =
+            Self.orderedByDominance(
+                above,
+                rustIndices: BASAutoRouteRanker
+                    .dreamLoopDominanceOrderDouble(scores: above.map { $0.score })?
+                    .map { Int($0) })
         let top = sorted.prefix(Parameters.topK)
         return top.map { tuple in
             // Echo the Jaccard score as the atom's
