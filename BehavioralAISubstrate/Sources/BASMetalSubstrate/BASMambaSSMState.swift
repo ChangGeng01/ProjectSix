@@ -436,7 +436,44 @@ public actor BASMambaSSMState {
     /// concurrent threads,each doing ~L × N=512-4096
     /// ops。 Significantly faster than CPU for
     /// L >= ~32 sequences on Apple Silicon GPUs。
+    // audit x-concurrency MED-9 — FIFO async mutex (mirrors BASPlasticityFold): selectiveScanGPU
+    // reads the `hiddenState` baseline before its single GPU await and overwrites it after, so two
+    // concurrent calls both captured the same pre-await state and the second lost the first's
+    // update. For a RECURRENT scan (h_new depends on h_old) an accumulate-onto-current writeback is
+    // UNSOUND, so serialization — one call airborne at a time, each reading a fresh baseline — is
+    // the correct fix. The lock hands off in arrival order.
+    private var scanBusy = false
+    private var scanWaiters: [CheckedContinuation<Void, Never>] = []
+
+    /// Run `op` under the per-actor scan lock — at most one op airborne across its await.
+    func _serializeScan<T>(_ op: () async throws -> T) async rethrows -> T {
+        if scanBusy {
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                scanWaiters.append(c)
+            }   // resumed via hand-off ⇒ we hold the lock
+        } else {
+            scanBusy = true
+        }
+        defer {
+            if scanWaiters.isEmpty {
+                scanBusy = false
+            } else {
+                scanWaiters.removeFirst().resume()
+            }
+        }
+        return try await op()
+    }
+
     public func selectiveScanGPU(
+        inputs: BASMambaSSMScanInputs
+    ) async throws -> BASMambaSSMScanOutputs {
+        // audit x-concurrency MED-9: serialize so a concurrent scan reads a FRESH hiddenState.
+        try await _serializeScan {
+            try await self._selectiveScanGPULocked(inputs: inputs)
+        }
+    }
+
+    private func _selectiveScanGPULocked(
         inputs: BASMambaSSMScanInputs
     ) async throws -> BASMambaSSMScanOutputs {
         let B = shape.batch

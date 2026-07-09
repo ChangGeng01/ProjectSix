@@ -502,7 +502,49 @@ public actor BASPlasticityFold {
     /// Parallelism:O(preDim × postDim) threads each
     /// doing O(1) work。 Significantly faster than CPU
     /// for weight matrices >= ~64×64 on Apple Silicon。
+    // audit x-concurrency MED-9 — FIFO async mutex so applyGPU calls never overlap at the GPU
+    // await. Both `applyGPU` and `selectiveScanGPU` (BASMambaSSMState) read a mutable state
+    // baseline BEFORE their single `await`, then overwrite it after — so two concurrent calls on
+    // the SAME actor both captured the SAME pre-await baseline and the second silently clobbered
+    // the first's committed update (a lost update; the counter still double-incremented). The lock
+    // hands off in arrival order; each call reads a FRESH baseline only once it holds the lock.
+    private var applyBusy = false
+    private var applyWaiters: [CheckedContinuation<Void, Never>] = []
+
+    /// Run `op` under the per-actor apply lock — at most one op airborne across its await.
+    func _serializeApply<T>(_ op: () async throws -> T) async rethrows -> T {
+        if applyBusy {
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                applyWaiters.append(c)
+            }   // resumed via hand-off ⇒ we now hold the lock (applyBusy stays true)
+        } else {
+            applyBusy = true
+        }
+        defer {
+            if applyWaiters.isEmpty {
+                applyBusy = false
+            } else {
+                applyWaiters.removeFirst().resume()   // hand the lock to the next waiter
+            }
+        }
+        return try await op()
+    }
+
     public func applyGPU(
+        pre: [Float],
+        post: [Float],
+        outcome: Float = 0,
+        timingDelta: Float = 0
+    ) async throws -> BASPlasticityUpdate {
+        // audit x-concurrency MED-9: serialize so a concurrent call reads a FRESH `weights`
+        // baseline (not the stale pre-await value the previous call is about to overwrite).
+        try await _serializeApply {
+            try await self._applyGPULocked(
+                pre: pre, post: post, outcome: outcome, timingDelta: timingDelta)
+        }
+    }
+
+    private func _applyGPULocked(
         pre: [Float],
         post: [Float],
         outcome: Float = 0,
