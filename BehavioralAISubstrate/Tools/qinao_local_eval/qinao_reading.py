@@ -22,10 +22,17 @@ def novel_doc_read_score(mc: int, n: int) -> float:
 
 
 def reading_out(mc: int, follow: int, genuine: int, leak: int, n: int) -> dict:
-    """Assemble the reading-panel metrics (all fractions in [0,1])."""
+    """Assemble the reading-panel metrics (all fractions in [0,1]).
+
+    audit x-test-integrity F5: #20 counterfactual_lift is NO LONGER emitted here. These items are
+    novel-FICTION facts (Velmoran Spire, …) that the model aces (base==tuned==1.0), so a soft #20
+    could never discriminate a grounded reader from a parroter. #20 now comes from the discriminating
+    contamination-free counterfactual probe (qinao_reading_hard.py, which emits "20"=follow/n with
+    computed provenance). #26 stays here as a legitimate "can the model read a matched passage at all"
+    floor; #21 remains here pending a discriminating repoint (tracked residual).
+    """
     return {
         "26": novel_doc_read_score(mc, n),            # novel_doc_read (matched-correct fraction)
-        "20": round(follow / max(1, n), 3),           # counterfactual_lift (answer follows swapped fact)
         "21": round(genuine / max(1, n), 3),          # genuine_reading (correct matched AND follows swap)
         "_leak": round(leak / max(1, n), 3), "_N": n,
     }

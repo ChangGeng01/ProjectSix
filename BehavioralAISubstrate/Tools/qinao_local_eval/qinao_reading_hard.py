@@ -46,5 +46,10 @@ for topic,cf,pr,q in ITEMS:
     elif has(r,pr): prior+=1
     else: other+=1
 n=len(ITEMS); cf_follow=round(follow/n*100,1)
-json.dump({"reading_hard_followrate":cf_follow,"follow":follow,"prior":prior,"other":other,"n":n}, open(f"/tmp/qinao_reading_hard_{tag}.json","w"))
-print(f"{tag} HARD-reading: follow-doc {follow}/{n}={cf_follow}% | revert-to-prior {prior} | other {other}")
+# audit x-test-integrity F5: emit #20 counterfactual_lift as the FRACTION follow/n so the merge folds
+# it into the CRITICAL gate with COMPUTED provenance. This is the DISCRIMINATING backing for #20 — a
+# parroter that reverts to its prior scores ~0.1 and FAILS >0.35, where the old saturated soft probe
+# (novel-fiction items, base==tuned==1.0) could never fail. reading_hard_followrate stays as the
+# human-readable percent diagnostic. (#21/#26 still ride the soft probe — see qinao_reading.py.)
+json.dump({"20":round(follow/n,3),"reading_hard_followrate":cf_follow,"follow":follow,"prior":prior,"other":other,"n":n}, open(f"/tmp/qinao_reading_hard_{tag}.json","w"))
+print(f"{tag} HARD-reading: follow-doc {follow}/{n}={cf_follow}% (#20={round(follow/n,3)}) | revert-to-prior {prior} | other {other}")
