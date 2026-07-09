@@ -637,58 +637,79 @@ public actor BASRoutedVectorIndexStorage {
             withUnsafeBytes(of: &x) { raw in bytes.append(contentsOf: raw) }
         }
         let dom = Array(domain.utf8)
-        var rowids = [Int64](repeating: 0, count: k)
+        // audit M-l MED-4 (x-concurrency) — ATOMIC topK. The OLD path called
+        // topK (→ rowids) then resolved each rowid→atom_id in K SEPARATE FFI
+        // calls; a concurrent remove/upsert between them let SQLite ROWID REUSE
+        // remap a rowid to a DIFFERENT atom (wrong recall) or drop it (silent
+        // miss), and the DEBUG-only tripwire compiled away in release. The new
+        // engine call reads atom_id DIRECTLY in the same scan under ONE Mutex
+        // hold — no rowid round-trip, so no reuse window at all — and returns a
+        // TOTAL, content-derived (score DESC, atom_id ASC) order (also fixing
+        // the K-th-boundary MEMBERSHIP determinism the old comment deferred).
         var scores = [Float](repeating: 0, count: k)
-        let n = dom.withUnsafeBufferPointer { domBuf in
-            bytes.withUnsafeBufferPointer { qBuf in
-                rowids.withUnsafeMutableBufferPointer { rBuf in
+        // atom_ids are bounded ids (UUID / content hash) — a generous buffer
+        // makes this a single atomic call; the retry below is a rare safety net.
+        var idsBuf = [UInt8](repeating: 0, count: max(k * 128, 256))
+        var idsNeeded: Int64 = 0
+        let call: () -> Int32 = {
+            dom.withUnsafeBufferPointer { domBuf in
+                bytes.withUnsafeBufferPointer { qBuf in
                     scores.withUnsafeMutableBufferPointer { sBuf in
-                        bas_l8_vector_index_cosine_topk_for_domain(
-                            enginePtr,
-                            domBuf.baseAddress.map {
-                                UnsafeRawPointer($0)
-                                    .assumingMemoryBound(to: CChar.self)
-                            },
-                            domBuf.count,
-                            qBuf.baseAddress, qBuf.count,
-                            k, rBuf.baseAddress, sBuf.baseAddress)
+                        idsBuf.withUnsafeMutableBufferPointer { iBuf in
+                            bas_l8_vector_index_cosine_topk_atom_ids_for_domain(
+                                self.enginePtr,
+                                domBuf.baseAddress.map {
+                                    UnsafeRawPointer($0)
+                                        .assumingMemoryBound(to: CChar.self)
+                                },
+                                domBuf.count,
+                                qBuf.baseAddress, qBuf.count,
+                                k,
+                                sBuf.baseAddress,
+                                iBuf.baseAddress, iBuf.count,
+                                &idsNeeded)
+                        }
                     }
                 }
             }
         }
+        var n = call()
         guard n >= 0 else { throw StoreError.readFailed(code: n) }
-        var out: [(atomID: String, score: Float)] = []
-        out.reserveCapacity(Int(n))
-        for i in 0..<Int(n) {
-            if let aid = Self.atomIDForRowidSync(enginePtr, rowids[i]) {
-                out.append((atomID: aid, score: scores[i]))
-            }
+        if Int(idsNeeded) > idsBuf.count {
+            // Rare: atom_ids exceeded the generous default — resize to the exact
+            // size and re-run. Each call is internally self-consistent (atom_id
+            // read directly), so a retry is still a valid top-k.
+            idsBuf = [UInt8](repeating: 0, count: Int(idsNeeded))
+            n = call()
+            guard n >= 0 else { throw StoreError.readFailed(code: n) }
         }
-        // 先稳 P2 — deterministic ORDER: re-sort the engine's (score, rowid)-ordered top-K by
-        // (score DESC, atomID ASC). atomID is content-derived (stable across engine rebuilds), so the
-        // RETURNED ORDER no longer depends on rowid assignment (which the in-memory ADR-037 engine
-        // reassigns on every rebuild). NOTE: this pins the ORDER; the K-th-boundary MEMBERSHIP at an EXACT
-        // score tie is still rowid-decided inside the engine — a rare, ACCEPTED non-byte-equal (ADR-036:
-        // this is the opt-in fast retrieve path, never the byte-deterministic spine). A full membership
-        // fix is the Rust-side `, atom_id` tiebreaker (requires an XCFramework rebuild — deferred).
+        let count = Int(n)
+        guard count > 0 else { return [] }
+        let joined = String(decoding: idsBuf.prefix(Int(idsNeeded)), as: UTF8.self)
+        let atomIDs = joined.split(
+            separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        // ids ↔ scores must align 1:1 (an atom_id containing '\n' would desync
+        // them) — fail closed rather than mis-pair.
+        guard atomIDs.count == count else {
+            throw StoreError.readFailed(code: -99)
+        }
+        var out: [(atomID: String, score: Float)] = []
+        out.reserveCapacity(count)
+        for i in 0..<count {
+            out.append((atomID: atomIDs[i], score: scores[i]))
+        }
+        // The engine already returns the TOTAL (score DESC, atom_id ASC) order
+        // atomically; this re-sort is now a redundant confirmation (defense in
+        // depth).
         out.sort { a, b in a.score != b.score ? a.score > b.score : a.atomID < b.atomID }
         return out
     }
 
-    /// SYNC rowid → atom_id via the probe-mode FFI (null buf returns the size). Returns nil on
-    /// not-found / decode failure (the caller skips that entry).
-    private nonisolated static func atomIDForRowidSync(
-        _ engine: OpaquePointer, _ rowid: Int64
-    ) -> String? {
-        let needed = bas_l8_vector_index_atom_id_for_rowid(engine, rowid, nil, 0)
-        guard needed > 0 else { return nil }  // -2 not found / -1 null / 0 empty
-        var buf = [UInt8](repeating: 0, count: Int(needed))
-        let wrote = buf.withUnsafeMutableBufferPointer { b in
-            bas_l8_vector_index_atom_id_for_rowid(
-                engine, rowid, b.baseAddress, b.count)
-        }
-        guard wrote == needed else { return nil }
-        return String(decoding: buf, as: UTF8.self)
-    }
+    // audit M-l MED-4 — `atomIDForRowidSync` (the per-rowid resolution FFI
+    // wrapper) was REMOVED: it was the second half of the multi-call TOCTOU.
+    // The atomic `cosineTopKAtomIDsSync` above now reads atom_id directly in
+    // the engine scan, so no rowid→atom_id round-trip exists. The underlying
+    // `bas_l8_vector_index_atom_id_for_rowid` FFI remains available for other
+    // callers / diagnostics.
 }
 #endif
