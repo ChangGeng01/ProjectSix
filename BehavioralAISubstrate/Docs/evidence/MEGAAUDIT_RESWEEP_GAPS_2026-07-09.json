@@ -42,7 +42,8 @@
       "status": "NOT_IN_ACCOUNTING",
       "evidence": "The 94-item ledger's unaccounted_items lists only hostkit-rest MED-1/MED-4/MED-5; HIGH-1 was folded into H18 (8a5e5d17b) but HIGH-2 is absent from every §8 HIGH table, §3 theme, and the unaccounted list. Only accounting hit for 'AgentFabricHostPipeline' is MED-1's FullTurnAdapter line, not the watcher block. git log post-2026-07-07 for BASAgentFabricHostPipeline.swift is EMPTY; the 3 git 'HIGH-2' hits are unrelated auditors' findings (ch1044 sovereign nonce, HostAlignment adapter chapters). Current code Sources/BASHostKit/BASAgentFabricHostPipeline.swift:512-531 still shows critic:nil, hostAlignment:nil and memory:memoryInput/sovereignSentinel:sovereignSentinelInput/evolutionShadow:evolutionShadowInput — while the effectiveMemory/effectiveSovereignInput/effectiveEvolutionInput computed at :351-385 are only threaded into the MAIN watcher path at :394-398, never the .all block. Defect fully live.",
       "macFixable": true,
-      "subsystem": "hostkit-rest"
+      "subsystem": "hostkit-rest",
+      "resolved": "7321781f1 (effective inputs + build critic/hostAlignment)"
     },
     {
       "id": "HIGH-1",
@@ -51,7 +52,8 @@
       "status": "NOT_IN_ACCOUNTING",
       "evidence": "grep of MED_55_ITEM_ACCOUNTING_2026-07-09.json for 'orchestration HIGH-1' / 'guardPaths' / 'reversal' returns ZERO entries — the only HIGH-1 rows are unrelated (x-concurrency HIGH-1, hostkit-rest HIGH-1, ch1044 sovereign-nonce). No git commit references guardPaths semantics. Current code confirms both producers live: BASAgentFabricAdapters.swift:362-363 (guardPaths = reversibility < 0.3) and EBrainNeuralMaterializationCore.swift:328-333 (guardPaths = reversibility >= 0.7 || guardLexicon). A HIGH-severity semantic-inversion sitting on the frontier/retreat-selection path was silently dropped from the accounting entirely.",
       "macFixable": true,
-      "subsystem": "orchestration"
+      "subsystem": "orchestration",
+      "resolved": "1a7745806 (guardPaths inversion reconciled to safe-retreat semantic)"
     },
     {
       "id": "runtimecore-a #1 (HIGH)",
@@ -60,7 +62,8 @@
       "status": "NOT_IN_ACCOUNTING",
       "evidence": "The 94-item accounting lists ONLY runtimecore-a #2 and #3; #1 has no entry (grep 'runtimecore-a' → 2 hits; JSON has no wallclock/mach/sleep-clock item). The only wallclock commit 85c1fb4a3 (2026-05-21) is the ORIGIN feature, PREDATES the audit (Jul 7). No post-audit commit touches bas_monotonic_nanos.c. Current bas_monotonic_nanos.c:388-427 still calls mach_absolute_time() in bas_wallclock_nanos. Dormant (zero production consumers) but exported, versioned, test-backed ABI that silently fails once adopted — audit rated it HIGH. Includes the '附带' sub-defect: V1 epoch-based vs V2 boot-based timebase mismatch with a doc calling V2 'strictly-better'.",
       "macFixable": true,
-      "subsystem": "runtimecore-a"
+      "subsystem": "runtimecore-a",
+      "resolved": "fbda118cf (mach_continuous_time; teeth device-gated)"
     },
     {
       "id": "runtimecore-a #1 (wallclock)",
@@ -69,7 +72,8 @@
       "status": "NOT_IN_ACCOUNTING",
       "evidence": "Grep of MED_55_ITEM_ACCOUNTING shows only 'runtimecore-a #2' and '#3' as line items — #1 is absent entirely. `git log --all | grep wallclock` returns only feature commits (85c1fb4a3 'sleep-inclusive clock' dated 2026-05-21, predating the 07-07 audit; a033a5817; 876ae7e8c) — no post-audit fix. Sibling M-e findings #2/#3 (5f36be54a) and #4 (259b85288) all got fixes; #1 was silently dropped from both the theme close and the per-item ledger.",
       "macFixable": true,
-      "subsystem": "synthesis"
+      "subsystem": "synthesis",
+      "resolved": "fbda118cf (mach_continuous_time; teeth device-gated)"
     },
     {
       "id": "MED-9",
@@ -114,7 +118,8 @@
       "status": "FALSE_CLOSE",
       "evidence": "Accounting marks mlx-decode MED-1 'closed' via commit b81490202. `git show --stat b81490202` touches ONLY BASQwen35MTPSpecDecoder+FusedChain.swift (added clampedChainWidth for the FUSED chain draft width) + a test. The evidence file's MED-1 explicitly names TWO write points and states 'fused 与 sampling 两条生产车道都中'; the second, generateSpecSampling's mtpForward at BASQwen35MTPSpecDecoder.swift:154 ('sampling 车道 generateSpecSampling 同样无任何钳位'), is NOT touched by the commit and current code still has the bare `mtpK[pos] = k` with hLastPos = prompt.count-1 / trunkLen-1 growing unbounded (no `pos < maxSeq` guard anywhere in the file; grep for maxSeq/clamp shows only buffer allocation, no write-time clamp). The shipped temp>0 rejection-sampling lane (~1.05x) thus retains the defect. Fused half fixed, sampling half live => not verifiably fully closed.",
       "macFixable": true,
-      "subsystem": "mlx-decode"
+      "subsystem": "mlx-decode",
+      "resolved": "6e8e75655 (all 5 mtpForward sites bounded; my prior fix was partial)"
     },
     {
       "id": "MED-2",
@@ -150,7 +155,8 @@
       "status": "CLAIMED_CLOSED_BUT_UNVERIFIED",
       "evidence": "Accounting item 'organ-eval MED-5' disposition=closed, remediation=commit a7c5e093e. That commit closes ONLY clause 1 (adds `gatedSkip: Bool` so a skipped verify != a passed one). Clause 2 is UNTOUCHED: current Sources/BASOrgan/BASLLMVerifierPipeline.swift:556 still `for (stage, outcome) in report.perStage` (nondeterministic dictionary iteration), appending `verifier-stage-failed:<stage>` in random order. The evidence's prescribed fix (`for stage in BASLLMVerifierStage.allCases`) was not applied — no allCases/sorted iteration exists in the file. Serialized feedback remains non-reproducible cross-process. Partial close mislabeled as closed.",
       "macFixable": true,
-      "subsystem": "organ-eval"
+      "subsystem": "organ-eval",
+      "resolved": "882fa3422 (clause 2 deterministic failure-label order; my prior fix closed clause 1)"
     },
     {
       "id": "runtimecore-b MED-3 (evidence item #3)",
@@ -1034,5 +1040,16 @@
       "macFixable": true,
       "subsystem": "x-test-integrity"
     }
-  ]
+  ],
+  "tranche_1_closed_2026_07_09": {
+    "directive": "operator chose \"HIGH + my partials first\"",
+    "closed": [
+      "hostkit-rest HIGH-2",
+      "orchestration HIGH-1",
+      "runtimecore-a #1 (fix Mac-compiled, sleep-advance teeth device-gated)",
+      "mlx-decode MED-1 complete (my partial)",
+      "organ-eval MED-5 clause 2 (my partial)"
+    ],
+    "still_open": "the rest of the 113 gaps: ~1 CRITICAL residual (HF token history, operator-gated) + remaining FALSE_CLOSE/CLAIMED partials (memory-b F3, orchestration MED-2/MED-4, runtimecore-b MED-3) + ~28 MED + ~79 LOW silent-drops (99 Mac-fixable overall)."
+  }
 }
