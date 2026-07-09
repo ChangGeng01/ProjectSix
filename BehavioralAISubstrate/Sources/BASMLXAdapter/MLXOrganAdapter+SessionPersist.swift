@@ -37,16 +37,18 @@ extension MLXOrganAdapter {
         guard let box = _sessionBox(sessionID: sessionID, role: role) else {
             throw SessionPersistError.noSuchSession(sessionID)
         }
-        return try await Self._persist(box, url: url, quantizeKV: quantizeKV)
+        return try await Self._persist(box, url: url, modelID: model.id, quantizeKV: quantizeKV)
     }
 
     /// The streamBody idiom: the @unchecked Sendable box crosses the region boundary; the session
     /// inside is only ever reached via this actor (the ChatSessionBox contract).
+    /// `modelID` binds the snapshot to its producing model (audit mlx-adapter-core MED-10).
     static func _persist(
-        _ box: ChatSessionBox, url: URL, quantizeKV: Bool
+        _ box: ChatSessionBox, url: URL, modelID: String, quantizeKV: Bool
     ) async throws -> Int {
         let bytes = try await box.session.withLiveCache { cache in
-            try BASSessionKVStore.save(cache: cache, tokenCount: 0, to: url, quantizeKV: quantizeKV)
+            try BASSessionKVStore.save(cache: cache, tokenCount: 0, to: url,
+                                       modelID: modelID, quantizeKV: quantizeKV)
         }
         // 缝2 (2026-07-06 audit): conversation KV on disk gets Data Protection —
         // readable after first unlock (background restores keep working), sealed
@@ -75,9 +77,10 @@ extension MLXOrganAdapter {
             throw SessionPersistError.notLoaded
         }
         struct CacheBox: @unchecked Sendable { let cache: [KVCache] }   // actor-confined handoff
+        let expectedModelID = model.id   // audit mlx-adapter-core MED-10: reject a wrong-model spill
         let box: CacheBox = try await container.perform { ctx in
             let fresh = ctx.model.newCache(parameters: nil)
-            _ = try BASSessionKVStore.restore(into: fresh, from: url)
+            _ = try BASSessionKVStore.restore(into: fresh, from: url, expectedModelID: expectedModelID)
             for c in fresh { eval(c.innerState()) }
             return CacheBox(cache: fresh)
         }

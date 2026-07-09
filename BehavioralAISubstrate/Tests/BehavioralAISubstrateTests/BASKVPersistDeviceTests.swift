@@ -61,12 +61,13 @@ final class BASKVPersistDeviceTests: XCTestCase {
             let seed = argMax(qwen.logits(fromHidden: h0)[0, h0.dim(1) - 1], axis: -1).item(Int.self)
             let coldMs = Date().timeIntervalSince(t0) * 1000
             let tS = Date()
-            let bytes = try BASSessionKVStore.save(cache: cache1, tokenCount: ids.count, to: url)
+            let bytes = try BASSessionKVStore.save(cache: cache1, tokenCount: ids.count, to: url,
+                                                   modelID: "qwen3.5-device")
             let saveMs = Date().timeIntervalSince(tS) * 1000
             let live = greedy(cache1, seed: seed, n: 48)
             let cache2 = qwen.newCache(parameters: nil)
             let tR = Date()
-            _ = try BASSessionKVStore.restore(into: cache2, from: url)
+            _ = try BASSessionKVStore.restore(into: cache2, from: url, expectedModelID: "qwen3.5-device")
             for c in cache2 { eval(c.innerState()) }
             let restoreMs = Date().timeIntervalSince(tR) * 1000
             let warm = greedy(cache2, seed: seed, n: 48)

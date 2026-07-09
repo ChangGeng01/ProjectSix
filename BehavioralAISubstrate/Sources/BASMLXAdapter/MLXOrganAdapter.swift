@@ -1692,7 +1692,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         while let entry = pendingSpill[key] {
             let gen = entry.generation
             let ok = (try? await Self._persist(entry.box, url: Self._spillURL(forKey: key),
-                                               quantizeKV: false)) != nil
+                                               modelID: model.id, quantizeKV: false)) != nil
             // H5: the writer-active flag is cleared atomically with the pending check below (no
             // await between), so a park that runs after this sees active=false and spawns fresh.
             if pendingSpill[key] == nil {
@@ -1758,7 +1758,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         for (key, box) in sessions {
             let counted = await _snapshotSeat(key: key) {
                 (try? await Self._persist(box, url: Self._spillURL(forKey: key),
-                                          quantizeKV: false)) != nil
+                                          modelID: model.id, quantizeKV: false)) != nil
                     ? Self._spillURL(forKey: key) : nil
             }
             if counted { n += 1 }
@@ -1784,9 +1784,10 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         let url = Self._spillURL(forKey: key)
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         struct CacheBox: @unchecked Sendable { let cache: [KVCache] }
+        let expectedModelID = model.id   // audit mlx-adapter-core MED-10: reject a wrong-model spill
         guard let box: CacheBox = try? await container.perform({ ctx in
             let fresh = ctx.model.newCache(parameters: nil)
-            _ = try BASSessionKVStore.restore(into: fresh, from: url)
+            _ = try BASSessionKVStore.restore(into: fresh, from: url, expectedModelID: expectedModelID)
             for c in fresh { eval(c.innerState()) }
             return CacheBox(cache: fresh)
         }) else {

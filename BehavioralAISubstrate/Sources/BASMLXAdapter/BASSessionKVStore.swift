@@ -23,6 +23,11 @@ public enum BASSessionKVStore {
         case badFile(String)
         case layerMismatch(expected: Int, found: Int)
         case unsupportedCache(String)
+        /// audit mlx-adapter-core MED-10 — the snapshot was written under a DIFFERENT model.
+        /// Restoring a wrong-model KV (even same shape) yields a garbage continuation or a
+        /// Metal shape-mismatch crash, so restore refuses it (mirrors the experience store's
+        /// `load(expectedModelID:)` reject).
+        case modelMismatch(expected: String, found: String)
     }
 
     static let version = "1"
@@ -31,14 +36,17 @@ public enum BASSessionKVStore {
     /// Default fp16 = EXACT continuation (F6: 48/48 token match, 45.7× TTFT, ~32KB/token marginal)
     /// — the house lossless bar. `quantizeKV: true` = the paper's Q4 recipe (~8KB/token, continuation
     /// diverges tie-break-class after ~20 tokens; F6: 33.6× TTFT) for bulk/space-constrained tiers.
+    /// `modelID` binds the snapshot to the model that produced it (audit mlx-adapter-core MED-10) —
+    /// restore rejects a mismatch so a model swap can't wrong-restore another model's KV.
     @discardableResult
     public static func save(cache: [KVCache], tokenCount: Int, to url: URL,
-                            quantizeKV: Bool = false) throws -> Int {
+                            modelID: String, quantizeKV: Bool = false) throws -> Int {
         var arrays: [String: MLXArray] = [:]
         var meta: [String: String] = [
             "version": Self.version,
             "tokens": "\(tokenCount)",
             "layers": "\(cache.count)",
+            "model": modelID,
         ]
         for (i, c) in cache.enumerated() {
             if let ac = c as? ArraysCache {                      // GDN first: MambaCache IS ArraysCache
@@ -74,14 +82,22 @@ public enum BASSessionKVStore {
     }
 
     /// Restore a snapshot INTO a fresh cache from `model.newCache` (layer kinds must line up).
-    /// Returns the persisted token count.
+    /// Returns the persisted token count. `expectedModelID` MUST match the model that saved the
+    /// snapshot (audit mlx-adapter-core MED-10) — a mismatch throws `.modelMismatch` rather than
+    /// wrong-restoring another model's KV into the currently loaded model.
     @discardableResult
-    public static func restore(into cache: [KVCache], from url: URL) throws -> Int {
+    public static func restore(into cache: [KVCache], from url: URL,
+                               expectedModelID: String) throws -> Int {
         let (arrays, meta) = try MLX.loadArraysAndMetadata(url: url)
         guard meta["version"] == Self.version,
               let layerCount = meta["layers"].flatMap(Int.init),
               let tokens = meta["tokens"].flatMap(Int.init) else {
             throw StoreError.badFile(url.lastPathComponent)
+        }
+        // Fail fast, BEFORE touching any array: the snapshot must be from the same model.
+        // A legacy snapshot (no "model" key) is treated as a mismatch — it cannot be proven safe.
+        guard meta["model"] == expectedModelID else {
+            throw StoreError.modelMismatch(expected: expectedModelID, found: meta["model"] ?? "<none>")
         }
         guard layerCount == cache.count else {
             throw StoreError.layerMismatch(expected: cache.count, found: layerCount)
