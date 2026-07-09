@@ -336,12 +336,37 @@ public actor BASTrainingDataExporter {
     /// no labels (zero behavior change vs pre-M925 export)。
     private let labelEnricher: (any BASTrainingLabelEnricher)?
 
+    /// audit TrainingDataExporter (§0 comment-lie) — the temp→destination commit step, extracted so
+    /// its atomicity is directly testable。 `(temp, destination) throws -> Void`。 A FAILING commit
+    /// MUST leave the prior destination intact (that is the property the old removeItem-then-moveItem
+    /// sequence violated)。
+    public typealias CommitStrategy =
+        @Sendable (_ temp: URL, _ destination: URL) throws -> Void
+
+    /// Default commit = Foundation safe-save。 `replaceItemAt` is an atomic same-volume swap that
+    /// PRESERVES the prior destination if the swap fails — so a crash/error never leaves the previous
+    /// export lost。 (The old code did `removeItem(destination)` THEN `moveItem`, a two-syscall
+    /// sequence with a destination-gone window despite the "Atomic rename" comment。 tempURL is
+    /// `url + ".tmp"`, i.e. the same directory/volume, so the swap is genuinely atomic — the old
+    /// "different volume" excuse for avoiding replaceItemAt was false here。)
+    public static let atomicCommitStrategy: CommitStrategy = { temp, destination in
+        if FileManager.default.fileExists(atPath: destination.path) {
+            _ = try FileManager.default.replaceItemAt(destination, withItemAt: temp)
+        } else {
+            try FileManager.default.moveItem(at: temp, to: destination)
+        }
+    }
+
+    private let commitStrategy: CommitStrategy
+
     public init(
         eventLog: any BASEventLogStorage,
         userStateStore: (any BASUserStateStorage)? = nil,
         pageSize: Int = BASTrainingDataExporter.defaultPageSize,
         labelEnricher:
-            (any BASTrainingLabelEnricher)? = nil
+            (any BASTrainingLabelEnricher)? = nil,
+        commitStrategy: @escaping CommitStrategy =
+            BASTrainingDataExporter.atomicCommitStrategy
     ) {
         precondition(pageSize > 0,
             "pageSize must be > 0")
@@ -349,6 +374,7 @@ public actor BASTrainingDataExporter {
         self.userStateStore = userStateStore
         self.pageSize = pageSize
         self.labelEnricher = labelEnricher
+        self.commitStrategy = commitStrategy
     }
 
     /// Export the filtered event corpus as JSONL to `url`。
@@ -613,18 +639,12 @@ public actor BASTrainingDataExporter {
         // handle released first)。
         try? handle.close()
 
-        // Atomic rename。
+        // Atomic FS-level commit (audit TrainingDataExporter §0)。 `commitStrategy` defaults to a
+        // safe-save that preserves the prior destination if the swap fails — NOT the old
+        // removeItem-then-moveItem, which had a destination-gone window despite claiming "Atomic
+        // rename"。 On any failure the half-written temp is cleaned up and the prior export survives。
         do {
-            // Remove existing destination (if any) to allow
-            // overwrite — `replaceItemAt` would also work but
-            // is more I/O on iOS where temp dir may be on a
-            // different volume。
-            if FileManager.default.fileExists(atPath: url.path)
-            {
-                try FileManager.default.removeItem(at: url)
-            }
-            try FileManager.default.moveItem(
-                at: tempURL, to: url)
+            try commitStrategy(tempURL, url)
         } catch {
             try? FileManager.default.removeItem(at: tempURL)
             throw BASTrainingDataExportError.fileWriteFailed(
