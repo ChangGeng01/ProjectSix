@@ -304,9 +304,7 @@ public enum BASNeuralMaterializationCompiler {
             // Swift legacy fallback (V1 implementation, kept active per 「依旧 不删除 只 comment」
             // + cross-platform safety) — also the fail-safe when Rust returns a bad permutation.
             let swiftFallback: () -> [String] = {
-                thoughtFrame.candidates
-                    .sorted { Self.candidateDominanceScore($0) > Self.candidateDominanceScore($1) }
-                    .map(\.candidateID)
+                Self.dominanceFallbackOrder(thoughtFrame.candidates)
             }
             // audit orchestration MED-2: the Rust index list must be a VALID PERMUTATION of
             // 0..<n (all in bounds, no duplicates, complete). An out-of-bounds index used to
@@ -833,6 +831,18 @@ public enum BASNeuralMaterializationCompiler {
         case .boundaryConflict:
             return "Neural critique flags boundary conflict (\(strength))."
         }
+    }
+
+    /// audit orchestration LOW-4 — the deterministic fallback dominance order: sort by dominance
+    /// score DESC, breaking ties on `candidateID` ASC so equal-score candidates get a STABLE order
+    /// (the byte-equality contract) rather than arbitrary input order. Internal for testability.
+    static func dominanceFallbackOrder(_ candidates: [BASCandidatePath]) -> [String] {
+        candidates.sorted { a, b in
+            let sa = candidateDominanceScore(a)
+            let sb = candidateDominanceScore(b)
+            if sa != sb { return sa > sb }
+            return a.candidateID < b.candidateID
+        }.map(\.candidateID)
     }
 
     private static func candidateDominanceScore(

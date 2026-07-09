@@ -32,4 +32,25 @@ final class BASDominancePermutationValidatorTests: XCTestCase {
         XCTAssertFalse(valid([0, 1], 3), "too few indices is not a complete permutation")
         XCTAssertFalse(valid([0, 1, 2, 0], 3), "too many indices")
     }
+
+    // MARK: - audit orchestration LOW-4: the fallback sort breaks score ties deterministically
+
+    private func candidate(_ id: String) -> BASCandidatePath {
+        // Identical benefit/cost/reversibility/confidence ⇒ identical dominance score.
+        BASCandidatePath(
+            candidateID: id, title: "t", actionSummary: "a",
+            expectedBenefit: 0.5, expectedCost: 0.1, reversibility: 0.5, confidence: 0.5)
+    }
+
+    func testEqualScoreCandidatesSortDeterministicallyByID() {
+        // Two equal-score candidates presented in DESCENDING id order.
+        let order = BASNeuralMaterializationCompiler.dominanceFallbackOrder(
+            [candidate("z-cand"), candidate("a-cand")])
+        XCTAssertEqual(order, ["a-cand", "z-cand"],
+            "equal dominance scores must tiebreak on candidateID ASC — a bare `>` left input order")
+        // Symmetry: the reverse input yields the SAME deterministic order.
+        let order2 = BASNeuralMaterializationCompiler.dominanceFallbackOrder(
+            [candidate("a-cand"), candidate("z-cand")])
+        XCTAssertEqual(order, order2, "the fallback order is input-order-independent for equal scores")
+    }
 }

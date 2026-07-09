@@ -102,6 +102,9 @@ public enum BASProviderReleaseEvaluator {
     ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
         BASProviderReleaseGate.verdict(
             for: BASProviderReleaseEvaluationRequest(
+                // audit orchestration LOW-3: an unrecognized trace-kind raw value falls back to
+                // `.primary` — the default (least-special) trace category, a conservative choice
+                // that grants no elevated handling. Deliberate, not an accidental collapse.
                 kind: BASAdaptiveTraceKind(identifier: traceKindRawValue) ?? .primary,
                 outputPreview: outputPreview,
                 kernelSnapshot: kernelSnapshot,
