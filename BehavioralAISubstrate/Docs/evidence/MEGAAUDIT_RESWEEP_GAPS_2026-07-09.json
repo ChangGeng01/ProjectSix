@@ -1165,16 +1165,19 @@
    "runtimecore-a (2/3)": [
     "#5 surprise +inf saturates to 1 (not NaN→0) + #6 wallclock negative/non-finite floors to 0 (no UInt64 trap) b2abf8697"
    ],
-   "runtimecore-b (2/4)": [
-    "#7 decode rebases non-zero-based Data slice + #9 tribunal empty-input baseAddress guard 718300892"
-   ],
+   "runtimecore-b (2/4)": "#7 decode slice-rebase + #9 tribunal empty baseAddress 718300892",
    "x-architecture (2 of 5)": [
     "LOW-7 boundary completeness gate + BASAdminUI/BASJournalCLI classified + LOW-8 stale god-file pins c206340f9"
    ],
    "x-test-integrity (2 of 3)": [
     "F10 release_gate deferred-gate docstring reconciled 0a1fe2c1a",
     "F9 arc-seal comment-not-delete permatrue → compile-time ref pin 6484b113b"
-   ]
+   ],
+   "hostkit-rest (2 of 3)": "LOW-2 ForbiddenGate true-state 9d5feb7b8 + LOW-3 tier validator alias 2ae9e89ea",
+   "mlx-adapter-core (2 of 4)": "LOW-13 draftModelSpec fail-close + LOW-15 max-live-sessions clamp 6f1dc7d7d",
+   "metal (1/1)": "#5 layer-norm dispatch recipe comment-lie 4b1d43278",
+   "rust (1 of 3)": "chain.rs canonical-bytes comment-lie 4b1d43278",
+   "hostkit-spine (1 of 4)": "F8 provisional needsProtectedWriteLane high-risk term 20813e261"
   },
   "deferred_with_reason": {
    "tools-scripts b2 domain": "b2_r2_pipeline.py + b2_refit_candidate.py + eval_probe_ood.py = operator b2/RSI experiment domain (recorded verdict rule + /tmp experiment data); do not touch per standing constraint",
@@ -1189,7 +1192,14 @@
    "x-architecture manifest/deletion": "LOW-4 (add mlx-swift direct dep) + LOW-5 (remove phantom Package.swift edges) need xcodebuild build-for-testing verification per standing rule (swift-build-masks-xcodebuild trap + DerivedData contention); LOW-6 (git mv 4 dead-code files to Archive) is deletion-class = operator-gated. All 3 flagged for operator.",
    "x-test-integrity F8": "#95 determinism gate letter→byte-identical = release-gate STRICTNESS change (operator eval domain, needs sign-off) + teeth blocked by un-importable model imports"
   },
-  "remaining_open": "~44 LOW: runtimecore-a(#7 MED)/runtimecore-b(#8/#10 SQLite)/x-architecture(5)/x-test-integrity(3)/x-concurrency(2)/organ-eval(3)/mlx-decode(2)/mlx-adapter-core(4)/hostkit-rest(3)/hostkit-spine(4)/rust(3)/metal(1)/sovereign(1)/x-sovereignty(1)/devicetestapp(7 device-gated)",
-  "closed_count": "28 LOW + 6 MED (tranche-3) this campaign"
+  "remaining_open": "~40 LOW: runtimecore-a #7(MED thermal)/runtimecore-b #8 #10(SQLite txn)/x-concurrency 2(device)/organ-eval 3/mlx-decode 2/mlx-adapter-core LOW-12 LOW-14(device)/hostkit-rest LOW-1/hostkit-spine F6 F7 F9/sovereign LOW-8(device)/x-sovereignty #7(SampleHost)/devicetestapp 7(device-gated)",
+  "closed_count": "35 LOW + 6 MED (tranche-3) = 41 findings this campaign, each TDD teeth + reversal + individual push",
+  "deferred_full": {
+   "operator-experiment-domain": "tools-scripts b2_r2_pipeline.py + b2_refit_candidate.py + eval_probe_ood.py",
+   "operator-eval-gate-strictness": "tools-scripts qinao_humaneval.py exec-sandbox + x-test-integrity F8 #95 byte-identical",
+   "manifest-needs-xcodebuild": "x-architecture LOW-4 (add mlx-swift dep) + LOW-5 (remove phantom edges)",
+   "deletion-class-operator-gated": "x-architecture LOW-6 (git mv dead code) + rust verdict_decisions.rs (2 dead lines) + rust assembler.rs (cfg-gate dead encoder)",
+   "not-a-defect": "hostkit-rest LOW-4, organ-eval LOW-1, hostkit-spine F6 (by-design transient field)"
+  }
  }
 }
