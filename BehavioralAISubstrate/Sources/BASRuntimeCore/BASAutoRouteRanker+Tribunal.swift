@@ -104,7 +104,10 @@ extension BASAutoRouteRanker {
         // Phase 1:discover required output capacity
         let needed = inputBytes.withUnsafeBufferPointer {
             ip -> Int32 in
-            return ip.baseAddress!.withMemoryRebound(
+            // audit runtimecore-b #9: an EMPTY input has a nil baseAddress — force-unwrapping it
+            // CRASHED. Pass (nil, 0) for empty, matching the BASInternalRustBridges idiom.
+            guard let base = ip.baseAddress else { return fn(nil, 0, nil, 0) }
+            return base.withMemoryRebound(
                 to: CChar.self, capacity: inputBytes.count
             ) { ccp in
                 return fn(ccp, Int32(inputBytes.count),
@@ -118,7 +121,13 @@ extension BASAutoRouteRanker {
             repeating: 0, count: Int(needed))
         let wrote = inputBytes.withUnsafeBufferPointer {
             ip -> Int32 in
-            return ip.baseAddress!.withMemoryRebound(
+            // audit runtimecore-b #9: empty input ⇒ nil baseAddress; pass (nil, 0) instead of crashing.
+            guard let base = ip.baseAddress else {
+                return out.withUnsafeMutableBufferPointer { op in
+                    return fn(nil, 0, op.baseAddress, Int32(op.count))
+                }
+            }
+            return base.withMemoryRebound(
                 to: CChar.self, capacity: inputBytes.count
             ) { ccp in
                 return out.withUnsafeMutableBufferPointer {

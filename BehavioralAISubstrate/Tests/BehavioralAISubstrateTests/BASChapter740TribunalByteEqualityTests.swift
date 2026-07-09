@@ -454,4 +454,15 @@ final class BASChapter740TribunalByteEqualityTests:
         }
         #endif
     }
+
+    // audit runtimecore-b #9: an EMPTY inputJSON produces an empty byte array whose baseAddress is
+    // nil — the old force-unwrap crashed. It must now be handled deterministically without trapping.
+    func testTribunalDeriveEmptyInputDoesNotCrash() {
+        #if os(iOS) || os(macOS)
+        let r1 = BASAutoRouteRanker.tribunalDeriveIdProfile(inputJSON: "")
+        let r2 = BASAutoRouteRanker.tribunalDeriveIdProfile(inputJSON: "")
+        XCTAssertEqual(r1, r2,
+            "empty input must be handled deterministically without crashing on a nil baseAddress")
+        #endif
+    }
 }
