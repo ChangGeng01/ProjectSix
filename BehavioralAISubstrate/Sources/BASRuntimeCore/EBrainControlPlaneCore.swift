@@ -1761,16 +1761,20 @@ public extension BASDeviceState {
         npuAvailable: Bool = true,
         latencyBudgetMs: Int = 1_500
     ) {
+        // x-arch MED-1 (mega-audit #15 follow-up, 2026-07-09): this was the SECOND
+        // thermal consumer the #15 fix missed — the old substring `switch` fell
+        // through to `.nominal` on every unrecognized `thermalState` string, so an
+        // overheating device routed here read cool (fail-OPEN, the exact bug #15
+        // claimed to close, patched only at RuntimeCore.swift:420). Route on the
+        // same canonical classification: recognized thermal → its level; known
+        // non-thermal producer strings → nominal (no false downgrade); anything
+        // genuinely unrecognized → fail-CLOSED (serious ⇒ .hot) via routingSeverity.
         let thermalLevel: BASThermalLevel
-        switch profile.thermalState.lowercased() {
-        case let value where value.contains("critical"):
-            thermalLevel = .critical
-        case let value where value.contains("serious") || value.contains("hot"):
-            thermalLevel = .hot
-        case let value where value.contains("fair") || value.contains("warm"):
-            thermalLevel = .warm
-        default:
-            thermalLevel = .nominal
+        switch BASThermalClassification.classify(profile.thermalState).routingSeverity {
+        case .nominal:  thermalLevel = .nominal
+        case .fair:     thermalLevel = .warm
+        case .serious:  thermalLevel = .hot
+        case .critical: thermalLevel = .critical
         }
 
         self.init(
