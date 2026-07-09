@@ -394,6 +394,12 @@ extension BASMemoryUsageTracker {
         recordID: String,
         notes: String
     ) throws {
+        // audit memory-a F6: the main-table UPSERT + the FTS DELETE + the FTS INSERT used to run as
+        // THREE separate autocommits — a failure after the main UPSERT left the FTS index inconsistent
+        // (search would miss the row). Wrap all three in ONE transaction so a mid-sequence failure
+        // rolls the whole thing back (fixing the "wrap in a transaction" comment that was a lie).
+        try runExec(db: db, sql: "BEGIN IMMEDIATE TRANSACTION;")
+        do {
         // Main table (UPSERT semantics)
         let sql = """
             INSERT INTO memory_usage_record_notes (
@@ -420,8 +426,8 @@ extension BASMemoryUsageTracker {
         }
         // FTS5 table — delete existing matching row,
         // then insert (FTS5 contentless / virtual tables
-        // don't natively support ON CONFLICT)。 Wrap in
-        // a transaction for atomicity。
+        // don't natively support ON CONFLICT)。 Now inside the
+        // enclosing transaction opened above (audit memory-a F6)。
         // Parameterized DELETE (audit ch1040 polish): recordID is
         // caller-supplied via attachNotes(); was previously
         // string-interpolated with manual ''-escaping — the only
@@ -468,6 +474,13 @@ extension BASMemoryUsageTracker {
             throw TrackerError.stepFailed(
                 sql: ftsSQL,
                 message: String(cString: sqlite3_errmsg(db)))
+        }
+        try runExec(db: db, sql: "COMMIT;")
+        } catch {
+            // audit memory-a F6: any step failed — roll the whole three-write sequence back so the
+            // main table and the FTS index never diverge.
+            try? runExec(db: db, sql: "ROLLBACK;")
+            throw error
         }
     }
 
