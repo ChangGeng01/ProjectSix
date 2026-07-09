@@ -59,15 +59,51 @@ declare -a SUBSTRATE_CORE=(
     "BASAdmin"
 )
 
-# Build forbidden-pattern regex (one alternation per SDK consumer)
+# Build forbidden-pattern regex (one alternation per SDK consumer).
+# audit tools-scripts LOW: the old `^import ${c}\b` missed the declaration-kind form
+# (`import struct BASHostKit.Foo`) and the `@_exported import` re-export form, both of which
+# still link the module — a real boundary bypass. Match an optional `@_exported` prefix and an
+# optional declaration kind, keeping the line-start anchor so `//`-comments stay clean.
+kind_re="(struct|class|enum|protocol|func|var|let|typealias|inout)"
 forbidden_pattern=""
 for c in "${SDK_CONSUMERS[@]}"; do
+    per_c="^(@_exported[[:space:]]+)?import([[:space:]]+${kind_re})?[[:space:]]+${c}\\b"
     if [[ -z "$forbidden_pattern" ]]; then
-        forbidden_pattern="^import ${c}\\b"
+        forbidden_pattern="$per_c"
     else
-        forbidden_pattern="${forbidden_pattern}|^import ${c}\\b"
+        forbidden_pattern="${forbidden_pattern}|$per_c"
     fi
 done
+
+# audit tools-scripts LOW — self-test the forbidden pattern against known bypass/clean lines so the
+# regex fix has teeth (reverting to `^import ${c}\b` reds the `import struct` + `@_exported` cases).
+if [[ "${1:-}" == "--self-test" ]]; then
+    must_match=(
+        "import BASHostKit"
+        "import struct BASHostKit.Foo"
+        "@_exported import BASHostKit"
+        "import class BASMLXAdapter.Bar"
+    )
+    must_not_match=(
+        "import Foundation"
+        "// import BASHostKit"
+        "    import BASHostKit"          # indented (not a top-level substrate-core import line)
+        "import BASRuntimeCore"          # a substrate module importing a substrate module is fine
+    )
+    st_fail=0
+    for line in "${must_match[@]}"; do
+        if ! echo "$line" | grep -qE "$forbidden_pattern"; then
+            echo "SELF-TEST FAIL: expected MATCH but missed: $line"; st_fail=1
+        fi
+    done
+    for line in "${must_not_match[@]}"; do
+        if echo "$line" | grep -qE "$forbidden_pattern"; then
+            echo "SELF-TEST FAIL: expected NO match but matched: $line"; st_fail=1
+        fi
+    done
+    if (( st_fail == 0 )); then echo "SELF-TEST PASS"; fi
+    exit "$st_fail"
+fi
 
 violations=0
 for module in "${SUBSTRATE_CORE[@]}"; do
