@@ -101,6 +101,17 @@ extension BASQwen35MTPSpecDecoder {
         min(maxTokens, max(8, probe))
     }
 
+    /// audit mlx-decode MED-1 — the chain draft width, floored at 0 (NOT 1). The old
+    /// inline `max(1, min(preferredK, tCapHeadroom, maxDraftWidth))` defeated its own KV
+    /// bound: `maxDraftWidth = maxSeq-1-pos0` goes ≤ 0 once the fixed [2048,…] mtpK/mtpV
+    /// buffer is full (pos0 ≥ 2047), but `max(1, …)` still returned 1 — so `draft(k: 1)`
+    /// wrote `mtpK[pos0 ..< pos0+1]` OUT OF BOUNDS (long context silently entered the
+    /// net-negative / overrun region). Flooring at 0 means "KV stream full ⇒ no legal
+    /// draft" and the caller takes a plain refeed step instead. Pure + Mac-testable.
+    static func clampedChainWidth(preferredK: Int, tCapHeadroom: Int, maxDraftWidth: Int) -> Int {
+        max(0, min(preferredK, tCapHeadroom, maxDraftWidth))
+    }
+
     /// One chain link: the MTP block with attention over `baseK/baseV` (committed slice, shared across the
     /// chain) ++ this chain's earlier links ++ self. Math mirrors `mtpForward` exactly (same rms/rope/gate);
     /// `fp32Scores` reproduces the production K=1 lane's fp32 QKᵀ+softmax semantics (acceptance was
@@ -257,8 +268,13 @@ extension BASQwen35MTPSpecDecoder {
             decoder: self, k: k, adaptiveK: adaptiveK, fp32Scores: fp32Scores)
         func draftAndCommit() -> [MLXArray] {
             // Clamp so chain positions stay inside the provider's KV bound (fp16-exact ≤ 2047 holds).
-            let kEff = max(1, min(provider.preferredK(), tCap - pending.count,
-                                  provider.maxDraftWidth(pos0: hLastPos)))
+            // audit mlx-decode MED-1: floor 0 ⇒ when the KV buffer is full (maxDraftWidth ≤ 0) do
+            // NOT draft (was max(1,…) → an out-of-bounds mtpK write). Empty ⇒ caller plain-refeeds.
+            let kEff = Self.clampedChainWidth(
+                preferredK: provider.preferredK(),
+                tCapHeadroom: tCap - pending.count,
+                maxDraftWidth: provider.maxDraftWidth(pos0: hLastPos))
+            guard kEff > 0 else { return [] }
             return provider.draft(k: kEff, firstToken: pending.last!, hidden: hLast, pos0: hLastPos)
         }
         // Non-round emissions (prefill / refeed argmaxes) MUST carry entropy too — nil-entropy
@@ -301,7 +317,10 @@ extension BASQwen35MTPSpecDecoder {
         if dbg { print("[fused-dbg] first chain built"); fflush(stdout) }
         let t0 = Date()
         while out.count < cap && !hitEOS {
-            if pending.count >= tCap {                  // commit refeed (itself ≤ tCap ⇒ stays in the qmv regime)
+            // audit mlx-decode MED-1: an empty draft means the MTP KV buffer is full (pos0 ≥ 2047);
+            // fall through to the SAME plain multi-token refeed the tCap branch uses (no MTP draft
+            // buffer touched) so the trunk keeps advancing instead of writing out of bounds.
+            if pending.count >= tCap || ds.isEmpty {    // commit refeed (itself ≤ tCap ⇒ stays in the qmv regime)
                 // ONE multi-token forward (the sequential-lane one-token-at-a-time loop was the first
                 // deep-K killer; the cap-6 no-draft round itself was the second — both retired, this
                 // branch is nearly unreachable). Same forward class as the verify feed → same ADR-039
