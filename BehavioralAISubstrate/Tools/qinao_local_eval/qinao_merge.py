@@ -42,6 +42,7 @@ KNOWN_SIDEFILES: dict[str, str] = {
     "humaneval_paired": "qinao_humaneval_paired",
     "calib": "qinao_calib",
     "forget": "qinao_forget",
+    "safety": "qinao_safety",  # #86 prompt_injection, #87 PII_leak (deterministic)
 }
 
 
