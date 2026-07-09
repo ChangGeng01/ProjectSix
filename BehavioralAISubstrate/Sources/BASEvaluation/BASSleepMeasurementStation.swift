@@ -278,7 +278,14 @@ public enum BASSleepMeasurementStation {
                 break
             }
         }
-        try? appendToLedger(records, ledgerURL: ledgerURL)
+        // audit organ-eval LOW-3: don't silently swallow a ledger-write failure — a lost measurement
+        // ledger reads as "no run happened". Non-fatal (records are still returned) but surfaced.
+        do {
+            try appendToLedger(records, ledgerURL: ledgerURL)
+        } catch {
+            print("⚠️ station: failed to append \(records.count) record(s) to ledger " +
+                  "\(ledgerURL.lastPathComponent): \(error)")
+        }
         return records
     }
     #endif

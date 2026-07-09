@@ -46,6 +46,22 @@ final class BASSleepMeasurementStationTests: XCTestCase {
         XCTAssertEqual(back.unparseable, 0)
     }
 
+    // audit organ-eval LOW-3: the station's runSuite now surfaces (do/catch + print) a ledger-write
+    // failure instead of `try?`-swallowing it. Pin that appendToLedger genuinely throws on a bad path,
+    // so that do/catch catches a real error (the surfacing itself is a non-fatal print, inspection-verified).
+    func testLedgerAppendThrowsOnUncreatablePath() throws {
+        let blocker = FileManager.default.temporaryDirectory
+            .appendingPathComponent("blk-\(UUID().uuidString)")
+        FileManager.default.createFile(atPath: blocker.path, contents: Data("x".utf8))  // a FILE, not a dir
+        defer { try? FileManager.default.removeItem(at: blocker) }
+        let badURL = blocker.appendingPathComponent("sub").appendingPathComponent("ledger.jsonl")
+        let r = BASStationRunRecord(startedAtMs: 1, suiteFilter: "S", exitCode: 0,
+                                    executedTests: 1, failures: 0, durationS: 0.1, verdictCandidate: "G")
+        XCTAssertThrowsError(
+            try BASSleepMeasurementStation.appendToLedger([r], ledgerURL: badURL),
+            "appendToLedger must throw on an uncreatable path — the station now surfaces this, not swallows it")
+    }
+
     func testLedgerSurfacesCorruptLines() throws {
         let url = dir.appendingPathComponent("ledger.jsonl")
         let r = BASStationRunRecord(startedAtMs: 1, suiteFilter: "S", exitCode: 0,
