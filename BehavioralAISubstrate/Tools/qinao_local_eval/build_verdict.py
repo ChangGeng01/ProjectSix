@@ -146,8 +146,14 @@ def build(base, tuned):
 
 def main():
     base_tag, tuned_tag = sys.argv[1], sys.argv[2]
-    base = _load_values(base_tag)
-    tuned = _load_values(tuned_tag)
+    # H23 wire-1/2 (2026-07-09): fold in the orphan harness side-files
+    # (qinao_read/bench/humaneval/bench_zh/cmmlu/gsm8k_fair/forget/…) that
+    # build_verdict never read, so their CRITICAL gates flow into the verdict
+    # instead of staying silently PENDING. The merge stamps computed provenance
+    # for MODEL_CRITICAL metrics so they count as genuine passes, not ATTEST.
+    from qinao_merge import merge_known_sidefiles
+    base = merge_known_sidefiles(_load_values(base_tag), base_tag)
+    tuned = merge_known_sidefiles(_load_values(tuned_tag), tuned_tag)
     verdict = build(base, tuned)
     verdict["model"] = tuned_tag; verdict["base"] = base_tag
     _out = os.environ.get("QINAO_VERDICT_OUT", os.path.expanduser("~/qwen_honesty_finetune/qinao_verdict.json"))
