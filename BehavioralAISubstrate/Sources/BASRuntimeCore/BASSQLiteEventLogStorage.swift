@@ -308,6 +308,10 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 confidence: entry.confidence,
                 payloadJson: entry.payloadJson)
             try Self.insertEntry(db: db, entry: stamped)
+            // audit runtimecore-b MED-2: advance the never-pruned seq high-water
+            // mark in the SAME txn, so a later full prune can't reset the sequence.
+            try Self.bumpSequenceHighWaterMark(
+                db: db, sessionID: entry.sessionID, seq: assigned)
             // ADR-040 — when enabled, record this row's chained hash in the SAME txn (atomic with the event row).
             if Self.rowIntegrityChainEnabled {
                 try self.appendIntegrityRow(db: db, entry: stamped)
@@ -718,6 +722,21 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             CREATE INDEX IF NOT EXISTS
                 event_log_kind_idx
                 ON event_log(kind);
+            """)
+        // audit runtimecore-b MED-2: a per-session monotonic sequence high-water
+        // mark that SURVIVES pruning. `nextSequenceNumber` derived the next seq
+        // from SURVIVING rows only, so a whole-session prune reset it to 0 —
+        // colliding with already-exported (session_id, seq) keys downstream. This
+        // table is NEVER pruned (pruneBefore only deletes event_log + the
+        // integrity sidecar), so the seq stays monotone for the DB's lifetime.
+        // Migration note: existing sessions seed the hwm on their next append; a
+        // session pruned-to-empty BEFORE this upgrade can still reset once (its
+        // pre-upgrade max is unrecoverable) — the fix prevents all FUTURE resets.
+        try runExec(db: db, sql: """
+            CREATE TABLE IF NOT EXISTS event_log_seq_hwm (
+                session_id TEXT PRIMARY KEY NOT NULL,
+                max_seq INTEGER NOT NULL
+            );
             """)
         // chapter 七百三十二 第一刀 — lazy ALTER TABLE migration
         // for v2 columns。 PRAGMA-checked first so we don't try
@@ -1142,9 +1161,17 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         db: OpaquePointer,
         sessionID: String
     ) throws -> Int64 {
+        // audit runtimecore-b MED-2: the next seq is the max of the SURVIVING
+        // rows' max AND the never-pruned high-water mark — so a whole-session
+        // prune can never reset the sequence and collide with exported keys.
         let sql = """
-            SELECT COALESCE(MAX(sequence_number), -1) FROM
-            event_log WHERE session_id = ?
+            SELECT MAX(v) FROM (
+                SELECT COALESCE(MAX(sequence_number), -1) AS v
+                    FROM event_log WHERE session_id = ?
+                UNION ALL
+                SELECT COALESCE(MAX(max_seq), -1) AS v
+                    FROM event_log_seq_hwm WHERE session_id = ?
+            )
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
@@ -1157,6 +1184,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         }
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, sessionID)
+        bindText(stmt, 2, sessionID)
         guard sqlite3_step(stmt) == SQLITE_ROW else {
             throw StorageError.stepFailed(
                 sql: sql,
@@ -1164,6 +1192,30 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         }
         let max = sqlite3_column_int64(stmt, 0)
         return max + 1
+    }
+
+    /// audit runtimecore-b MED-2: bump the per-session sequence high-water mark
+    /// (called INSIDE the append txn, atomic with the row insert). Monotone —
+    /// `MAX(existing, new)` — and never decremented, so pruning can't reset it.
+    fileprivate static func bumpSequenceHighWaterMark(
+        db: OpaquePointer, sessionID: String, seq: Int64
+    ) throws {
+        let sql = """
+            INSERT INTO event_log_seq_hwm (session_id, max_seq) VALUES (?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET max_seq = MAX(max_seq, excluded.max_seq)
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw StorageError.prepareFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, sessionID)
+        sqlite3_bind_int64(stmt, 2, seq)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
     }
 
     fileprivate static func fetchEventsForSession(
