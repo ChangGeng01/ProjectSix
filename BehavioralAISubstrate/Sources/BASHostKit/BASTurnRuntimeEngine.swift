@@ -586,10 +586,21 @@ public actor BASTurnRuntimeEngine {
             String(Int(
                 request.recordedAt
                     .timeIntervalSince1970))
-        lastAssignmentLedger = await
+        // audit M-k F1 — capture the per-turn ledgers as LOCALS and thread
+        // them to the emit helpers below (see the emit calls). This actor is
+        // REENTRANT at every await, so a concurrent turn can overwrite the
+        // shared `lastAssignmentLedger` / `lastDispatchLedger` between here and
+        // the emit-helper reads — the emitted audit event would then carry THIS
+        // turn's sessionID but the OTHER turn's ledger payload (the documented
+        // M-k F1 "sessionID 与 payload 不一致" crossing). The shared vars are
+        // still assigned, only for the (host-side, currently dormant) `last*`
+        // accessors — whose cross-turn staleness needs turn-level
+        // serialization, tracked separately from this attribution fix.
+        let turnAssignmentLedger = await
             captureSchedulerAssignmentsIfWired(
                 plan: plan,
                 turnID: turnIDForLedger)
+        lastAssignmentLedger = turnAssignmentLedger
         // Resolve delegate: caller-provided OR fresh
         // identity-default。 Default delegate uses the
         // canonical plan;explicit `plan:` parameter
@@ -608,7 +619,8 @@ public actor BASTurnRuntimeEngine {
         // consultation),fall back to the M998
         // unrouted path — V1 byte-equality preserved。
         let stageLedger: BASTurnRuntimeStageLedger
-        if lastAssignmentLedger.recordCount > 0 {
+        let turnDispatchLedger: BASNativeStageDispatchLedger
+        if turnAssignmentLedger.recordCount > 0 {
             // chapter 四百三十八 / M1129 — thread host-
             // provided routed + fallback closures through
             // delegate boundary。 nil → no-op defaults
@@ -621,18 +633,19 @@ public actor BASTurnRuntimeEngine {
             let routedResult = await activeDelegate
                 .runScaffoldedWithAssignments(
                     request: request,
-                    assignments: lastAssignmentLedger,
+                    assignments: turnAssignmentLedger,
                     routedExecutor: routed,
                     fallbackExecutor: fallback)
             stageLedger = routedResult.stageLedger
-            lastDispatchLedger = routedResult
+            turnDispatchLedger = routedResult
                 .dispatchLedger
         } else {
             // Unrouted path — empty dispatch ledger
             stageLedger = await activeDelegate
                 .runScaffolded(request: request)
-            lastDispatchLedger = .empty
+            turnDispatchLedger = .empty
         }
+        lastDispatchLedger = turnDispatchLedger
         // Run V1 coordinator for the byte-stable
         // BASEBrainTurnResult (ADR-014 OPT-IN preserved
         // until `BASTurnRuntimeMode.nativeV2` flips at
@@ -660,6 +673,7 @@ public actor BASTurnRuntimeEngine {
         // when eventLog == nil OR ledger empty。
         await emitNativeStageDispatchEventIfNeeded(
             for: result,
+            dispatchLedger: turnDispatchLedger,          // audit M-k F1: this turn's ledger, not shared
             timestampMsOverride: timestampMsOverride)
         // chapter 四百四十一 / M1141 — auto-emit plan-
         // assignment event payload (sibling of dispatch
@@ -671,6 +685,7 @@ public actor BASTurnRuntimeEngine {
         // OR ledger empty。
         await emitPlanAssignmentEventIfNeeded(
             for: result,
+            assignmentLedger: turnAssignmentLedger,      // audit M-k F1: this turn's ledger, not shared
             timestampMsOverride: timestampMsOverride)
         // chapter 461 / M1221 — biomimetic turn observer
         // hook (closes integration debt surfaced by
@@ -900,12 +915,17 @@ public actor BASTurnRuntimeEngine {
     /// (engine took the V1-fallback path or has no
     /// event log to emit to)。 Pure additive
     /// observability — V1 byte-equality preserved。
-    private func emitNativeStageDispatchEventIfNeeded(
+    // audit M-k F1 — `internal` (was private) so the ledger-locality
+    // attribution is directly unit-testable. `dispatchLedger` is THIS turn's
+    // ledger, passed by value; the helper no longer reads the shared
+    // `lastDispatchLedger`, which a concurrent turn could have overwritten.
+    internal func emitNativeStageDispatchEventIfNeeded(
         for result: BASEBrainTurnResult,
+        dispatchLedger: BASNativeStageDispatchLedger,
         timestampMsOverride: Int64?
     ) async {
         guard let log = eventLog else { return }
-        guard lastDispatchLedger.executionCount > 0
+        guard dispatchLedger.executionCount > 0
         else { return }
         let timestampMs = timestampMsOverride ?? clockMs()
         let nextSeq = sequenceCounter
@@ -915,7 +935,7 @@ public actor BASTurnRuntimeEngine {
             result.runtimeTrace.sessionID
         let payload = BASNativeStageDispatchEventPayload
             .from(
-                ledger: lastDispatchLedger,
+                ledger: dispatchLedger,
                 turnID: turnID)
         let eventID = eventIDFactory()
         let entry = BASEventLogEntry
@@ -961,19 +981,23 @@ public actor BASTurnRuntimeEngine {
     /// (engine took the V1-fallback path or has no
     /// event log to emit to)。 Pure additive
     /// observability — V1 byte-equality preserved。
-    private func emitPlanAssignmentEventIfNeeded(
+    // audit M-k F1 — `internal` (was private) + takes THIS turn's
+    // `assignmentLedger` by value instead of reading the shared
+    // `lastAssignmentLedger` (which a concurrent turn could have overwritten).
+    internal func emitPlanAssignmentEventIfNeeded(
         for result: BASEBrainTurnResult,
+        assignmentLedger: BASTurnRuntimePlanAssignmentLedger,
         timestampMsOverride: Int64?
     ) async {
         guard let log = eventLog else { return }
-        guard lastAssignmentLedger.recordCount > 0
+        guard assignmentLedger.recordCount > 0
         else { return }
         let timestampMs = timestampMsOverride ?? clockMs()
         let nextSeq = sequenceCounter
         sequenceCounter += 1
         let payload =
             BASTurnRuntimePlanAssignmentEventPayload
-                .from(ledger: lastAssignmentLedger)
+                .from(ledger: assignmentLedger)
         let eventID = eventIDFactory()
         let entry = BASEventLogEntry
             .planAssignmentEvent(
