@@ -79,6 +79,38 @@ final class BASSQLiteMemoryAtomStoreTests: XCTestCase {
         XCTAssertEqual(ids, [])
     }
 
+    // MARK: - audit devicetestapp MED-3 — count is a faithful O(1) substitute for allAtoms().count
+    //
+    // The endurance runner loaded the ENTIRE store (allAtoms()) every time it only needed the
+    // COUNT — an O(N) materialization that scales with cross-restart monotonic growth. The fix
+    // swaps those call sites to the O(1) `countOrThrow()` (SELECT COUNT(*)). This pins the
+    // correctness contract the swap depends on: countOrThrow() == count == allAtoms().count,
+    // across admits and a remove (so count can never silently drift from the materialized set).
+
+    func testCountOrThrowMatchesFullMaterialization() async throws {
+        let store = try BASSQLiteMemoryAtomStore(databaseURL: tempURL)
+        for _ in 0..<25 { try await store.admit(makeAtom()) }
+        let materialized = try await store.allAtoms().count
+        let o1Count = try await store.countOrThrow()
+        let nonThrowing = await store.count
+        XCTAssertEqual(o1Count, 25)
+        XCTAssertEqual(o1Count, materialized,
+            "SELECT COUNT(*) must equal the full-materialization count — the substitution the fix relies on")
+        XCTAssertEqual(nonThrowing, materialized)
+    }
+
+    func testCountStaysConsistentAfterRemove() async throws {
+        let store = try BASSQLiteMemoryAtomStore(databaseURL: tempURL)
+        let keep = makeAtom(), drop = makeAtom()
+        try await store.admit(keep)
+        try await store.admit(drop)
+        _ = await store.remove(forID: drop.id.uuidString)
+        let materialized = try await store.allAtoms().count
+        let o1Count = try await store.countOrThrow()
+        XCTAssertEqual(o1Count, 1)
+        XCTAssertEqual(o1Count, materialized, "count must track the materialized set through a remove")
+    }
+
     // MARK: - 2. atom(forID:) returns nil for missing
 
     func testAtomLookupMissReturnsNil() async throws {

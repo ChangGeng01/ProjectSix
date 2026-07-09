@@ -1336,7 +1336,9 @@ final class BASEnduranceAppController: ObservableObject {
         // container — i.e. a prior run's self-populated memory survived an app restart.
         if let store = memoryStore {
             await brain.refreshMemory()
-            let preloaded = (try? await store.allAtoms().count) ?? 0
+            // audit devicetestapp MED-3: O(1) SELECT COUNT, not an O(N) full-store materialization
+            // just to read the count (cross-restart growth otherwise scales this load every run).
+            let preloaded = (try? await store.countOrThrow()) ?? 0
             let vidxEntries = (memoryVectorIndex != nil)
                 ? await memoryVectorIndex!.totalCount : 0
             await emitBoth(
@@ -2761,7 +2763,8 @@ final class BASEnduranceAppController: ObservableObject {
         // provenance per atom over the whole run). No-op for the legacy backend.
         if let store = memoryStore {
             let mem = await brain.drainMemoryIntents()
-            let storedAtoms = (try? await store.allAtoms().count) ?? -1
+            // audit devicetestapp MED-3: O(1) count for the final summary, not a full-store load.
+            let storedAtoms = (try? await store.countOrThrow()) ?? -1
             await emitBoth(
                 "📊 ch1062 FINAL memory total_store_atoms=\(storedAtoms) " +
                 "final_flush_admitted=\(mem.admitted) " +
