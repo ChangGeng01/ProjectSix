@@ -56,12 +56,75 @@ public enum BASSovereignFragmentMerger {
                 combined.append(frame)
             }
         }
-        // Step 3: total-order sort.
-        return combined.sorted(by: orderBefore)
+        // Step 3: deterministic linear extension of the causal partial order.
+        // audit blindspot-CRDT: was `combined.sorted(by: orderBefore)`, but `orderBefore` is
+        // INTRANSITIVE (see its doc) — it mixed the causal PARTIAL order with a per-pair origin
+        // tiebreak, so a 3-frame concurrent-with-causal-edge cycle A<B<C<A made `sorted(by:)`
+        // undefined and input-order-dependent → two devices holding the same frame set sorted to
+        // DIFFERENT timelines (falsifying the whole cross-device convergence guarantee). A topological
+        // order is a genuine total order that respects causality AND is a pure function of the SET.
+        return topologicalOrder(combined)
     }
 
-    /// Strict weak ordering predicate: returns true iff `lhs`
-    /// must come before `rhs` in the merged timeline.
+    /// A deterministic topological order of the causal DAG: repeatedly emit the
+    /// (originDeviceID, auditEntryRef)-minimal frame among those whose causal predecessors within the
+    /// set have all been emitted. This RESPECTS causality (a frame follows all its causal ancestors),
+    /// breaks a concurrent antichain by origin-ASC then ref-ASC (matching the documented tiebreak +
+    /// the 2-frame tests), and is a pure function of the frame SET — so two devices with the same
+    /// frames in ANY concatenation order produce the SAME timeline (the convergence the old comparator
+    /// could not deliver). Kahn's algorithm; O(n²) over the (bounded) fragment set.
+    static func topologicalOrder(
+        _ frames: [BASSovereignCrossDeviceLedgerFrame]
+    ) -> [BASSovereignCrossDeviceLedgerFrame] {
+        let n = frames.count
+        if n <= 1 { return frames }
+        // Causal edges: j → i when frames[j] is causally-BEFORE frames[i]. `.equal` clocks are NOT
+        // edges (same-clock frames are a concurrent antichain, broken by the tiebreak) — matching the
+        // old code, which routed `.equal` through the origin/ref tiebreak too.
+        var indeg = [Int](repeating: 0, count: n)
+        var successors = [[Int]](repeating: [], count: n)
+        for i in 0..<n {
+            for j in 0..<n where j != i {
+                if frames[j].clock.compare(to: frames[i].clock) == .before {
+                    indeg[i] += 1
+                    successors[j].append(i)
+                }
+            }
+        }
+        var emitted = [Bool](repeating: false, count: n)
+        var result: [BASSovereignCrossDeviceLedgerFrame] = []
+        result.reserveCapacity(n)
+        for _ in 0..<n {
+            // The (origin, ref)-minimal ready frame (indeg 0, not yet emitted).
+            var best: Int?
+            for i in 0..<n where !emitted[i] && indeg[i] == 0 {
+                if best == nil || tieBreakBefore(frames[i], frames[best!]) { best = i }
+            }
+            guard let pick = best else { break }   // a finite DAG always has a source; defensive.
+            emitted[pick] = true
+            result.append(frames[pick])
+            for s in successors[pick] { indeg[s] -= 1 }
+        }
+        return result
+    }
+
+    /// Antichain tiebreak: originDeviceID ASC, then auditEntryRef ASC. Lexicographic ⇒ a genuine
+    /// strict weak ordering (transitive) — safe to use with `min`/`sorted`, unlike `orderBefore`.
+    static func tieBreakBefore(
+        _ lhs: BASSovereignCrossDeviceLedgerFrame,
+        _ rhs: BASSovereignCrossDeviceLedgerFrame
+    ) -> Bool {
+        if lhs.originDeviceID != rhs.originDeviceID {
+            return lhs.originDeviceID < rhs.originDeviceID
+        }
+        return lhs.auditEntryRef < rhs.auditEntryRef
+    }
+
+    /// SUPERSEDED (audit blindspot-CRDT) — INTRANSITIVE, DO NOT use as a sort comparator.
+    /// It returns causal-before for a `.before`/`.after` pair but an origin/ref tiebreak for a
+    /// `.concurrent`/`.equal` pair; mixing a partial order with a per-pair tiebreak is not transitive
+    /// (A causally-before B, B origin< C, C origin< A ⇒ A<B<C<A, a cycle). `mergeOrdered` now uses
+    /// `topologicalOrder`. Kept for reference (the intransitivity is pinned by a regression test).
     static func orderBefore(
         _ lhs: BASSovereignCrossDeviceLedgerFrame,
         _ rhs: BASSovereignCrossDeviceLedgerFrame
@@ -72,7 +135,6 @@ public enum BASSovereignFragmentMerger {
         case .after:
             return false
         case .equal, .concurrent:
-            // Tie-break: originDeviceID ASC, then auditEntryRef ASC.
             if lhs.originDeviceID != rhs.originDeviceID {
                 return lhs.originDeviceID < rhs.originDeviceID
             }

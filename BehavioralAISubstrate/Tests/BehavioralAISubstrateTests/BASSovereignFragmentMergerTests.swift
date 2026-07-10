@@ -157,6 +157,52 @@ final class BASSovereignFragmentMergerTests: XCTestCase {
         XCTAssertEqual(ab, ba)
     }
 
+    // MARK: - audit blindspot-CRDT: intransitive-comparator convergence
+
+    /// The 3-frame case the old `orderBefore` could not order deterministically: A causally-before B,
+    /// but B and C (and C and A) concurrent with an origin-tiebreak cycle A<B<C<A. Under the old
+    /// `sorted(by: orderBefore)` two devices holding the same frame set — concatenated in different
+    /// orders — sorted to DIFFERENT timelines (the cross-device divergence). `mergeOrdered` must be a
+    /// PURE FUNCTION of the frame set: every input permutation yields the identical output, and
+    /// causality (A before B) is respected. Reversal (mergeOrdered → sorted(by: orderBefore)) reds.
+    func test_intransitiveCycle_convergesRegardlessOfInputOrder() {
+        let a = makeFrame(ref: "a", device: "3", counters: ["p": 1])   // causally before b
+        let b = makeFrame(ref: "b", device: "1", counters: ["p": 2])
+        let c = makeFrame(ref: "c", device: "2", counters: ["q": 1])   // concurrent with a and b
+        // Sanity: the exact causal/concurrent shape that makes orderBefore cyclic.
+        XCTAssertEqual(a.clock.compare(to: b.clock), .before)
+        XCTAssertEqual(b.clock.compare(to: c.clock), .concurrent)
+        XCTAssertEqual(c.clock.compare(to: a.clock), .concurrent)
+
+        let M = BASSovereignFragmentMerger.mergeOrdered
+        // Six input arrangements of the same set (as different (left,right) splits / orders).
+        let outputs = [
+            M([a, b, c], []), M([c, b, a], []), M([], [a, b, c]),
+            M([a], [b, c]), M([b], [c, a]), M([c, a], [b]),
+        ]
+        for (i, o) in outputs.enumerated() {
+            XCTAssertEqual(o, outputs[0],
+                "mergeOrdered must be a pure function of the frame SET — permutation \(i) diverged, "
+                + "so two devices with the same frames would build different timelines (non-convergence)")
+        }
+        // Causality is respected: a (before b) precedes b in the canonical output.
+        let out = outputs[0]
+        XCTAssertLessThan(out.firstIndex(of: a)!, out.firstIndex(of: b)!,
+            "a is causally-before b ⇒ must precede it in the merged timeline")
+    }
+
+    /// Regression-doc: the SUPERSEDED `orderBefore` is intransitive — pins WHY it can never be a sort
+    /// comparator, so no future edit re-wires `sorted(by: orderBefore)` thinking it is total.
+    func test_orderBeforeIsIntransitive_documented() {
+        let a = makeFrame(ref: "a", device: "3", counters: ["p": 1])
+        let b = makeFrame(ref: "b", device: "1", counters: ["p": 2])
+        let c = makeFrame(ref: "c", device: "2", counters: ["q": 1])
+        let lt = BASSovereignFragmentMerger.orderBefore
+        // A < B (causal), B < C (origin 1<2), C < A (origin 2<3) — a cycle ⇒ NOT a strict weak order.
+        XCTAssertTrue(lt(a, b) && lt(b, c) && lt(c, a),
+            "orderBefore forms a cycle A<B<C<A (intransitive) — kept only as the documented negative")
+    }
+
     // MARK: - Mixed scenarios
 
     func test_typicalSyncMerge() {
