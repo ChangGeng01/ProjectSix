@@ -39,6 +39,50 @@ final class BASSovereignAuditLedgerTests: XCTestCase {
         )
     }
 
+    // MARK: - id14: auditChainFull routes through sealHash, not hash
+
+    func testAuditChainFullRoutesThroughSealHashNotPlainHash() async throws {
+        // id14: auditChainFull() must recompute selfHash via sealHash
+        // (the routed impl append() sealed with + verifyChainIntegrity()
+        // recomputes with), NOT plain hash(). In production the Rust seal
+        // is byte-identical to CryptoKit, so a naive positive test is a
+        // FALSE-GREEN (passes whether line 826 uses hash or sealHash).
+        // Force a DIVERGENCE via the test override: the chain is sealed
+        // with a routed digest that differs from plain hash(), so a
+        // verify path using plain hash() flags .selfHashMismatch on every
+        // entry — while sealHash() (routed) matches and stays clean.
+        let prevRouted = BASSovereignAuditLedger.useRoutedSeal
+        let prevOverride =
+            BASSovereignAuditLedger._routedSealOverrideForTesting
+        defer {
+            BASSovereignAuditLedger.useRoutedSeal = prevRouted
+            BASSovereignAuditLedger._routedSealOverrideForTesting =
+                prevOverride
+        }
+        BASSovereignAuditLedger.useRoutedSeal = true
+        // Deterministic digest that is NOT equal to plain hash(_:)'s
+        // base64(SHA256) output (distinct prefix) but is stable per input.
+        BASSovereignAuditLedger._routedSealOverrideForTesting = { data in
+            "ROUTED::" + Data(SHA256.hash(data: data)).base64EncodedString()
+        }
+
+        let ledger = makeLedger(seed: "id14-routed-divergence")
+        _ = try await ledger.append(makeEntry(auditID: "a-001"))
+        _ = try await ledger.append(
+            makeEntry(auditID: "a-002", turn: "turn-2"))
+
+        // verifyChainIntegrity uses sealHash → override → matches stored.
+        try await ledger.verifyChainIntegrity()
+
+        // auditChainFull must ALSO route through sealHash → clean.
+        // Under the bug (plain hash), it recomputes base64(SHA256) which
+        // never equals "ROUTED::…" → .selfHashMismatch on every entry.
+        let report = await ledger.auditChainFull()
+        XCTAssertTrue(report.isClean,
+            "auditChainFull must recompute via sealHash (routed), not "
+            + "plain hash — else it false-mismatches a routed-sealed chain")
+    }
+
     // MARK: - Append + basic shape
 
     func testAppendAssignsSignatureAndLinksGenesis() async throws {

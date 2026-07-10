@@ -822,8 +822,14 @@ public actor BASSovereignAuditLedger {
                 for: appended.entry,
                 priorHash: appended.priorHash)
 
-            // 2a. Self-hash.
-            if appended.selfHash != hash(canonical) {
+            // 2a. Self-hash. audit sovereign LOW-8 (id14): recompute via
+            // sealHash — the SAME impl append() sealed with and
+            // verifyChainIntegrity() recomputes with — NOT plain hash(),
+            // which ignores useRoutedSeal. auditChainFull was the missed
+            // third site: under a routed seal it would flag a false
+            // .selfHashMismatch on every entry if the routed digest ever
+            // diverged from CryptoKit.
+            if appended.selfHash != sealHash(canonical) {
                 reasons.append(.selfHashMismatch)
             }
 
@@ -1337,9 +1343,11 @@ public actor BASSovereignAuditLedger {
         Data(SHA256.hash(data: data)).base64EncodedString()
     }
 
-    /// audit sovereign LOW-8 — the SINGLE source of the seal-hash routing decision, used by BOTH
-    /// `append` (seal) and `verifyChainIntegrity` (recompute). Routing the two through one helper
-    /// guarantees they can never use different SHA implementations for the same chain.
+    /// audit sovereign LOW-8 — the SINGLE source of the seal-hash routing decision, used by
+    /// `append` (seal), `verifyChainIntegrity` (recompute), AND `auditChainFull` (recompute).
+    /// Routing all three through one helper guarantees they can never use different SHA
+    /// implementations for the same chain. (id14: auditChainFull was the missed third site —
+    /// it recomputed via plain `hash(_:)`, ignoring the routed seal.)
     func sealHash(_ canonical: Data) -> String {
         Self.useRoutedSeal ? Self.hashViaAutoRouter(canonical) : hash(canonical)
     }
