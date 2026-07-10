@@ -87,12 +87,16 @@ fi
 # Build forbidden-pattern regex (one alternation per SDK consumer).
 # audit tools-scripts LOW: the old `^import ${c}\b` missed the declaration-kind form
 # (`import struct BASHostKit.Foo`) and the `@_exported import` re-export form, both of which
-# still link the module — a real boundary bypass. Match an optional `@_exported` prefix and an
-# optional declaration kind, keeping the line-start anchor so `//`-comments stay clean.
+# still link the module — a real boundary bypass. A follow-up (2026-07-10) generalizes the
+# attribute prefix: `@_exported` alone was hardcoded, so `@preconcurrency`, `@_implementationOnly`,
+# `@_spi(Foo)`, `@_weakLinked` etc. still bypassed the gate though they ALL link the module.
+# `attr_re` now matches any leading Swift import-attribute(s) (each `@name` with optional `(...)`
+# args), keeping the line-start anchor so `//`-comments and indented lines stay clean.
 kind_re="(struct|class|enum|protocol|func|var|let|typealias|inout)"
+attr_re="(@[_A-Za-z]+([[:space:]]*\\([^)]*\\))?[[:space:]]+)*"
 forbidden_pattern=""
 for c in "${SDK_CONSUMERS[@]}"; do
-    per_c="^(@_exported[[:space:]]+)?import([[:space:]]+${kind_re})?[[:space:]]+${c}\\b"
+    per_c="^${attr_re}import([[:space:]]+${kind_re})?[[:space:]]+${c}\\b"
     if [[ -z "$forbidden_pattern" ]]; then
         forbidden_pattern="$per_c"
     else
@@ -108,6 +112,13 @@ if [[ "${1:-}" == "--self-test" ]]; then
         "import struct BASHostKit.Foo"
         "@_exported import BASHostKit"
         "import class BASMLXAdapter.Bar"
+        # audit tools-scripts LOW (2026-07-10): non-@_exported attribute prefixes must NOT bypass —
+        # they all still link the module into substrate core.
+        "@preconcurrency import BASHostKit"
+        "@_implementationOnly import BASHostKit"
+        "@_spi(Foo) import BASHostKit"
+        "@_weakLinked import BASHostKit"
+        "@_spi(Reflection) @_implementationOnly import BASHostKit"
     )
     must_not_match=(
         "import Foundation"
