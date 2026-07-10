@@ -93,9 +93,26 @@ final class BASEffortAllocatorTests: XCTestCase {
         XCTAssertNil(p.overrideReason)
     }
 
-    func testGuardedYieldsToCriticalThermal() {
+    // operator decision 1B (audit runtimecore-a #7): a DELIBERATELY-guarded turn keeps its safety
+    // dials (criticStrength / toolVerificationStrength) even under critical thermal — thermal-lease
+    // no longer strips verification off a guarded turn (the old behavior dropped it to .fast = 0/0).
+    func testGuardedSurvivesCriticalThermal() {
         let p = BASEffortAllocator.resolve(requested: .guarded, surprise: 0, stakes: 0, headroom: 0.0) // critical
-        XCTAssertEqual(p.applied, .fast)
+        XCTAssertEqual(p.applied, .guarded,
+            "an explicit .guarded is never dropped below .guarded by the thermal cap")
+        XCTAssertNil(p.overrideReason, "the guarded request takes effect unchanged")
+        let fast = BASEffortBudget.forLevel(.fast)
+        XCTAssertEqual(p.budget, BASEffortBudget.forLevel(.guarded))
+        XCTAssertGreaterThan(p.budget.criticStrength, fast.criticStrength,
+            "guarded keeps a non-zero critic strength that .fast would have zeroed")
+        XCTAssertGreaterThan(p.budget.toolVerificationStrength, fast.toolVerificationStrength,
+            "guarded keeps a non-zero tool-verification strength on the hottest device")
+    }
+
+    // A non-guarded base still yields to the critical thermal cap (thermal-lease unchanged for it).
+    func testNonGuardedStillYieldsToCriticalThermal() {
+        let p = BASEffortAllocator.resolve(requested: .deep, surprise: 0, stakes: 0, headroom: 0.0) // critical
+        XCTAssertEqual(p.applied, .fast, "an explicit .deep still yields to the critical thermal cap")
         XCTAssertTrue(p.overrideReason!.contains("thermal-lease"))
     }
 

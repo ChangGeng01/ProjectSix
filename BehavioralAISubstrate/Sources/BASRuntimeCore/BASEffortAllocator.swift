@@ -61,7 +61,12 @@ public enum BASEffortAllocator {
 
         let demandLevel = levelForDemand(demand)
         let base = (requested == .auto) ? demandLevel : requested
-        let cap = levelForHeadroom(h)
+        let rawCap = levelForHeadroom(h)
+        // operator decision 1B (audit runtimecore-a #7): a DELIBERATELY-guarded turn keeps its safety
+        // dials (criticStrength / toolVerificationStrength = 3) even on a critically hot device — the
+        // thermal cap never drops an explicit `.guarded` base below `.guarded`. Thermal-lease is
+        // overridden for guarded turns ONLY; every other base still yields to the cap as before.
+        let cap = (base == .guarded && rank(rawCap) < rank(.guarded)) ? .guarded : rawCap
         let capped = rank(cap) < rank(base)
         let applied = capped ? cap : base
 
