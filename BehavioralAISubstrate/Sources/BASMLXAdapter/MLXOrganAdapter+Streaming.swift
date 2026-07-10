@@ -58,6 +58,16 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
         }
 
         #if canImport(MLXLLM)
+        // audit mlx-adapter-core LOW-12: route the streaming turn through the SAME experience
+        // warm-start / persist / pressure funnel as the eager executor (`_execute` + `_finish`).
+        // Previously streaming turns bypassed it entirely — experience never warmed on a
+        // streaming-only session, and streamed deltas never persisted the fold or sampled reclaim.
+        // The defer covers BOTH the speculative and plain streaming sub-paths' exits.
+        await _ensureExperienceLoaded()
+        defer {
+            _persistExperienceIfDue()
+            _pressureCheck(keeping: nil)
+        }
         // Planner-decided streaming (the same single decider as the eager path; kill-switch off = pure plain). With
         // purpose .scoutDefault the planner yields .draftModelSpec (when a draft is loaded → the streaming spec path)
         // or .plain; the model-free lanes don't stream, so .scoutDefault never selects them here.
