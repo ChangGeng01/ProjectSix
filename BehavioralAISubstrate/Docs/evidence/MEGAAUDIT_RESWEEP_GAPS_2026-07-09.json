@@ -1352,5 +1352,72 @@
     "method": "Every fix: deep-verify the claim (read prod + trace callers/data-flow) → confirm real vs false alarm → TDD teeth (some rewrote a bug-pinning test into the new teeth) → adversarial reversal (each teeth verified RED with the fix disabled) → individual commit/push. 2 of the 6 (SEALED, Crisis) proved to be latent logic in currently-unreferenced reference code — fixed with honest severity framing.",
     "HIGH_scorecard": "Blind-spot HIGH total ~15: 8 cleared prior turn + 6 fixed this turn + 1 dismissed false alarm = all dispositioned.",
     "still_open": "MED/LOW: ~23 verified-real blind-spot MED/LOW candidates remain (blindspot_map.json). Operator-gated: rebuild+re-pin BASRustMemoryTracker.xcframework then un-skip the 2 parity assertions (importance scorer #7 + soft-signal verdict #8)."
+  },
+  "blindspot_medlow_verify_2026_07_10": {
+    "method": "50 MED/LOW blindspot candidates → parallel deep-verify (read CURRENT source + trace data-flow, high effort) → adversarial-refute stage on every real+fixable verdict. 70 agents, 0 errors.",
+    "tally": {
+      "WORK_real_mac_fixable": 16,
+      "FALSE_ALARM": 30,
+      "REFUTED": 4,
+      "GATED": 0
+    },
+    "headline": "34 of 50 (68%) dismissed — very high recon false-positive rate at MED/LOW. Dominant false-alarm classes: intended+committed-test-pinned behavior, non-existent data-flow (helped-flag pattern), already-fixed-in-a-prior-commit, doc-comment-in-test-only-namespace. The adversarial-refute stage overturned 4 more the single verify pass had accepted.",
+    "work_list_16": [
+      "id10",
+      "id15",
+      "id16",
+      "id8",
+      "id29",
+      "id32",
+      "id24",
+      "id22",
+      "id31",
+      "id30",
+      "id27",
+      "id34",
+      "id43",
+      "id41",
+      "id47",
+      "id45"
+    ],
+    "false_alarms_30": {
+      "id6": "Intended + test-pinned. Nursery is a pre-trial phase whose transition (start the run) is verdict-independent by design; the unknown-verdict rejection intentionally lives only in the trialInFlight arm. Behavior is documen",
+      "id5": "The buggy code no longer exists in the current source. It was fixed in commit 6c177f974 (blindspot-③ HIGH, same-day 2026-07-10) in both the Rust crate and the Swift original, and pinned by test no_history_atom_stays_not_",
+      "id4": "Dead/unwired code AND intended+test-pinned behavior. weighted_linear_fuse has no production caller and is not FFI-exported — production fusion goes through the independent bas_ranker_decayed_fuse_batch. Separately, the \"",
+      "id12": "Intended + test-pinned. (1) The class doc (BASGuardBranch.swift:12-18) and producer comment (EBrainNeuralMaterializationCore.swift:322-324) explicitly state the bands were unified to a single 0.7 source of truth. (2) Two",
+      "id7": "Truncation is intended behavior deliberately test-pinned (line 401), not a defect. The overflow concern is unreachable: (a) no production caller exists — every non-definition reference is under Tests/; (b) latency_ms is ",
+      "id0": "Intended-by-design, not a bug. The scope comment describes the mirrored BASHostVersionTreeMerge.swift doctrine (which DOES do LWW-by-createdAt at mergeVersions:99 and resolveActiveVersion:154). The Rust port deliberately",
+      "id13": "Intended behavior, deliberately pinned by committed tests and never silently swallowed. (1) M406KunlunPermitEscalationTests.swift test 5 (testReservedHumanAnchorSuppressesEscalation, line 159) asserts decision.permit == ",
+      "id2": "No documented NaN→0.0 contract exists on record_turn; the contract that DOES exist (on decay) is upheld. record_turn is NaN-safe by construction (decayed and contribution both finite), so no NaN ever leaks — returning th",
+      "id9": "Non-existent data-flow (same pattern as the prior helped-flag false alarm). No consumer in Sources/ or Cargo/ ever reads a BASSovereignVerdict.expiresAt for any decision, let alone latch release. Latch release is governe",
+      "id14": "Recon mislabels intended, deliberate design as a defect. The reject/repair severity tiering is the explicit contract, directly pinned by two committed test suites (BASCognitionKernelTests + BASQINAOSubstrateGatesBatch6Te",
+      "id18": "Intended behavior deliberately pinned by a committed, self-verifying test. The flagged constant is the ceiling of a documented monotonically-decreasing budget whose stated purpose is to freeze and drive down the very per",
+      "id19": "Intended + documented behavior. The docstring on lines 23-24 explicitly states the plumbing-level assertions are deliberate (\"Honest-failure discipline... the PROMOTION VERDICT is read from the printed table, not from XC",
+      "id11": "Intended behavior, not a bug. 0.5 is the explicitly-documented default/neutral value of a cosmic-cold axis (threshold constant doc, lines 100-103); the design escalates only STRICTLY above default. The sole production pr",
+      "id17": "Not a defect: (1) the anchor is a doc-comment, not executable code, in a test-only namespace — no data-flow, no production path (grep confirms only test-file consumers). (2) The described risk does not occur in the commi",
+      "id1": "The claimed data flow does not exist. \"aggregations byte-equality\" refers to bas-retrieval-ranker/src/aggregations.rs, a different function on a different in-memory type (UsageRecord has no turn_ref) that never exchanges",
+      "id23": "Two independent reasons the claim does not hold. (1) INTENDED + DOCUMENTED: lines 94-96 explicitly state \"Block unless the caller explicitly uses Rollback (which is structurally safe — it restores a different version).\" ",
+      "id26": "Intended/by-design scoping mischaracterized as a missing functional step. The Rust port is ADR-014 opt-in and intentionally ports only the 3 deterministic NUMERIC derivations; the 4th \"factory\" (aggregate) is a trivial S",
+      "id21": "(1) Comment is not false: it claims precision parity (avoids Float32 tie) and independently states NaN-last for the Rust path — it never asserts the Swift fallback matches under NaN. (2) Rust NaN-last is INTENDED and pin",
+      "id33": "The buggy mean-gate no longer exists. Line 169 gates on `!pressure.recommendedModes.isEmpty`; the mean (`aggregateMagnitude`) does not gate anything in escalate(). The live callers (EBrainRuntimeCoordinator+RunTurn.swift",
+      "id25": "Behavior is real but intended+documented (BASL8RoutedMemoryService.swift:159 \"tie membership at the K-th boundary by rowid\"; base fn doc vector_index.rs:251-253 acknowledges rowid-decided ties). It is already fixed for t",
+      "id38": "The claim (\"commutativity/convergence tests only use 2 frames — the failing 3-frame case is never pinned\") is refuted by the current source and tests. (1) mergeOrdered (Sources/BASSovereign/BASSovereignFragmentMerger.swi",
+      "id39": "Intended behavior, doctrine-documented (header lines 34-40 disclaim leader election/verification) AND explicitly test-pinned by test_noLeaderFrames_allFollowersPass, which asserts the union (result.count==2) when no lead",
+      "id28": "Intended + test-pinned in BOTH twins: Rust test_worst_reversibility_empty_yields_easy (lib.rs:408) + C-ABI len==0 branch (line 268); Swift testWorldPriorWorstReversibilityEmptyYieldsEasy (BASInternalRustBridgesTests.swif",
+      "id36": "Intended behavior that committed tests deliberately pin. Cloud-egress fail-open already remediated in H19 (3cb95a156); non-cloud local allow is by-design sovereign-local doctrine, documented at PolicyCore.swift:138-141 a",
+      "id37": "The claim describes intended, doc-pinned design (decouple causal metadata from entry schema; hosts resolve auditEntryRef and verify their own chain) mistaken for a defect, AND the path is unreachable: zero constructors o",
+      "id42": "The claim is technically true about line 33 (in-memory JSON round-trip, no SQLite) but mis-framed as a defect. It is intended, test-pinned behavior: a replay-determinism unit test for the in-memory reference impl, explic",
+      "id46": "The precondition for the alleged vacuous pass (both stores' remove() returning nil) never holds: both stores are seeded with the atom before remove(). The event store returns the hydrated atom (unique eventID ⇒ appended=",
+      "id44": "Intended + test-pinned scope, not a bug. Line 197 compares only counts by design: chapter 896 was a count-only bridge (row FFI didn't exist yet), and its own comments say so. Content byte-equality is fully guarded elsewh",
+      "id49": "Claim is stale/inaccurate: the \"never asserts clock convergence\" premise does not match the code. Lines 154-169 assert vector-clock convergence across all three devices and peers, and have done so since the file was crea",
+      "id40": "Intended + doc-pinned behavior, and the divergence the claim describes does not exist for causally-ordered frames (reversal preserves descendant-over-ancestor). It only manifests inside a concurrent antichain where 'newe"
+    },
+    "refuted_4": {
+      "id3": "Refuted on reachability + tested-invariant grounds. scan_parallel_v2 is called in exactly ONE place: the C ABI entry point bas_mamba_scan_parallel (lib.rs:565), which returns -1 on b<=0||l<=0||d<=0 at lib.rs:525 BEFORE r",
+      "id20": "Confirmed the source: BASTurnRuntimeStressFixtureKey.label (Sources/BASHostKit/BASTurnRuntimeStressFixtureKey.swift:95-104) is a pure computed property joining rawValues + bool interpolations over immutable `let` fields,",
+      "id48": "Refuted: the finding's core premise (\"mirror is the sole oracle\" / matrix-correctness is \"tautological with respect to any shared transcription mistake\") is false. An INDEPENDENT hardcoded-literal oracle for the same doc",
+      "id35": "The verdict's two load-bearing claims collapse under scrutiny. (1) \"Tie test is false-green\" is wrong: testEqualScoreCandidatesSortDeterministicallyByID calls dominanceFallbackOrder directly and asserts exactly that func"
+    },
+    "status": "work-list clearing in progress — each real behavior bug gets TDD+reversal+push; doc-comment-lies get an honest correction (no runtime teeth); test-hygiene tautologies get converted to real cross-checks."
   }
 }
