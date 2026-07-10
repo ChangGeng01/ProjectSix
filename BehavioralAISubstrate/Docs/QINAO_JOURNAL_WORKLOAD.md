@@ -320,3 +320,29 @@ retire; and migration does not clobber existing store content.
    domain (ship/drop micro-bets, auto-ingestable `fix(#N/HX)` commits) is the seed because it
    is behavior the operator already produces daily — and it is self-grounding (the git log IS
    the fact source), which partly answers the empty-FactBank problem.
+
+## First real run — the workload STARTED (2026-07-11)
+
+After the deep fine-grained audit (16 fixes across BASMemory / BASSovereign / BASRuntimeCore —
+the journal's own spine), the workload was built and run end-to-end for the first time against
+the real store (which had gone cold since 2026-07-08 — limit #3 biting). Result:
+
+- **All chambers fire.** `add` runs the full L1–L14 governance spine and seals a verdict; `council`
+  genuinely convened the 4-of-9 deliberation fabric (4/4 deltas applied, 4 distinct domains
+  written, 9 trace events — the "loaded but never fired" fabric fired); `bet` opened a live
+  ShadowTrial; `ledger` verified the Ed25519 chain INTACT (cross-process). The 16 audit fixes did
+  NOT break the spine — the workload is itself the integration test that proves it.
+- **The workload truth-checked the substrate (limit #1, confirmed empirically).** The escalation
+  band OVER-triggers on benign CAUTION words: "Reviewed the plan." and "I paused to think." both
+  rose to `gov2:memoryFreeze|risk:high`, while "Had coffee." stayed `risk:low` and "Bought
+  groceries." landed `risk:medium` with no risk cue at all. So the risk band is currently
+  keyword-noisy / ungrounded — exactly the panel's "grounded verdict is aspirational" limit, now
+  DEMONSTRATED rather than asserted. NOTE: this is NOT a regression from the audit fixes (the
+  add-turn lexicon lives in `BASHostKit/EBrainRuntimeCoordinator+Helpers.swift`, untouched by the
+  fixes which changed only the `BASOrchestration` copies). It is the known aspirational-verdict
+  limit; the escalation band's signal is weak until the FactBank/grounding work lands. Recorded as
+  a truth-check, not a false all-clear — and arguably a calibration question worth a focused
+  session: caution words (review/pause/delay) reading as risk-UP is backwards (prudence, not danger).
+- **Retention restarted.** The real journal was opened today with genuine marathon-domain content
+  (this session's ship/defer decisions + an open bet), so it is no longer cold. That is the whole
+  point: the audit finds unfired chambers; only the live workload keeps them firing.
