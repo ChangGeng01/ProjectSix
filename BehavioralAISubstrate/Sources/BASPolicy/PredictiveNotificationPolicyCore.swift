@@ -191,8 +191,17 @@ public enum BASPredictiveNotificationPolicyEngine {
         )
     }
 
-    private static func minimumEvidenceSignalCount(for riskLevelID: String) -> Int {
+    // audit blindspot-② HIGH — internal (not private) so the monotonicity is directly unit-testable.
+    static func minimumEvidenceSignalCount(for riskLevelID: String) -> Int {
+        // "extreme" — the HIGHEST risk tier — previously fell into `default: 99`, an unreachable
+        // threshold (evidenceSignalCount < 99 always blocks), so an extreme-risk predictive
+        // intervention was NEVER notified — the exact opposite of the intent (higher risk ⇒ act
+        // SOONER, on FEWER signals). The required count is now MONOTONIC in risk:
+        // extreme(1) < high(2) = medium(2) < low/unknown(99, effectively never — a low-risk or
+        // unrecognized level does not warrant a predictive push; the unknown case stays fail-closed).
         switch riskLevelID {
+        case "extreme":
+            1
         case "medium", "high":
             2
         default:
