@@ -274,6 +274,14 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         // max+1 per session) ⇒ byte-equal with the in-memory store + the parity suites. On any error the
         // txn is rolled back so a failed append never leaves a half-open transaction (which would make the
         // NEXT append's BEGIN IMMEDIATE fail). Mirrors BASSQLiteAtomLifecycleStore's txn idiom.
+        //
+        // audit runtimecore-b #8: snapshot the process-global feature flags ONCE per append. insertEntry
+        // reads (useBinaryPayload && !rowIntegrityChainEnabled) and the chain-row decision below reads
+        // rowIntegrityChainEnabled AGAIN — a concurrent flip between the two reads could write a BINARY
+        // payload row (chain-off path) AND a chain row (chain-on path), which the binary path is meant to
+        // exclude. Threading one snapshot makes a single append internally consistent.
+        let useBinarySnapshot = Self.useBinaryPayload
+        let chainOn = Self.rowIntegrityChainEnabled
         try Self.runExec(db: db, sql: "BEGIN IMMEDIATE;")
         do {
             // Idempotent retry: if event_id exists, return its sequenceNumber + wasNew=false.
@@ -307,13 +315,16 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 actions: entry.actions,
                 confidence: entry.confidence,
                 payloadJson: entry.payloadJson)
-            try Self.insertEntry(db: db, entry: stamped)
+            try Self.insertEntry(
+                db: db, entry: stamped,
+                useBinaryPayload: useBinarySnapshot, chainEnabled: chainOn)
             // audit runtimecore-b MED-2: advance the never-pruned seq high-water
             // mark in the SAME txn, so a later full prune can't reset the sequence.
             try Self.bumpSequenceHighWaterMark(
                 db: db, sessionID: entry.sessionID, seq: assigned)
-            // ADR-040 — when enabled, record this row's chained hash in the SAME txn (atomic with the event row).
-            if Self.rowIntegrityChainEnabled {
+            // ADR-040 — when enabled, record this row's chained hash in the SAME txn (atomic with the event
+            // row). Uses the per-append snapshot (audit runtimecore-b #8), NOT a fresh flag read.
+            if chainOn {
                 try self.appendIntegrityRow(db: db, entry: stamped)
             }
             try Self.runExec(db: db, sql: "COMMIT;")
@@ -839,9 +850,18 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
 
     // MARK: - CRUD primitives
 
+    /// audit runtimecore-b #8 — pure decision: write a binary payload ONLY when the binary format is
+    /// on AND the integrity chain is off (a chained row forces the faithful JSON path so the hash
+    /// domain is unambiguous). Internal for testability.
+    static func shouldWriteBinaryPayload(useBinaryPayload: Bool, chainEnabled: Bool) -> Bool {
+        useBinaryPayload && !chainEnabled
+    }
+
     fileprivate static func insertEntry(
         db: OpaquePointer,
-        entry: BASEventLogEntry
+        entry: BASEventLogEntry,
+        useBinaryPayload: Bool,
+        chainEnabled: Bool
     ) throws {
         // chapter 七百三十二 第三刀 — dual-format insert。 Selects
         // JSON v1 (legacy) or binary v2 path based on the
@@ -872,7 +892,9 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         // (computed over the in-memory entry at append) matches the re-decoded entry at verify. JSON stores the
         // full entry verbatim, so its decode→encode round-trip is exact. (Belt-and-suspenders even though the
         // v2 envelope below is now faithful too — this keeps the canonical hash domain unambiguous.)
-        let useBinary = useBinaryPayload && !rowIntegrityChainEnabled
+        // audit runtimecore-b #8: use the per-append snapshot params, not a fresh static-flag read.
+        let useBinary = shouldWriteBinaryPayload(
+            useBinaryPayload: useBinaryPayload, chainEnabled: chainEnabled)
         var payloadJson: String = ""
         var payloadBlob: Data? = nil
         var format: Int32 = 1
