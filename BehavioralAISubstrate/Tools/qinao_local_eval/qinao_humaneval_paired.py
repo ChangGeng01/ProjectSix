@@ -22,19 +22,30 @@ import textwrap
 import subprocess
 import tempfile
 
-from mlx_lm import load, generate
-from datasets import load_dataset
-
-try:
-    from mlx_lm.sample_utils import make_sampler
-    GREEDY = make_sampler(temp=0.0)
-except Exception:  # pragma: no cover
-    GREEDY = None
-
 PYBIN = os.path.expanduser("~/qwen_honesty_finetune/.venv/bin/python")
 
 
+def counts_toward_denominator(outcome: str) -> bool:
+    """audit tools-scripts LOW / decision 7 — only an execution that actually RAN the model's code
+    (returned a result, or timed out = a legitimate wrong answer) counts toward the pass@1
+    denominator. An INFRA failure (e.g. PYBIN missing, subprocess spawn error) must be EXCLUDED —
+    otherwise a broken harness scores a false 0% capability. Mirrors the fix already shipped in the
+    sibling qinao_humaneval.py (commit 13afefed8), which this paired variant had missed.
+    Kinds: 'ran', 'timeout' -> True; 'infra' -> False."""
+    return outcome in ("ran", "timeout")
+
+
 def main() -> None:
+    # audit tools-scripts LOW: heavy deps imported LAZILY (inside main) so the module — and its pure
+    # helper counts_toward_denominator — can be imported for unit tests without mlx_lm/datasets present.
+    from mlx_lm import load, generate
+    from datasets import load_dataset
+    try:
+        from mlx_lm.sample_utils import make_sampler
+        GREEDY = make_sampler(temp=0.0)
+    except Exception:
+        GREEDY = None
+
     mp = sys.argv[1]
     ad = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != "none" else None
     tag = sys.argv[3]
@@ -74,7 +85,7 @@ def main() -> None:
     idx = idx[:n]
 
     per: dict[str, int] = {}
-    ok = tot = 0
+    ok = tot = infra_errs = 0
     for i in idx:
         r = ds[i]
         entry = r["entry_point"]
@@ -82,28 +93,47 @@ def main() -> None:
         code = extract_code(resp)
         program = assemble(r["prompt"], code, entry) + "\n" + r["test"] + f"\ncheck({entry})\n"
         passed = 0
+        outcome = "infra"
         path = None
         try:
             with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
                 f.write(program)
                 path = f.name
-            res = subprocess.run([PYBIN, path], capture_output=True, timeout=15)
+            # audit tools-scripts LOW / decision 7: -I isolated mode (ignore env / user site-packages)
+            # hardens the exec of model-generated code a little (a real sandbox is the follow-up).
+            res = subprocess.run([PYBIN, "-I", path], capture_output=True, timeout=15)
             passed = int(res.returncode == 0)
-        except Exception:
+            outcome = "ran"
+        except subprocess.TimeoutExpired:
             passed = 0
+            outcome = "timeout"   # a hung program is a legitimate wrong answer
+        except Exception as e:
+            # audit tools-scripts LOW / decision 7: an INFRA failure (e.g. PYBIN missing) is NOT a
+            # model wrong answer — it used to be `except: pass`-swallowed with an unconditional
+            # `tot += 1`, scoring a broken harness as a false 0%. Surface it + EXCLUDE it.
+            passed = 0
+            outcome = "infra"
+            sys.stderr.write(f"qinao_humaneval_paired: harness error (not a model failure) on task {i}: {e}\n")
         finally:
             if path:
                 try:
                     os.unlink(path)
                 except Exception:
                     pass
-        per[r["task_id"]] = passed
-        ok += passed
-        tot += 1
+        if counts_toward_denominator(outcome):
+            per[r["task_id"]] = passed
+            ok += passed
+            tot += 1
+        else:
+            infra_errs += 1
 
     sc = round(ok / max(1, tot) * 100, 1)
-    json.dump({"30": sc, "_N": tot, "per_problem": per}, open(f"/tmp/qinao_humaneval_paired_{tag}.json", "w"))
-    print(f"{tag} HumanEval(paired,fixed) pass@1 = {ok}/{tot} = {sc}%")
+    out = {"30": sc, "_N": tot, "per_problem": per}
+    if infra_errs:
+        out["_infra_errs"] = infra_errs
+    json.dump(out, open(f"/tmp/qinao_humaneval_paired_{tag}.json", "w"))
+    print(f"{tag} HumanEval(paired,fixed) pass@1 = {ok}/{tot} = {sc}%"
+          + (f"  ({infra_errs} task(s) EXCLUDED — harness/infra error, not model failures)" if infra_errs else ""))
 
 
 if __name__ == "__main__":
