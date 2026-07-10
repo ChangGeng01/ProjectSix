@@ -88,6 +88,15 @@ let package = Package(
         // package. Same on-disk path SPM already resolves ⇒ same identity,
         // no duplicate (byte-equal build).
         .package(path: "Vendor/swift-crypto"),
+        // audit x-architecture LOW-4 — explicit mlx-swift (base MLX / MLXNN /
+        // MLXOptimizers) was in the graph ONLY transitively via mlx-swift-lm;
+        // BASMLXAdapter imports MLX/MLXNN/MLXOptimizers directly. Declared at
+        // root so the base MLX dependency is first-class, not contingent on the
+        // mlx-swift-lm LLM package (a vendor refresh that dropped mlx-swift-lm's
+        // dep would break the direct imports). Same on-disk path SPM already
+        // resolves (mlx-swift-lm references it as ../mlx-swift) ⇒ same identity,
+        // no duplicate (byte-equal build). Mirrors the swift-crypto MED-3 fix.
+        .package(path: "Vendor/mlx-swift"),
         .package(path: "Vendor/mlx-swift-lm"),
         .package(path: "Vendor/swift-transformers"),
         .package(path: "Vendor/swift-huggingface")
@@ -369,6 +378,12 @@ let package = Package(
             dependencies: [
                 "BASRuntimeCore",
                 "BASOrgan",
+                // audit x-architecture LOW-4 — explicit mlx-swift base products
+                // (was transitive-only via mlx-swift-lm). This target imports
+                // MLX / MLXNN / MLXOptimizers directly.
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "MLXOptimizers", package: "mlx-swift"),
                 // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(
