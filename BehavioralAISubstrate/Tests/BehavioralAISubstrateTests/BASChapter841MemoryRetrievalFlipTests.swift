@@ -101,7 +101,14 @@ final class BASChapter841MemoryRetrievalFlipTests: XCTestCase {
             budget: neutralBudget())
         // All returned atoms must have the same score
         let scores = bundle.atoms.map(\.confidence)
-        guard scores.count >= 2 else { return }
+        // blindspot MED id43: the old `guard scores.count >= 2 else
+        // { return }` was fail-open — if retrieval degraded to 0/1
+        // atoms, the tie invariant was silently skipped and the test
+        // passed vacuously. Assert the tie fixture actually produced a
+        // comparable group (6 identical-signal atoms were seeded).
+        XCTAssertGreaterThanOrEqual(scores.count, 2,
+            "6 identical-signal atoms were seeded; retrieval must " +
+            "return >= 2 tied atoms to compare (got \(scores.count))")
         for s in scores {
             XCTAssertEqual(s, scores[0], accuracy: 1e-12,
                 "All tied atoms must report the same score")
