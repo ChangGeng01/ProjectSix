@@ -694,4 +694,62 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
             "atom content must round-trip without re-passing " +
             "initial: parameter to second wire builder")
     }
+
+    // MARK: - Seed-failure → observability sink (blindspot MED id30)
+
+    func testSeedEventSourcedRecordsAdmitFailures() async {
+        // Drive the shared seed helper through a store whose event log
+        // ALWAYS throws on append (so every admit throws). Each failure
+        // must be recorded to the failure log. Before extraction this
+        // path had no direct coverage — a revert to silent-swallow
+        // stayed green behind the PROOF-test mocks.
+        let log = BASHostStorageInitialAtomAdmitFailureLog()
+        let store = BASEventSourcedMemoryAtomStore(
+            eventLog: ThrowingEventLog(),
+            sessionID: "id30-test")
+        await BASHostStorageWireBuilder.seedEventSourced(
+            store: store,
+            initial: [sampleAtom(content: "a"),
+                      sampleAtom(content: "b")],
+            failureLog: log)
+        let count = await log.recordedCount
+        XCTAssertEqual(count, 2,
+            "both admit failures must be recorded to the sink")
+    }
+
+    func testSeedEventSourcedNilLogSilentlySwallows() async {
+        // With failureLog == nil the M1517 silent-swallow behavior is
+        // preserved: admit failures do not propagate / crash.
+        let store = BASEventSourcedMemoryAtomStore(
+            eventLog: ThrowingEventLog(),
+            sessionID: "id30-nil")
+        await BASHostStorageWireBuilder.seedEventSourced(
+            store: store,
+            initial: [sampleAtom(content: "a")],
+            failureLog: nil)
+        // Reaching here without throwing == silent-swallow preserved.
+    }
+}
+
+/// Event log whose append always throws — used to force
+/// `BASEventSourcedMemoryAtomStore.admit` to throw so the seed
+/// helper's failure → sink wiring is exercised. (blindspot MED id30)
+private actor ThrowingEventLog: BASEventLogStorage {
+    struct BoomError: Error {}
+    @discardableResult
+    func append(
+        _ entry: BASEventLogEntry
+    ) async throws -> (wasNew: Bool, assignedSequenceNumber: Int64) {
+        throw BoomError()
+    }
+    func events(
+        forSession sessionID: String
+    ) async -> [BASEventLogEntry] { [] }
+    func events(
+        sinceTimestampMs since: Int64, limit: Int
+    ) async -> [BASEventLogEntry] { [] }
+    var totalCount: Int { get async { 0 } }
+    func pruneEventsBefore(
+        timestampMs cutoff: Int64
+    ) async throws -> Int { 0 }
 }
