@@ -303,7 +303,12 @@ public actor BASSQLiteAtomLifecycleStore: BASAtomLifecycleStore {
                    recorded_at_ms, actor_ref
             FROM atom_lifecycle_events
             WHERE \(whereClause)
-            ORDER BY recorded_at_ms ASC, rowid ASC
+            -- deep-audit MED: the protocol mandates INSERTION order, and reconstructCurrentPhaseByte
+            -- takes the LAST advanced event's phase. Ordering by recorded_at_ms first reorders events
+            -- whose caller-supplied/clock-skewed timestamps disagree with insertion order, diverging
+            -- from the in-memory reference conformer (and picking a wrong "current" phase). rowid is the
+            -- monotonic implicit insertion counter for this append-only, TEXT-PK table ⇒ true insertion order.
+            ORDER BY rowid ASC
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
