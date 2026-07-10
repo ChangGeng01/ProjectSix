@@ -37,12 +37,23 @@ public final class BASSaguaroSpeculator: BASSaguaroDraft, @unchecked Sendable {
     /// one (the pending seed is consumed at the start of the next propose), which is intentional.
     public private(set) var draftPos: Int = 0
 
+    #if DEBUG
+    // audit x-concurrency §三① — the prefill→propose→commit cycle mutates `pending` / `draftPos`
+    // (a state machine) and must be driven by ONE serialized caller. The underlying session's own
+    // tripwire only guards `step`, not the snapshot/restore windows or this class's frontier state,
+    // so guard the cycle here too. DEBUG-only; zero-cost in release.
+    private let driverTripwire = BASSingleDriverTripwire(label: "BASSaguaroSpeculator")
+    #endif
+
     public init(session: BASCoreAIMambaSession) {
         self.session = session
     }
 
     /// Fresh state for a new generation.
     public func reset() {
+        #if DEBUG
+        driverTripwire.enter(); defer { driverTripwire.exit() }   // audit x-concurrency §三①
+        #endif
         session.reset()
         pending = nil
         draftPos = 0
@@ -52,6 +63,9 @@ public final class BASSaguaroSpeculator: BASSaguaroDraft, @unchecked Sendable {
     /// convention the LAST token is round-1's seed (consumed at the start of the first `propose`), so we consume
     /// everything BUT the last here. `draftPos` is the logical frontier (= tokens.count).
     public func prefill(_ tokens: [Int]) async throws {
+        #if DEBUG
+        driverTripwire.enter(); defer { driverTripwire.exit() }   // audit x-concurrency §三①
+        #endif
         session.reset()
         for t in tokens.dropLast() { _ = try await session.step(token: t) }
         draftPos = tokens.count
@@ -61,6 +75,9 @@ public final class BASSaguaroSpeculator: BASSaguaroDraft, @unchecked Sendable {
     /// snapshot for an exact commit-time rewind. Does NOT advance `draftPos`.
     @discardableResult
     public func propose(seed: Int, k: Int) async throws -> [Int] {
+        #if DEBUG
+        driverTripwire.enter(); defer { driverTripwire.exit() }   // audit x-concurrency §三①
+        #endif
         guard k > 0 else { pending = nil; return [] }
         let snap = session.snapshot()
         var props: [Int] = []
@@ -77,6 +94,9 @@ public final class BASSaguaroSpeculator: BASSaguaroDraft, @unchecked Sendable {
     /// `seed` + the accepted props (the correction is NOT replayed — it becomes the next round's seed). Advances
     /// `draftPos` by `acc + 1`.
     public func commit(acc: Int, correction: Int) async throws {
+        #if DEBUG
+        driverTripwire.enter(); defer { driverTripwire.exit() }   // audit x-concurrency §三①
+        #endif
         guard let p = pending else { return }
         session.restore(p.snapshot)
         _ = try await session.step(token: p.seed)

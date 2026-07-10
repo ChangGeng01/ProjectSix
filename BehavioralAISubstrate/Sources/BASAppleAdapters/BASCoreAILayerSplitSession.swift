@@ -40,6 +40,12 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
     private let stateNames: [String]            // each function's KV state name ("kv0", "kv1", …)
     private let outputNames: [String]           // "hidden" for non-last, "logits" for the last
     private var kvs: [NDArray]                   // one fused KV per function (fp16)
+    #if DEBUG
+    // audit x-concurrency §三① — enforces the `@unchecked Sendable` single-serialized-driver
+    // contract at runtime (DEBUG only): a concurrent driver corrupts the in-place state.
+    // Zero-cost in release; the utility is unit-tested in BASSingleDriverTripwireTests.
+    private let driverTripwire = BASSingleDriverTripwire(label: "BASCoreAILayerSplitSession")
+    #endif
     private let maxSeq: Int
     private let headDim: Int
     private let neg: Float
@@ -116,6 +122,10 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
     /// piped function→function; the last function yields fp32 logits → argmax.
     @discardableResult
     public func step(token: Int, pos: Int) async throws -> Int {
+        #if DEBUG
+        driverTripwire.enter()   // audit x-concurrency §三①
+        defer { driverTripwire.exit() }
+        #endif
         guard pos < maxSeq else { throw DecodeError.windowOverflow(pos: pos, maxSeq: maxSeq) }
         let base = pos * headDim
         let cos = NDArray(scalars: cosTable[base..<base + headDim].map { Float16($0) }, shape: [headDim])
