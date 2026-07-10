@@ -112,11 +112,13 @@ enum BASQuantABProbe {
             let kpre  = await runModel(fourBit, label: "kvNil-pre",  captureBodies: true,  kvBits: nil, promptSet: [longP])
             let kq    = await runModel(fourBit, label: "kv\(kvb)",   captureBodies: true,  kvBits: kvb, promptSet: [longP])
             let kpost = await runModel(fourBit, label: "kvNil-post", captureBodies: false, kvBits: nil, promptSet: [longP])
-            let kbracket = (kpre.meanMs + kpost.meanMs) / 2
+            // device-recon id13: single-sourced through the Mac-unit-tested verdict.
+            let kbv = BASBracketVerdict.classify(
+                preMs: kpre.meanMs, challengerMs: kq.meanMs, postMs: kpost.meanMs)
+            let kbracket = kbv.bracketMs
             let kdrift = kpre.meanMs > 0 ? (kpost.meanMs - kpre.meanMs) / kpre.meanMs * 100 : 0
-            let kspeedup = kq.meanMs > 0 ? kbracket / kq.meanMs : 0
-            let kverdict = (kq.meanMs > 0 && kq.meanMs < (kbracket - abs(kpost.meanMs - kpre.meanMs)))
-                ? "KV-SPEED-WIN" : "KV-INCONCLUSIVE-WITHIN-DRIFT"
+            let kspeedup = kbv.speedup
+            let kverdict = kbv.isWin ? "KV-SPEED-WIN" : "KV-INCONCLUSIVE-WITHIN-DRIFT"
             fileLog.emit(String(format: "📊 quant-ab KVQUANT kvbits=%d kvNil_bracket_ms=%.0f kv%d_ms=%.0f "
                 + "drift_pct=%+.1f%% speedup=%.2fx verdict=%@", kvb, kbracket, kvb, kq.meanMs, kdrift, kspeedup, kverdict))
             if let a = kpre.bodies.first { fileLog.emit("   [kvNil] " + String(a.prefix(200))) }
@@ -130,12 +132,13 @@ enum BASQuantABProbe {
         let three = await runModel(threeBit, label: "3bit", captureBodies: true)
         let post = await runModel(fourBit, label: "4bit-post", captureBodies: false)
 
-        let bracket = (pre.meanMs + post.meanMs) / 2
-        let driftMs = abs(post.meanMs - pre.meanMs)
+        // device-recon id13: single-sourced through the Mac-unit-tested verdict.
+        let bv = BASBracketVerdict.classify(
+            preMs: pre.meanMs, challengerMs: three.meanMs, postMs: post.meanMs)
+        let bracket = bv.bracketMs
         let driftPct = pre.meanMs > 0 ? (post.meanMs - pre.meanMs) / pre.meanMs * 100 : 0
-        let speedup = three.meanMs > 0 ? bracket / three.meanMs : 0
-        let verdict = (three.meanMs > 0 && three.meanMs < (bracket - driftMs))
-            ? "SPEED-WIN" : "SPEED-INCONCLUSIVE-WITHIN-DRIFT"
+        let speedup = bv.speedup
+        let verdict = bv.isWin ? "SPEED-WIN" : "SPEED-INCONCLUSIVE-WITHIN-DRIFT"
         fileLog.emit(String(format: "📊 quant-ab SPEED 3bit_ms=%.0f 4bit_bracket_ms=%.0f "
             + "drift_pct=%+.1f%% speedup=%.2fx verdict=%@ (quality is the SEPARATE gate below)",
             three.meanMs, bracket, driftPct, speedup, verdict))
