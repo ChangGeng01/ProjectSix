@@ -1301,6 +1301,13 @@
     "operator_gated_final": {
       "tools-scripts R2/R3 corpus": "/tmp→Docs move is operator experiment-domain (consult-before-deleting doctrine)."
     },
-    "verdict": "Every clean/safe/Mac-fixable residual finding is now closed. The remainder is device-runtime-gated (LOW-16, MED-LOW-10), operator-gated (R2/R3), or a deliberate empirically-backed non-fix (tests-arch ①)."
+    "verdict": "Every clean/safe/Mac-fixable residual finding is now closed. The remainder is device-runtime-gated (LOW-16, MED-LOW-10), operator-gated (R2/R3), or a deliberate empirically-backed non-fix (tests-arch ①). [UPDATE: hostkit-spine F3 — the one remaining claim-only closure — is now teeth-backed (see hostkit_spine_F3_settled_2026_07_10): confirmed false alarm via the additive-mode-doctrine invariant + adversarial reversal.]"
+  },
+  "hostkit_spine_F3_settled_2026_07_10": {
+    "was": "the single weakest closure — disposition=not-reproduced, NO code fix, closure rested only on the auditor claim \"permit.mode is invariant across the seam\".",
+    "verdict": "CONFIRMED FALSE ALARM, now teeth-backed (no longer claim-only).",
+    "proof": "BASHumanAnchorProtocol.derive reads ONLY permit.mode (agencyRisk 0.75 vs 0.25 across the .block boundary; alienation/dignity switch on it). All 6 permit transformations between the gate-side derive (RunTurn:706) and the audit-side derive (RunTurn:1377) — Abyssal(732)/assertion-ceiling(739)/Kunlun(798)/cthulhu-assertion(991)/cthulhu-escalation(1042) — are ADDITIVE: each rebuilds the permit with mode: permit.mode UNCHANGED, touching only stackedModes/reasonCodes (verified line-by-line: Abyssal:214, Kunlun:203, AssertionCeilingGate:202, CthulhuAssertionCeiling:237, Cthulhu withStackedModes mode:mode). So permit.mode is invariant ⇒ gate-side and audit-side humanAnchor are byte-identical ⇒ the \"byte-identical by construction\" comment is TRUE.",
+    "teeth": "Tests/BehavioralAISubstrateTests/BASPermitEscalationModeInvarianceTests.swift — a fired escalation (pressure ≥ 0.6 floor, non-reserved anchor) preserves permit.mode and yields byte-identical pre/post humanAnchor; a .block turn stays .block; a mode-sensitivity guard proves the invariance is load-bearing. Adversarial reversal (escalate mutates .mode → .block) reds with the exact F3 divergence: agencyRisk 0.25→0.75, tone steady→warm.",
+    "status": "CLOSED (false alarm, teeth-locked)"
   }
 }
