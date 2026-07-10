@@ -185,7 +185,13 @@ struct ContentView: View {
             // the endurance loop。 No-op otherwise(legacy
             // xcodebuild test mode still works because the
             // controller simply stays idle)。
-            endurance.autostartIfEnabled()
+            // audit devicetestapp LOW-5: the v12 probe (above) runs EXCLUSIVELY — it loads a 4B model
+            // on the 8GB A19 and skips the GPU chain to avoid contention. Don't also autostart the
+            // endurance loop alongside it (a second heavy load ⇒ OOM/jetsam); every other launch is
+            // unaffected.
+            if ProcessInfo.processInfo.environment["BAS_V12_PROBE"] != "1" {
+                endurance.autostartIfEnabled()
+            }
         }
     }
 }
