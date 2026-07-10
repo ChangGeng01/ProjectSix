@@ -54,7 +54,10 @@ final class ProbeFileLog: @unchecked Sendable {
     }
 
     func emit(_ line: String) {
-        logger.info("\(line, privacy: .public)")
+        // audit devicetestapp LOW-3: `.notice` (default level) is PERSISTED to the unified log store
+        // and survives to `log collect`; `.info` is memory-only and dropped by default, silently
+        // losing probe diagnostics on an unattended device run.
+        logger.notice("\(line, privacy: .public)")
         if alsoPrint { print(line) }
         if alsoFlush { fflush(stdout) }
         guard let data = (line + "\n").data(using: .utf8) else { return }
@@ -213,7 +216,9 @@ enum BASBandwidthProbe {
                     log.emit(String(format: "📊 bw-probe %@ run=%d ms=%.0f tok/s=%.1f achieved=%.1fGB/s util=%.0f%% thermal=%@",
                         m.name, r, ms, tps, bw, bw / peak * 100, ts()))
                     best = min(best, ms)
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    // audit devicetestapp MED-2: route inter-run cooldown through the lock-survivable
+                    // guard (bare Task.sleep can be suspended indefinitely once the screen locks).
+                    await idleGuardedSleep(seconds: 5)
                 }
                 bestTps[m.name] = Double(fwd) * 1000.0 / best
             } catch {
