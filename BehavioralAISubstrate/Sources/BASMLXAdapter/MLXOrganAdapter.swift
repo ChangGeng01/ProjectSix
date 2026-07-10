@@ -162,16 +162,39 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         if let explicit = mtpDrafterWeightsURL { return explicit }
         guard model.id.lowercased().contains("qwen3.5") else { return nil }
         let fm = FileManager.default
+        // operator decision 6A / audit mlx-decode LOW-1: the world-writable /tmp candidate is a
+        // Mac-DEV convenience only — gate it behind an explicit opt-in env so a stray or
+        // attacker-planted /tmp file can't become the loaded MTP weights on a default run.
+        #if os(macOS)
+        let allowTmp = ProcessInfo.processInfo.environment["BAS_MTP_ALLOW_TMP_WEIGHTS"] == "1"
+        #else
+        let allowTmp = false
+        #endif
+        let candidates = Self.mtpWeightsCandidates(
+            documentsDir: fm.urls(for: .documentDirectory, in: .userDomainMask).first,
+            localDirName: model.localDirectoryName,
+            allowTmpDevCandidate: allowTmp)
+        return candidates.first { fm.fileExists(atPath: $0.path) }
+    }
+
+    /// audit mlx-decode LOW-1 — the ordered MTP-weights candidate paths. The world-writable
+    /// `/tmp/gdn_coreai` dev candidate is included ONLY when `allowTmpDevCandidate` is true (Mac-dev
+    /// opt-in via `BAS_MTP_ALLOW_TMP_WEIGHTS=1`); iOS/device never opts in. Pure + testable.
+    static func mtpWeightsCandidates(
+        documentsDir: URL?, localDirName: String?, allowTmpDevCandidate: Bool
+    ) -> [URL] {
         var candidates: [URL] = []
-        if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
+        if let docs = documentsDir {
             candidates.append(docs.appendingPathComponent("qwen35_mtp_folded.safetensors"))
-            if let local = model.localDirectoryName {
+            if let local = localDirName {
                 candidates.append(docs.appendingPathComponent(local)
                     .appendingPathComponent("qwen35_mtp_folded.safetensors"))
             }
         }
-        candidates.append(URL(fileURLWithPath: "/tmp/gdn_coreai/qwen35_mtp_folded.safetensors"))
-        return candidates.first { fm.fileExists(atPath: $0.path) }
+        if allowTmpDevCandidate {
+            candidates.append(URL(fileURLWithPath: "/tmp/gdn_coreai/qwen35_mtp_folded.safetensors"))
+        }
+        return candidates
     }
     /// Cached MTP decoder (created on first `.mtpSpec` execution inside the container actor; the box mirrors
     /// `ChatSessionBox`'s @unchecked-Sendable pattern — exclusively used within `container.perform`).

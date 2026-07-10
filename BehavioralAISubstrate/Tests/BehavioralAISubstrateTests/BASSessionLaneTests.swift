@@ -53,6 +53,22 @@ final class BASSessionLaneTests: XCTestCase {
         XCTAssertEqual(lane(fused: false, capped: false), .pooled)
     }
 
+    // audit mlx-decode LOW-1 / operator decision 6A: the world-writable /tmp MTP-weights candidate is
+    // included ONLY when explicitly opted in (Mac-dev BAS_MTP_ALLOW_TMP_WEIGHTS=1), never by default.
+    func testTmpWeightsCandidateGatedByOptIn() {
+        let docs = URL(fileURLWithPath: "/Docs")
+        let tmpPath = "/tmp/gdn_coreai/qwen35_mtp_folded.safetensors"
+        let off = MLXOrganAdapter.mtpWeightsCandidates(
+            documentsDir: docs, localDirName: nil, allowTmpDevCandidate: false)
+        XCTAssertFalse(off.contains { $0.path == tmpPath },
+            "the world-writable /tmp candidate must NOT be probed by default")
+        let on = MLXOrganAdapter.mtpWeightsCandidates(
+            documentsDir: docs, localDirName: nil, allowTmpDevCandidate: true)
+        XCTAssertTrue(on.contains { $0.path == tmpPath },
+            "with the opt-in, the /tmp dev candidate is included (last, after Documents)")
+        XCTAssertEqual(on.last?.path, tmpPath, "the /tmp candidate is lowest-priority")
+    }
+
     // audit mlx-adapter-core LOW-15: BAS_MAX_LIVE_SESSIONS must clamp to a floor of 1 — a 0/negative
     // value would make _evictBeyondCap thrash (evict-everything / never-satisfiable cap).
     func testMaxLiveSessionsClampsToFloorOfOne() {
