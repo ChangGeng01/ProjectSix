@@ -58,6 +58,25 @@ public enum BASActionPermitMode: String, Codable, CaseIterable, Sendable {
     case replace
     case escalate
 
+    /// audit blindspot-② HIGH — the canonical strictness ORDER of the permit modes (0 = least
+    /// restrictive `.answer` … 8 = most restrictive `.escalate`). Single source of truth: the
+    /// EBrainRuntimeCoordinator `permitStrictness` helper and `BASShadowResultPermitUpgrader` both
+    /// derive their ranking from here so they can never diverge. Note this is NOT the CaseIterable
+    /// declaration order (which lists block before replace) — it is the semantic restrictiveness rank.
+    public var strictnessRank: Int {
+        switch self {
+        case .answer:    return 0
+        case .mirror:    return 1
+        case .compare:   return 2
+        case .delay:     return 3
+        case .draftOnly: return 4
+        case .localOnly: return 5
+        case .replace:   return 6
+        case .block:     return 7
+        case .escalate:  return 8
+        }
+    }
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let rawValue = try container.decode(String.self)

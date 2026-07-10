@@ -87,26 +87,9 @@ extension BASEBrainRuntimeCoordinator {
     func permitStrictness(
         _ mode: BASActionPermitMode
     ) -> Int {
-        switch mode {
-        case .answer:
-            return 0
-        case .mirror:
-            return 1
-        case .compare:
-            return 2
-        case .delay:
-            return 3
-        case .draftOnly:
-            return 4
-        case .localOnly:
-            return 5
-        case .replace:
-            return 6
-        case .block:
-            return 7
-        case .escalate:
-            return 8
-        }
+        // audit blindspot-② HIGH: single-sourced from BASActionPermitMode.strictnessRank so this and
+        // BASShadowResultPermitUpgrader can never diverge on the restrictiveness order.
+        mode.strictnessRank
     }
 
     func allowedDomains(

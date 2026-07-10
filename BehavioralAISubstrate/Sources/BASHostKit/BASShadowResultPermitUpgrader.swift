@@ -157,6 +157,14 @@ public enum BASShadowResultPermitUpgrader {
         guard targetMode != currentPermit.mode else {
             return .noChange
         }
+        // audit blindspot-② HIGH: an UP-grader must only ever INCREASE strictness. The old code
+        // escalated to ANY different target mode, so a shadow result naming a LESS-restrictive mode
+        // (e.g. current `.block`(7) → target `.answer`(0)) would silently DOWNGRADE the permit — a
+        // safety weakening from a component whose entire job is to add caution. Refuse any target
+        // that is not strictly more strict than the current mode (single-sourced strictnessRank).
+        guard targetMode.strictnessRank > currentPermit.mode.strictnessRank else {
+            return .noChange
+        }
         // Build merged reason codes
         let transitionTag =
             "\(escalationReasonCodePrefix):" +
