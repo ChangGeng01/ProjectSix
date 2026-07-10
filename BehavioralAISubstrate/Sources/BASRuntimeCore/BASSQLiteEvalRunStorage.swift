@@ -100,6 +100,17 @@ public actor BASSQLiteEvalRunStorage: BASEvalRunStorage {
     /// actor-isolated methods)。
     private nonisolated(unsafe) var db: OpaquePointer?
 
+    /// audit runtimecore-b MED-3 — surfaced when a READ (run / latestRun / runs / report /
+    /// reportsForCandidate / counts) errors on a BUSY or corrupt DB. The non-throwing accessors
+    /// return nil/[]/0 on error, indistinguishable from genuinely-empty (silent fail-open — a
+    /// locked/stale read looked like "no runs recorded"). A host wires this to observe the real
+    /// error; the *OrThrow siblings surface it directly. nil ⇒ unobserved (default). Mirrors the
+    /// KG store's identical hook.
+    public var onSilentFailure: (@Sendable (Error) -> Void)?
+    public func setOnSilentFailure(_ handler: (@Sendable (Error) -> Void)?) {
+        self.onSilentFailure = handler
+    }
+
     // MARK: - Lifecycle
 
     public init(databaseURL: URL) throws {
@@ -125,6 +136,12 @@ public actor BASSQLiteEvalRunStorage: BASEvalRunStorage {
         // than [read as empty]") TRUE for structural corruption — the read paths' `(try? …) ?? []`
         // could not deliver it. Default-on, fail-closed.
         try BASSQLiteIntegrity.assertOK(db: handle, store: "eval-run")
+
+        // audit runtimecore-b MED-3: a BUSY (WAL-locked) read must WAIT briefly rather than return
+        // SQLITE_BUSY that the fail-open read paths would swallow as "no data". Mirrors the KG /
+        // event-log three-piece set (5s cap).
+        try Self.runExec(
+            db: handle, sql: "PRAGMA busy_timeout=5000;")
 
         try Self.runExec(
             db: handle, sql: "PRAGMA journal_mode=WAL;")
@@ -200,30 +217,54 @@ public actor BASSQLiteEvalRunStorage: BASEvalRunStorage {
         return true
     }
 
+    // audit runtimecore-b MED-3: every non-throwing read routes a busy/corrupt error to
+    // onSilentFailure before falling open, and has an *OrThrow sibling that surfaces it — so a
+    // caller can distinguish "no such run" from "DB busy/broken".
     public func run(forID runID: String) async -> BASEvalRun? {
         guard let db else { return nil }
-        return (try? Self.fetchRun(db: db, runID: runID))
-            ?? nil
+        do { return try Self.fetchRun(db: db, runID: runID) }
+        catch { onSilentFailure?(error); return nil }
+    }
+
+    public func runOrThrow(forID runID: String) async throws -> BASEvalRun? {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchRun(db: db, runID: runID)
     }
 
     public func latestRun(
         forBuildChapter buildChapter: String
     ) async -> BASEvalRun? {
         guard let db else { return nil }
-        return (try? Self.fetchLatestRun(
-            db: db,
-            column: "build_chapter",
-            value: buildChapter)) ?? nil
+        do { return try Self.fetchLatestRun(db: db, column: "build_chapter", value: buildChapter) }
+        catch { onSilentFailure?(error); return nil }
+    }
+
+    public func latestRunOrThrow(
+        forBuildChapter buildChapter: String
+    ) async throws -> BASEvalRun? {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchLatestRun(db: db, column: "build_chapter", value: buildChapter)
     }
 
     public func latestRun(
         forHostFingerprint hostFingerprint: String
     ) async -> BASEvalRun? {
         guard let db else { return nil }
-        return (try? Self.fetchLatestRun(
-            db: db,
-            column: "host_fingerprint",
-            value: hostFingerprint)) ?? nil
+        do { return try Self.fetchLatestRun(db: db, column: "host_fingerprint", value: hostFingerprint) }
+        catch { onSilentFailure?(error); return nil }
+    }
+
+    public func latestRunOrThrow(
+        forHostFingerprint hostFingerprint: String
+    ) async throws -> BASEvalRun? {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchLatestRun(db: db, column: "host_fingerprint", value: hostFingerprint)
     }
 
     public func runs(
@@ -231,15 +272,26 @@ public actor BASSQLiteEvalRunStorage: BASEvalRunStorage {
         limit: Int
     ) async -> [BASEvalRun] {
         guard let db, limit > 0 else { return [] }
-        return (try? Self.fetchRunsSince(
-            db: db, since: since, limit: limit)) ?? []
+        do { return try Self.fetchRunsSince(db: db, since: since, limit: limit) }
+        catch { onSilentFailure?(error); return [] }
+    }
+
+    public func runsOrThrow(
+        sinceTimestampMs since: Int64,
+        limit: Int
+    ) async throws -> [BASEvalRun] {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        guard limit > 0 else { return [] }
+        return try Self.fetchRunsSince(db: db, since: since, limit: limit)
     }
 
     public var totalRunCount: Int {
         get async {
             guard let db else { return 0 }
-            return (try? Self.countAll(
-                db: db, table: "eval_run")) ?? 0
+            do { return try Self.countAll(db: db, table: "eval_run") }
+            catch { onSilentFailure?(error); return 0 }
         }
     }
 
@@ -272,26 +324,45 @@ public actor BASSQLiteEvalRunStorage: BASEvalRunStorage {
         candidateRunID: String
     ) async -> BASEvalRegressionReport? {
         guard let db else { return nil }
-        return (try? Self.fetchReport(
-            db: db,
-            baselineRunID: baselineRunID,
-            candidateRunID: candidateRunID)) ?? nil
+        do {
+            return try Self.fetchReport(
+                db: db, baselineRunID: baselineRunID, candidateRunID: candidateRunID)
+        } catch { onSilentFailure?(error); return nil }
+    }
+
+    public func reportOrThrow(
+        baselineRunID: String,
+        candidateRunID: String
+    ) async throws -> BASEvalRegressionReport? {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchReport(
+            db: db, baselineRunID: baselineRunID, candidateRunID: candidateRunID)
     }
 
     public func reportsForCandidate(
         _ candidateRunID: String
     ) async -> [BASEvalRegressionReport] {
         guard let db else { return [] }
-        return (try? Self.fetchReportsForCandidate(
-            db: db, candidateRunID: candidateRunID)) ?? []
+        do { return try Self.fetchReportsForCandidate(db: db, candidateRunID: candidateRunID) }
+        catch { onSilentFailure?(error); return [] }
+    }
+
+    public func reportsForCandidateOrThrow(
+        _ candidateRunID: String
+    ) async throws -> [BASEvalRegressionReport] {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchReportsForCandidate(db: db, candidateRunID: candidateRunID)
     }
 
     public var totalReportCount: Int {
         get async {
             guard let db else { return 0 }
-            return (try? Self.countAll(
-                db: db,
-                table: "eval_regression_report")) ?? 0
+            do { return try Self.countAll(db: db, table: "eval_regression_report") }
+            catch { onSilentFailure?(error); return 0 }
         }
     }
 
