@@ -390,6 +390,35 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// media and is non-Sendable, so messages are rebuilt locally where consumed). Purged on
     /// clearSession/transition.
     private var fusedTranscripts: [String: [(role: String, text: String)]] = [:]
+    /// audit mlx-adapter-core LOW-14 — recency order for the transcript-only seats (which never enter
+    /// `sessionLRU`, since they hold no KV box). Front = least-recently-used. Kept single-sourced with
+    /// `fusedTranscripts` via `_touchFusedTranscript` (on write) and `_dropFusedTranscript` (on every
+    /// removal) so the over-cap eviction can drop the OLDEST seat, not an arbitrary dictionary key.
+    private var fusedTranscriptOrder: [String] = []
+
+    /// Record a write/use of `key`'s transcript as most-recently-used.
+    private func _touchFusedTranscript(_ key: String) {
+        fusedTranscriptOrder.removeAll { $0 == key }
+        fusedTranscriptOrder.append(key)
+    }
+
+    /// The ONE removal funnel: drop `key` from both the transcript store and its recency order so the
+    /// two never diverge (a stale order entry would make eviction "drop" an already-gone key — a no-op
+    /// that fails to reduce the count).
+    private func _dropFusedTranscript(_ key: String) {
+        fusedTranscripts.removeValue(forKey: key)
+        fusedTranscriptOrder.removeAll { $0 == key }
+    }
+
+    /// audit mlx-adapter-core LOW-14 — pick the transcript seat to evict when over cap: the
+    /// least-recently-used key (front of the recency order) that isn't the seat just written. Pure +
+    /// static so the LRU choice carries unit teeth independent of the MLX-gated decode path.
+    static func _fusedTranscriptEvictionVictim(
+        order: [String], currentKey: String, count: Int, cap: Int
+    ) -> String? {
+        guard count > cap else { return nil }
+        return order.first(where: { $0 != currentKey })
+    }
 
     /// H6 (mega-audit tranche-3, 2026-07-07): per-key FIFO gate serializing the session-pool
     /// critical section. DEFAULT-ON per ADR-014 after two device certs (endurance 5E5C: 71 turns
@@ -1363,6 +1392,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             transcript.append((role: "assistant", text: r.draft.body))
             if _clearEpoch(key) == fusedEpoch {
                 fusedTranscripts[key] = transcript
+                _touchFusedTranscript(key)   // audit LOW-14: MRU on write
                 if case .fusedTranscript = lane { fusedSessionTurnCount += 1 }
             }
             // 可解释性①: THE turn line, session flavor — lane election + thermal fallback +
@@ -1382,11 +1412,14 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 if Self.turnLineEnabled { print(a.summaryLine) }
                 draftOut = draftOut.withDecodeAttribution(a)
             }
-            // Transcript seats carry no KV — their own FIFO bound (缝8a: pooled eviction stays
+            // Transcript seats carry no KV — their own LRU bound (缝8a: pooled eviction stays
             // single-sourced in _evictBeyondCap; the old inline LRU loop dropped KV unspilled).
-            if fusedTranscripts.count > Self.maxTranscriptSessions,
-               let drop = fusedTranscripts.keys.first(where: { $0 != key }) {
-                fusedTranscripts.removeValue(forKey: drop)
+            // audit LOW-14: evict the least-recently-used seat (recency order front), not an arbitrary
+            // dictionary key — `keys.first(where:)` order is nondeterministic and could drop a hot one.
+            if let drop = Self._fusedTranscriptEvictionVictim(
+                order: fusedTranscriptOrder, currentKey: key,
+                count: fusedTranscripts.count, cap: Self.maxTranscriptSessions) {
+                _dropFusedTranscript(drop)
             }
             return draftOut
         case .fusedTranscript(transition: true), .cappedFusedTranscript(transition: true):
@@ -1402,7 +1435,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                     for: request.preset, maxOutputTokens: request.maxOutputTokens),
                 additionalContext: Self._sessionAdditionalContext)
             sessions[key] = ChatSessionBox(session: rehydrated)
-            fusedTranscripts.removeValue(forKey: key)
+            _dropFusedTranscript(key)   // audit LOW-14: keep recency order in sync
         case .pooled:
             break
         }
@@ -1443,7 +1476,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 additionalContext: Self._sessionAdditionalContext)
             box = ChatSessionBox(session: migrated)
             sessions[key] = box
-            fusedTranscripts.removeValue(forKey: key)
+            _dropFusedTranscript(key)   // audit LOW-14: keep recency order in sync
             poolAcquisition = "transcript-migration"
         } else {
             if dbgS { NSLog("[sess-dbg] %@ fresh", key) }
@@ -1652,7 +1685,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     func _evictBeyondCap() async {
         while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
             sessionLRU.removeFirst()
-            fusedTranscripts.removeValue(forKey: oldest)
+            _dropFusedTranscript(oldest)   // audit LOW-14: keep recency order in sync
             guard let victim = sessions.removeValue(forKey: oldest), Self.sessionSpillEnabled
             else { continue }
             _parkPending(oldest, victim)
@@ -1675,7 +1708,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     func _spillEvictAll(except key: String?) {
         for k in sessions.keys where k != key {
             sessionLRU.removeAll { $0 == k }
-            fusedTranscripts.removeValue(forKey: k)
+            _dropFusedTranscript(k)   // audit LOW-14: keep recency order in sync
             guard let victim = sessions.removeValue(forKey: k), Self.sessionSpillEnabled
             else { continue }
             _parkPending(k, victim)
@@ -1945,7 +1978,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             let key = Self.sessionKey(sessionID, role)
             keyClearEpoch[key, default: 0] += 1          // H7: mark this key cleared
             sessions.removeValue(forKey: key)
-            fusedTranscripts.removeValue(forKey: key)
+            _dropFusedTranscript(key)                    // audit LOW-14: keep recency order in sync
             pendingSpill.removeValue(forKey: key)        // 缝8a: in-flight write self-deletes
             spillWriterActive.remove(key)
             // 缝2 (2026-07-06 audit): clear must reach the DISK tier too — a spilled (or dream-loop
@@ -1965,6 +1998,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         clearAllEpoch += 1                               // H7: mark all keys cleared
         sessions.removeAll()
         fusedTranscripts.removeAll()
+        fusedTranscriptOrder.removeAll()   // audit LOW-14: keep recency order in sync
         sessionLRU.removeAll()
         pendingSpill.removeAll()                         // 缝8a: in-flight writes self-delete
         spillWriterActive.removeAll()

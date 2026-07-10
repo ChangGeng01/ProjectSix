@@ -69,6 +69,28 @@ final class BASSessionLaneTests: XCTestCase {
         XCTAssertEqual(on.last?.path, tmpPath, "the /tmp candidate is lowest-priority")
     }
 
+    // audit mlx-adapter-core LOW-14: the transcript-seat eviction must drop the LEAST-recently-used
+    // seat (front of the recency order), never an arbitrary dictionary key. Reversal (return
+    // `order.last` — the MRU — or drop the `!= currentKey` skip) reds these.
+    func testFusedTranscriptEvictionPicksLRU() {
+        // Under cap ⇒ no eviction.
+        XCTAssertNil(MLXOrganAdapter._fusedTranscriptEvictionVictim(
+            order: ["a", "b", "c"], currentKey: "c", count: 3, cap: 3),
+            "count <= cap must not evict")
+        // Over cap ⇒ evict the oldest (front) that isn't the seat just written.
+        XCTAssertEqual(MLXOrganAdapter._fusedTranscriptEvictionVictim(
+            order: ["a", "b", "c", "d"], currentKey: "d", count: 4, cap: 3), "a",
+            "over cap must evict the least-recently-used seat")
+        // The current key is never evicted even if it is the oldest in the order.
+        XCTAssertEqual(MLXOrganAdapter._fusedTranscriptEvictionVictim(
+            order: ["cur", "b", "c", "d"], currentKey: "cur", count: 4, cap: 3), "b",
+            "the just-written seat is skipped; the next-oldest is evicted")
+        // No eligible victim (only the current key present) ⇒ nil.
+        XCTAssertNil(MLXOrganAdapter._fusedTranscriptEvictionVictim(
+            order: ["cur"], currentKey: "cur", count: 4, cap: 3),
+            "no evictable seat other than the current key ⇒ nil")
+    }
+
     // audit mlx-adapter-core LOW-15: BAS_MAX_LIVE_SESSIONS must clamp to a floor of 1 — a 0/negative
     // value would make _evictBeyondCap thrash (evict-everything / never-satisfiable cap).
     func testMaxLiveSessionsClampsToFloorOfOne() {
