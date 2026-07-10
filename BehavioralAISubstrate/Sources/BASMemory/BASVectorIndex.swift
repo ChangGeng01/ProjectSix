@@ -380,7 +380,11 @@ public actor BASVectorIndex {
                 atomID: id, score: score))
         }
         // Sort descending + truncate
-        scored.sort { Self.sortKey($0.score) > Self.sortKey($1.score) }
+        // deep-audit MED: content-derived tie-break (atomID ASC) so score ties (orthogonal / identical
+        // embeddings) yield a DETERMINISTIC top-K independent of insertion order — mirrors the routed
+        // sibling BASRoutedVectorIndexStorage (score DESC, atom_id ASC). Swift sort is not stable.
+        scored.sort { let a = Self.sortKey($0.score), b = Self.sortKey($1.score)
+                      return a != b ? a > b : $0.atomID < $1.atomID }
         if scored.count > k {
             return Array(scored.prefix(k))
         }
@@ -458,7 +462,9 @@ public actor BASVectorIndex {
                 BASVectorTopKResult(
                     atomID: $0.0, score: $0.1)
             }
-        paired.sort { Self.sortKey($0.score) > Self.sortKey($1.score) }
+        // deep-audit MED: content-derived tie-break (atomID ASC) — deterministic top-K at score ties.
+        paired.sort { let a = Self.sortKey($0.score), b = Self.sortKey($1.score)
+                      return a != b ? a > b : $0.atomID < $1.atomID }
         if paired.count > k {
             return Array(paired.prefix(k))
         }
@@ -567,7 +573,11 @@ public actor BASVectorIndex {
             scored.append(BASVectorTopKResult(
                 atomID: id, score: r.value[i]))
         }
-        scored.sort { Self.sortKey($0.score) > Self.sortKey($1.score) }
+        // deep-audit MED: content-derived tie-break (atomID ASC) so score ties (orthogonal / identical
+        // embeddings) yield a DETERMINISTIC top-K independent of insertion order — mirrors the routed
+        // sibling BASRoutedVectorIndexStorage (score DESC, atom_id ASC). Swift sort is not stable.
+        scored.sort { let a = Self.sortKey($0.score), b = Self.sortKey($1.score)
+                      return a != b ? a > b : $0.atomID < $1.atomID }
         if scored.count > k {
             return Array(scored.prefix(k))
         }
