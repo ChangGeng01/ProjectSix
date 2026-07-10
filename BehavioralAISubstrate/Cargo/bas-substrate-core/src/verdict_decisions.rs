@@ -31,8 +31,6 @@
 // (chapter 七百四十二 第三刀 verdict_decisions schema) is the
 // real Rust WIN here。
 
-use std::os::raw::c_char;
-
 // MARK: - VerdictLevel (mirrors BASSovereignVerdictLevel)
 
 /// 8 sovereign verdict levels,strictly ordered by severity
@@ -452,7 +450,6 @@ pub unsafe extern "C" fn bas_verdict_derive(
         audit_append_failed:
             hard_bits & 0x0800 != 0,
     };
-    let _ = c_char::from(0); // silence unused import warn
     derive_verdict_level(
         &hard, &soft, domain,
         evidence_sufficient != 0).rank()
