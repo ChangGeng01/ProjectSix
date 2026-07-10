@@ -51,4 +51,32 @@ final class BASBurnInDeadlineTests: XCTestCase {
         let plugged = d.onSample(nowEpoch: 5 * 60, plugged: true, batteryPct: 40)
         XCTAssertTrue(plugged.burning, "a plugged reading must not end burn-in")
     }
+
+    /// SAFETY BOUND (the complement of the mid-burn-in guard): a plateau that NEVER
+    /// dips must still END via the burn cap — isExpired flips true at the cap even
+    /// while burning, so a stuck "100%" reading can't burn-in forever.
+    func testBurnCapBoundsAStuckPlateau() {
+        let d = BASBurnInDeadline.atUnplug(nowEpoch: 0, atPlateau: true,
+                                           windowSec: window, burnCapSec: burnCap)
+        // 21 min in, STILL at plateau (never dipped): state unchanged (still
+        // burning), but the 20-min cap has now passed.
+        let still = d.onSample(nowEpoch: 21 * 60, plugged: false, batteryPct: 99.8)
+        XCTAssertTrue(still.burning, "never dipped ⇒ still in the burn-in phase")
+        XCTAssertTrue(still.isExpired(nowEpoch: 21 * 60),
+            "21 min ≥ 20-min burn cap ⇒ the run ends via the safety cap, not forever")
+    }
+
+    /// A dip while NOT burning (already in the counted window) must NOT restart the
+    /// window — only a dip WHILE BURNING transitions. Otherwise every sub-plateau
+    /// battery wiggle during the real measurement would reset the counters.
+    func testDipWhileNotBurningDoesNotRestartWindow() {
+        let d = BASBurnInDeadline.atUnplug(nowEpoch: 0, atPlateau: false,
+                                           windowSec: window, burnCapSec: burnCap)
+        XCTAssertFalse(d.burning)
+        let sampled = d.onSample(nowEpoch: 5 * 60, plugged: false, batteryPct: 90)
+        XCTAssertEqual(sampled, d,
+            "a dip while already counting leaves the counted window untouched")
+        XCTAssertEqual(sampled.deadlineEpoch, window,
+            "the counted window (deadline = window) is not restarted by a sub-window dip")
+    }
 }
