@@ -50,16 +50,22 @@ extension MLXOrganAdapter {
             try BASSessionKVStore.save(cache: cache, tokenCount: 0, to: url,
                                        modelID: modelID, quantizeKV: quantizeKV)
         }
-        // 缝2 (2026-07-06 audit): conversation KV on disk gets Data Protection —
-        // readable after first unlock (background restores keep working), sealed
-        // in the pre-unlock window。 audit x-sov #6: the setAttributes error is
-        // now SURFACED via the hook (was `try?`-swallowed) so a failure to
-        // protect sensitive KV is observable; routed through the shared
-        // BASSQLiteFileProtection helper (same class, kill-switch, +sidecars)。
-        if let err = BASSQLiteFileProtection.apply(toDatabaseAt: url.path) {
-            Self._sessionProtectionFailureHook?(err)
-        }
+        Self._protectSnapshot(at: url)
         return bytes
+    }
+
+    /// 缝2 / x-sov #6 (device-recon id2): apply Data Protection to the KV
+    /// snapshot and SURFACE any setAttributes failure via the hook (was
+    /// `try?`-swallowed). Split out of `_persist` — which needs a live
+    /// ChatSessionBox+model — so this security branch is Mac-unit-testable on
+    /// its own, parallel to the atom-store path (id1). No MLX types touched.
+    static func _protectSnapshot(at url: URL) {
+        // Readable after first unlock (background restores keep working),
+        // sealed in the pre-unlock window. Routed through the shared
+        // BASSQLiteFileProtection helper (same class, kill-switch, +sidecars).
+        if let err = BASSQLiteFileProtection.apply(toDatabaseAt: url.path) {
+            _sessionProtectionFailureHook?(err)
+        }
     }
 
     /// Warm-start a pooled session from a snapshot: fresh model cache ← restored state, wrapped
