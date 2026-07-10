@@ -15,6 +15,7 @@
 
 import Foundation
 import os
+import BASRuntimeCore    // BASIdleGuardedSpin (device-recon id5 monotonic cooldown spin)
 import BASOrgan          // BASOrganRequest (BASBandwidthProbe)
 import BASMLXAdapter     // MLXOrganAdapter + MLXModelCatalog (BASBandwidthProbe)
 import BASSovereign      // ②-observe: BASModelHonestySignal scores each draft for sycophancy
@@ -526,10 +527,13 @@ enum BASV12HonestyProbe {
 func idleGuardedSleep(seconds: Double) async {
     guard seconds > 0 else { return }
     if ProcessInfo.processInfo.environment["BAS_COOLDOWN_SPIN"] == "1" {
-        let end = Date().addingTimeInterval(seconds)
-        var x = 1.0
-        while Date() < end { x = sin(x) + 1.000001 }
-        if x == .infinity { print("[idle-guard] unreachable") }   // defeat dead-code elimination
+        // device-recon id5: spin on a MONOTONIC clock via the Mac-unit-tested
+        // BASIdleGuardedSpin (was a wall-clock Date() loop — a backward NTP/DST
+        // step could stall it past its deadline, a forward jump cut a cooldown
+        // short). DispatchTime uptime nanoseconds are immune.
+        BASIdleGuardedSpin.spin(seconds: seconds) {
+            DispatchTime.now().uptimeNanoseconds
+        }
     } else {
         try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
     }
