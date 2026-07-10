@@ -40,7 +40,12 @@ extension BASAutoRouteRanker {
     ) -> [Int32]? {
         #if os(iOS) || os(macOS)
         let n = candidates.count
-        guard n == benefits.count, n == costs.count
+        // deep-audit MED (rs-dream-loop): the Rust kernel reads exactly n*query.count f32 via
+        // from_raw_parts(flat_ptr, n*dim). Without a per-ROW length check, a candidate row shorter
+        // (or longer) than query.count makes flat.count != n*dim → the FFI reads out of bounds past
+        // the Swift buffer (UB). Enforce the flat.count == n*query.count invariant here.
+        guard n == benefits.count, n == costs.count,
+              query.count > 0, candidates.allSatisfy({ $0.count == query.count })
         else { return nil }
         // Flatten candidates row-major
         var flat: [Float] = []
