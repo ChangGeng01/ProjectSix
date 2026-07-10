@@ -214,6 +214,20 @@ pub fn update_helped_state(
 ///
 /// The encoding keeps the wire format scalar — no string
 /// FFI per row, just i64 pairs。
+///
+/// ⚠️ This scalar is a PRIVATE wire format between this fn and its
+/// sole consumer, Swift `BASRoutedMemoryUsageRecordsStore.recentRecords`,
+/// which decodes it back to the helped_state STRING with the SAME
+/// mapping (0→"unknown"/1→"helped"/2→"notHelped"). It is NOT the
+/// importance scorer's u8 contract: `BASImportanceHelpedFlag` /
+/// `bas-retrieval-ranker::importance_scorer::HelpedFlag` use a
+/// DIFFERENT order (notHelped=0, helped=1, unknown=2). The two never
+/// interoperate — this code round-trips to a String and never reaches
+/// `HelpedFlag::from_u8`. Do NOT feed this scalar into the scorer's
+/// from_u8; go through the string. (2026-07-10 blindspot re-verify:
+/// the "encoding-incompatible-with-scorer" finding was a FALSE ALARM —
+/// no such data flow exists — but the convention divergence is a real
+/// footgun, hence this note.)
 pub fn recent_records_for_atom(
     conn: &Connection,
     atom_id: &str,
