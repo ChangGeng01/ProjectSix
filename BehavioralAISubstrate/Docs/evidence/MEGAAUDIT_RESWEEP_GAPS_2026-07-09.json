@@ -1177,7 +1177,10 @@
    "mlx-adapter-core (2 of 4)": "LOW-13 draftModelSpec fail-close + LOW-15 max-live-sessions clamp 6f1dc7d7d",
    "metal (1/1)": "#5 layer-norm dispatch recipe comment-lie 4b1d43278",
    "rust (1 of 3)": "chain.rs canonical-bytes comment-lie 4b1d43278",
-   "hostkit-spine (1 of 4)": "F8 provisional needsProtectedWriteLane high-risk term 20813e261"
+   "hostkit-spine (1 of 4)": "F8 provisional needsProtectedWriteLane high-risk term 20813e261",
+   "runtimecore-b (4/4)": "#7 slice-rebase + #9 tribunal empty 718300892 · #10 removeNode atomic 6dcb286f7 · #8 per-append flag snapshot c18159631",
+   "organ-eval (2 open closed)": "LOG-3 sleep-station surface a99ab48bd · LOW-4 Saguaro accepted-count 60c0a7706 (LOW-2 verified NOT-REPRODUCED: role guard already precedes elect guard)",
+   "mlx-decode (1 of 2)": "LOW-3 difficulty-probe value guard (zero-sd/inf fail-closed) 90f4c0aab"
   },
   "deferred_with_reason": {
    "tools-scripts b2 domain": "b2_r2_pipeline.py + b2_refit_candidate.py + eval_probe_ood.py = operator b2/RSI experiment domain (recorded verdict rule + /tmp experiment data); do not touch per standing constraint",
@@ -1192,14 +1195,17 @@
    "x-architecture manifest/deletion": "LOW-4 (add mlx-swift direct dep) + LOW-5 (remove phantom Package.swift edges) need xcodebuild build-for-testing verification per standing rule (swift-build-masks-xcodebuild trap + DerivedData contention); LOW-6 (git mv 4 dead-code files to Archive) is deletion-class = operator-gated. All 3 flagged for operator.",
    "x-test-integrity F8": "#95 determinism gate letter→byte-identical = release-gate STRICTNESS change (operator eval domain, needs sign-off) + teeth blocked by un-importable model imports"
   },
-  "remaining_open": "~40 LOW: runtimecore-a #7(MED thermal)/runtimecore-b #8 #10(SQLite txn)/x-concurrency 2(device)/organ-eval 3/mlx-decode 2/mlx-adapter-core LOW-12 LOW-14(device)/hostkit-rest LOW-1/hostkit-spine F6 F7 F9/sovereign LOW-8(device)/x-sovereignty #7(SampleHost)/devicetestapp 7(device-gated)",
-  "closed_count": "35 LOW + 6 MED (tranche-3) = 41 findings this campaign, each TDD teeth + reversal + individual push",
+  "remaining_open": "~33 LOW: runtimecore-a #7(MED thermal-cap)/hostkit-spine F7 F9(F9 deferred)/hostkit-rest LOW-1/sovereign LOW-8(device)/x-sovereignty #7(SampleHost)/x-concurrency 2(device)/mlx-adapter-core LOW-12 LOW-14(device)/devicetestapp 7(device-gated)/rust 2(deletion-deferred)",
+  "closed_count": "40 LOW + 6 MED = 46 findings this campaign; each TDD teeth + reversal + individual push",
   "deferred_full": {
    "operator-experiment-domain": "tools-scripts b2_r2_pipeline.py + b2_refit_candidate.py + eval_probe_ood.py",
    "operator-eval-gate-strictness": "tools-scripts qinao_humaneval.py exec-sandbox + x-test-integrity F8 #95 byte-identical",
    "manifest-needs-xcodebuild": "x-architecture LOW-4 (add mlx-swift dep) + LOW-5 (remove phantom edges)",
    "deletion-class-operator-gated": "x-architecture LOW-6 (git mv dead code) + rust verdict_decisions.rs (2 dead lines) + rust assembler.rs (cfg-gate dead encoder)",
-   "not-a-defect": "hostkit-rest LOW-4, organ-eval LOW-1, hostkit-spine F6 (by-design transient field)"
-  }
+   "not-a-defect": "hostkit-rest LOW-4, organ-eval LOW-1, hostkit-spine F6 (by-design transient field)",
+   "schema-safety-critical": "hostkit-spine F9 (sovereign-execution-receipt over-claims synthesized per-index latency/timestamps as measured) — honest fix touches a schema-versioned safety-critical enum + has an existing .executed pinning test; needs consumer analysis + operator awareness",
+   "mlx-weights-tmp": "mlx-decode LOW-1 (/tmp world-writable MTP weights opt-in gate) changes Mac-dev staging workflow"
+  },
+  "not_reproduced": "organ-eval LOW-2 (prompt-lookup role guard already hoisted above the elect guard across all entry points)"
  }
 }
