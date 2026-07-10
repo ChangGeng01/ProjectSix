@@ -36,10 +36,11 @@ extension BASEBrainRuntimeCoordinator {
         // determinism risk vs V1 Swift `.sorted` over Doubles)。
         // Switched to `dreamLoopDominanceOrderDouble` which
         // preserves full Double precision through the Rust kernel。
-        // OOB guard upgraded to precondition() per review M1 —
-        // Rust kernel cannot return OOB by construction,so a
-        // bad index means the kernel is corrupted (fail loud
-        // rather than silently shortening the result)。
+        // audit orchestration MED-2: the OOB guard now lives in the FFI wrapper
+        // (dreamLoopDominanceOrderDouble → validatedPermutation): a corrupt / short /
+        // duplicate kernel return yields nil, routing HERE to the Swift `.sorted`
+        // fallback (fail-SAFE) rather than aborting the whole process with a call-site
+        // precondition (the old fail-loud). A validated permutation indexes safely below.
         let dominanceOrder: [String] = {
             let scores: [Double] = thoughtFrame.candidates.map {
                 candidateDominanceScore($0)
@@ -47,13 +48,9 @@ extension BASEBrainRuntimeCoordinator {
             if let indices = BASAutoRouteRanker
                 .dreamLoopDominanceOrderDouble(scores: scores) {
                 return indices.map { idx -> String in
-                    let i = Int(idx)
-                    precondition(i >= 0
-                        && i < thoughtFrame.candidates.count,
-                        "Rust dominance_order_f64 returned " +
-                        "out-of-bounds index \(i) for n=" +
-                        "\(thoughtFrame.candidates.count)")
-                    return thoughtFrame.candidates[i].candidateID
+                    // audit orchestration MED-2: wrapper-validated permutation ⇒ index in range;
+                    // a corrupt FFI return fell back to the Swift `.sorted` path (nil wrapper).
+                    return thoughtFrame.candidates[Int(idx)].candidateID
                 }
             }
             // Swift legacy fallback (V1 implementation,kept active

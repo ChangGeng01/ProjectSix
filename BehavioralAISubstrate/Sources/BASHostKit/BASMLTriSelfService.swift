@@ -179,12 +179,11 @@ public struct BASMLTriSelfService: BASTriSelfServicing,
             if let indices = BASAutoRouteRanker
                 .dreamLoopDominanceOrderDouble(scores: scores) {
                 return indices.map { idx -> BASCandidatePath in
-                    let i = Int(idx)
-                    precondition(i >= 0 && i < working.count,
-                        "Rust dominance_order_f64 returned " +
-                        "out-of-bounds index \(i) for n=" +
-                        "\(working.count)")
-                    return working[i]
+                    // audit orchestration MED-2: the wrapper (validatedPermutation) guarantees a full
+                    // valid permutation of 0..<count, so this index is in range. A corrupt FFI return
+                    // already fell back to the Swift `.sorted` path (nil wrapper result) — no
+                    // process-aborting precondition here.
+                    return working[Int(idx)]
                 }
             }
             // Swift legacy fallback (V1 implementation,kept active

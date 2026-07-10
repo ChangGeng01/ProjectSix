@@ -350,11 +350,9 @@ struct BASHostRuntimeEBrainTriSelfService: BASTriSelfServicing {
             if let indices = BASAutoRouteRanker
                 .dreamLoopDominanceOrderDouble(scores: scoreValues) {
                 return indices.map { idx -> BASTriSelfScore in
-                    let i = Int(idx)
-                    precondition(i >= 0 && i < filtered.count,
-                        "Rust dominance_order_f64 returned " +
-                        "out-of-bounds index \(i)")
-                    return filtered[i]
+                    // audit orchestration MED-2: wrapper-validated permutation ⇒ index in range;
+                    // a corrupt FFI return fell back to the Swift `.sorted` path (nil wrapper).
+                    return filtered[Int(idx)]
                 }
             }
             // Swift legacy fallback
@@ -521,12 +519,9 @@ struct BASHostRuntimeEBrainTriSelfService: BASTriSelfServicing {
             if let indices = BASAutoRouteRanker
                 .dreamLoopDominanceOrderDouble(scores: scoreValues) {
                 return indices.map { idx -> String in
-                    let i = Int(idx)
-                    precondition(i >= 0
-                        && i < filteredFallbacks.count,
-                        "Rust dominance_order_f64 returned " +
-                        "out-of-bounds index \(i)")
-                    return filteredFallbacks[i].candidateID
+                    // audit orchestration MED-2: wrapper-validated permutation ⇒ index in range;
+                    // a corrupt FFI return fell back to the Swift `.sorted` path (nil wrapper).
+                    return filteredFallbacks[Int(idx)].candidateID
                 }
             }
             // Swift legacy fallback
