@@ -148,12 +148,16 @@ final class BASCognitiveBrainProbabilityDistributionTests:
         print("[ambiguity-test] clear top1-top2 gap:" +
               " \(clearGap),ambiguous gap:" +
               " \(ambiguousGap)")
-        // Clear training-set input should have a wider
-        // top1-top2 gap than ambiguous out-of-distribution
-        // input。 Strict inequality is fragile;just log
-        // for now and assert both are ≥ 0 (sanity)。
+        // deep-audit MED: the previous `clearGap >= 0 && ambiguousGap >= 0` was a TAUTOLOGY (a
+        // descending sort makes top1-top2 >= 0 unconditionally) — it asserted nothing about the
+        // calibration property this test is named for. classifyProbabilities is deterministic (see
+        // testProbabilitiesAreDeterministic) and the observed margin is large + stable (clear ~1.00 vs
+        // ambiguous ~0.61), so the STRICT ordering is a robust, non-vacuous assertion.
         XCTAssertGreaterThanOrEqual(clearGap, 0.0)
         XCTAssertGreaterThanOrEqual(ambiguousGap, 0.0)
+        XCTAssertLessThan(ambiguousGap, clearGap,
+            "ambiguous / out-of-distribution input must be LESS peaky (a smaller top1-top2 gap) "
+            + "than a clear training-set input — the calibration property this test exists to check")
     }
 
     // MARK: - Determinism
