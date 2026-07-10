@@ -135,7 +135,10 @@ enum BASQwen35RdarProbe {
         // WAIT-FOR-UNPLUG (≤5 min), called AFTER the arm's model load/download so the window is pure decode.
         // Also warns on the 100% top-buffer plateau (iOS holds "100%" for ~10-20 min after unplug — a 0% delta
         // starting at 100% is NOT a real zero).
-        func waitUnplug() async {
+        // Returns whether the phone is at the 100% plateau on unplug (iOS holds
+        // "100%" ~10-20 min); the caller feeds it to BASBurnInDeadline.atUnplug
+        // rather than mutating the state here (device-recon id6 rewire).
+        func waitUnplug() async -> Bool {
             if plugged() {
                 log.emit("[m4-\(arm)] ⏳ models ready — waiting for UNPLUG (up to 300s), pull the cable now")
                 let waitEnd = Date().addingTimeInterval(300)
@@ -145,13 +148,12 @@ enum BASQwen35RdarProbe {
             }
             log.emit("[m4-\(arm)] " + (plugged() ? "still plugged — measuring anyway (⚠️invalid)"
                                                   : "unplugged ✓ — starting the \(Int(minutes))-min window"))
-            if !plugged() && battery() >= 99.5 {
-                burning = true
-                deadline = Date().addingTimeInterval(20 * 60)   // burn-in cap
+            let atPlateau = !plugged() && battery() >= 99.5
+            if atPlateau {
                 log.emit("[m4-\(arm)] 🔥 battery at 100% plateau — PRE-BURN (uncounted) until the reading dips <99.5%")
             }
+            return atPlateau
         }
-        var deadline = Date().addingTimeInterval(minutes * 60)
         var tokens = 0
         var lastSample = Date()
         var bStart: Double = -1     // set at first UNPLUGGED sample (charging start invalidates)
@@ -159,26 +161,29 @@ enum BASQwen35RdarProbe {
         // (iOS holds "100%" ~10-20 min after unplug) — then zero the counters and restart the window. Immune to
         // launch timing AND the top-buffer.
         //
-        // audit M-i MED-4: this deadline/burning state machine is EXTRACTED and
-        // Mac-unit-tested as `BASBurnInDeadline` (BASRuntimeCore) — see
-        // BASBurnInDeadlineTests, which deterministically proves the guard that a
-        // plateau outlasting the window does NOT end M4 mid-burn-in. The inline
-        // vars below MIRROR that tested spec (kept inline here because runM4's
-        // log/loop state is device-instrument-coupled; a full call-through rewire
-        // is a device-verified follow-up, not a Mac-safe change).
-        var burning = false
+        // audit M-i MED-4 / device-recon id6: this burn-in state machine IS
+        // `BASBurnInDeadline` (BASRuntimeCore) — the SAME value type
+        // BASBurnInDeadlineTests deterministically verifies on macOS (the plateau
+        // does not end M4 mid-burn-in; the burn cap bounds a stuck plateau). runM4
+        // now CALLS it (atUnplug / onSample / isExpired) as the single source of
+        // truth instead of a hand-copied inline mirror.
+        let windowSec = minutes * 60, burnCapSec = 20.0 * 60
+        var burnState = BASBurnInDeadline.atUnplug(
+            nowEpoch: Date().timeIntervalSince1970, atPlateau: false,
+            windowSec: windowSec, burnCapSec: burnCapSec)
         func sampleIfDue() {
             guard Date().timeIntervalSince(lastSample) >= 30 else { return }
             lastSample = Date()
-            if burning && !plugged() && battery() < 99.5 {
-                burning = false
+            let next = burnState.onSample(
+                nowEpoch: Date().timeIntervalSince1970, plugged: plugged(), batteryPct: battery())
+            if burnState.burning && !next.burning {   // burn-in just completed (reading first dipped)
                 tokens = 0
                 bStart = battery()
-                deadline = Date().addingTimeInterval(minutes * 60)
                 log.emit("[m4-\(arm)] 🔥 burn-in complete (battery \(battery())%) — window RESTARTED")
             }
-            if bStart < 0 && !plugged() && !burning { bStart = battery() }
-            log.emit("[m4-\(arm)] t=\(Int(Date().timeIntervalSince(deadline) + minutes * 60))s tokens=\(tokens) battery=\(battery())% plugged=\(plugged()) thermal=\(thermal()) \(burning ? "(burn-in)" : "")")
+            burnState = next
+            if bStart < 0 && !plugged() && !burnState.burning { bStart = battery() }
+            log.emit("[m4-\(arm)] t=\(Int(Date().timeIntervalSince(Date(timeIntervalSince1970: burnState.deadlineEpoch)) + minutes * 60))s tokens=\(tokens) battery=\(battery())% plugged=\(plugged()) thermal=\(thermal()) \(burnState.burning ? "(burn-in)" : "")")
         }
         if arm == "ane" {
             // ALL-RESIDENT 4-stage chain (this is also the residency experiment: 4 assets ≈4.2GB int8 → relies on
@@ -212,16 +217,15 @@ enum BASQwen35RdarProbe {
                 } catch { log.emit("[m4-ane] \(name) LOAD FAILED \(error) ✗"); log.close(); return }
             }
             log.emit("[m4-ane] all 4 resident — residency experiment PASSED load; looping")
-            await waitUnplug()
-            // audit M-i MED-4: DON'T clobber the burn-in cap. When waitUnplug hit
-            // the 100% plateau it set `burning=true` + a 20-min burn deadline;
-            // overwriting it with the 12-min window here would end M4 mid-burn-in
-            // (the plateau holds ~10-20 min → an invalid, empty measurement). Only
-            // (re)arm the counted window when NOT burning; the burn-in-complete
-            // path (sampleIfDue) restarts the window once the reading first dips.
-            if !burning { deadline = Date().addingTimeInterval(minutes * 60) }
+            // audit M-i MED-4: atUnplug enters uncounted burn-in (bounded by the
+            // burn cap) at the 100% plateau, else arms the counted window — so a
+            // plateau outlasting the window can't end M4 mid-burn-in.
+            let atPlateau = await waitUnplug()
+            burnState = BASBurnInDeadline.atUnplug(
+                nowEpoch: Date().timeIntervalSince1970, atPlateau: atPlateau,
+                windowSec: windowSec, burnCapSec: burnCapSec)
             var x = embeds[0]
-            while Date() < deadline {
+            while !burnState.isExpired(nowEpoch: Date().timeIntervalSince1970) {
                 do {
                     var h = x
                     for k in 0..<fns.count {
@@ -252,12 +256,14 @@ enum BASQwen35RdarProbe {
                 log.emit("[m4-mlx] loadModel FAILED \(error) ✗ (first run needs the on-device model download)"); log.close(); return
             }
             log.emit("[m4-mlx] model loaded; looping")
-            await waitUnplug()
-            // audit M-i MED-4 (see the ane arm): preserve the burn-in cap at the
-            // 100% plateau instead of clobbering it with the 12-min window.
-            if !burning { deadline = Date().addingTimeInterval(minutes * 60) }
+            // audit M-i MED-4 (see the ane arm): atUnplug preserves the burn-in
+            // cap at the 100% plateau instead of arming the window.
+            let atPlateau = await waitUnplug()
+            burnState = BASBurnInDeadline.atUnplug(
+                nowEpoch: Date().timeIntervalSince1970, atPlateau: atPlateau,
+                windowSec: windowSec, burnCapSec: burnCapSec)
             var i = 0
-            while Date() < deadline {
+            while !burnState.isExpired(nowEpoch: Date().timeIntervalSince1970) {
                 let req = BASOrganRequest(requestID: "m4-\(i)", role: .core, preset: .core,
                                           instruction: "Write a short paragraph about topic \(i).", context: [])
                 var body = ""
