@@ -29,6 +29,15 @@ public struct BASDifficultyProbe: Sendable {
         guard w.count == mu.count, mu.count == sd.count else {
             throw ProbeError.dimensionMismatch(w.count, mu.count)
         }
+        // audit mlx-decode LOW-3: validate VALUES at this untrusted file boundary. A NaN/±inf
+        // coefficient, or a zero std-dev (division-by-zero in the (x-mu)/sd standardization), would
+        // silently poison every inference. Fail closed on a malformed weights file.
+        guard b.isFinite,
+              w.allSatisfy(\.isFinite),
+              mu.allSatisfy(\.isFinite),
+              sd.allSatisfy({ $0.isFinite && $0 != 0 }) else {
+            throw ProbeError.badFile(weightsURL.lastPathComponent)
+        }
         self.w = w.map(Float.init)
         self.b = Float(b)
         self.mu = mu.map(Float.init)

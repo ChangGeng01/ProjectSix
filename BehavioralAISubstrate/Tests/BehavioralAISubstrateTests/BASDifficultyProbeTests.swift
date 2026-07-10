@@ -47,4 +47,25 @@ final class BASDifficultyProbeTests: XCTestCase {
         XCTAssertEqual(p.heldoutAUC, 0.9)
         XCTAssertEqual(try p.successProbability(hidden: [1, 2]), 1 / (1 + exp(-0.25)), accuracy: 1e-6)
     }
+
+    // audit mlx-decode LOW-3: a malformed weights file must FAIL CLOSED — a zero std-dev (division-
+    // by-zero) or a non-finite coefficient (e.g. 1e400 → +inf on parse) would otherwise poison every
+    // inference. Written as raw JSON text so the +inf literal survives (JSONSerialization won't emit it).
+    func testMalformedWeightsFailClosed() throws {
+        func writeRaw(_ json: String) throws -> URL {
+            let u = FileManager.default.temporaryDirectory
+                .appendingPathComponent("probe_bad_\(UUID().uuidString).json")
+            try Data(json.utf8).write(to: u)
+            return u
+        }
+        let zeroSD = try writeRaw(#"{"w":[0.5,0.5],"b":0.1,"mu":[0,0],"sd":[1,0]}"#)
+        defer { try? FileManager.default.removeItem(at: zeroSD) }
+        XCTAssertThrowsError(try BASDifficultyProbe(weightsURL: zeroSD),
+            "a zero std-dev (division-by-zero) must fail closed")
+
+        let infW = try writeRaw(#"{"w":[1e400,0.5],"b":0.1,"mu":[0,0],"sd":[1,1]}"#)
+        defer { try? FileManager.default.removeItem(at: infW) }
+        XCTAssertThrowsError(try BASDifficultyProbe(weightsURL: infW),
+            "a +inf coefficient (1e400) must fail closed")
+    }
 }
