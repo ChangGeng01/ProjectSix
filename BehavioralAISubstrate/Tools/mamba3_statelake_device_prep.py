@@ -57,7 +57,11 @@ def read_statelake(out: str, expected_bkey: str) -> dict:
     if h["binding_key"] != expected_bkey:
         raise SL.StateLakeError("binding-key mismatch")
     blob = open(os.path.join(out, "payload.bin"), "rb").read()
-    assert hashlib.sha256(blob).hexdigest() == h["checksum"], "checksum mismatch"
+    # decision 7: fail-closed integrity check that SURVIVES `python -O` (which strips bare `assert`, so
+    # the old `assert … == checksum` silently vanished and a corrupt/tampered blob loaded unchecked).
+    # Mirrors the binding-key check above (57-58) and the library reader mamba3_statelake.deserialize_artifact.
+    if not (hashlib.sha256(blob).hexdigest() == h["checksum"]):
+        raise SL.StateLakeError("checksum mismatch")
     npd = {"int8": np.int8, "fp16": np.float16}
     states = {}
     for r in h["tensors"]:
@@ -73,7 +77,11 @@ def main() -> None:
     m = HY.HybridM(vocab, L).float().eval()
     if sd is not None:
         miss, unexp = m.load_state_dict(sd, strict=False)
-        assert not unexp, f"CKPT has keys HybridM lacks: {unexp[:3]}"
+        # decision 7 (lesser: dev-time sanity, but a CKPT carrying keys HybridM lacks means the loaded
+        # model diverges from what gets serialized — undermining the "rehydrates IDENTICALLY" proof this
+        # tool exists for). CLI entry ⇒ sys.exit; survives `python -O` unlike the old bare assert.
+        if unexp:
+            sys.exit(f"CKPT has keys HybridM lacks: {unexp[:3]}")
         print(f"loaded TRAINED ckpt (vocab={vocab})")
     seq = torch.tensor([(i * 17 + 5) % vocab for i in range(PROMPT + CONT)])    # deterministic, mirrors the duet probe
     with torch.no_grad():
