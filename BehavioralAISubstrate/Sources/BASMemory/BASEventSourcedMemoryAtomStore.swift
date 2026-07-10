@@ -341,18 +341,24 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
         _ atom: BASGovernedMemory
     ) async throws -> Bool {
         let key = atom.id.uuidString
-        // audit memory-b F3: capture the CURRENT winner's confidence BEFORE the append. The M942
-        // reducer keeps the HIGHER-confidence entry (ties go to the existing one). If this atom
-        // does NOT strictly win, its content must NOT overwrite the winner's cached content —
-        // otherwise atom(forID:) returns a winner-metadata + loser-content HYBRID.
-        let priorConfidence = await currentProjection()[key]?.confidence
         let payload = BASMemoryAtomEventPayload(admitted: atom)
         let appended = try await appendEventAndUpdateCache(
             payload: payload)
         if appended, !atom.content.isEmpty {
-            // Cache content for in-process content fidelity — ONLY when this atom won the reducer's
-            // confidence tiebreak (no prior, or strictly higher confidence than the prior winner).
-            if priorConfidence == nil || atom.confidence > priorConfidence! {
+            // audit memory-b F3 (2nd clause): decide the cache write on the POST-append projection
+            // winner, NOT a pre-append snapshot. Two concurrent same-id admits could both capture an
+            // empty prior projection and let a LOSING (lower-confidence) admit write its content last
+            // → a winner-metadata + loser-content HYBRID. Re-reading the winner AFTER the append and
+            // writing only when THIS atom IS the winner closes that reentrancy hole. There is NO
+            // await between this re-read and the synchronous cache write, so the check+write is atomic
+            // under actor reentrancy.
+            //
+            // Residual (out of F3's scope): two EQUAL-confidence same-id admits with different content
+            // can't be disambiguated by confidence alone — the reducer ties-to-existing but the cache
+            // compare can't see event identity. Fully robust closure would key the write on the
+            // winning eventID. F3's cited defect is a LOWER-confidence re-admit, which this fully closes.
+            let winnerConfidence = await currentProjection()[key]?.confidence
+            if winnerConfidence == atom.confidence {
                 contentCache[key] = atom.content
             }
         }
