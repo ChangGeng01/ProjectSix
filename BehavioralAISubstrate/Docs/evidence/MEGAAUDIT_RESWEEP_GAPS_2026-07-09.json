@@ -1284,5 +1284,23 @@
     "operator_gated": {
       "tools-scripts R2/R3 corpus (×2, same finding)": "/tmp→Docs corpus move is operator experiment-domain per the consult-before-deleting doctrine."
     }
+  },
+  "residual_continuation_2026_07_10": {
+    "closed": [
+      "41daa24b4 tools-scripts — StateLake device-prep integrity checks fail-closed (bare assert→raise StateLakeError, survives python -O) + static lint",
+      "9a0c3f5cc x-concurrency §三① COMPLETE — tripwire extended to 5 more CoreAI sessions (LayerSplit/Mamba3Dual/HybridDecode/Mamba3/Mamba step drivers) + BASSaguaroSpeculator (4-method state machine). Prefill=stateless N/A, SaguaroLoop=struct N/A, SaguaroMLXTarget=other module/out-of-scope. Device-gated runtime trip; utility unit-tested + reversed; compiles Mac.",
+      "5673f402e tests-arch ③ CLOSED (deferral overturned) — lint pins turn-driving swift-testing suites (runTurn/startSession) are @MainActor. Signal is EXACT: the 1 turn-driving suite is @MainActor, 0/75 pure-logic suites reference the symbols. Reversal (strip @MainActor from BASEBrainSchemaCoreTests) flags it."
+    ],
+    "deliberate_non_fix_empirically_backed": {
+      "tests-arch ① (env gate registry)": "CONFIRMED not-cleanly-fixable: 281 distinct BAS_/QINAO_/TEST_RUNNER_ names; an auto-derived edit-distance-1 typo-lint yields 10 near-pairs, ALL 10 legitimate families (LOG1/LOG2, T1/T4/T5_XCTEST, RUNTIME_MODE vs RUNTIME_MODE_OVERRIDE) — 100% false-positive → net noise. A hand-maintained 281-name catalog drifts into the exact comment-lie class the audit condemns (§0 disease #1). No hidden typo exists. Correct engineering call = NO infrastructure. Unlike ③ whose signal had 0 false positives."
+    },
+    "device_runtime_gated_final": {
+      "LOW-16 (mlx rung-1 virtual reclaim)": "the parked box stays in pendingSpill until the async spill write lands (KV not freed synchronously); MLX-memory behavior only observable on-device with a real model.",
+      "x-concurrency MED-LOW-10 (BASMetalSyncBridge semaphore.wait)": "device-only pool-saturation; the async restructure that would fix it risks priority inversion — deliberately not changed."
+    },
+    "operator_gated_final": {
+      "tools-scripts R2/R3 corpus": "/tmp→Docs move is operator experiment-domain (consult-before-deleting doctrine)."
+    },
+    "verdict": "Every clean/safe/Mac-fixable residual finding is now closed. The remainder is device-runtime-gated (LOW-16, MED-LOW-10), operator-gated (R2/R3), or a deliberate empirically-backed non-fix (tests-arch ①)."
   }
 }
