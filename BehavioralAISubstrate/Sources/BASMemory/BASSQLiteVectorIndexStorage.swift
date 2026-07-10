@@ -93,6 +93,17 @@ public actor BASSQLiteVectorIndexStorage {
     /// magic-number。Used by encode/decode of embedding_blob。
     public static let floatByteSize: Int = 4
 
+    /// deep-audit LOW: overflow-safe embedding byte-size for an UNTRUSTED `dimension` read from the DB.
+    /// Throws `.dimensionMismatch` on a negative or `* floatByteSize`-overflowing value rather than
+    /// letting the raw multiply TRAP (crash) on a corrupt/tampered local vector DB.
+    static func safeEmbeddingByteSize(dimension: Int, atomID: String) throws -> Int {
+        let (product, overflowed) = dimension.multipliedReportingOverflow(by: floatByteSize)
+        guard dimension >= 0, !overflowed else {
+            throw StorageError.dimensionMismatch(atomID: atomID, expected: -1, got: dimension)
+        }
+        return product
+    }
+
     // MARK: - State
 
     public let databaseURL: URL
@@ -584,7 +595,10 @@ public actor BASSQLiteVectorIndexStorage {
         }
         let blobSize = Int(
             sqlite3_column_bytes(stmt, offset + 2))
-        let expectedSize = dimension * floatByteSize
+        // deep-audit LOW: `dimension` comes straight from the DB column; a corrupt/tampered value
+        // makes `dimension * floatByteSize` overflow and TRAP (crash) on a bad local vector DB.
+        // safeEmbeddingByteSize throws (recoverable) on negative/overflow instead of aborting.
+        let expectedSize = try Self.safeEmbeddingByteSize(dimension: dimension, atomID: atomID)
         guard blobSize == expectedSize else {
             throw StorageError.dimensionMismatch(
                 atomID: atomID,
