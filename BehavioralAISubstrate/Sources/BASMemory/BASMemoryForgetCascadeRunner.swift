@@ -111,9 +111,11 @@ public struct BASForgetCascadeOutcome: BASSchemaVersioned, Equatable {
     public var cascade: BASMemoryForgetCascade
     /// Typed terminal state the runner decided.
     public var terminalState: BASForgetCascadeExecutionState
-    /// Record IDs (matching `BASTemporalMemoryRecord.recordID`)
+    /// Record IDs (matching `BASTemporalMemoryRecord.memoryID`)
     /// that were actually removed from the input field. Empty
     /// when `terminalState == .skipped` or `.failed`.
+    // blindspot LOW id10: the field is `memoryID`, not `recordID`
+    // (recordID belongs to the distinct SQL usage-tracker record type).
     public var removedRecordIDs: [String]
     /// Free-text reason codes — e.g. `"nothing-to-remove"` when
     /// `.skipped`, or `"target-id-not-found"` when `.failed`.

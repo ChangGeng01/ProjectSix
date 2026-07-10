@@ -6,8 +6,15 @@ import BASRuntimeCore
 /// Given a `VerdictContext` describing the current turn (hard-rule
 /// observations, soft-signal scores, operation domain, evidence),
 /// produces a `BASSovereignVerdict` and appends it to the audit
-/// ledger in a single atomic step. This is the single authoritative
-/// place where L14 decides whether an action is allowed.
+/// ledger in a single atomic step.
+///
+/// blindspot MED id41: this is the SDK-façade / warrant-signing verdict
+/// authority and the reference engine for the OBSERVE-lane parity check
+/// (`BASSovereignTurnVerifier`) — NOT the sole runtime decider. The live
+/// per-turn path uses the hand-rolled `computeVerdictDecision`
+/// (`+SovereignVerdict.swift`); the BR-001..BR-012 kernel here is the
+/// parity oracle, not the production hot path. (Was overstated as "the
+/// single authoritative place where L14 decides.")
 ///
 /// ## Decision model
 ///
