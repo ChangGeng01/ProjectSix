@@ -410,6 +410,17 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         fusedTranscriptOrder.removeAll { $0 == key }
     }
 
+    // Test seams (audit LOW-14 / device-recon id10): seed + read the fused-
+    // transcript state so the order↔keys sync invariant carries unit teeth
+    // without the MLX-gated decode path. Mirrors `_activeSessionDecodesForTest`.
+    func _seedFusedTranscriptForTest(_ key: String) {
+        fusedTranscripts[key] = [(role: "user", text: "seed")]
+        _touchFusedTranscript(key)
+    }
+    func _dropFusedTranscriptForTest(_ key: String) { _dropFusedTranscript(key) }
+    var _fusedTranscriptOrderForTest: [String] { fusedTranscriptOrder }
+    var _fusedTranscriptKeysForTest: Set<String> { Set(fusedTranscripts.keys) }
+
     /// audit mlx-adapter-core LOW-14 — pick the transcript seat to evict when over cap: the
     /// least-recently-used key (front of the recency order) that isn't the seat just written. Pure +
     /// static so the LRU choice carries unit teeth independent of the MLX-gated decode path.

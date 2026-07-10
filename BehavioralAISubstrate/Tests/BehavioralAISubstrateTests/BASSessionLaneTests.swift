@@ -20,6 +20,38 @@ final class BASSessionLaneTests: XCTestCase {
         XCTAssertEqual(lane(), .cappedFusedTranscript(transition: false))
     }
 
+    // MARK: - id10 / LOW-14: fusedTranscriptOrder stays in sync with keys
+
+    func testFusedTranscriptOrderStaysInSyncWithKeys() async {
+        // LOW-14: fusedTranscriptOrder (recency) must never diverge from
+        // fusedTranscripts.keys — a stale order entry makes the over-cap
+        // eviction "drop" an already-gone key (a no-op that fails to reduce
+        // the count). The _dropFusedTranscript funnel is the single removal
+        // source; this pins the invariant across seed / drop / clearAll.
+        let a = MLXOrganAdapter()
+        for i in 0..<5 { await a._seedFusedTranscriptForTest("k\(i)") }
+        let order1 = await a._fusedTranscriptOrderForTest
+        let keys1 = await a._fusedTranscriptKeysForTest
+        XCTAssertEqual(order1.count, 5)
+        XCTAssertEqual(Set(order1), keys1, "order and keys match after seeding")
+
+        // Drop a middle key through the funnel: both drop it.
+        await a._dropFusedTranscriptForTest("k2")
+        let order2 = await a._fusedTranscriptOrderForTest
+        let keys2 = await a._fusedTranscriptKeysForTest
+        XCTAssertEqual(Set(order2), keys2,
+                       "the funnel drops the key from BOTH order and store")
+        XCTAssertFalse(order2.contains("k2"))
+        XCTAssertEqual(order2.count, 4)
+
+        // clearAllSessions empties both.
+        await a.clearAllSessions()
+        let order3 = await a._fusedTranscriptOrderForTest
+        let keys3 = await a._fusedTranscriptKeysForTest
+        XCTAssertTrue(order3.isEmpty)
+        XCTAssertTrue(keys3.isEmpty)
+    }
+
     func testSeamFourShapes_forcePooled() {
         XCTAssertEqual(lane(cap: nil), .pooled, "uncapped must ride pooled (the amnesia shape)")
         XCTAssertEqual(lane(cap: 385), .pooled, "cap>384 must ride pooled")
