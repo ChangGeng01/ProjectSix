@@ -558,8 +558,18 @@ public actor BASSovereignVerdictEngine {
         for entry in ordered {
             switch band(entry.score) {
             case .high:
-                // Non-compensatory: highest-priority .high pins, return.
-                return (entry.highLevel, entry.domain)
+                // audit blindspot-② HIGH: pin to the MOST-SEVERE .high, not the first in list order.
+                // The old `return (entry.highLevel, entry.domain)` on the first .high let a lower-
+                // severity domain MASK a co-present higher-severity one: privilegeViolation-high
+                // (→ .quarantine, rank 5, listed at index 1) short-circuited BEFORE selfMod-high
+                // (→ .deadStop, rank 7, index 2) was ever examined, so a self-modification attack
+                // co-present with a privilege violation was only QUARANTINED, not dead-stopped —
+                // an under-escalation of the strongest hard signal. Take the max; list order still
+                // breaks ties (strict `>` keeps the earlier domain when severities are equal).
+                if entry.highLevel > best {
+                    best = entry.highLevel
+                    bestDomain = entry.domain
+                }
             case .mid:
                 if entry.midLevel > best {
                     best = entry.midLevel
