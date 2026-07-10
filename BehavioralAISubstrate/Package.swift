@@ -395,9 +395,10 @@ let package = Package(
                 .product(
                     name: "Tokenizers",
                     package: "swift-transformers"),
-                .product(
-                    name: "Hub",
-                    package: "swift-transformers"),
+                // audit x-arch LOW-5: the "Hub" product edge was phantom — no `import Hub`, no
+                // #hubDownloader/#huggingFaceTokenizerLoader macro invocation in Sources/ (Tokenizers
+                // resolves Hub internally via the package graph). Removed 2026-07-10, full DeviceTestApp
+                // xcodebuild verified green.
                 // M221 — MLXHuggingFace freestanding macros
                 // (#hubDownloader / #huggingFaceTokenizerLoader)
                 // bridge HuggingFace.HubClient + Tokenizers into
@@ -418,7 +419,9 @@ let package = Package(
         // per-ticket observation bundle on the main-chain thought frame.
         // Safe topology: BASObservability does not import BASOrchestration,
         // so no cycle.
-        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASLeaseLife", "BASOrgan", "BASObservability",
+        // audit x-arch LOW-5: BASLeaseLife edge was phantom — no `import BASLeaseLife` in
+        // Sources/BASOrchestration/, no re-export dependency (removed 2026-07-10, build-verified).
+        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASOrgan", "BASObservability",
             // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
             .product(name: "Crypto", package: "swift-crypto")]),
         .target(
@@ -636,10 +639,11 @@ let package = Package(
         .executableTarget(
             name: "BASBrainCLI",
             dependencies: [
+                // audit x-arch LOW-5: BASMemory/BASPolicy edges were phantom — main.swift imports
+                // only Foundation/BASHostKit/BASRuntimeCore, and BASHostKit already declares +
+                // @_exports both (removed 2026-07-10, build-verified).
                 "BASHostKit",
-                "BASRuntimeCore",
-                "BASMemory",
-                "BASPolicy"
+                "BASRuntimeCore"
             ],
             path: "Sources/BASBrainCLI"),
 
