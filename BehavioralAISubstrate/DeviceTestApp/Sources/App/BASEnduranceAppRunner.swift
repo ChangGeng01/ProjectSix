@@ -1890,7 +1890,11 @@ final class BASEnduranceAppController: ObservableObject {
         // Default OFF — normal endurance/cert runs are unaffected.
         let probeConcurrent = (env["BAS_METAL_PROBE_CONCURRENT"] ?? "0") == "1"
         let probeHbIntervalSec = max(1.0, Double(env["BAS_METAL_PROBE_HB_SEC"] ?? "20") ?? 20.0)
-        let probeHbTimeoutSec = max(1.0, Double(env["BAS_METAL_PROBE_TIMEOUT_SEC"] ?? "6") ?? 6.0)
+        // audit devicetestapp LOW-2: the heartbeat gets its OWN timeout knob so it can be tuned
+        // independently of the standalone metal-probe-only run (BAS_METAL_PROBE_TIMEOUT_SEC). Falls
+        // back to the shared var, then 6s, so existing invocations keep their exact behavior.
+        let probeHbTimeoutSec = max(1.0, Double(
+            env["BAS_METAL_PROBE_HB_TIMEOUT_SEC"] ?? env["BAS_METAL_PROBE_TIMEOUT_SEC"] ?? "6") ?? 6.0)
         var metalProbeHeartbeat: Task<Void, Never>? = nil
         if probeConcurrent {
             await emitBoth(
@@ -2578,9 +2582,12 @@ final class BASEnduranceAppController: ObservableObject {
                     // Locked-phone freeze guard (the Task.sleep-at-idle suspension, 2026-07-04): a sync
                     // spin keeps the process schedulable; the GPU (what the cooldown cools) still rests.
                     // ~1 e-core for `cooldown` seconds — accepted tax for unattended device runs.
-                    let end = Date().addingTimeInterval(Double(cooldown))
+                    // audit devicetestapp LOW-6: gate the spin on the MONOTONIC clock (monoNowNs), not
+                    // Date() — a wall-clock NTP/DST step mid-cooldown could otherwise cut it short or
+                    // (backward step) stall it, exactly the hazard this file's monoNowNs helper exists for.
+                    let endNs = monoNowNs() &+ UInt64(Double(cooldown) * 1_000_000_000)
                     var x = 1.0
-                    while Date() < end { x = sin(x) + 1.000001 }
+                    while monoNowNs() < endNs { x = sin(x) + 1.000001 }
                     if x == .infinity { await emitBoth("unreachable") }
                 } else {
                     try? await Task.sleep(
@@ -2700,11 +2707,15 @@ final class BASEnduranceAppController: ObservableObject {
             let rssPeakVsFirstMB = rssMaxMB
                 - (iterRssBefore.first ?? 0)
 
+            // audit devicetestapp LOW-1: report the ACTUAL completed count (iterDurationMs records
+            // one entry per finished iter), not the requested `totalIters` — a wall-cap-truncated run
+            // (the break at the time-cap check) otherwise over-reports how many iterations ran.
+            let completedIters = iterDurationMs.count
             await emitBoth(String(format:
-                "📊 ch1025 FINAL run_sec=%.0f iters=%d " +
+                "📊 ch1025 FINAL run_sec=%.0f iters=%d requested=%d " +
                 "avg_iter_ms=%.0f p50_iter_ms=%.0f " +
                 "p99_iter_ms=%.0f",
-                totalSec, totalIters,
+                totalSec, completedIters, totalIters,
                 avgDurMs, p50DurMs, p99DurMs))
             if let tp = thermalPredictor {
                 await emitBoth(String(format:
@@ -2776,9 +2787,12 @@ final class BASEnduranceAppController: ObservableObject {
         metalProbeHeartbeat?.cancel()
 
         let finalTokensSnapshot = totalTokens   // snapshot before the @Sendable MainActor.run capture (Swift-6)
+        // audit devicetestapp LOW-1: the terminal status reports the ACTUAL completed iters (0 for an
+        // empty run), not the requested target — mirrors the FINAL summary line above.
+        let finalCompletedIters = iterDurationMs.count
         await MainActor.run {
             self.status = .completed(
-                totalIters: totalIters,
+                totalIters: finalCompletedIters,
                 totalTokens: finalTokensSnapshot,
                 runSec: totalSec)
             self.started = false
