@@ -232,9 +232,7 @@ public struct BASMemoryImportanceScorer: Codable, Sendable, Equatable,
         let tierDecay = tierDecayComponent(for: currentTier)
 
         // Weighted geometric-mean style: product of (1+ε)
-        // components, then root-4. The +ε prevents zero records
-        // from collapsing total to 0 — a brand-new atom with no
-        // usage history scores neutral, not min.
+        // components, then root-4.
         let epsilon = 0.0001
         let product =
             (recency + epsilon) *
@@ -242,11 +240,20 @@ public struct BASMemoryImportanceScorer: Codable, Sendable, Equatable,
             (helped + epsilon) *
             (tierDecay + epsilon)
         let raw = pow(product, 0.25)
-        let total = Self.clamp(raw, lo: 0, hi: 1)
+        let geometricTotal = Self.clamp(raw, lo: 0, hi: 1)
 
-        let recommended = recommendedTier(
-            for: currentTier,
-            total: total)
+        // audit blindspot-③ HIGH: a brand-new atom has NO usage records, so recency/frequency/helped
+        // are all 0 and the geometric mean collapses to ~0.001 (NEAR-MIN) despite the +ε — the +ε only
+        // prevents a hard 0, it does NOT lift the mean to the "neutral" the old comment claimed. So a
+        // fresh atom was scored near-min and recommended for DEMOTION on arrival, before it could ever
+        // be used. With zero usage the importance is genuinely UNKNOWN, so keep the promise: a
+        // no-history atom STAYS in its current tier (never demoted on arrival) and reports a neutral
+        // total; once usage accrues, the geometric score governs as before.
+        let hasHistory = !records.isEmpty
+        let total = hasHistory ? geometricTotal : 0.5
+        let recommended = hasHistory
+            ? recommendedTier(for: currentTier, total: geometricTotal)
+            : currentTier
 
         return BASMemoryImportanceScore(
             atomID: atomID,
