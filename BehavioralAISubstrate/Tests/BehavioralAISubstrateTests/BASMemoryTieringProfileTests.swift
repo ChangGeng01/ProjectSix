@@ -89,7 +89,10 @@ final class BASMemoryTieringProfileTests: XCTestCase {
             .promote(
                 from: .cold,
                 to: .warm,
-                reason: .compositeHeatAboveUpperBand))
+                // blindspot MED id31: cold → warm crosses the LOWER band
+                // (heat ≥ warmLowerBand), so the audit reason must name
+                // the lower band, not the upper.
+                reason: .compositeHeatAboveLowerBand))
     }
 
     func testWarmAtomPromotedWhenHeatCrossesUpperBand() {

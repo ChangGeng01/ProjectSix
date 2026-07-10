@@ -159,6 +159,12 @@ public enum BASMemoryTierPromoteReason: String, Sendable, Codable {
     case highRecency
     case highAccessFrequency
     case compositeHeatAboveUpperBand
+    /// cold → warm crossing (heat ≥ warmLowerBand). Distinct from
+    /// compositeHeatAboveUpperBand (warm → hot, heat ≥ hotUpperBand) so
+    /// the audit reason names the threshold that actually fired.
+    /// blindspot MED id31: cold → warm previously mis-stamped the
+    /// UPPER-band reason though it triggers on the LOWER band.
+    case compositeHeatAboveLowerBand
 }
 
 public enum BASMemoryTierDemoteReason: String, Sendable, Codable {
@@ -258,7 +264,7 @@ public enum BASMemoryTemperaturePolicy {
                 return .promote(
                     from: .cold,
                     to: .warm,
-                    reason: .compositeHeatAboveUpperBand)
+                    reason: .compositeHeatAboveLowerBand)
             }
             // Rule 4: eviction suggestion when cold + very stale
             // world context.
