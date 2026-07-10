@@ -466,10 +466,15 @@ final class BASPostRadicalSweepDoctrineTests:
         }
     }
 
-    /// Determinism:doctrine answers must be
-    /// idempotent — same query → same answer。 Pins
-    /// the static-let nature against accidental
-    /// computed-property regressions。
+    /// Stability smoke test:the doctrine surfaces read back the same
+    /// value on repeated access。
+    /// blindspot MED id47: the old comment claimed this "pins the
+    /// static-let nature against accidental computed-property
+    /// regressions" — a guard the code provably cannot provide.
+    /// Comparing a value to ITSELF (a == a) stays green even if the
+    /// surface became a computed property returning the same value each
+    /// call, so it detects no such regression. Corrected to describe
+    /// what it actually is: a light read-stability smoke test.
     func testDoctrineIsDeterministic() {
         let a = BASPostRadicalSweepDoctrine
             .chapterTagsShipped
