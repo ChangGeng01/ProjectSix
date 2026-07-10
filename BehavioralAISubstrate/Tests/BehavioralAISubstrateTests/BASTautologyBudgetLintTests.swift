@@ -24,8 +24,25 @@ final class BASTautologyBudgetLintTests: XCTestCase {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     }
 
-    /// Count EXECUTABLE `XCTAssertTrue(true …)` lines (skip `//`-commented lines — doctrine
-    /// references to the anti-tautology rule must not be counted as tautologies themselves).
+    /// audit tests-arch ②b — the per-line classifier, extracted PURE + static so it is directly
+    /// unit-testable (the inline predicate could not be tested without walking the tree) AND hardened
+    /// against the obvious evasion of switching `XCTAssertTrue(true)` to the equally-permatrue
+    /// `XCTAssert(true)`. Skips `//`-commented lines (doctrine references to the anti-tautology rule
+    /// must not count as tautologies). A trailing `,`/`)` after the literal `true` distinguishes a
+    /// permatrue from `XCTAssertTrue(trueValue)` (a real variable).
+    static func isExecutableTautology(_ rawLine: String) -> Bool {
+        let trimmed = Substring(rawLine).drop { $0 == " " || $0 == "\t" }
+        if trimmed.hasPrefix("//") { return false }
+        for prefix in ["XCTAssertTrue(true", "XCTAssert(true"] {
+            if trimmed.hasPrefix(prefix),
+               trimmed.dropFirst(prefix.count).first.map({ $0 == "," || $0 == ")" }) ?? false {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Count EXECUTABLE permatrue lines across the suite source (`//`-commented lines skipped).
     private func executableTautologyLines() throws -> [String] {
         let dir = testsDir()
         let fm = FileManager.default
@@ -38,12 +55,7 @@ final class BASTautologyBudgetLintTests: XCTestCase {
             let text = try String(contentsOf: url, encoding: .utf8)
             for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
                 let line = String(raw)
-                let trimmed = line.drop { $0 == " " || $0 == "\t" }
-                if trimmed.hasPrefix("//") { continue }
-                if trimmed.hasPrefix("XCTAssertTrue(true")
-                    && (trimmed.dropFirst("XCTAssertTrue(true".count).first.map {
-                        $0 == "," || $0 == ")"
-                    } ?? false) {
+                if Self.isExecutableTautology(line) {
                     hits.append("\(url.lastPathComponent): \(line.trimmingCharacters(in: .whitespaces))")
                 }
             }
@@ -67,6 +79,23 @@ final class BASTautologyBudgetLintTests: XCTestCase {
         XCTAssertFalse(hits.isEmpty,
             "the lint must be reading real source — a zero count means the predicate/path broke, " +
             "not that the suite is tautology-free (lower the budget to 0 only when it genuinely is)")
+    }
+
+    /// audit tests-arch ②b — unit teeth for the extracted classifier. Reversal (return false always,
+    /// or drop the `XCTAssert(true` evasion prefix) reds the positive fixtures.
+    func testClassifierMatchesBothPermatrueFormsAndSkipsRealAssertions() {
+        typealias L = BASTautologyBudgetLintTests
+        // Positive: both literal-true forms, with or without a message, at any indent.
+        XCTAssertTrue(L.isExecutableTautology("XCTAssertTrue(true)"))
+        XCTAssertTrue(L.isExecutableTautology("        XCTAssertTrue(true, \"M123 pin\")"))
+        XCTAssertTrue(L.isExecutableTautology("\tXCTAssert(true)"), "the XCTAssert(true) evasion form is caught")
+        XCTAssertTrue(L.isExecutableTautology("XCTAssert(true, \"pin\")"))
+        // Negative: commented, real assertions, and a variable literally named `trueValue`.
+        XCTAssertFalse(L.isExecutableTautology("// XCTAssertTrue(true) — doctrine reference"))
+        XCTAssertFalse(L.isExecutableTautology("XCTAssertTrue(condition)"))
+        XCTAssertFalse(L.isExecutableTautology("XCTAssertTrue(trueValue)"), "a real variable is not a permatrue")
+        XCTAssertFalse(L.isExecutableTautology("XCTAssertEqual(a, b)"))
+        XCTAssertFalse(L.isExecutableTautology("let x = true"))
     }
 }
 #endif
