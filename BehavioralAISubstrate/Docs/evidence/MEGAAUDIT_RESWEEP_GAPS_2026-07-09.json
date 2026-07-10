@@ -1425,5 +1425,19 @@
       "doc_comment_lies_4": "51f4dac57 id10/id24/id34/id41",
       "dead_code_1": "cf9441db0 id8 frontier builder→reversibility SSOT (+ deletion task task_cdf23448)"
     }
+  },
+  "device_runtime_recon_2026_07_10": {
+    "what": "Reconnoitred 14 device-runtime-gated deferred items. 14 scouts, 0 errors.",
+    "headline": "ALL 14 have an actionable MAC-SIDE layer (genuinely_device_only=0). The code-path/helper/logic layer is Mac-verifiable; only irreducible hardware behavior needs a device. Found REAL bugs + false-greens, not just coverage gaps.",
+    "real_bugs_and_false_greens": {
+      "id14": "BASSovereignAuditLedger.auditChainFull():826 uses hash(canonical) not sealHash(canonical) — inconsistent with append()+verifyChainIntegrity(); false-green tests (Rust==CryptoKit today masks it). REAL integrity bug.",
+      "id5": "idleGuardedSleep (BASProbeCommon) STILL uses wall-clock Date() despite its docstring claiming LOW-6 monotonic hardening — real freeze-pit risk.",
+      "id1": "x-sov #5 error-SURFACING arm untested — reverting surface-not-swallow keeps the suite green (false-green). readback flip test itself is correct.",
+      "id3": "BOTH BASWallclockSleepInclusiveTests are false-green (share the sleep-excluded clock on a non-slept machine).",
+      "id6": "runM4 keeps a SEPARATE inline hand-copy of the burn-in deadline; extracted BASBurnInDeadline has ZERO callers — teeth test a divergent model."
+    },
+    "plumbing_only": "id2/id9/id12/id13 device tests assert only plumbing; several have a Mac-extractable pure verdict (BASTraceExitABVerdict, BASBracketVerdict) that can be unit-asserted.",
+    "mac_gaps_all_14": "Each item has a fix+teeth sketch in evidence/device_recon.json. Real bugs + false-greens first.",
+    "device_layer_after_mac": "Irreducible on-device layers remain for hardware runs (at-rest lock-screen, real thermal, MLX reclaim, crash survival, concurrent-drive trip). Operator has 2 iPhone Air connected."
   }
 }
