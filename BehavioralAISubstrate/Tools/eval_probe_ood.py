@@ -13,11 +13,19 @@ ship a v2 refit on the combined set.
 """
 import json
 import math
+import os
 import sys
 from collections import defaultdict
 
-WEIGHTS = "Docs/probe_weights_v1_2026-07-04.json"
+# audit tools-scripts / decision 7: resolve WEIGHTS relative to THIS file, not the cwd, so the script
+# runs from any directory (matching the absolute-path convention of sibling Tools scripts).
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WEIGHTS = os.path.join(_REPO_ROOT, "Docs", "probe_weights_v1_2026-07-04.json")
 BROAD = "/tmp/gdn_coreai/probe_features_broad.jsonl"
+
+# audit tools-scripts / decision 7: the in-domain downshift-bucket success floor the OOD verdict
+# compares against (was an inline 0.85). Named so the verdict rule is grep-able + tunable in one place.
+IN_DOMAIN_DOWNSHIFT_SUCCESS = 0.85
 
 
 def auc(scores: list[float], labels: list[int]) -> float:
@@ -69,7 +77,7 @@ def main() -> None:
           f"   mid-band(no-op): {len(mid)}/{(sum(mid)/len(mid)) if mid else float('nan'):4.2f}")
     pooled_auc = auc(ps, ls)
     hi_succ = (sum(hi) / len(hi)) if hi else float("nan")
-    verdict = "GENERALIZES" if (pooled_auc >= 0.70 and (not hi or hi_succ >= 0.85)) \
+    verdict = "GENERALIZES" if (pooled_auc >= 0.70 and (not hi or hi_succ >= IN_DOMAIN_DOWNSHIFT_SUCCESS)) \
         else "NEEDS v2 REFIT"
     print(f"\nVERDICT: v1 {verdict} (pooled OOD AUC={pooled_auc:.3f}, "
           f"downshift-bucket success={hi_succ:.2f})")

@@ -46,7 +46,7 @@ def sha256(path):
 
 def load_rows():
     actual = sha256(DATA)
-    assert actual == DATA_SHA_PINNED, f"dataset sha mismatch: {actual} (预注册 {DATA_SHA_PINNED})"
+    if not (actual == DATA_SHA_PINNED): sys.exit(f"dataset sha mismatch: {actual} (预注册 {DATA_SHA_PINNED})")  # decision 7: fail-closed, survives python -O
     rows = [json.loads(l) for l in open(DATA) if l.strip()]
     H = np.array([r["h"] for r in rows], dtype=np.float64)
     y = np.array([r["label"] for r in rows], dtype=np.float64)

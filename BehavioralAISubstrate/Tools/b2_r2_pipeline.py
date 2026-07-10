@@ -73,7 +73,7 @@ def merge(*paths):
 def load():
     sha = sha256(CORPUS)
     pinned = open(CORPUS_SHA_FILE).read().strip()
-    assert sha == pinned, f"corpus sha mismatch: {sha} != pinned {pinned}"
+    if not (sha == pinned): sys.exit(f"corpus sha mismatch: {sha} != pinned {pinned}")  # decision 7: fail-closed, survives python -O
     rows = [json.loads(l) for l in open(CORPUS) if l.strip()]
     H = np.array([r["h"] for r in rows], dtype=np.float64)
     y = np.array([r["label"] for r in rows], dtype=np.float64)
@@ -227,7 +227,7 @@ def _strat_boot_delta(sc, si, y_sub, n_boot, seed):
 def describe3():
     """R3 修订1:描述性轮——三臂分域 AUC 表,无 verdict,无采纳通道。"""
     sha = sha256(FRESH)
-    assert sha == open(FRESH_SHA_FILE).read().strip(), "fresh sha mismatch"
+    if not (sha == open(FRESH_SHA_FILE).read().strip()): sys.exit("fresh sha mismatch")  # decision 7: fail-closed, survives python -O
     rows = [json.loads(l) for l in open(FRESH) if l.strip()]
     H = np.array([r["h"] for r in rows], dtype=np.float64)
     y = np.array([r["label"] for r in rows], dtype=np.float64)
@@ -235,7 +235,7 @@ def describe3():
     arms = {}
     for name, (path, pin) in PIN.items():
         actual = sha256(path)[:16]
-        assert actual == pin, f"{name} sha mismatch: {actual} != pinned {pin}"
+        if not (actual == pin): sys.exit(f"{name} sha mismatch: {actual} != pinned {pin}")  # decision 7: fail-closed, survives python -O
         wj = json.load(open(path))
         arms[name] = ((H - np.array(wj["mu"])) / np.array(wj["sd"])) @ np.array(wj["w"]) + wj["b"]
     from collections import Counter
@@ -274,11 +274,11 @@ def merge_r4(*paths):
     """R4 合并:语义键内部去重 + 对 1171 语料与 R3 fresh 双集排除。"""
     # R4v2(批判 MED-6):排除集来源先验 sha——语料被截断/误编辑时排除集静默缩水
     # = 已见题混进"fresh"(与 J2 静默丢锚同类缺陷)。
-    assert sha256(CORPUS) == open(CORPUS_SHA_FILE).read().strip(), "corpus sha mismatch(排除集来源)"
+    if not (sha256(CORPUS) == open(CORPUS_SHA_FILE).read().strip()): sys.exit("corpus sha mismatch(排除集来源)")  # decision 7: fail-closed, survives python -O
     excl = {semantic_key(json.loads(l)) for l in open(CORPUS) if l.strip()}
     import os
-    assert os.path.exists(FRESH), "R3 fresh 集缺失——先跑 merge-fresh(双集排除是冻结条款)"
-    assert sha256(FRESH) == open(FRESH_SHA_FILE).read().strip(), "r3 fresh sha mismatch(排除集来源)"
+    if not (os.path.exists(FRESH)): sys.exit("R3 fresh 集缺失——先跑 merge-fresh(双集排除是冻结条款)")  # decision 7: fail-closed, survives python -O
+    if not (sha256(FRESH) == open(FRESH_SHA_FILE).read().strip()): sys.exit("r3 fresh sha mismatch(排除集来源)")  # decision 7: fail-closed, survives python -O
     excl |= {semantic_key(json.loads(l)) for l in open(FRESH) if l.strip()}
     seen, kept, dup, leaked = set(), [], 0, 0
     for path in paths:
@@ -310,7 +310,7 @@ def merge_r4(*paths):
 def judge4():
     """J4(章程第六部分,冻结):纯确认——alpha 主门 + math 非劣 + overall 守卫。"""
     sha = sha256(R4_FRESH)
-    assert sha == open(R4_SHA_FILE).read().strip(), "r4 fresh sha mismatch"
+    if not (sha == open(R4_SHA_FILE).read().strip()): sys.exit("r4 fresh sha mismatch")  # decision 7: fail-closed, survives python -O
     rows = [json.loads(l) for l in open(R4_FRESH) if l.strip()]
     H = np.array([r["h"] for r in rows], dtype=np.float64)
     y = np.array([r["label"] for r in rows], dtype=np.float64)
@@ -318,7 +318,7 @@ def judge4():
     arms = {}
     for name, (path, pin) in PIN.items():
         actual = sha256(path)[:16]
-        assert actual == pin, f"{name} sha mismatch: {actual} != pinned {pin}"
+        if not (actual == pin): sys.exit(f"{name} sha mismatch: {actual} != pinned {pin}")  # decision 7: fail-closed, survives python -O
         wj = json.load(open(path))
         arms[name] = ((H - np.array(wj["mu"])) / np.array(wj["sd"])) @ np.array(wj["w"]) + wj["b"]
     sc, si = arms["r2_candidate"], arms["incumbent"]
@@ -475,7 +475,7 @@ def merge_fresh(*paths):
 
 def judge3():
     sha = sha256(FRESH)
-    assert sha == open(FRESH_SHA_FILE).read().strip(), "fresh sha mismatch"
+    if not (sha == open(FRESH_SHA_FILE).read().strip()): sys.exit("fresh sha mismatch")  # decision 7: fail-closed, survives python -O
     rows = [json.loads(l) for l in open(FRESH) if l.strip()]
     H = np.array([r["h"] for r in rows], dtype=np.float64)
     y = np.array([r["label"] for r in rows], dtype=np.float64)
@@ -483,7 +483,7 @@ def judge3():
     arms = {}
     for name, (path, pin) in PIN.items():
         actual = sha256(path)[:16]
-        assert actual == pin, f"{name} sha mismatch: {actual} != pinned {pin}(臂文件被动过,判决拒开)"
+        if not (actual == pin): sys.exit(f"{name} sha mismatch: {actual} != pinned {pin}(臂文件被动过,判决拒开)")  # decision 7: fail-closed, survives python -O
         wj = json.load(open(path))
         arms[name] = ((H - np.array(wj["mu"])) / np.array(wj["sd"])) @ np.array(wj["w"]) + wj["b"]
     broad_idx = [i for i, f in enumerate(fam) if f in BROAD_FAMS]

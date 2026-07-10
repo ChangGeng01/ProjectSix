@@ -23,24 +23,37 @@ def extract_code(resp, entry):
     return code
 ds=load_dataset("openai/openai_humaneval", split="test")
 idx=list(range(len(ds))); random.seed(2); random.shuffle(idx); idx=idx[:N]
-ok=tot=0
+ok=tot=infra_errs=0
 for i in idx:
     r=ds[i]; entry=r["entry_point"]
     resp=ask("Complete this Python function. Return ONLY the full function in a ```python code block```:\n\n"+r["prompt"])
     code=extract_code(resp, entry)
     if f"def {entry}" not in code: code=r["prompt"]+code  # model returned only the body
     program=code+"\n"+r["test"]+f"\ncheck({entry})\n"
-    tot+=1
+    path=None
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
             f.write(program); path=f.name
-        res=subprocess.run([PYBIN, path], capture_output=True, timeout=15)
+        # audit tools-scripts / decision 7: -I isolated mode (ignore env / user site-packages) hardens
+        # the exec of model-generated code a little (a real sandbox is the recommended follow-up).
+        res=subprocess.run([PYBIN, "-I", path], capture_output=True, timeout=15)
+        tot+=1                      # counted only when the harness actually RAN the code
         ok+=(res.returncode==0)
-    except Exception:
-        pass
+    except subprocess.TimeoutExpired:
+        tot+=1                      # generated code hung → a legitimate wrong answer
+    except Exception as e:
+        # audit tools-scripts / decision 7: an INFRA failure (e.g. PYBIN missing) is NOT a model wrong
+        # answer — it used to be `except: pass`-swallowed and scored as one (a broken harness → a false
+        # 0% capability). Surface it + EXCLUDE it from the denominator.
+        infra_errs+=1
+        sys.stderr.write(f"qinao_humaneval: harness error (not a model failure) on task {i}: {e}\n")
     finally:
-        try: os.unlink(path)
-        except Exception: pass
+        if path:
+            try: os.unlink(path)
+            except Exception: pass
 sc=round(ok/max(1,tot)*100,1)
-json.dump({"30":sc,"_N":tot}, open(f"/tmp/qinao_humaneval_{tag}.json","w"))
-print(f"{tag} HumanEval pass@1 = {ok}/{tot} = {sc}%")
+out={"30":sc,"_N":tot}
+if infra_errs: out["_infra_errs"]=infra_errs
+json.dump(out, open(f"/tmp/qinao_humaneval_{tag}.json","w"))
+print(f"{tag} HumanEval pass@1 = {ok}/{tot} = {sc}%"
+      + (f"  ({infra_errs} task(s) EXCLUDED — harness/infra error, not model failures)" if infra_errs else ""))
