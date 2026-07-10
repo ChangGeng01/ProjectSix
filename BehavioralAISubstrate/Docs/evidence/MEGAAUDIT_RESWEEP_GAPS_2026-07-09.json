@@ -1309,5 +1309,33 @@
     "proof": "BASHumanAnchorProtocol.derive reads ONLY permit.mode (agencyRisk 0.75 vs 0.25 across the .block boundary; alienation/dignity switch on it). All 6 permit transformations between the gate-side derive (RunTurn:706) and the audit-side derive (RunTurn:1377) — Abyssal(732)/assertion-ceiling(739)/Kunlun(798)/cthulhu-assertion(991)/cthulhu-escalation(1042) — are ADDITIVE: each rebuilds the permit with mode: permit.mode UNCHANGED, touching only stackedModes/reasonCodes (verified line-by-line: Abyssal:214, Kunlun:203, AssertionCeilingGate:202, CthulhuAssertionCeiling:237, Cthulhu withStackedModes mode:mode). So permit.mode is invariant ⇒ gate-side and audit-side humanAnchor are byte-identical ⇒ the \"byte-identical by construction\" comment is TRUE.",
     "teeth": "Tests/BehavioralAISubstrateTests/BASPermitEscalationModeInvarianceTests.swift — a fired escalation (pressure ≥ 0.6 floor, non-reserved anchor) preserves permit.mode and yields byte-identical pre/post humanAnchor; a .block turn stays .block; a mode-sensitivity guard proves the invariance is load-bearing. Adversarial reversal (escalate mutates .mode → .block) reds with the exact F3 divergence: agencyRisk 0.25→0.75, tone steady→warm.",
     "status": "CLOSED (false alarm, teeth-locked)"
+  },
+  "blindspot_recon_2026_07_10": {
+    "what": "4 never-audited blind spots (cross-device/CRDT, L3-L14 organ logic, Rust business logic, test↔prod) reconnoitred by a 15-sub-area read-only workflow + adversarial verify. 67 candidates → 39 top verified → 31 REAL, all mac-verifiable. VALIDATES the operator instinct: the blind spots hid serious findings reproducing the 4 named diseases in NEW code.",
+    "HIGH_cleared_8": [
+      "6b4bda4db CRDT merger orderBefore INTRANSITIVE (3-frame cycle) → devices diverge → topological sort",
+      "911ef58ea CRDT LWW pickLatest intransitive fold → divergent/wrong winner → causally-maximal-set + tiebreak",
+      "a26a64fcf abyssal escalation LOADED-NEVER-FIRED (mean gate unreachable, 3/6 dims pinned 0) → gate on recommendations",
+      "2a59cf3d3 Rust monotonic_version_compare lexicographic → accepted v10→v9 DOWNGRADE → numeric compare",
+      "bcf24e00b PermitUpgrader could DOWNGRADE a permit (no stringency guard) → strictnessRank guard",
+      "8de9ba871 predictive-notification extreme-risk gated to NEVER fire (default 99) → monotonic in risk",
+      "6c177f974 importance scorer DEMOTED brand-new atoms on arrival (Swift+Rust) → no-history stays neutral",
+      "1ce2e3365 soft-signal verdict UNDER-escalated (first-.high masked stronger .high; Swift+Rust) → max-severity"
+    ],
+    "HIGH_remaining": {
+      "REAL": [
+        "test↔prod: unknown-label audit-hint test never exercises the prod branch (BASMLContextServiceUnknownLabelTests:72)"
+      ],
+      "unverified_need_deepcheck": [
+        "SEALED policy ALLOWS InPlaceEdit",
+        "Crisis climate downgrades Refuse/Quarantine",
+        "Non-Euclidean escalation drops boundaryViolation",
+        "helped-flag encoding incompatible between crates (workload-gated)",
+        "PrivilegeArbiter domain-wide revocation fail-open",
+        "sovereign commit-token digest self-mirror"
+      ]
+    },
+    "KEY_PATTERN_coordinated_swift_rust_xcframework": "TWO of the HIGH (importance scorer, soft-signal verdict) are the SAME bug in BOTH the Swift source AND a Rust twin (bas-retrieval-ranker / bas-substrate-core). The Swift byte-parity / routed-production path links the SHA-pinned BASRustMemoryTracker.xcframework, so the fix lands in both source trees + is cargo-verified, but the Swift-side parity re-greens ONLY after the operator rebuilds the XCFramework from the fixed Rust source. Marked infra-gated (1 XCTSkip pending rebuild). OPERATOR ACTION: rebuild + re-pin the XCFramework, then un-skip BASChapter723...testAtomTierWithNoRecordsScoresIdentically.",
+    "MED_LOW_candidates_remaining": "~23 MED/LOW verified-real candidates across the 4 domains still open (see blindspot_map.json) — the recon full haul."
   }
 }
