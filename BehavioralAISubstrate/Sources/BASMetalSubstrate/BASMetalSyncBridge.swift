@@ -27,6 +27,28 @@ public enum BASMetalSyncBridge {
     /// `timeoutMs`. Use ONLY on the approximate side with a real fallback (never the deterministic spine).
     ///
     /// - Returns: `(value, usedFallback)` — `usedFallback == true` when the op failed or timed out.
+    ///
+    /// KNOWN EDGE — MED-LOW-10 (DEFERRED/LOW, 2026-07-10, adversarially adjudicated): the `Task { await op() }`
+    /// below enqueues onto the GLOBAL cooperative executor, while `sem.wait` blocks the CALLING cooperative
+    /// thread. If the cooperative pool is otherwise saturated for the whole `timeoutMs`, the spawned op may
+    /// never get a thread to start on → 100% fallback + one burned thread × timeout. This is DEGRADATION,
+    /// never deadlock (the timeout guarantees liveness — see `testConcurrentSaturationStaysLive`), and it is
+    /// deliberately NOT fixed because every property that would raise its severity is absent: the shipped
+    /// library (`Sources/`) has ZERO callers of this bridge; the sole caller (the `BASEnduranceAppRunner`
+    /// L8 metal-topK seam) is opt-in default-off, single-in-flight-gated (`L8MetalInFlightGate.tryEnter`
+    /// precedes the call, so bridge concurrency ≤ 1), and on the APPROXIMATE retrieval side with a guaranteed
+    /// correctness-neutral CPU/Rust fallback (a 100%-fallback outcome is byte-identical, only lost GPU
+    /// acceleration). NOTE: the single-flight gate prevents the N-thread self-deadlock but NOT single-caller
+    /// op-starvation, so the degradation IS reachable at N=1 under the harness's own pool load — it stays LOW
+    /// on the grounds above, not on unreachability. SOUND FIX for when this ships into `Sources/` default-on
+    /// or GPU-hit-rate becomes a product goal: run `op` on a dedicated Swift-6 `TaskExecutor` via
+    /// `Task(executorPreference:)` (sound because the Metal op chain are default actors that honor the
+    /// preference, SE-0417), guarded `if #available(macOS 15, *)` with today's inline `Task` as the macOS-14
+    /// fallback (package floor is macOS 14) — plus a degradation-witness test (fast op + generous timeout
+    /// under N in-pool callers asserting `usedFallback == false`; the current test is a liveness pin only,
+    /// fix-blind). REOPEN on any of: (i) this seam moving into `Sources/` default-on or a correctness-load-
+    /// bearing path; (ii) GPU hit-rate becoming a measured product goal; (iii) a second un-gated concurrent
+    /// bridge caller, or removal of `L8MetalInFlightGate`.
     @discardableResult
     public static func runWithTimeout<T: Sendable>(
         timeoutMs: Int,
