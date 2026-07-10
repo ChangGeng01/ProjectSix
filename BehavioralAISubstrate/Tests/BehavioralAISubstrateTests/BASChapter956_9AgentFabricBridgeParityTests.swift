@@ -133,6 +133,22 @@ final class BASChapter956_9AgentFabricBridgeParityTests:
         XCTAssertEqual(b, c)
     }
 
+    /// deep-audit MED: the Swift strongMergeID sorted delta IDs with `.sorted()` = Unicode-CANONICAL
+    /// (NFC-normalizing) order, while the canonical Rust kernel byte-sorts the raw IDs. For an NFC vs
+    /// NFD form of the SAME character (canonically equal, byte-DISTINCT), Swift's sort ordered them
+    /// differently than Rust's byte-sort → a DIFFERENT mergeID for the same delta set across the two
+    /// implementations. The Swift byte-order fix makes them agree with the live Rust XCFramework.
+    func testStrongMergeID_ByteOrderParityWithRustForNFCvsNFD() {
+        let nfc = "\u{00E9}"        // é, precomposed (bytes C3 A9)
+        let nfd = "e\u{0301}"       // é, e + combining acute (bytes 65 CC 81)
+        let deltas = [nfc, nfd]
+        let swiftMid = BASAgentMergeEngine._strongMergeIDForTesting(turnID: "t1", deltaIDs: deltas)
+        let rustMid = BASAgentFabricBridge.strongMergeID(turnID: "t1", deltaIDs: deltas)
+        XCTAssertNotNil(rustMid, "Rust bridge must return an id")
+        XCTAssertEqual(swiftMid, rustMid,
+            "Swift mergeID MUST byte-match the canonical Rust kernel for NFC/NFD delta IDs")
+    }
+
     func testStrongMergeID_DifferentInputsDiffer() {
         let a = BASAgentFabricBridge.strongMergeID(
             turnID: "t1", deltaIDs: ["d1"])
