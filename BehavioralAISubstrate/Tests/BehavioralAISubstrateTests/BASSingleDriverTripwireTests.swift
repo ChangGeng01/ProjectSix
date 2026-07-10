@@ -46,6 +46,30 @@ final class BASSingleDriverTripwireTests: XCTestCase {
         XCTAssertEqual(tw.inFlightCount, 0)
     }
 
+    func testConcurrentAsyncDriversAcrossTasksFireViolation() async {
+        // id8: testConcurrentEntryFiresViolation above is nested-SYNCHRONOUS
+        // (enter; enter; on one thread) — it proves reentrancy detection but
+        // not the real production contract the sessions rely on: two Tasks
+        // driving the SAME session concurrently across threads (enter → await
+        // → defer exit). Deterministic construction (no timing race): driver
+        // A enters on the test's context and stays in-flight; driver B enters
+        // from a SEPARATE Task while A is still in-flight → it observes A's
+        // in-flight driver through the NSLock → trips.
+        let rec = Recorder()
+        let tw = BASSingleDriverTripwire(label: "BASCoreAIDecodeSession") { l, n in rec.record(l, n) }
+        tw.enter()  // A in flight
+        let b = Task {
+            tw.enter()   // B, on a separate Task/thread, observes A → violation
+            tw.exit()
+        }
+        await b.value
+        tw.exit()  // A exits
+        XCTAssertGreaterThanOrEqual(rec.count, 1,
+            "a driver arriving from another Task while A is in-flight must trip the wire")
+        XCTAssertEqual(rec.lastN, 2, "the trip reports two in-flight drivers")
+        XCTAssertEqual(tw.inFlightCount, 0, "both brackets balanced afterward")
+    }
+
     func testExitNeverDrivesCountNegative() {
         let rec = Recorder()
         let tw = BASSingleDriverTripwire(label: "T") { l, n in rec.record(l, n) }
