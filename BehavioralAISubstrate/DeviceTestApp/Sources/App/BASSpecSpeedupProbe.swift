@@ -85,7 +85,9 @@ enum BASSpecSpeedupProbe {
             // The original plain-then-spec single-shot gave spec a hot-SECOND bias on a +77-112%-drift device and ran
             // the free-form workloads last (hottest) — so the 0.88× "NET LOSS" that set minDraftModelAccepted=2.7 was
             // confounded. This bracket makes each workload self-thermal-controlled; the per-workload drift is reported.
-            func cooldown() async { try? await Task.sleep(nanoseconds: 6_000_000_000) }
+            // audit devicetestapp MED-2: lock-survivable cooldown (bare Task.sleep can be suspended
+            // indefinitely once the screen locks, stranding an unattended probe mid-run).
+            func cooldown() async { await idleGuardedSleep(seconds: 6) }
             func ts() -> String {
                 switch ProcessInfo.processInfo.thermalState {
                 case .nominal: return "nominal"; case .fair: return "fair"

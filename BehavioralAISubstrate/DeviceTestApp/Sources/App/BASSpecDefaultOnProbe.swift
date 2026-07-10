@@ -80,7 +80,7 @@ enum BASSpecDefaultOnProbe {
                     Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000.0))
             }
             auto = nil
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await idleGuardedSleep(seconds: 2)   // audit devicetestapp MED-2: lock-survivable cooldown
 
             // Reference: explicit .off adapter, same target, same requests — byte-comparison baseline.
             var off: MLXOrganAdapter? = MLXOrganAdapter(
@@ -91,7 +91,7 @@ enum BASSpecDefaultOnProbe {
                 baseStream.append(try await timedStream(off!, request(i, p, decodeCap)))
             }
             off = nil
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            await idleGuardedSleep(seconds: 1)   // audit devicetestapp MED-2: lock-survivable cooldown
 
             let streamMatches = zip(specStream, baseStream).filter { $0.0.0 == $0.1.0 }.count
             let draftMatches = zip(specDraft, baseStream).filter { $0.0.0 == $0.1.0 }.count
@@ -135,7 +135,7 @@ enum BASSpecDefaultOnProbe {
                 means[n] = total / Double(prompts.count)
                 fileLog.emit(String(format: "📊 spec-sweep n=%d mean_ms=%.0f", n, means[n]!))
                 adapter = nil
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                await idleGuardedSleep(seconds: 2)   // audit devicetestapp MED-2: lock-survivable cooldown
             }
             var base: MLXOrganAdapter? = MLXOrganAdapter(model: target, speculativeDecoding: .off)
             try await base!.loadModel()
@@ -190,7 +190,7 @@ enum BASSpecDefaultOnProbe {
             base = nil
             let mean = total / Double(prompts.count)
             fileLog.emit(String(format: "📊 greedy-sweep baseline-%@ mean_ms=%.0f", label, mean))
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await idleGuardedSleep(seconds: 2)   // audit devicetestapp MED-2: lock-survivable cooldown
             return mean
         }
 
@@ -210,7 +210,7 @@ enum BASSpecDefaultOnProbe {
                 means[n] = total / Double(prompts.count)
                 fileLog.emit(String(format: "📊 greedy-sweep n=%d mean_ms=%.0f", n, means[n]!))
                 adapter = nil
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                await idleGuardedSleep(seconds: 2)   // audit devicetestapp MED-2: lock-survivable cooldown
             }
             let basePost = try await baselineMean("post")
             let driftPct = basePre > 0 ? (basePost - basePre) / basePre * 100 : 0
