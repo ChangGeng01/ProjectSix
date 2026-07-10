@@ -87,27 +87,25 @@ public struct BASSovereignLWWElementSetStrategy:
         among frames: [BASSovereignCrossDeviceLedgerFrame]
     ) -> BASSovereignCrossDeviceLedgerFrame? {
         guard !frames.isEmpty else { return nil }
-        var winner = frames[0]
-        for candidate in frames.dropFirst() {
-            switch candidate.compare(to: winner) {
-            case .after:
-                winner = candidate
-            case .concurrent:
-                if candidate.originDeviceID
-                    < winner.originDeviceID
-                {
-                    winner = candidate
-                } else if candidate.originDeviceID
-                            == winner.originDeviceID,
-                          candidate.auditEntryRef
-                            < winner.auditEntryRef
-                {
-                    winner = candidate
-                }
-            case .before, .equal:
-                continue
+        // audit blindspot-CRDT: the old single-pass fold's "beats" relation (causal `.after` mixed
+        // with a concurrent origin-ASC tiebreak) is INTRANSITIVE, so the winner depended on array
+        // order — two devices picked DIFFERENT LWW winners for the same ref (divergence), and the
+        // fold could even settle on a causally-DOMINATED (non-latest) frame. Correct LWW in two
+        // stages: (1) the causally-MAXIMAL set = frames dominated by NO other (the genuinely-latest,
+        // a concurrent antichain); (2) break that antichain deterministically by origin-ASC then
+        // ref-ASC. A pure function of the group ⇒ every device converges on the same winner.
+        let maximal = frames.filter { candidate in
+            !frames.contains { other in
+                other != candidate && candidate.compare(to: other) == .before
             }
         }
-        return winner
+        // `maximal` is non-empty (a finite causal DAG has at least one maximum). `.min` over a
+        // lexicographic (origin, ref) key — a genuine strict weak ordering — is well-defined.
+        return maximal.min { lhs, rhs in
+            if lhs.originDeviceID != rhs.originDeviceID {
+                return lhs.originDeviceID < rhs.originDeviceID
+            }
+            return lhs.auditEntryRef < rhs.auditEntryRef
+        }
     }
 }

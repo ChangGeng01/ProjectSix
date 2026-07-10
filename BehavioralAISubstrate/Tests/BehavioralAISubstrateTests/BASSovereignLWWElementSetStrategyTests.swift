@@ -94,6 +94,36 @@ final class BASSovereignLWWElementSetStrategyTests: XCTestCase {
         XCTAssertEqual(result[0].originDeviceID, "A")
     }
 
+    // MARK: - audit blindspot-CRDT: intransitive-fold winner divergence
+
+    /// The 3-frame group the old single-pass fold could not resolve deterministically: P dominates Q
+    /// (causal), R concurrent with both, with an origin-tiebreak cycle. The old fold picked R for
+    /// input order [P,Q,R] but P for [Q,R,P] — two devices with the same group chose DIFFERENT LWW
+    /// winners (divergence), and P is causally DOMINATED (not even latest). pickLatest must return the
+    /// same winner for every input order = the origin-min of the causally-MAXIMAL set (R). Reversal
+    /// (restore the single-pass fold) reds.
+    func test_intransitiveGroup_sameWinnerRegardlessOfInputOrder() {
+        let p = makeFrame(ref: "r1", device: "C", counters: ["A": 1, "C": 1])  // dominates q
+        let q = makeFrame(ref: "r1", device: "A", counters: ["A": 1])          // dominated by p
+        let r = makeFrame(ref: "r1", device: "B", counters: ["B": 1])          // concurrent with both
+        XCTAssertEqual(p.compare(to: q), .after, "sanity: p causally dominates q")
+        XCTAssertEqual(r.compare(to: p), .concurrent)
+        XCTAssertEqual(r.compare(to: q), .concurrent)
+
+        let perms: [[BASSovereignCrossDeviceLedgerFrame]] = [
+            [p, q, r], [q, r, p], [r, p, q], [q, p, r], [r, q, p], [p, r, q],
+        ]
+        let winners = perms.map { BASSovereignLWWElementSetStrategy.pickLatest(among: $0) }
+        for (i, w) in winners.enumerated() {
+            XCTAssertEqual(w, winners[0],
+                "pickLatest must be a pure function of the group — order \(i) picked a different "
+                + "winner, so two devices would diverge on the same ref")
+        }
+        // The winner is the origin-min of the maximal set {p,r} = r ("B" < "C"); NOT the dominated q.
+        XCTAssertEqual(winners[0]?.originDeviceID, "B",
+            "winner must be the origin-min of the causally-maximal set (r), never the dominated q")
+    }
+
     // MARK: - Different refs preserved
 
     func test_differentRefs_allPreserved() async {
