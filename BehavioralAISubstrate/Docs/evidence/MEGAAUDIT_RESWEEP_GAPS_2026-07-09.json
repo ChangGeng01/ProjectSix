@@ -1438,6 +1438,33 @@
     },
     "plumbing_only": "id2/id9/id12/id13 device tests assert only plumbing; several have a Mac-extractable pure verdict (BASTraceExitABVerdict, BASBracketVerdict) that can be unit-asserted.",
     "mac_gaps_all_14": "Each item has a fix+teeth sketch in evidence/device_recon.json. Real bugs + false-greens first.",
-    "device_layer_after_mac": "Irreducible on-device layers remain for hardware runs (at-rest lock-screen, real thermal, MLX reclaim, crash survival, concurrent-drive trip). Operator has 2 iPhone Air connected."
+    "device_layer_after_mac": "Irreducible on-device layers remain for hardware runs (at-rest lock-screen, real thermal, MLX reclaim, crash survival, concurrent-drive trip). Operator has 2 iPhone Air connected.",
+    "mac_side_cleared": {
+      "status": "COMPLETE — 12 of 14 Mac-side layers closed this turn (TDD+reversal+push each); 2 honestly deferred.",
+      "real_bugs_and_false_greens_fixed": {
+        "id14": "a1626fa4d auditChainFull hash→sealHash (sovereign integrity) + injectable-divergence discriminating teeth",
+        "id3": "a78a754c6 wallclock false-greens → sleep-conditional discriminator (abstains-or-proves, never false-greens)",
+        "id1": "07203a296 x-sov #6 atom-store surfacing false-green closed (UF_IMMUTABLE force-error)",
+        "id5": "fd8259a6e REAL BUG: idleGuardedSleep wall-clock Date()→monotonic BASIdleGuardedSpin (injectable clock, Mac-tested, reversal 512318x)"
+      },
+      "coverage_and_extraction": {
+        "id4": "334b2e88f guarded+critical composed-seam (governor+chat)",
+        "id8": "d79d7c872 tripwire cross-Task concurrent contract (deterministic)",
+        "id10": "03a819586 LOW-14 fusedTranscriptOrder↔keys sync invariant (internal seams)",
+        "id12": "fc2ffb280 extracted BASTraceExitABVerdict (plumbing-only device test → real quality gate)",
+        "id13": "3fec75599 extracted BASBracketVerdict (drift-refusing; single-sourced 2 QuantAB sites)",
+        "id2": "671f67b69 x-sov #6 SessionPersist _protectSnapshot seam + invocation/flip teeth",
+        "id6": "9184de75f BASBurnInDeadline 2 uncovered branches + spawned runM4-rewire task",
+        "id7": "38181a08e crash-log buffering premise (safe non-fork macOS test)"
+      },
+      "deferred_honestly": {
+        "id9": "BEHAVIOR CHANGE (quantize KV under pressure = a device-only quality/memory tradeoff) — operator decision, not changed blind on Mac.",
+        "id11": "gaps[92] metal-sync semaphore — soft concurrency-liveness (a regression manifests as a hang, not a clean red); gaps[92] is explicitly low-severity. Skipped rather than add a flaky test."
+      },
+      "spawned_tasks": [
+        "task_4c8a1ff2 rewire runM4→BASBurnInDeadline (device-verified refactor the code comment defers as not-Mac-safe)"
+      ],
+      "device_layer_still_needs_hardware": "The irreducible on-device layers remain for the 2 iPhone Air: at-rest lock-screen unreadability (#5/#6), real thermal throttle (#7-thermal), sleep advance (id3 discriminator RUNS+discriminates on device), MLX memory reclaim (LOW-16), crash survival, concurrent-drive trip. The Mac teeth now certify every code-path layer."
+    }
   }
 }
