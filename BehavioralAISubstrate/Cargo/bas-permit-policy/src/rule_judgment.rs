@@ -153,7 +153,9 @@ impl HostUpdatePolicy {
 ///
 /// Decision matrix:
 ///   - InPlaceEdit     → allowed iff requires_review is FALSE
-///                       (review-NOT-required → in-place writes ok)
+///                       AND the policy is not SEALED
+///                       (review-NOT-required → in-place writes ok,
+///                        UNLESS the actor is in the frozen lockdown)
 ///   - Rollback        → allows_rollback
 ///   - Delete          → allows_delete
 ///   - Freeze          → allows_freeze
@@ -161,11 +163,22 @@ impl HostUpdatePolicy {
 ///                       (review channel exists → mutation may
 ///                        flow through it)
 ///
-/// chapter 七百六十三 / M2466。
+/// SEALED override (blindspot-① HIGH,chapter 七百六十三 / M2466):
+/// the SEALED lockdown (all four flags false) freezes EVERY mutation
+/// including direct in-place edits。 requires_review=false in SEALED
+/// does NOT mean "edits need no review" — it means the review channel
+/// is GONE because the L12 actor sealed after a critical attestation
+/// failure。 An in-place edit is still a mutation,so it must NOT flow:
+/// fail CLOSED,not open。 Without this guard the most-direct mutation
+/// leaked through the strictest policy。
 pub fn allow_action(
     policy: HostUpdatePolicy,
     action: UpdateAction,
 ) -> bool {
+    // Frozen lockdown denies every action (SEALED == all-false)。
+    if policy == HostUpdatePolicy::SEALED {
+        return false;
+    }
     match action {
         UpdateAction::InPlaceEdit => !policy.requires_review,
         UpdateAction::Rollback => policy.allows_rollback,
@@ -318,19 +331,44 @@ mod tests {
 
     #[test]
     fn test_allow_action_sealed_denies_everything() {
+        // blindspot-① HIGH: SEALED is the frozen lockdown the L12
+        // actor enters after a critical attestation failure。 Its
+        // docstring says "frozen ALL mutations" — an in-place edit
+        // is the MOST direct mutation, so it must be denied too。
+        // The old body asserted InPlaceEdit ALLOWED (fail-open) with
+        // a self-doubting "wait, this is intentional" comment; that
+        // rationalization was wrong — requires_review=false in SEALED
+        // means the review channel is GONE, not that edits may flow。
         let s = HostUpdatePolicy::SEALED;
-        // requires_review=false → InPlaceEdit ALLOWED (no review gate)
-        // wait,this is intentional — sealed lets in-place edits flow
-        // because there's no review channel left to gate them through
-        // (the policy is itself frozen,not the data)。 Per the
-        // SEALED docstring,this is "no review channel exists"。
-        // But all the other actions are denied。
-        assert!(allow_action(s, UpdateAction::InPlaceEdit),
-            "SEALED has no review → in-place ALLOWED by design");
+        assert!(!allow_action(s, UpdateAction::InPlaceEdit),
+            "SEALED froze all mutations → in-place edit must be DENIED");
         assert!(!allow_action(s, UpdateAction::Rollback));
         assert!(!allow_action(s, UpdateAction::Delete));
         assert!(!allow_action(s, UpdateAction::Freeze));
         assert!(!allow_action(s, UpdateAction::ReviewGatedEdit));
+        // Every action denied — the name of this test is now literal。
+        for a in UpdateAction::ALL {
+            assert!(!allow_action(s, a),
+                "SEALED must deny {:?}", a);
+        }
+    }
+
+    #[test]
+    fn test_sealed_denies_inplace_edit_regression() {
+        // Dedicated regression guard for the fail-open leak: the
+        // strictest policy must not permit the most-direct mutation。
+        // Contrast with a NON-sealed no-review policy, which still
+        // allows in-place edits (the requires_review=false path is
+        // only unsafe for the all-frozen SEALED sentinel)。
+        assert!(!allow_action(
+            HostUpdatePolicy::SEALED, UpdateAction::InPlaceEdit),
+            "SEALED lockdown must deny InPlaceEdit (fail-closed)");
+        let open_no_review = HostUpdatePolicy {
+            requires_review: false, allows_rollback: true,
+            allows_delete: false, allows_freeze: false };
+        assert!(allow_action(
+            open_no_review, UpdateAction::InPlaceEdit),
+            "a non-sealed no-review policy still allows in-place edits");
     }
 
     #[test]
