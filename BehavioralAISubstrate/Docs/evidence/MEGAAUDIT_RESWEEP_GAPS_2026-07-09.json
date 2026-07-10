@@ -1418,6 +1418,12 @@
       "id48": "Refuted: the finding's core premise (\"mirror is the sole oracle\" / matrix-correctness is \"tautological with respect to any shared transcription mistake\") is false. An INDEPENDENT hardcoded-literal oracle for the same doc",
       "id35": "The verdict's two load-bearing claims collapse under scrutiny. (1) \"Tie test is false-green\" is wrong: testEqualScoreCandidatesSortDeterministicallyByID calls dominanceFallbackOrder directly and asserts exactly that func"
     },
-    "status": "work-list clearing in progress — each real behavior bug gets TDD+reversal+push; doc-comment-lies get an honest correction (no runtime teeth); test-hygiene tautologies get converted to real cross-checks."
+    "status": "COMPLETE — all 16 work-items dispositioned with TDD+reversal+push (5 real behavior bugs, 4 test-hygiene→real-teeth, 4 doc-comment-lie corrections, 1 dead-code SSOT re-thread+deletion-task, 2 tautology→cross-check/comment). 30 false-alarms + 4 refuted honestly dropped.",
+    "commits": {
+      "behavior_bugs_5": "ce63a9533 id27 tribunal urgency floor→fallback · 07bcfcc1d id32 markCompleted needs inFlight · 4d9e540e8 id31 cold→warm audit reason · 3b0298853 id22 batch_top_k NaN-last · d94ff1955 id29 latency-budget→CPU downgrade",
+      "test_hygiene_realteeth": "2bb93c2eb id45+id15 doctrine-drift guard reactivate + tautology→Phase2 tie · bf87569c4 id43 fail-open tie guard→hard assert · d0b5c5251 id16 tautology→line-count cross-check + id47 comment · 0fbdf4829 id30 atom-admit→sink real coverage",
+      "doc_comment_lies_4": "51f4dac57 id10/id24/id34/id41",
+      "dead_code_1": "cf9441db0 id8 frontier builder→reversibility SSOT (+ deletion task task_cdf23448)"
+    }
   }
 }
