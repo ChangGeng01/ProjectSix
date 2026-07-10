@@ -99,7 +99,12 @@ final class M384AbyssalPermitEscalationTests: XCTestCase {
 
     // MARK: - 2. Below floor — no escalation
 
-    func testBelowFloorNoEscalation() {
+    /// audit blindspot-② HIGH: the live-wire UN-DEADLOCK. A pressure whose MEAN is below the old 0.6
+    /// floor but which DOES carry per-dimension recommendations must now FIRE. This is exactly the
+    /// production scenario the old mean gate suppressed: the sole producer pins 3 of 6 dims to 0 (max
+    /// mean 0.5 < 0.6), yet a single live axis recommends a mode. Reversal to `aggregateMagnitude >=
+    /// triggerFloor` reds — it returns triggered=false and silently drops [.compare, .delay].
+    func testLowMeanWithRecommendationsStillFires() {
         let p = pressure(
             magnitude: 0.5,
             recommendedModes: [.compare, .delay])
@@ -108,9 +113,10 @@ final class M384AbyssalPermitEscalationTests: XCTestCase {
             permit: permit,
             pressure: p,
             humanAnchor: nil)
-        XCTAssertFalse(decision.triggered)
-        XCTAssertEqual(decision.reasonCodes, [])
-        XCTAssertEqual(decision.permit, permit)
+        XCTAssertTrue(decision.triggered,
+            "a low-MEAN pressure that carries recommendations must escalate — the old mean gate "
+            + "falsely suppressed it, making the escalation dead on the live wire")
+        XCTAssertEqual(decision.permit.stackedModes, [.compare, .delay])
     }
 
     // MARK: - 3. At floor — escalation fires
@@ -281,8 +287,9 @@ final class M384AbyssalPermitEscalationTests: XCTestCase {
             permit: permit,
             pressure: p,
             humanAnchor: nil)
-        // triggered=true (floor crossed) but no modes to add.
-        XCTAssertTrue(decision.triggered)
+        // audit blindspot-② HIGH: no recommendations ⇒ nothing to escalate ⇒ NOT triggered. (Under
+        // the old mean gate this was triggered=true even with zero modes to apply — a spurious fire.)
+        XCTAssertFalse(decision.triggered)
         XCTAssertEqual(decision.reasonCodes, [])
         XCTAssertEqual(decision.permit, permit)
     }
@@ -294,7 +301,9 @@ final class M384AbyssalPermitEscalationTests: XCTestCase {
             magnitude: 0.4,
             recommendedModes: [.compare])
         let permit = basePermit()
-        // Lower floor — should fire at 0.4.
+        // audit blindspot-② HIGH: `triggerFloor` no longer gates (the gate is recommendation
+        // non-emptiness); it is retained only for API/signature stability. This fires because there
+        // IS a recommendation, not because of the custom floor — passing triggerFloor is a no-op.
         let decision = BASAbyssalPermitEscalation.escalate(
             permit: permit,
             pressure: p,
@@ -304,46 +313,26 @@ final class M384AbyssalPermitEscalationTests: XCTestCase {
         XCTAssertEqual(decision.permit.stackedModes, [.compare])
     }
 
-    // MARK: - 12. Chapter 九十一 fix-pin — boundary semantics
+    // MARK: - 12. Gate boundary — recommendation-based (audit blindspot-② HIGH)
 
-    /// Pin chapter 九十一 deep-review note #8: the threshold
-    /// comparison is `>=`, not `>`. Producers measuring exactly
-    /// at the floor must trigger; producers a hair below must
-    /// not. This pins the inequality direction so a future
-    /// refactor that switches `>=` to `>` (or re-introduces a
-    /// tolerance band) fails fast.
-    func testTriggerFloorBoundarySemantics() {
+    /// audit blindspot-② HIGH: the gate boundary is now "did the producer recommend >=1 mode",
+    /// independent of the pressure MEAN. A pressure with ZERO recommendations does not fire (even at
+    /// high mean); a pressure with exactly ONE recommendation fires (even at low mean). The old test
+    /// pinned the mean `>=`-floor inequality — the very gate that made the escalation dead on the live
+    /// wire — so it was pinning the bug.
+    func testGateBoundaryIsRecommendationNonEmptiness() {
         let permit = basePermit()
-        // Just below floor → no escalation.
-        let pBelow = pressure(
-            magnitude: 0.5999999,
-            recommendedModes: [.compare])
-        let belowDecision = BASAbyssalPermitEscalation.escalate(
-            permit: permit,
-            pressure: pBelow,
-            humanAnchor: nil)
-        XCTAssertFalse(belowDecision.triggered,
-                       "magnitude 0.5999999 < default floor 0.6 " +
-                       "must NOT trigger")
-        // Exactly at floor → triggers (>= semantics).
-        let pAt = pressure(
-            magnitude: 0.6,
-            recommendedModes: [.compare])
-        let atDecision = BASAbyssalPermitEscalation.escalate(
-            permit: permit,
-            pressure: pAt,
-            humanAnchor: nil)
-        XCTAssertTrue(atDecision.triggered,
-                      "magnitude 0.6 == default floor 0.6 must " +
-                      "trigger (>= semantics, not strict >)")
-        // Just above floor → triggers.
-        let pAbove = pressure(
-            magnitude: 0.6000001,
-            recommendedModes: [.compare])
-        let aboveDecision = BASAbyssalPermitEscalation.escalate(
-            permit: permit,
-            pressure: pAbove,
-            humanAnchor: nil)
-        XCTAssertTrue(aboveDecision.triggered)
+        // High mean but NO recommendations → does NOT fire.
+        let pNone = pressure(magnitude: 0.9, recommendedModes: [])
+        XCTAssertFalse(
+            BASAbyssalPermitEscalation.escalate(
+                permit: permit, pressure: pNone, humanAnchor: nil).triggered,
+            "zero recommendations must NOT fire, regardless of the (now-irrelevant) mean")
+        // Low mean but ONE recommendation → fires.
+        let pOne = pressure(magnitude: 0.1, recommendedModes: [.compare])
+        XCTAssertTrue(
+            BASAbyssalPermitEscalation.escalate(
+                permit: permit, pressure: pOne, humanAnchor: nil).triggered,
+            "one recommendation must fire, regardless of the (now-irrelevant) mean")
     }
 }

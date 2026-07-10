@@ -23,11 +23,13 @@
 //     `check_sovereign_redaction.sh` allowlist is consulted in the
 //     accompanying tests to ensure we never leak forbidden tokens.
 //
-// Threshold: pressure escalation fires when
-// `pressure.aggregateMagnitude >= triggerFloor` (default 0.6).
-// Producers can still emit recommendedModes at lower magnitudes —
-// they simply do not become permit escalations until the floor is
-// crossed.
+// Threshold (audit blindspot-② HIGH — corrected): pressure escalation fires
+// when the producer recommended at least one mode (`pressure.recommendedModes`
+// is non-empty), i.e. some dimension crossed its per-dimension threshold. The
+// old gate used the MEAN (`aggregateMagnitude >= triggerFloor`), which the
+// sole live producer could never cross (it pins 3 of 6 dims to 0 ⇒ max mean
+// 0.5 < 0.6), so the escalation was loaded but never fired. Gating on the
+// recommendation set is consistent with what the escalation actually applies.
 
 import Foundation
 import BASPolicy
@@ -52,7 +54,7 @@ public struct BASAbyssalPermitEscalationDecision:
     /// `true` when escalation was suppressed by red line 8
     /// (human-anchor tone == .reserved).
     public let suppressedByHumanAnchor: Bool
-    /// `true` when the floor (`triggerFloor`) was crossed.
+    /// `true` when the escalation fired (the producer recommended >=1 mode).
     public let triggered: Bool
 
     public init(
@@ -154,11 +156,17 @@ public enum BASAbyssalPermitEscalation {
                 triggered: false)
         }
 
-        // Floor check. Below the floor, recommendedModes stay in
-        // audit metadata only. Magnitude == floor counts as
-        // triggering — strict > would let producers right at the
-        // boundary slip through.
-        let triggered = pressure.aggregateMagnitude >= triggerFloor
+        // audit blindspot-② HIGH: trigger iff the producer recommended at least one mode to apply —
+        // the SAME `pressure.recommendedModes` the application below iterates. The old gate was
+        // `aggregateMagnitude >= triggerFloor` (a MEAN of 6 dims), but the sole live producer
+        // (BASAbyssalPressureBudget.derive) hardcodes 3 of the 6 dims to 0, so the max attainable mean
+        // is (1+1+1)/6 = 0.5 < 0.6 → this escalation was LOADED BUT NEVER FIRED (the per-dimension
+        // recommendedModes were computed and then silently discarded by the mean gate), and a single
+        // maxed axis was structurally suppressed by averaging. Gating on the recommendation set makes
+        // the gate consistent with the application, un-deadlocks the live wire, and is toward-caution
+        // (a safety escalation that can never escalate is the dangerous state). `triggerFloor` is
+        // retained for API/signature stability; the mean threshold it drove proved unreachable.
+        let triggered = !pressure.recommendedModes.isEmpty
         guard triggered else {
             return BASAbyssalPermitEscalationDecision(
                 permit: permit,
