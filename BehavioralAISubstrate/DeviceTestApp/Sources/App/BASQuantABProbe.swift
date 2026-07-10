@@ -79,7 +79,7 @@ enum BASQuantABProbe {
                 let mean = total / Double(ps.count)
                 adapter = nil
                 fileLog.emit(String(format: "📊 quant-ab %@ mean_ms=%.0f", label, mean))
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                await idleGuardedSleep(seconds: 2)   // audit devicetestapp MED-2: lock-survivable cooldown
                 return (mean, bodies)
             } catch {
                 fileLog.emit("📊 quant-ab \(label) ERROR=\(error)")
@@ -92,6 +92,13 @@ enum BASQuantABProbe {
         // of the per-token read). Physics caveat: at ≤4k ctx the KV is ~10-20% of bandwidth (weights dominate) →
         // expect ≤~10% even before the A19's ±78% thermal drift, so a clean win is unlikely; this MEASURES the bound.
         if let kvb = Int(env["BAS_QUANT_KVBITS"] ?? "") {
+            // audit devicetestapp LOW-4: MLX kvCacheBits supports ONLY 4- or 8-bit. Any other value
+            // (3, 5, 100…) would reach the MLX quant layer and crash / silently misbehave — whitelist
+            // it and abort this run loudly rather than launch an invalid KV-quant measurement.
+            guard kvb == 4 || kvb == 8 else {
+                fileLog.emit("📊 quant-ab KVQUANT ABORT invalid BAS_QUANT_KVBITS=\(kvb) — must be 4 or 8")
+                return
+            }
             // ~150-token passage × 14 ≈ 2.1k-token prompt; decodeCap controls generated tokens on top.
             let passage = "In a quiet coastal town, the lighthouse keeper recorded the tides each morning, noting how "
                 + "the gulls wheeled over the harbour and the fishing boats slipped out before dawn. The old ledger, "
