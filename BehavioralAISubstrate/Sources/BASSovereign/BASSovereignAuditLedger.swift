@@ -540,12 +540,10 @@ public actor BASSovereignAuditLedger {
         //
         // LEGACY PATH (unchanged,kept for byte-pinned compat):
         //     let selfHash = hash(canonical)
-        let selfHash: String
-        if Self.useRoutedSeal {
-            selfHash = Self.hashViaAutoRouter(canonical)
-        } else {
-            selfHash = hash(canonical)
-        }
+        // audit sovereign LOW-8: seal AND verify must route through the SAME SHA impl. `sealHash`
+        // is the single source of that routing (used here + in verifyChainIntegrity), so append and
+        // verify can never diverge if the routed / plain implementations ever differ.
+        let selfHash = sealHash(canonical)
         let appended = AppendedEntry(entry: sealed, priorHash: priorHash, selfHash: selfHash)
 
         // H13 (mega-audit 2026-07-07): capture rollback state BEFORE any mutation so a
@@ -668,7 +666,9 @@ public actor BASSovereignAuditLedger {
                     throw LedgerError.chainIntegrityBroken(lastVerifiedAuditID: lastClean)
                 }
             }
-            let expectedSelfHash = hash(canonical)
+            // audit sovereign LOW-8: recompute via the SAME routing the seal used (sealHash), not a
+            // hardcoded plain `hash` — otherwise a routed-seal chain fails verify if routed ≠ plain.
+            let expectedSelfHash = sealHash(canonical)
             guard appended.selfHash == expectedSelfHash else {
                 throw LedgerError.chainIntegrityBroken(lastVerifiedAuditID: lastClean)
             }
@@ -1335,6 +1335,13 @@ public actor BASSovereignAuditLedger {
 
     private func hash(_ data: Data) -> String {
         Data(SHA256.hash(data: data)).base64EncodedString()
+    }
+
+    /// audit sovereign LOW-8 — the SINGLE source of the seal-hash routing decision, used by BOTH
+    /// `append` (seal) and `verifyChainIntegrity` (recompute). Routing the two through one helper
+    /// guarantees they can never use different SHA implementations for the same chain.
+    func sealHash(_ canonical: Data) -> String {
+        Self.useRoutedSeal ? Self.hashViaAutoRouter(canonical) : hash(canonical)
     }
 
     // MARK: - M83 · Segment helpers (private)
