@@ -114,10 +114,7 @@ final class BASChapter1000_5SingleCanonicalConsultTests:
         throws
     {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let path = "\(projectRoot)/Sources/BASHostKit/" +
             "BASCognitiveBrain+KernelsANE.swift"
         guard let content = try? String(

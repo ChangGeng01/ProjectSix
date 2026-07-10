@@ -116,10 +116,7 @@ final class BASChapter1014_6Round23FixesTests: XCTestCase {
         // `evolution_seal:` / `retraction:` patterns at
         // verdictRef sites remain。
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let path =
             "\(projectRoot)/Sources/BASMemory/" +
             "ShadowTrialCoordinator.swift"

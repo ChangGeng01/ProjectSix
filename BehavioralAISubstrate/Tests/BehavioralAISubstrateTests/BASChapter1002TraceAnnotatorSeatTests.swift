@@ -284,10 +284,7 @@ final class BASChapter1002TraceAnnotatorSeatTests: XCTestCase {
         throws
     {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         // Iterate every Swift source file in Sources/ and count
         // occurrences of `.traceAnnotation` in a `writeDomains:`
         // context。 Allowance:tests + the seat file's own doc

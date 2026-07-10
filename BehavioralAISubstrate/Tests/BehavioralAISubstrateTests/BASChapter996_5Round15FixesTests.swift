@@ -212,10 +212,7 @@ final class BASChapter996_5Round15FixesTests: XCTestCase {
         throws
     {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let callSites = [
             "Sources/BASHostKit/EBrainRuntimeCoordinator+" +
                 "SovereignCommit.swift",

@@ -28,10 +28,7 @@ final class BASChapter1010ScaffoldClosureArcSealTests:
 {
 
     private static var projectRoot: String {
-        ProcessInfo.processInfo.environment[
-            "BAS_PROJECT_ROOT"] ??
-        "/Users/changgeng/Project/Project06/Project06/" +
-        "BehavioralAISubstrate"
+        BASSourceTreeAudit.repoRoot
     }
 
     private static func readFile(_ relPath: String) throws
