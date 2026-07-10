@@ -15,6 +15,20 @@ final class BASSovereignPrivilegeArbiterTests: XCTestCase {
         XCTAssertTrue(ok)
     }
 
+    /// deep-audit MED: explainDenial must AGREE with isAllowed on a nil-domain query. A domain-sealed
+    /// permission denies a nil-domain query (isAllowed==false, blindspot-HIGH fail-closed); explainDenial
+    /// must NAME that seal, not return nil ("allowed"). Unfixed: explainDenial skips the domain block when
+    /// featureDomain==nil → returns nil while isAllowed==false → RED.
+    func testExplainDenialAgreesWithIsAllowedForNilDomainSeal() async {
+        let arb = BASSovereignPrivilegeArbiter()
+        await arb.revoke(.toolWrite, session: "S1", featureDomain: "network", reasonCode: "seal-01")
+        let allowed = await arb.isAllowed(.toolWrite, session: "S1", turn: nil, featureDomain: nil)
+        let explain = await arb.explainDenial(.toolWrite, session: "S1", turn: nil, featureDomain: nil)
+        XCTAssertFalse(allowed, "nil-domain query is fail-closed against the domain seal")
+        XCTAssertNotNil(explain, "a domain-sealed denial must be explained, not reported allowed")
+        XCTAssertEqual(explain, "domain(network):seal-01")
+    }
+
     func testTurnRevocationBlocksCurrentTurnOnly() async {
         let arb = BASSovereignPrivilegeArbiter()
         await arb.revoke(.toolWrite, session: "S1", turn: "T1", reasonCode: "BR-003")

@@ -151,6 +151,17 @@ public actor BASSovereignPrivilegeArbiter {
         if let featureDomain,
            let rev = domainRevocations[featureDomain]?.first(where: { $0.permission == permission }) {
             return "domain(\(featureDomain)):\(rev.reasonCode)"
+        } else if featureDomain == nil {
+            // deep-audit MED: mirror isAllowed's nil-domain fail-closed (lines 122-126) — a nil-domain
+            // query is sealed by ANY domain revocation of the permission, so explainDenial must NAME that
+            // seal. Before this, explainDenial skipped the domain block entirely when featureDomain==nil,
+            // so a genuinely domain-sealed denial (isAllowed==false) returned nil ("allowed") — divergence.
+            // Deterministic: report the lowest-named sealing domain.
+            for name in domainRevocations.keys.sorted() {
+                if let rev = domainRevocations[name]?.first(where: { $0.permission == permission }) {
+                    return "domain(\(name)):\(rev.reasonCode)"
+                }
+            }
         }
         if let rev = sessionRevocations[session]?.first(where: { $0.permission == permission }) {
             return "session(\(session)):\(rev.reasonCode)"
