@@ -68,6 +68,23 @@ final class BASBrainChatEffortTests: XCTestCase {
         XCTAssertEqual(cap.effort, .fast, "critical thermal ⇒ capped to reflex regardless of demand (thermal-lease)")
     }
 
+    func testGuardedEffortSurvivesCriticalThermalThroughChat() async throws {
+        // id4 composed-seam coverage: the facade threads an explicit effort
+        // to the executor. testThermalCriticalCapsThreadedEffort covers
+        // effort:.auto (derived → capped to .fast), but effort:.guarded +
+        // thermal:.critical — the safety-guarded turn on the hottest device —
+        // was untested end-to-end. Decision 1B: a deliberate .guarded must
+        // thread through UNCHANGED (safety dials intact), NOT re-floor to
+        // .fast like a derived effort does.
+        let cap = Capture()
+        let resp = try await makeChat(probe: probe(), capture: cap)
+            .chat(request(health, effort: .guarded, thermal: .critical))
+        XCTAssertEqual(cap.effort, .guarded,
+            "an explicit .guarded effort survives critical thermal through the chat facade")
+        XCTAssertEqual(resp.effortReceipt.applied, .guarded,
+            "the receipt records the guarded effort actually threaded")
+    }
+
     func testSurpriseModulatesThreadedEffort() async throws {
         let freshCap = Capture()
         _ = try await makeChat(probe: probe(), capture: freshCap).chat(request(health, effort: .auto))

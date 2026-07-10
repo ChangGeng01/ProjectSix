@@ -50,6 +50,28 @@ final class BASEffortGovernorTests: XCTestCase {
         XCTAssertTrue(p.overrideReason?.contains("thermal-lease") ?? false)
     }
 
+    func testGuardedRequestSurvivesCriticalThermalThroughGovernor() {
+        // id4 composed-seam coverage: the pure-allocator guarded+critical
+        // invariant (decision 1B) is proven in BASEffortAllocatorTests, but
+        // the LIVE governor seam — which maps .critical → headroom(0) →
+        // resolve(requested:) — was never exercised with requested:.guarded
+        // (every governor test defaults requested:.auto). This proves the
+        // composed headroom→resolve chain preserves an explicit guarded
+        // request on the hottest device, not just the pure fn with a
+        // hand-written 0.0 headroom.
+        let p = BASEffortGovernor.plan(
+            for: req("high-stakes guarded turn"),
+            requested: .guarded,
+            runningMSE: 10.0,                                 // surprise ≈ 0.91
+            thermalState: { .critical },                      // headroom 0
+            estimateStakes: { _, _ in 1.0 })                  // max demand
+        XCTAssertEqual(p.applied, .guarded,
+            "an explicit .guarded request is never dropped below .guarded by "
+            + "the thermal cap through the live governor")
+        XCTAssertNil(p.overrideReason,
+            "thermal-lease is overridden for guarded turns — request unchanged")
+    }
+
     func testRealStakesEstimatorEndToEnd() {
         // No injected stakes ⇒ the REAL BASStakesEstimator runs. A health-safety advice turn is high-stakes;
         // with cold-start neutral surprise (0.5) it must escalate ABOVE the reflex tier — proving the live
