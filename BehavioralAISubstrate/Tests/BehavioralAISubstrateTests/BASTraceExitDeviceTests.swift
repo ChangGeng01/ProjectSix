@@ -100,6 +100,25 @@ final class BASTraceExitDeviceTests: XCTestCase {
         XCTAssertFalse(rows.isEmpty)
         let exitFires = rows.filter { $0.arm == "exit" && $0.fired != "-" }.count
         print("[trace-ab] VERDICT-INPUT exit-arm fires: \(exitFires)/\(rows.count / 2)")
+
+        // device-recon id12: compute the promotion verdict via the pure
+        // BASTraceExitABVerdict (Mac-unit-tested) and ASSERT the documented
+        // quality gate, instead of only printing the numbers. A trace-exit
+        // that cut tokens by sacrificing correctness now REDS here.
+        func samples(_ rs: [Row]) -> [BASTraceExitABVerdict.ArmSample] {
+            rs.map { .init(think: $0.think, correct: $0.correct, answerLen: $0.answerLen) }
+        }
+        let entropyRows = rows.filter { r in Self.quiz.contains { $0.q == r.prompt } }
+        let budgetRows = rows.filter { r in Self.budgetQuiz.contains { $0.q == r.prompt } }
+        let verdict = BASTraceExitABVerdict.evaluate(
+            entropyExit: samples(entropyRows.filter { $0.arm == "exit" }),
+            entropyCtrl: samples(entropyRows.filter { $0.arm == "ctrl" }),
+            budgetExit: samples(budgetRows.filter { $0.arm == "exit" }))
+        print(String(format: "[trace-ab] VERDICT qualityHeld=%@ thinkCut=%.0f%% budgetAnswered=%@ promote=%@",
+                     verdict.qualityHeld ? "Y" : "N", verdict.thinkCut * 100,
+                     verdict.budgetAnswered ? "Y" : "N", verdict.promote ? "Y" : "N"))
+        XCTAssertTrue(verdict.qualityHeld,
+            "ENTROPY quality gate: trace-exit must not drop answer correctness below control")
         #else
         throw XCTSkip("MLXLLM unavailable")
         #endif
