@@ -1677,6 +1677,31 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// write self-deletes (generation guard). Also single-sources transcript cleanup here — the
     /// audit's second divergent eviction copy dropped KV without spilling.
     struct _PendingSpill { let box: ChatSessionBox; let generation: Int }
+
+    /// device-recon id9 (bounds LOW-16's transient): quantize the parked KV to
+    /// int8 ONLY when spilling under real memory pressure (current headroom ≤
+    /// `spillQuantizePressureThreshold` of the cap) — halving the largest
+    /// transient materialization exactly when headroom is scarcest — while
+    /// keeping fp16 exactness on the idle (nil-headroom) dream-loop path.
+    /// Default-on; kill-switch `BAS_SPILL_QUANTIZE_UNDER_PRESSURE=0` restores the
+    /// prior always-fp16 behavior. Pure + Mac-unit-tested; the memory/quality
+    /// effect is device-verified.
+    static let spillQuantizePressureThreshold = 0.10   // == BASPressureLadder.dropBelow
+    nonisolated static var _spillQuantizeUnderPressureEnabled: Bool {
+        ProcessInfo.processInfo.environment["BAS_SPILL_QUANTIZE_UNDER_PRESSURE"] != "0"
+    }
+    static func _spillQuantizeUnderPressure(headroomFrac: Double?) -> Bool {
+        guard _spillQuantizeUnderPressureEnabled, let frac = headroomFrac else { return false }
+        return frac <= spillQuantizePressureThreshold
+    }
+    /// Current process headroom as a fraction of the resolved hard cap, or nil if
+    /// either is unavailable (⇒ no quantize — fp16). Read by the spill writer.
+    static func _currentHeadroomFraction() -> Double? {
+        guard let h = _memoryHeadroomBytes(),
+              let cap = BASMLXMemoryModel.resolvedActiveHardCapBytes(), cap > 0
+        else { return nil }
+        return Double(max(0, h)) / Double(cap)
+    }
     var pendingSpill: [String: _PendingSpill] = [:]
     private var spillGeneration = 0
     /// H5 (mega-audit tranche-3): single spill-writer per key. `!hadPending` could double-spawn a
@@ -1858,8 +1883,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     func _completePendingSpill(key: String) async {
         while let entry = pendingSpill[key] {
             let gen = entry.generation
+            // device-recon id9: the writer materializes the transient NOW, so it
+            // decides on the CURRENT headroom — quantize the parked KV only if
+            // memory is under pressure at write time (bounds LOW-16's transient).
+            let quantize = Self._spillQuantizeUnderPressure(
+                headroomFrac: Self._currentHeadroomFraction())
             let ok = (try? await Self._persist(entry.box, url: Self._spillURL(forKey: key),
-                                               modelID: model.id, quantizeKV: false)) != nil
+                                               modelID: model.id, quantizeKV: quantize)) != nil
             // H5: the writer-active flag is cleared atomically with the pending check below (no
             // await between), so a park that runs after this sees active=false and spawns fresh.
             if pendingSpill[key] == nil {
@@ -1924,8 +1954,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         var n = 0
         for (key, box) in sessions {
             let counted = await _snapshotSeat(key: key) {
+                // device-recon id9: the idle dream-loop warm-seat path keeps fp16
+                // exactness (nil headroom ⇒ _spillQuantizeUnderPressure=false),
+                // single-sourced through the same decision as the pressure writer.
                 (try? await Self._persist(box, url: Self._spillURL(forKey: key),
-                                          modelID: model.id, quantizeKV: false)) != nil
+                                          modelID: model.id,
+                                          quantizeKV: Self._spillQuantizeUnderPressure(headroomFrac: nil))) != nil
                     ? Self._spillURL(forKey: key) : nil
             }
             if counted { n += 1 }
