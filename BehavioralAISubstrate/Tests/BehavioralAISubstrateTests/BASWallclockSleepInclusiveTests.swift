@@ -1,4 +1,5 @@
 import XCTest
+import Darwin
 @testable import BASRuntimeCore
 
 /// audit runtimecore-a #1 — `bas_wallclock_nanos` now reads the sleep-INCLUSIVE clock
@@ -18,12 +19,47 @@ final class BASWallclockSleepInclusiveTests: XCTestCase {
     }
 
     func testWallclockNeverReadsBehindTheSleepExcludedClock() throws {
-        // mach_continuous_time (sleep-inclusive) can never be BEHIND CLOCK_UPTIME_RAW
-        // (sleep-excluded) on the same epoch, modulo a few µs of read-order skew. This is a weak
-        // cross-check that the two clocks share a timescale; the strict sleep gap is device-verified.
+        // WEAK timescale sanity check only — it does NOT discriminate the
+        // runtimecore-a #1 fix (id3): wall>=mono holds whether
+        // bas_wallclock_nanos reads mach_continuous_time (fixed) OR
+        // mach_absolute_time (buggy), because both share the timescale and
+        // wall is read after mono. The real discriminator is
+        // testWallclockSleepAdvanceMatchesSleepInterval below.
         let mono = try BASMonotonicNanos.rawCNanos()
         let wall = try BASWallclockNanos.rawCNanos()   // read AFTER mono
         XCTAssertGreaterThanOrEqual(wall, mono,
             "the sleep-inclusive clock, read after the uptime clock, is at least as large")
+    }
+
+    func testWallclockSleepAdvanceMatchesSleepInterval() throws {
+        // id3 DISCRIMINATING teeth (no false-green). Independently measure
+        // the accumulated sleep-since-boot as continuous − absolute (mach
+        // ticks → ns via timebase). If the machine has not slept, that gap
+        // is ~0 → XCTSkip (honest: sleep-advance is device-gated, cannot be
+        // induced in a unit test). When it HAS slept, bas_wallclock_nanos
+        // (continuous) minus bas_monotonic_nanos (absolute) must equal that
+        // sleep interval — under the OLD bug (wallclock read absolute) the
+        // difference collapses to ~0 and this reds.
+        var tb = mach_timebase_info_data_t()
+        guard mach_timebase_info(&tb) == KERN_SUCCESS, tb.denom != 0 else {
+            throw XCTSkip("mach_timebase_info unavailable")
+        }
+        let ticks = mach_continuous_time() &- mach_absolute_time()
+        let sleepNs = ticks / UInt64(tb.denom) * UInt64(tb.numer)
+            &+ (ticks % UInt64(tb.denom) * UInt64(tb.numer)) / UInt64(tb.denom)
+        // Require a clear ≥1s sleep so read-order/scheduling skew (µs) is
+        // negligible against the signal; otherwise abstain.
+        try XCTSkipUnless(sleepNs > 1_000_000_000,
+            "machine has not slept since boot (sleep gap "
+            + "\(sleepNs) ns); sleep-advance is device-gated")
+        let mono = try BASMonotonicNanos.rawCNanos()
+        let wall = try BASWallclockNanos.rawCNanos()   // read AFTER mono
+        let basGap = wall - mono
+        // Tolerance: 5% of the sleep interval + 50ms for read skew.
+        let tol = Double(sleepNs) * 0.05 + 50_000_000
+        XCTAssertEqual(Double(basGap), Double(sleepNs), accuracy: tol,
+            "bas_wallclock_nanos − bas_monotonic_nanos must equal the "
+            + "sleep interval (\(sleepNs) ns); a ~0 gap means wallclock "
+            + "still reads the sleep-EXCLUDED clock (the reverted bug)")
     }
 }
