@@ -1337,5 +1337,20 @@
     },
     "KEY_PATTERN_coordinated_swift_rust_xcframework": "TWO of the HIGH (importance scorer, soft-signal verdict) are the SAME bug in BOTH the Swift source AND a Rust twin (bas-retrieval-ranker / bas-substrate-core). The Swift byte-parity / routed-production path links the SHA-pinned BASRustMemoryTracker.xcframework, so the fix lands in both source trees + is cargo-verified, but the Swift-side parity re-greens ONLY after the operator rebuilds the XCFramework from the fixed Rust source. Marked infra-gated (1 XCTSkip pending rebuild). OPERATOR ACTION: rebuild + re-pin the XCFramework, then un-skip BASChapter723...testAtomTierWithNoRecordsScoresIdentically.",
     "MED_LOW_candidates_remaining": "~23 MED/LOW verified-real candidates across the 4 domains still open (see blindspot_map.json) — the recon full haul."
+  },
+  "blindspot_HIGH_all_cleared_2026_07_10": {
+    "what": "Completed the operator directive 先清全部 HIGH — all remaining blind-spot HIGH candidates dispositioned with deep-verify → TDD → adversarial reversal → individual push, or honest dismissal.",
+    "HIGH_cleared_this_turn_6": [
+      "caaba47d3 SEALED lockdown ALLOWED in-place edits (allow_action !requires_review; the post-critical-attestation-failure freeze permitted the most-direct mutation) → SEALED denies every action. Rust-only. Pre-existing test PINNED the bug w/ a self-doubting comment; corrected.",
+      "30910c841 Crisis climate DOWNGRADED a sovereign Refuse/Quarantine to Defer (hard-return ignored sovereign_verdict; doc said at-least-Defer FLOOR) → Verdict.severity_rank + max_severity floor. decide() is an unreferenced reference table (latent, not live).",
+      "689d218a1 PrivilegeArbiter domain seal DODGEABLE by omitting featureDomain (nil query fell through to session/turn → true) → nil query fails closed vs ANY domain seal; preserved committed named-domain partition; corrected overstated doc.",
+      "6ca25bc8f Non-Euclidean escalation DROPPED boundaryViolation + consistencyLoss (2 of 4 modes; test pinned it w/ a comment claiming a nonexistent other gating layer) → exhaustive switch, representation→.compare / constitution+values→.mirror.",
+      "65df1f93a unknown-label audit-hint test had ZERO prod coverage (dead never-instantiated mock, wrong seam, fabricated the hint) → made mapLabel internal static, drive the REAL default branch; removed dead mock.",
+      "23cda7de7 commit-token digest suites are self-mirrors (expectedDigest calls the same compute() the minter uses; cannot catch field-binding drift) → added independent from-first-principles SHA256 oracle + per-field binding + injectivity teeth."
+    ],
+    "DISMISSED_false_alarm_1": "b9b3e371d helped-flag encoding incompatible between crates — FALSE ALARM. The recon conflated two same-named functions in different crates. l8 recent_records_for_atom scalar code is decoded back to a STRING by its SOLE consumer (BASRoutedMemoryUsageRecordsStore.recentRecords) with a MATCHING convention; it never reaches the ranker HelpedFlag::from_u8 (fed by a separate byte-equality-tested Swift enum). No cross-feed exists. No behavioral bug; added a footgun-warning note at the encoding site (the divergent conventions are what tripped the auditor).",
+    "method": "Every fix: deep-verify the claim (read prod + trace callers/data-flow) → confirm real vs false alarm → TDD teeth (some rewrote a bug-pinning test into the new teeth) → adversarial reversal (each teeth verified RED with the fix disabled) → individual commit/push. 2 of the 6 (SEALED, Crisis) proved to be latent logic in currently-unreferenced reference code — fixed with honest severity framing.",
+    "HIGH_scorecard": "Blind-spot HIGH total ~15: 8 cleared prior turn + 6 fixed this turn + 1 dismissed false alarm = all dispositioned.",
+    "still_open": "MED/LOW: ~23 verified-real blind-spot MED/LOW candidates remain (blindspot_map.json). Operator-gated: rebuild+re-pin BASRustMemoryTracker.xcframework then un-skip the 2 parity assertions (importance scorer #7 + soft-signal verdict #8)."
   }
 }
