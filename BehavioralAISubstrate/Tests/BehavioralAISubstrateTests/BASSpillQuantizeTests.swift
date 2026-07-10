@@ -3,9 +3,10 @@ import XCTest
 
 /// device-recon id9: Mac teeth for the spill-quantize-under-pressure DECISION —
 /// the one Mac-side lever that bounds LOW-16's transient. Quantize the parked KV
-/// to int8 only when spilling under real memory pressure (headroom ≤ 0.10 of the
-/// cap); keep fp16 exactness on the idle (nil-headroom) dream-loop path. The
-/// memory/quality EFFECT is device-verified; the decision is pinned here.
+/// to 4-bit (Q4) only when spilling under real memory pressure (headroom ≤ 0.10 of
+/// the cap); keep fp16 exactness on the idle (nil-headroom) dream-loop path. The
+/// Q4-shrink EFFECT is pinned in BASSessionKVStoreQuantizeTests (Mac) and
+/// A19-device-certified by BASSpillQuantizeProbe; the decision is pinned here.
 final class BASSpillQuantizeTests: XCTestCase {
 
     func testQuantizesOnlyUnderPressure() {

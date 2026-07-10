@@ -318,6 +318,13 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASBandwidthProbe.run() }
             return
         }
+        // device-recon id9 — spill-quantize-under-pressure A19 certification (BAS_SPILL_QUANTIZE_PROBE=1):
+        // the REAL headroom reader + the Q4-shrink EFFECT (MLX.quantized(bits:4) on the A19 Metal GPU,
+        // materially smaller than fp16 + restorable). NO model load ⇒ no jetsam risk. Self-asserts PASS/FAIL.
+        if (env["BAS_SPILL_QUANTIZE_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASSpillQuantizeProbe.run() }
+            return
+        }
         // DecodePlan S4c — flag-off(legacy) vs flag-on(planner) byte-equivalence gate, before flipping
         // decodePlannerAutoSelect (BAS_DECODE_PLANNER_AB=1). Needs the local 3-bit Llama staged. Device-only.
         if (env["BAS_DECODE_PLANNER_AB"] ?? "0") == "1" {

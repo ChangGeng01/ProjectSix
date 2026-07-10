@@ -1679,14 +1679,17 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     struct _PendingSpill { let box: ChatSessionBox; let generation: Int }
 
     /// device-recon id9 (bounds LOW-16's transient): quantize the parked KV to
-    /// int8 ONLY when spilling under real memory pressure (current headroom ≤
-    /// `spillQuantizePressureThreshold` of the cap) — halving the largest
-    /// transient materialization exactly when headroom is scarcest — while
-    /// keeping fp16 exactness on the idle (nil-headroom) dream-loop path.
-    /// Default-on; kill-switch `BAS_SPILL_QUANTIZE_UNDER_PRESSURE=0` restores the
-    /// prior always-fp16 behavior. Pure + Mac-unit-tested; the memory/quality
-    /// effect is device-verified.
-    static let spillQuantizePressureThreshold = 0.10   // == BASPressureLadder.dropBelow
+    /// 4-bit (Q4 — the BASSessionKVStore `quantizeKV` recipe, 4 bits vs fp16's 16)
+    /// ONLY when spilling under real memory pressure (current headroom ≤
+    /// `spillQuantizePressureThreshold` of the cap) — shrinking the largest
+    /// transient KV materialization to roughly a quarter of fp16 exactly when
+    /// headroom is scarcest — while keeping fp16 exactness on the idle
+    /// (nil-headroom) dream-loop path. Default-on; kill-switch
+    /// `BAS_SPILL_QUANTIZE_UNDER_PRESSURE=0` restores the prior always-fp16
+    /// behavior. Pure DECISION (Mac-unit-tested, BASSpillQuantizeTests); the
+    /// Q4-shrink EFFECT is Mac-unit-tested (BASSessionKVStoreQuantizeTests) and
+    /// A19-device-certified (BASSpillQuantizeProbe).
+    public static let spillQuantizePressureThreshold = 0.10   // == BASPressureLadder.dropBelow
     nonisolated static var _spillQuantizeUnderPressureEnabled: Bool {
         ProcessInfo.processInfo.environment["BAS_SPILL_QUANTIZE_UNDER_PRESSURE"] != "0"
     }
@@ -1701,6 +1704,18 @@ public actor MLXOrganAdapter: BASOrganAdapter {
               let cap = BASMLXMemoryModel.resolvedActiveHardCapBytes(), cap > 0
         else { return nil }
         return Double(max(0, h)) / Double(cap)
+    }
+    /// device-recon id9 on-device probe surface: the REAL-memory headroom reader
+    /// (`os_proc_available_memory` / jetsam cap) and the quantize decision it drives,
+    /// exposed for the DeviceTestApp certification probe (a non-`@testable` import
+    /// can't reach the internal statics). Pure read — never mutates state. On macOS
+    /// the readers return nil ⇒ (0, nil, nil, false).
+    public static func spillQuantizeDiagnostics()
+        -> (availableBytes: Int, capBytes: Int?, headroomFrac: Double?, wouldQuantizeUnderRealPressure: Bool) {
+        let avail = _memoryHeadroomBytes() ?? 0
+        let cap = BASMLXMemoryModel.resolvedActiveHardCapBytes()
+        let frac = _currentHeadroomFraction()
+        return (avail, cap, frac, _spillQuantizeUnderPressure(headroomFrac: frac))
     }
     var pendingSpill: [String: _PendingSpill] = [:]
     private var spillGeneration = 0
