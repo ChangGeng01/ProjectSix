@@ -1196,7 +1196,7 @@
    "x-test-integrity F8": "#95 determinism gate letter→byte-identical = release-gate STRICTNESS change (operator eval domain, needs sign-off) + teeth blocked by un-importable model imports"
   },
   "remaining_open": "~33 LOW: runtimecore-a #7(MED thermal-cap)/hostkit-spine F7 F9(F9 deferred)/hostkit-rest LOW-1/sovereign LOW-8(device)/x-sovereignty #7(SampleHost)/x-concurrency 2(device)/mlx-adapter-core LOW-12 LOW-14(device)/devicetestapp 7(device-gated)/rust 2(deletion-deferred)",
-  "closed_count": "40 LOW + 6 MED = 46 findings this campaign; each TDD teeth + reversal + individual push",
+  "closed_count": "41 LOW + 6 MED = 47 findings this campaign (+hostkit-rest LOW-1 89cdd0a77); each TDD teeth or honest integration/comment note + reversal + individual push",
   "deferred_full": {
    "operator-experiment-domain": "tools-scripts b2_r2_pipeline.py + b2_refit_candidate.py + eval_probe_ood.py",
    "operator-eval-gate-strictness": "tools-scripts qinao_humaneval.py exec-sandbox + x-test-integrity F8 #95 byte-identical",
@@ -1204,8 +1204,12 @@
    "deletion-class-operator-gated": "x-architecture LOW-6 (git mv dead code) + rust verdict_decisions.rs (2 dead lines) + rust assembler.rs (cfg-gate dead encoder)",
    "not-a-defect": "hostkit-rest LOW-4, organ-eval LOW-1, hostkit-spine F6 (by-design transient field)",
    "schema-safety-critical": "hostkit-spine F9 (sovereign-execution-receipt over-claims synthesized per-index latency/timestamps as measured) — honest fix touches a schema-versioned safety-critical enum + has an existing .executed pinning test; needs consumer analysis + operator awareness",
-   "mlx-weights-tmp": "mlx-decode LOW-1 (/tmp world-writable MTP weights opt-in gate) changes Mac-dev staging workflow"
+   "mlx-weights-tmp": "mlx-decode LOW-1 (/tmp world-writable MTP weights opt-in gate) changes Mac-dev staging workflow",
+   "operator-policy-decision": "runtimecore-a #7 — guarded→.fast under critical thermal (zeroes critic/tool-verification) is a DOCUMENTED, test-pinned, DORMANT design decision the audit itself deferred (\"decide before adoption\"); any fix is a policy flip + test rewrite needing operator sign-off on the thermal-lease-vs-safety tradeoff",
+   "dormant-feature-wiring": "hostkit-spine F7 — additive wiring for the chapter-188 SSM cross-turn caution operator (itself dormant); full teeth needs turn execution (integration/device); best wired when the feature activates",
+   "sample-host-demo": "x-sovereignty #7 — SampleHost stress-runner raw identifierForVendor → SHA (privacy doctrine); separate demo package with CoreML .mlpackage deps"
   },
-  "not_reproduced": "organ-eval LOW-2 (prompt-lookup role guard already hoisted above the elect guard across all entry points)"
+  "not_reproduced": "organ-eval LOW-2 (prompt-lookup role guard already hoisted above the elect guard across all entry points)",
+  "final_disposition": "ALL clean/safe/non-device/non-operator-gated/non-dormant substrate findings closed. Remaining OPEN = device-gated (devicetestapp 7 + sovereign LOW-8 + x-concurrency 2 + mlx-adapter-core LOW-12/14) OR deferred (operator policy/schema-safety/experiment-domain/manifest-xcodebuild/deletion/dormant/SampleHost). Natural handoff to hardware + operator decisions; daily-workload pivot (The Ledger) remains the main line."
  }
 }
