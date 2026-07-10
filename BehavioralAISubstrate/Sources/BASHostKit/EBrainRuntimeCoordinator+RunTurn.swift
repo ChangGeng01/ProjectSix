@@ -1957,7 +1957,7 @@ extension BASEBrainRuntimeCoordinator {
             riskCard: boundRiskCard,
             actionPermit: boundActionPermit
         )
-        let sovereignExecutionReceipts = buildSovereignExecutionReceipts(
+        let sovereignExecutionReceipts = Self.buildSovereignExecutionReceipts(
             sovereignActuationCommands: sovereignActuationCommands,
             runtimeTrace: runtimeTrace
         )

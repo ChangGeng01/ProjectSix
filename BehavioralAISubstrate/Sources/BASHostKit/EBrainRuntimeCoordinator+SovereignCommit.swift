@@ -1739,17 +1739,22 @@ extension BASEBrainRuntimeCoordinator {
         return BASAutoRouteRanker.bytesToHexLower(Array(digest))
     }
 
-    func buildSovereignExecutionReceipts(
+    /// audit hostkit-spine F9 / operator decision 2B: these are COMMIT-TIME receipts — the commands
+    /// were actuated (status `.executed`) but this layer measures NO per-command timing. So `latencyMs`
+    /// is 0 (unmeasured sentinel, NOT a claimed 0ms) and `executedAt` is the real trace `recordedAt`
+    /// for all — the previous `(index+1)*12ms` latency + per-index timestamp stagger were FABRICATED
+    /// numbers presented as if measured. (Kept `.executed` + the schema; only the fake metrics dropped.)
+    static func buildSovereignExecutionReceipts(
         sovereignActuationCommands: [BASSovereignActuationCommand],
         runtimeTrace: BASRuntimeTrace
     ) -> [BASSovereignExecutionReceipt] {
-        sovereignActuationCommands.enumerated().map { index, command in
+        sovereignActuationCommands.map { command in
             BASSovereignExecutionReceipt(
                 commandID: command.commandID,
                 kind: command.kind,
                 status: .executed,
-                executedAt: runtimeTrace.recordedAt.addingTimeInterval(Double(index + 1) * 0.012),
-                latencyMs: (index + 1) * 12,
+                executedAt: runtimeTrace.recordedAt,
+                latencyMs: 0,
                 enforcedMode: command.forcedMode,
                 reasonCodes: command.reasonCodes
             )
