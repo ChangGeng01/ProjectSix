@@ -103,15 +103,20 @@ public struct BASSaguaroLoop {
             // Accept the longest matching prefix; always emit the target's argmax (byte-identity by construction).
             var acc = 0
             while acc < draftTokens.count && mainList[acc] == draftTokens[acc] { acc += 1 }
-            accepted += acc
 
             var stop = false
-            for i in 0...acc {          // acc accepted draft tokens + the correction/bonus token
+            // audit organ-eval LOW-4: count only draft tokens actually COMMITTED before a break. The
+            // emit loop can stop early (EOS / maxTokens) before emitting all `acc` accepted drafts, so
+            // the old `accepted += acc` over-counted acceptance on a truncated (EOS) round.
+            var emittedDraft = 0
+            for i in 0...acc {          // positions [0,acc) = accepted drafts; acc = the correction/bonus token
                 let t = mainList[i]
                 if eosTokenIds.contains(t) { stop = true; break }   // stop-before-EOS (terminator not emitted)
                 out.append(t)
+                if i < acc { emittedDraft += 1 }
                 if out.count >= maxTokens { stop = true; break }
             }
+            accepted += emittedDraft
             // Rewind the target cache for the rejected drafts.
             target.trimRejected(draftTokens.count - acc)
             if stop { break }

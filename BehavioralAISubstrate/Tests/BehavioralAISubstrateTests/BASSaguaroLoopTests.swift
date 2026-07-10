@@ -82,6 +82,21 @@ final class BASSaguaroLoopTests: XCTestCase {
         XCTAssertFalse(r.tokens.contains(42))                       // terminator never emitted
     }
 
+    // audit organ-eval LOW-4: an EOS token INSIDE the accepted prefix stops emission before those
+    // drafts are committed — `accepted` must not count them. `accepted` can never exceed the number
+    // of tokens actually emitted (the old `accepted += acc` counted the whole accepted prefix).
+    func testEOSInsideAcceptedPrefixDoesNotOvercountAccepted() async throws {
+        var truth = Array(0..<500); truth[2] = 42        // EOS at index 2 (inside round 1's accepted prefix)
+        let r = try await BASSaguaroLoop.generate(
+            promptTokens: [1],
+            draft: MockDraft(truth: truth, perfect: true),   // every proposed draft matches (acc = K)
+            target: MockTarget(truth: truth, eos: [42]),
+            eosTokenIds: [42], maxTokens: 100, numDraftTokens: 4)
+        XCTAssertFalse(r.tokens.contains(42), "the EOS terminator is not emitted")
+        XCTAssertLessThanOrEqual(r.accepted, r.tokens.count,
+            "accepted draft tokens must never exceed emitted tokens (no over-count when EOS truncates the prefix)")
+    }
+
     func testKZero_isPureAutoregressive_noDraftCalls() async throws {
         let truth = Array(0..<500)
         let draft = MockDraft(truth: truth, perfect: true)
