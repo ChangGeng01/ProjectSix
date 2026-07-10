@@ -4,6 +4,25 @@ import XCTest
 /// B2 — the pure probe head (no model): scoring math, dimension guards, budget refinement bounds.
 final class BASDifficultyProbeTests: XCTestCase {
 
+    /// deep-audit LOW (mirrors decision 6A): the world-writable /tmp probe-weights fallback must be
+    /// gated to macOS + explicit opt-in, so a production (iOS) run never loads weights another process
+    /// planted in /tmp. Unfixed (unconditional allow) → the no-opt-in assertion goes red.
+    func testTmpDiffProbeCandidateGatedToMacOSAndOptIn() {
+        XCTAssertFalse(MLXOrganAdapter._tmpDiffProbeAllowed(env: [:]),
+            "no opt-in ⇒ the /tmp candidate is never used (production-safe default)")
+        XCTAssertFalse(MLXOrganAdapter._tmpDiffProbeAllowed(
+            env: ["BAS_DIFF_PROBE_ALLOW_TMP_WEIGHTS": "0"]))
+        #if os(macOS)
+        XCTAssertTrue(MLXOrganAdapter._tmpDiffProbeAllowed(
+            env: ["BAS_DIFF_PROBE_ALLOW_TMP_WEIGHTS": "1"]),
+            "macOS dev with explicit opt-in may use the /tmp staging candidate")
+        #else
+        XCTAssertFalse(MLXOrganAdapter._tmpDiffProbeAllowed(
+            env: ["BAS_DIFF_PROBE_ALLOW_TMP_WEIGHTS": "1"]),
+            "iOS never allows the /tmp candidate, even with the opt-in set")
+        #endif
+    }
+
     private var probe: BASDifficultyProbe {
         // 4 dims: w=[1,-1,0,0], identity standardization → z = h0 − h1 + b
         BASDifficultyProbe(w: [1, -1, 0, 0], b: 0,

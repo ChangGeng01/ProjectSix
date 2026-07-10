@@ -299,13 +299,26 @@ extension MLXOrganAdapter {
         }
     }
 
-    /// B2 — difficulty-probe weights resolution (env override → Documents → the Mac dev path).
+    /// deep-audit LOW (mirrors mlx-decode LOW-1 / decision 6A): the world-writable
+    /// `/tmp/gdn_coreai/probe_weights.json` fallback is a Mac-dev-staging convenience ONLY. Allow it
+    /// solely on macOS AND with explicit opt-in, so a production (iOS) run can never load probe weights
+    /// another process planted in /tmp.
+    nonisolated static func _tmpDiffProbeAllowed(env: [String: String]) -> Bool {
+        #if os(macOS)
+        return env["BAS_DIFF_PROBE_ALLOW_TMP_WEIGHTS"] == "1"
+        #else
+        return false
+        #endif
+    }
+
+    /// B2 — difficulty-probe weights resolution (env override → Documents → gated Mac dev path).
     nonisolated static func _resolveDiffProbeURL() -> URL? {
         let env = ProcessInfo.processInfo.environment
         if let p = env["BAS_DIFF_PROBE_WEIGHTS"] { return URL(fileURLWithPath: p) }
         if let d = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
             .appendingPathComponent("probe_weights.json"),
             FileManager.default.fileExists(atPath: d.path) { return d }
+        guard _tmpDiffProbeAllowed(env: env) else { return nil }
         let tmp = URL(fileURLWithPath: "/tmp/gdn_coreai/probe_weights.json")
         return FileManager.default.fileExists(atPath: tmp.path) ? tmp : nil
     }
