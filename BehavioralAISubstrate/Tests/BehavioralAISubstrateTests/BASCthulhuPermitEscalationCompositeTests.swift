@@ -58,7 +58,15 @@ final class BASCthulhuPermitEscalationCompositeTests: XCTestCase {
         XCTAssertTrue(decision.permit.stackedModes.contains(.compare))
     }
 
-    func testBoundaryViolationDoesNotFireCompare() {
+    func testBoundaryViolationForcesMirror() {
+        // blindspot HIGH: .boundaryViolation — a candidate whose logic
+        // crosses a host-constitution boundary the substrate would not
+        // normally cross — is the MOST safety-relevant failure mode. It
+        // used to be silently dropped (firedNonEuclidean=false) with a
+        // comment claiming it was "handled by other gating layers"; no
+        // such layer exists anywhere in Sources/. It must escalate — a
+        // constitution crossing forces a host-facing .mirror reflection
+        // before the substrate commits.
         let permit = makePermit(stackedModes: [])
         let candidate = BASNonEuclideanCandidate(
             candidateID: "ne-3",
@@ -70,10 +78,34 @@ final class BASCthulhuPermitEscalationCompositeTests: XCTestCase {
             permit: permit,
             nonEuclideanCandidates: [candidate],
             cosmicColdCounterweight: nil)
-        // boundaryViolation is handled by other gating layers
-        // (host-constitution boundary checks); this helper
-        // only fires for collapsedOnGrasp / topologyDistortion.
-        XCTAssertFalse(decision.firedNonEuclidean)
+        XCTAssertTrue(decision.firedNonEuclidean,
+            "boundaryViolation must not be silently dropped")
+        XCTAssertTrue(decision.permit.stackedModes.contains(.mirror),
+            "a host-constitution boundary crossing forces .mirror")
+        XCTAssertTrue(decision.reasonCodes.contains {
+            $0.contains("cthulhu-noneuclidean:boundary-violation")
+        })
+    }
+
+    func testConsistencyLossForcesMirror() {
+        // .consistencyLoss — internally consistent but inconsistent
+        // with the host's stated values — is a values conflict and was
+        // also dropped. It must force a host-facing .mirror reflection.
+        let permit = makePermit(stackedModes: [])
+        let candidate = BASNonEuclideanCandidate(
+            candidateID: "ne-4",
+            nonStandardTopology: "values-conflict",
+            consistentUnderPartialView: true,
+            failureModeWhenGrasped: .consistencyLoss,
+            supportingAnchors: [])
+        let decision = BASCthulhuPermitEscalation.escalate(
+            permit: permit,
+            nonEuclideanCandidates: [candidate],
+            cosmicColdCounterweight: nil)
+        XCTAssertTrue(decision.firedNonEuclidean,
+            "consistencyLoss must not be silently dropped")
+        XCTAssertTrue(decision.permit.stackedModes.contains(.mirror),
+            "a host-values conflict forces .mirror")
     }
 
     func testNonEuclideanDoesNotDuplicateExistingMode() {
