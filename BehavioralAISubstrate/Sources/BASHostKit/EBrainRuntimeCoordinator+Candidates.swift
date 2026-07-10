@@ -62,12 +62,21 @@ extension BASEBrainRuntimeCoordinator {
                 }
                 .map(\.candidateID)
         }()
+        // blindspot LOW id8: this HostKit frontier builder is a DEAD
+        // duplicate (production uses BASNeuralMaterializationCompiler /
+        // EBrainNeuralMaterializationCore.buildCandidateFrontier). It
+        // still carried the pre-consolidation raw 0.6/0.7 reversibility
+        // thresholds; re-threaded onto the BASReversibilityBands SSOT so
+        // the dead copy can't become a stale-band landmine if revived.
+        // (See spawned task: consider deleting this dead duplicate.)
         let reversiblePaths = thoughtFrame.candidates
-            .filter { $0.reversibility >= 0.6 }
+            .filter { BASReversibilityBands
+                .isReversiblePath(reversibility: $0.reversibility) }
             .map(\.candidateID)
         let guardPaths = thoughtFrame.candidates
             .filter { candidate in
-                candidate.reversibility >= 0.7
+                BASReversibilityBands
+                    .isGuardPath(reversibility: candidate.reversibility)
                     || containsGuardLexicon(candidate.title)
                     || containsGuardLexicon(candidate.actionSummary)
             }
