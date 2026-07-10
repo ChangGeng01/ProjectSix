@@ -56,6 +56,31 @@ final class BASSQLiteFileProtectionTests: XCTestCase {
             "the -wal sidecar was flipped too")
     }
 
+    /// DISTINGUISHING (id1 / x-sov #6 surfacing arm): force setAttributes to
+    /// throw by making the DB file user-immutable (UF_IMMUTABLE), then `apply`
+    /// MUST RETURN that error — not swallow it. Every other test asserts the
+    /// nil happy-path, so reverting line 51 `return error` → `return nil` stays
+    /// green everywhere EXCEPT here — this closes that false-green.
+    func testApplySurfacesSetAttributesError() throws {
+        let u = tempURL()
+        defer {
+            // Clear the immutable flag before cleanup can remove the file.
+            try? FileManager.default.setAttributes(
+                [.immutable: false], ofItemAtPath: u.path)
+            cleanup(u)
+        }
+        try writeProtected(u.path, .complete)
+        // Owner-settable user-immutable flag: subsequent setAttributes
+        // (incl. .protectionKey) fails with EPERM.
+        try FileManager.default.setAttributes(
+            [.immutable: true], ofItemAtPath: u.path)
+
+        let err = BASSQLiteFileProtection.apply(toDatabaseAt: u.path)
+        XCTAssertNotNil(err,
+            "apply must RETURN the setAttributes error — x-sov #6 surfaces "
+            + "the failure to the caller's diagnostic channel, never swallows it")
+    }
+
     /// DISTINGUISHING: a missing `-shm` sidecar must be SKIPPED (fileExists
     /// guard), not error — DB flips, absent sidecar is a clean no-op.
     func testApplySkipsMissingSidecarWithoutError() throws {
