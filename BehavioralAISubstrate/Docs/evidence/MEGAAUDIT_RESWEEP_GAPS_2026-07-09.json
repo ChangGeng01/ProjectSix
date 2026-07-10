@@ -1211,5 +1211,16 @@
   },
   "not_reproduced": "organ-eval LOW-2 (prompt-lookup role guard already hoisted above the elect guard across all entry points)",
   "final_disposition": "ALL clean/safe/non-device/non-operator-gated/non-dormant substrate findings closed. Remaining OPEN = device-gated (devicetestapp 7 + sovereign LOW-8 + x-concurrency 2 + mlx-adapter-core LOW-12/14) OR deferred (operator policy/schema-safety/experiment-domain/manifest-xcodebuild/deletion/dormant/SampleHost). Natural handoff to hardware + operator decisions; daily-workload pivot (The Ledger) remains the main line."
+ },
+ "operator_decisions_2026_07_10": {
+  "1B": "runtimecore-a #7 — guarded turn keeps 3/3 safety dials under critical thermal (thermal cap floored at .guarded) — commit 6e89a56ac",
+  "2B": "hostkit-spine F9 — sovereign receipts drop fabricated per-index latency/timestamps (latencyMs=0, executedAt=recordedAt, status stays .executed) — commit f336f068c",
+  "3A": "x-test-integrity F8 — #95 determinism gate compares full bytes (ask(q)==r0), not just the letter — commit 69d08f6b7",
+  "5-rust": "verdict_decisions.rs dead c_char import removed + bas-canonical-bytes assembler cfg(test)-fenced (forgeable encoder unreachable in prod) — commit d5f544203; cargo check+test clean",
+  "5-xarch-LOW-6": "SURFACED BACK, NOT DONE: the git-mv premise fails inspection — the one named file BASSovereignAuditCoverage.swift has an ACTIVE 25-assertion passing test suite (test-covered, not dead), and the zero-reference heuristic is unreliable (false-flags BASConfigRegistry which IS used). Per consult-before-deleting: moving test-covered code would orphan its tests. Needs the operator to name specific confirmed-dead files (with their tests) if they want this done.",
+  "6A": "mlx-decode LOW-1 — /tmp MTP-weights candidate os(macOS)-gated + opt-in BAS_MTP_ALLOW_TMP_WEIGHTS=1 — commit 66bb582a3",
+  "7": "tools-scripts — b2 freeze asserts→sys.exit (survive -O) + eval_probe_ood file-relative WEIGHTS/named floor + qinao_humaneval infra-error surfacing/-I isolation — commit 13afefed8",
+  "4-HELD": "x-architecture LOW-4/LOW-5 Package.swift changes HELD per operator (need xcodebuild verification)",
+  "status": "6 decisions implemented (1B/2B/3A/5-rust/6A/7), each teeth-or-honest-note + reversal + push; 4 held; 5-xarch-LOW-6 surfaced back (premise fails inspection — test-covered code)"
  }
 }
