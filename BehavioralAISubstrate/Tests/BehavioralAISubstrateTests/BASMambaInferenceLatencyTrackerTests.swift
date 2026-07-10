@@ -33,6 +33,23 @@ final class BASMambaInferenceLatencyTrackerTests:
         XCTAssertEqual(count, 3)
     }
 
+    /// deep-audit MED: record() appended latencies with no cap → samplesByBand grew unboundedly (leak).
+    /// Per-band retention must cap at maxSamplesPerBand while totalCalls stays the true monotonic count.
+    /// Unfixed: sampleCount == the overflow count (no trim) → RED.
+    func testPerBandSamplesCappedWhileTotalCallsMonotonic() async {
+        let tracker = BASMambaInferenceLatencyTracker()
+        let over = BASMambaInferenceLatencyTracker.maxSamplesPerBand + 250
+        for i in 0..<over {
+            await tracker.record(latencyMs: Double(i % 100), thermalBand: .low)
+        }
+        let snap = await tracker.snapshot(atTimestampMs: 1)
+        let low = snap.perBand.first { $0.band == .low }
+        XCTAssertEqual(low?.sampleCount, BASMambaInferenceLatencyTracker.maxSamplesPerBand,
+            "per-band retention is capped (was unbounded)")
+        let total = await tracker.totalCalls
+        XCTAssertEqual(total, over, "totalCalls stays the true monotonic count")
+    }
+
     func testPerBandStratification() async {
         let tracker = BASMambaInferenceLatencyTracker()
         // 100 samples in .low at ~5ms,100 in .medium at
