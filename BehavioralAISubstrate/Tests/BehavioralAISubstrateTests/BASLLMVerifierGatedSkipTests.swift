@@ -87,4 +87,40 @@ final class BASLLMVerifierGatedSkipTests: XCTestCase {
         XCTAssertFalse(r.gatedSkip, "an ungated verify (even with no stages wired) is NOT a gated-skip")
         XCTAssertTrue(r.perStage.isEmpty)
     }
+
+    // MARK: consumer-boundary (makeEngineVerifierCallback) — the fail-open the write-only report
+    // flag missed. The report-level gatedSkip was read by ZERO production consumers; the engine
+    // callback collapsed a gated-skip (empty perStage ⇒ allSatisfy vacuously true) into a clean
+    // approve. These pin the fix at the boundary the M932 engine + L11 gate actually consume.
+
+    /// Reversal-red teeth: revert `approved = allSucceeded && !report.gatedSkip` back to
+    /// `approved: allSucceeded` (or drop the feedback gatedSkip field) and this reds — a gated-skip
+    /// draft reads as verifier-approved again, byte-identical to a clean all-pass.
+    func testGatedSkipCallbackIsNotApprovedAndCarriesFlag() async throws {
+        let pipeline = BASLLMVerifierPipeline(adapters: [:], verifyGate: { _, _ in false })
+        let feedback = try await pipeline.makeEngineVerifierCallback()(makeDraft(), makeTaskPackage())
+        XCTAssertFalse(feedback.approved,
+            "a gated-skip (unverified) draft must NOT read as verifier-approved at the consumer boundary")
+        XCTAssertTrue(feedback.gatedSkip,
+            "the consumer feedback must carry gatedSkip so L11 can tell 'unverified' from 'a stage failed'")
+        XCTAssertNotEqual(feedback, BASLLMVerifierFeedback.approvedNoAmendments,
+            "an unverified draft's feedback must not equal a clean all-pass")
+    }
+
+    func testUngatedNoStagesCallbackStillApproves() async throws {
+        let pipeline = BASLLMVerifierPipeline(adapters: [:], verifyGate: { _, _ in true })
+        let feedback = try await pipeline.makeEngineVerifierCallback()(makeDraft(), makeTaskPackage())
+        XCTAssertTrue(feedback.approved,
+            "an ungated run with no wired stages still approves — the fix must not over-block real passes")
+        XCTAssertFalse(feedback.gatedSkip)
+    }
+
+    func testFeedbackCodableAbsentGatedSkipDecodesAsFalse() throws {
+        var obj = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(BASLLMVerifierFeedback(approved: false, gatedSkip: true))) as! [String: Any]
+        obj.removeValue(forKey: "gatedSkip")   // simulate feedback persisted before the field
+        let legacy = try JSONSerialization.data(withJSONObject: obj)
+        let decoded = try JSONDecoder().decode(BASLLMVerifierFeedback.self, from: legacy)
+        XCTAssertFalse(decoded.gatedSkip, "an absent gatedSkip key decodes as not-gated (byte-stable)")
+    }
 }

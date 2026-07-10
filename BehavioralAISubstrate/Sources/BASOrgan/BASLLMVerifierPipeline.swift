@@ -559,8 +559,14 @@ extension BASLLMVerifierPipeline {
                 draft: draft,
                 taskPackage: taskPackage)
             // M940:approved iff all wired stages succeeded
+            // audit organ-eval MED-5 (clause 1): a GATED-SKIP report has an EMPTY perStage, so
+            // `allSatisfy` is VACUOUSLY true — an unverified draft used to read as verifier-accepted
+            // (fail-open), byte-identical to a clean pass. The report's gatedSkip flag was write-only
+            // (no consumer could see it); gate `approved` on it so an unverified draft is NOT accepted,
+            // and propagate the flag so downstream (L11) can tell "unverified" from "a stage failed".
             let allSucceeded = report.perStage.values
                 .allSatisfy { $0.succeeded }
+            let approved = allSucceeded && !report.gatedSkip
             // M940:append failure-stage names so downstream
             // can detect partial failure even when other
             // stages produced output
@@ -570,7 +576,7 @@ extension BASLLMVerifierPipeline {
                 report.aggregatedCounterArguments
             counterArgs.append(contentsOf: report.orderedFailureLabels)
             return BASLLMVerifierFeedback(
-                approved: allSucceeded,
+                approved: approved,
                 amendedAnswer:
                     report.finalRecommendedAnswer
                         != draft.body
@@ -579,7 +585,8 @@ extension BASLLMVerifierPipeline {
                 counterArguments: counterArgs,
                 confidenceScores: [
                     "overall": report.overallConfidence
-                ])
+                ],
+                gatedSkip: report.gatedSkip)
         }
     }
 }
