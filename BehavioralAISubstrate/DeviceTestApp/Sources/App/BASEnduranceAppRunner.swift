@@ -1032,22 +1032,31 @@ final class BASEnduranceAppController: ObservableObject {
         // key custody; production needs keychain per ADR-032)。 Pure
         // side-channel: reads the entry off the result, never touches
         // the turn bytes (ADR-014 / 红线 7)。
+        // deep-audit LOW (INTERPRETABILITY_AUDIT hard-fact ③): opt-in gate (BAS_SOVEREIGN_LEDGER=1),
+        // default-OFF — mirrors the adjacent shadowTrialLoop and honors the ADR-014 / 红线 posture that
+        // signed owner-receipt persistence is NO until the operator opts in. Was armed UNCONDITIONALLY,
+        // writing an Ed25519 key file + SQLite chain to Documents and signing every turn on any run.
+        let sovereignLedgerEnabled = (env["BAS_SOVEREIGN_LEDGER"] ?? "0") == "1"
         let sovereignSink: BASSovereignLedgerHostSink?
-        do {
-            let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first!
-            sovereignSink = try BASSovereignLedgerHostSink
-                .makeReferenceHost(
-                    keyURL: docs.appendingPathComponent(
-                        "bas-sovereign-host.key"),
-                    storagePath: docs.appendingPathComponent(
-                        "bas-sovereign-ledger.sqlite").path)
-            await emitBoth("🔐 sovereign-loop ARMED — per-turn entries "
-                + "signed + chained (keyed Ed25519 ledger, Documents)")
-        } catch {
+        if sovereignLedgerEnabled {
+            do {
+                let docs = FileManager.default.urls(
+                    for: .documentDirectory, in: .userDomainMask).first!
+                sovereignSink = try BASSovereignLedgerHostSink
+                    .makeReferenceHost(
+                        keyURL: docs.appendingPathComponent(
+                            "bas-sovereign-host.key"),
+                        storagePath: docs.appendingPathComponent(
+                            "bas-sovereign-ledger.sqlite").path)
+                await emitBoth("🔐 sovereign-loop ARMED — per-turn entries "
+                    + "signed + chained (keyed Ed25519 ledger, Documents)")
+            } catch {
+                sovereignSink = nil
+                await emitBoth("⚠️ sovereign-loop init failed: \(error) "
+                    + "— continuing without ledger closure")
+            }
+        } else {
             sovereignSink = nil
-            await emitBoth("⚠️ sovereign-loop init failed: \(error) "
-                + "— continuing without ledger closure")
         }
 
         // ADR-018 P2 (2026-06-12) — opt-in shadow-trial N→N+1 carrier
