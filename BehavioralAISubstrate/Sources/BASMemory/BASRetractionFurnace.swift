@@ -229,14 +229,20 @@ public struct BASRetractionFurnace:
         }
     }
 
-    /// Move an entry to `.completed`. No-op if not found or not in
-    /// a non-terminal state.
+    /// Move an entry from `.inFlight` to `.completed`. No-op if not
+    /// found or not in `.inFlight`. Completion means the retraction was
+    /// EXECUTED successfully, so it must follow `markInFlight` — the
+    /// documented lifecycle is `queued → inFlight → completed`. (An
+    /// order that never executes reaches a terminal state via
+    /// `markSkipped`/`markFailed`, not `markCompleted`.)
+    /// blindspot MED id32: the old guard `!entry.state.isTerminal`
+    /// allowed `queued → completed`, skipping execution.
     public func markCompleted(
         orderID: String,
         at timestamp: Date
     ) -> BASRetractionFurnace {
         updateEntry(orderID: orderID) { entry in
-            guard !entry.state.isTerminal else { return entry }
+            guard entry.state == .inFlight else { return entry }
             var next = entry
             next.state = .completed
             next.finishedAt = timestamp
