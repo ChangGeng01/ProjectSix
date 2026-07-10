@@ -400,9 +400,9 @@ public final class BASSovereignLedgerSQLiteStorage:
         Self.bindText(stmt, 2, e.sessionID)
         Self.bindText(stmt, 3, e.turnID)
         Self.bindText(stmt, 4, e.verdictRef)
-        Self.bindText(stmt, 5, e.ruleIDs.joined(separator: ","))
-        Self.bindText(stmt, 6, e.signalRefs.joined(separator: ","))
-        Self.bindText(stmt, 7, e.actionRefs.joined(separator: ","))
+        Self.bindText(stmt, 5, Self.encodeRefList(e.ruleIDs))
+        Self.bindText(stmt, 6, Self.encodeRefList(e.signalRefs))
+        Self.bindText(stmt, 7, Self.encodeRefList(e.actionRefs))
         Self.bindText(stmt, 8, e.snapshotRef)
         Self.bindText(stmt, 9, e.actor.rawValue)
         Self.bindText(stmt, 10, e.signature)
@@ -525,11 +525,11 @@ public final class BASSovereignLedgerSQLiteStorage:
             let sessionID = Self.readText(stmt, 1)
             let turnID = Self.readText(stmt, 2)
             let verdictRef = Self.readText(stmt, 3)
-            let ruleIDs = Self.splitCommaJoined(
+            let ruleIDs = Self.decodeRefList(
                 Self.readText(stmt, 4))
-            let signalRefs = Self.splitCommaJoined(
+            let signalRefs = Self.decodeRefList(
                 Self.readText(stmt, 5))
-            let actionRefs = Self.splitCommaJoined(
+            let actionRefs = Self.decodeRefList(
                 Self.readText(stmt, 6))
             let snapshotRef = Self.readText(stmt, 7)
             let actorRaw = Self.readText(stmt, 8)
@@ -817,7 +817,48 @@ public final class BASSovereignLedgerSQLiteStorage:
         return String(cString: raw)
     }
 
-    private static func splitCommaJoined(_ s: String) -> [String] {
-        s.isEmpty ? [] : s.split(separator: ",").map(String.init)
+    // deep-audit HIGH (CH_1044_DEEP A4 / rs-integrity-canonical): ruleIDs/signalRefs/actionRefs are part
+    // of the SIGNED 1.2.0 injective canonical (basSovereignAuditCanonicalBytes keeps [] vs [""] and
+    // ["a,b"] vs ["a","b"] distinct). The old serialization `joined(separator: ",")` + `split(separator:
+    // ",")` (which drops empty subsequences AND treats an in-band comma as a delimiter) was LOSSY: a
+    // legal comma-bearing or empty-string ref round-tripped to a DIFFERENT array, so on cold-start
+    // reload auditChainFull recomputed the canonical over the mis-split arrays → selfHash/signature
+    // mismatch → the whole benign chain is permanently integrity-quarantined (every later append throws).
+    // MCP audit entries legitimately carry commas (BASMCPInvocationAuditBridge U+001F-joined IDs).
+    // Fix: store INJECTIVELY as a sentinel + per-element "<utf8ByteCount>:<element>" (netstring), so the
+    // reloaded arrays byte-equal the signed originals for any content.
+    private static let refListSentinel = "\u{01}nl1\u{1F}"
+
+    /// Injective serialization of a ref array (netstring: sentinel + "<utf8ByteCount>:<bytes>" per element).
+    static func encodeRefList(_ xs: [String]) -> String {
+        var out = refListSentinel
+        for x in xs { out += "\(x.utf8.count):\(x)" }
+        return out
+    }
+
+    /// Inverse of `encodeRefList`. A stored value WITHOUT the sentinel is a legacy comma-joined row: it is
+    /// re-split KEEPING empty subsequences (which exactly recovers pre-existing empty-element rows; comma-
+    /// free rows are unaffected; comma-bearing legacy rows remain irrecoverable — they already quarantined
+    /// on reload before this fix, so this is strictly better).
+    static func decodeRefList(_ s: String) -> [String] {
+        guard s.hasPrefix(refListSentinel) else {
+            return s.isEmpty ? []
+                : s.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+        }
+        let bytes = Array(s.utf8)
+        var i = refListSentinel.utf8.count
+        var result: [String] = []
+        while i < bytes.count {
+            var j = i
+            while j < bytes.count, bytes[j] != UInt8(ascii: ":") { j += 1 }
+            guard j < bytes.count,
+                  let n = Int(String(decoding: bytes[i..<j], as: UTF8.self)), n >= 0
+            else { break }
+            let start = j + 1, end = start + n
+            guard end <= bytes.count else { break }
+            result.append(String(decoding: bytes[start..<end], as: UTF8.self))
+            i = end
+        }
+        return result
     }
 }
