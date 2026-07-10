@@ -1239,5 +1239,50 @@
     ],
     "verification": "substrate: swift build per target + full swift build green; Mac-testable seams (§三① tripwire, LOW-14 LRU) carry teeth+adversarial-reversal. DeviceTestApp (separate .xcodeproj, no swift test target): swiftc -parse syntax-check; full build + behavior are xcodebuild/on-device-gated.",
     "honest_notes": "sovereign LOW-8 + mlx LOW-12 + x-concurrency LOW-12 cannot red on Mac (byte-identical SHA impls / MLX-model-required / real-Metal-device-required) — shipped as fixes that remove a latent surface, not live-Mac bugs."
+  },
+  "residual_verify_workflow_2026_07_10": {
+    "method": "30 residual/high-risk findings → verify agent (reads CURRENT code+git) → adversarial refute agent; reconciled finalStatus. The adversarial stage overturned several verify verdicts (caught real FALSE_CLOSE: a sibling file with the same bug, attribute-prefix bypasses, an EvalRun store the KG fix missed, a write-only gatedSkip field).",
+    "tally": {
+      "OPEN_MAC_FIXABLE": 15,
+      "ALREADY_CLOSED": 11,
+      "DEVICE_GATED": 3,
+      "OPERATOR_GATED": 2
+    },
+    "closed_this_pass": [
+      "ffbba8d7e orchestration MED-2 — FFI dominance-order OOB fails SAFE (validatedPermutation), not process-abort at 5 sites",
+      "e6def0931 runtimecore-b MED-3 — EvalRun store three-piece set (KG fix did not cover it)",
+      "26f22a771 organ-eval MED-5 — gatedSkip propagated to the consumer callback (was write-only ⇒ fail-open)",
+      "f5d7e2ab6 memory-b F3 2nd clause — content-cache write decided on POST-append winner (reentrancy hybrid)",
+      "907bc9a36 tools-scripts LOW — check_sdk_import_boundaries.sh catches all import attributes (not just @_exported)",
+      "a42ac2722 tools-scripts LOW — qinao_humaneval_paired.py excludes infra errors from denominator",
+      "f4625ed0f rust LOW — chain.rs 2 residual wire-shape comment-lies corrected",
+      "5ad4f5a9a tests-arch ⑤ — repo root derived from #filePath, not hardcoded dev-box path (14 sites/9 files)",
+      "ac13697fa tests-arch ⑤ — 18 wall-clock threshold assertions gated behind BAS_PERF_GATE",
+      "6b8190293 tests-arch ②b — permatrue classifier extracted + hardened vs XCTAssert(true) evasion"
+    ],
+    "already_closed_confirmed": [
+      "memory-b F3 (1st clause, 991750dd2)",
+      "organ-eval MED-2 (fidelity anchor fails closed)",
+      "mlx-decode MED-1 (sampling lane HAS the mtpStreamHasRoom guard — ledger FALSE_CLOSE was wrong)",
+      "orchestration MED-4 (SinkNotificationError d22985751)",
+      "rust verdict_decisions.rs:455 c_char (decision 5)",
+      "rust assembler.rs #[cfg(test)] (decision 5)",
+      "tools-scripts eval_probe_ood + assert-sha (decision 7)",
+      "tools-scripts pre-commit-gates /tmp race",
+      "CLEAN-caveat BASWorldAwareRiskBridge comment (ff0f3655f)",
+      "tests-arch ④ (ceiling tripwire bounds shrinkage)"
+    ],
+    "deferred_with_reasoning": {
+      "tests-arch ③ (@MainActor lint)": "A reliable lint needs a \"turn-driving suite\" detector that does not exist; 75/76 swift-testing suites are correctly plain (pure logic), so a naive all-@MainActor rule false-reds them. Documented discipline + runtime SIGBUS remain the enforcement until a robust detector exists. Shipping a bad lint is worse than none.",
+      "tests-arch ① (env gate registry)": "A 417-name hand-maintained Set<String> catalog is drift-prone (becomes its own comment-lie) and does not prevent a mistype at the USE site without a second big lint over every env read. Disproportionate for a LOW; net-negative maintenance burden."
+    },
+    "device_gated": {
+      "LOW-16 (rung-1 virtual reclaim)": "MLX pressure-ladder runtime; device-only.",
+      "x-concurrency MED-LOW-10 (BASMetalSyncBridge semaphore.wait)": "device-only; async restructure risks priority inversion.",
+      "x-concurrency §三① sibling sessions": "BASSingleDriverTripwire utility exists + is installed in BASCoreAIDecodeSession (836c69478); extending to the other 7 CoreAI sessions + Saguaro compiles on Mac but trips only on-device — mechanical device-gated follow-up, mechanism ready."
+    },
+    "operator_gated": {
+      "tools-scripts R2/R3 corpus (×2, same finding)": "/tmp→Docs corpus move is operator experiment-domain per the consult-before-deleting doctrine."
+    }
   }
 }
