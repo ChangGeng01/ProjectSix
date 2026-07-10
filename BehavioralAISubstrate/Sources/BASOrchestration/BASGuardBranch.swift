@@ -28,6 +28,17 @@ public enum BASReversibilityBands {
     public static func isReversiblePath(reversibility: Double) -> Bool {
         reversibility >= reversibleThreshold
     }
+
+    /// deep-audit MED: SINGLE source of truth for the guard lexicon. A candidate is ALSO a guard path
+    /// (regardless of reversibility band) when its title/summary explicitly names a protective/delaying
+    /// action. The two guardPaths producers had drifted: the neural producer applied this lexicon, the
+    /// fabric adapter did NOT — so a low-reversibility "pause and review" candidate was a guard path in
+    /// one and a danger path in the other. Both now call this.
+    public static func containsGuardLexicon(_ value: String) -> Bool {
+        let n = value.lowercased()
+        return n.contains("delay") || n.contains("pause") || n.contains("wait")
+            || n.contains("review") || n.contains("bounded") || n.contains("protect")
+    }
 }
 
 /// A protective fallback path in the L9 candidate frontier — the "守护分支".

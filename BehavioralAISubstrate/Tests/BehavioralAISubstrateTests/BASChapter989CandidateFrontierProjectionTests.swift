@@ -40,6 +40,27 @@ final class BASChapter989CandidateFrontierProjectionTests:
             "(host's original enumeration)")
     }
 
+    // MARK: - guardPaths lexicon parity (deep-audit MED)
+
+    /// A low-reversibility candidate whose title/summary NAMES a protective/delaying action must be a
+    /// guard path — matching the neural producer's guard-lexicon branch. Unfixed: the fabric adapter
+    /// only checked the reversibility band, so this candidate was a guard path in the neural producer but
+    /// a DANGER path here (producer divergence) → RED.
+    func testGuardPaths_IncludeLowReversibilityGuardLexiconCandidate() {
+        let lexiconCand = BASPlannerCandidate(
+            candidateID: "pauseCand", title: "pause and review before acting",
+            actionSummary: "wait", confidence: 0.5, reversibility: 0.5)   // below the 0.7 band
+        let plainCand = BASPlannerCandidate(
+            candidateID: "goCand", title: "execute now", actionSummary: "do it",
+            confidence: 0.5, reversibility: 0.5)
+        let frontier = BASAgentFabricAdapters
+            .candidateFrontierProjection(from: [lexiconCand, plainCand])
+        XCTAssertTrue(frontier.guardPaths.contains("pauseCand"),
+            "a low-reversibility guard-lexicon candidate must be a guard path (parity with neural producer)")
+        XCTAssertFalse(frontier.guardPaths.contains("goCand"),
+            "a plain low-reversibility candidate is NOT a guard path")
+    }
+
     // MARK: - dominanceOrder
 
     func testDominanceOrder_ConfidenceDescending() {

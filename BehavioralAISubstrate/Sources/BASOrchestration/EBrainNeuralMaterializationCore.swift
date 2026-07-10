@@ -872,13 +872,9 @@ public enum BASNeuralMaterializationCompiler {
     private static func containsGuardLexicon(
         _ value: String
     ) -> Bool {
-        let normalized = value.lowercased()
-        return normalized.contains("delay")
-            || normalized.contains("pause")
-            || normalized.contains("wait")
-            || normalized.contains("review")
-            || normalized.contains("bounded")
-            || normalized.contains("protect")
+        // deep-audit MED: delegate to the single source of truth (BASReversibilityBands) so this
+        // producer and the fabric adapter can never drift apart again.
+        BASReversibilityBands.containsGuardLexicon(value)
     }
 
     private static func isDelayedCandidate(

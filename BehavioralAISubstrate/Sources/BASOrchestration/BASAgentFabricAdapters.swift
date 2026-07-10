@@ -403,8 +403,16 @@ public enum BASAgentFabricAdapters {
         // audit orchestration HIGH-1: guardPaths are SAFE-RETREAT fallbacks (HIGH reversibility),
         // not the danger band — was `reversibility < 0.3`, the exact opposite of the canonical
         // BASGuardBranch semantic + the neural producer.
+        // deep-audit MED: mirror the neural producer — a guard path is a high-reversibility fallback OR
+        // an explicit guard-lexicon match on title/summary (was reversibility-band ONLY, so a
+        // low-reversibility "pause and review" candidate was a guard path in the neural producer but a
+        // danger path here). Single source of truth: BASReversibilityBands.containsGuardLexicon.
         let guardPaths = candidates
-            .filter { BASReversibilityBands.isGuardPath(reversibility: $0.reversibility) }
+            .filter {
+                BASReversibilityBands.isGuardPath(reversibility: $0.reversibility)
+                    || BASReversibilityBands.containsGuardLexicon($0.title)
+                    || BASReversibilityBands.containsGuardLexicon($0.actionSummary)
+            }
             .map { $0.candidateID }
         // Diversity score = 1 - std-dev(confidence),clamped。
         // Empty / single-candidate case is "perfectly diverse"
