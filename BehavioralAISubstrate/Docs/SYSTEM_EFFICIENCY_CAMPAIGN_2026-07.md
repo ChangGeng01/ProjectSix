@@ -242,3 +242,27 @@ lever at production scale (1131-fact bundled corpus, on-device MiniLM, no LLM):
 ADR-039 lossless decode semantics untouched · never-worse gates with measured baselines · quality
 co-gates from the v6-900 harness on every avoided-compute lever (skipping compute must not skip
 honesty) · single-device evidence labeled as such.
+
+## 2026-07-11 — operator re-affirmation + the last dormant link goes LIVE
+
+Operator: "目前效率过于低下 希望以后可以移动端及其高效 仍然ok多 sub agents 协作 大模型与14层完美契合"
+— the charter's north star, re-issued. State check against the charter:
+
+- **ε→effort→tier loop**: recon had found it BUILT but DORMANT at the host face. TODAY the face
+  carries `effortPlan` (buildEBrainTurn / runtime-mode / makeEBrainTurn + both request builders,
+  default nil = byte-parity), with REAL-engine teeth: a `.fast` floor collapses the deliberation
+  loop to 1 pass ⇒ frame EQUALS loop-off (avoided compute is real); nil keeps multi-pass. And the
+  loop gained its FIRST live consumer (击发上膛): the Journal CLI's --deliberate path sizes passes
+  by stakes×headroom (surprise honestly unknown one-shot; NO MiniLM load — pure CPU). a7464c5d7.
+- **多 agents 协作 (T4)**: 8 seats / one trunk certified (3118MB, P2a) + bounded-concurrency
+  governor (cap 2). The fabric seats ride the M254 session pool; twin-phone infrastructure now
+  supports parallel device lanes.
+- **大模型与14层契合 (#77)**: the 14-layer substrate ≈ 11ms = 0.3% of a turn — the turn's cost IS
+  the LLM; every avoided/floored call is the whole lever. T1 ladder to date: 2.00 → 1.37 (P1) →
+  1.17/0.58-ratio (P3, target ≤0.6 MET on device 1).
+- **2nd-device cert** (the charter's last hardware item): BAST1DeviceTests running on 5E5C today
+  (paced protocol; TEST_RUNNER_ env must be injected via the xcodebuild PROCESS environment, not
+  command-line build settings — the skip-not-run trap, learned again).
+
+Remaining by-choice: tier-0 expansion beyond covered-factual (quality-risk design, deferred with
+rationale + the NLI question-fit follow-up for the 0.82-cosine qualifier breach).
