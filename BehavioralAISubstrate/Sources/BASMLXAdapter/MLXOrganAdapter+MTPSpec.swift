@@ -33,6 +33,37 @@ extension MLXOrganAdapter {
         var traceThinkTokens: Int? = nil
     }
 
+    /// gaps-reconciliation MED-8 (2026-07-11): resolve the SHARED decoder box — warm cache first,
+    /// else single-flight the ~300MB build so concurrent cold turns construct EXACTLY ONE decoder
+    /// (both then decode with it under the container actor's serialization, exactly like the warm
+    /// path). The box is published IMMEDIATELY after the build (MED-7 dropEpoch-gated, so a
+    /// pressure drop racing the build is not silently undone) — closing the residual window where
+    /// a third turn arriving between build-completion and the old post-decode republish rebuilt.
+    /// EMA continuity: one shared decoder ⇒ chainEmaL evolves in ONE place (no clobber).
+    func _resolveMTPDecoderBox(
+        container: ModelContainer, wURL: URL
+    ) async throws -> MTPDecoderBox {
+        if let warm = mtpDecoderBox { return warm }
+        let epochAtStart = mtpDecoderDropEpoch
+        let seed = restoredChainEmaL
+        let box = try await mtpDecoderBuildSlot.run { [container, wURL] in
+            try await container.perform { ctx in
+                guard let qwen = ctx.model as? Qwen35Model else {
+                    throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
+                }
+                let dec = try BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
+                // P0: seed the regime EMA from the persisted/carried value (nil unless
+                // BAS_PROFILER_PERSIST=1 ⇒ off = cold 1.6 default, byte-equal today).
+                if let seed { dec.chainEmaL = seed }
+                return MTPDecoderBox(decoder: dec)
+            }
+        }
+        if Self._shouldRepublishDecoder(epochAtStart: epochAtStart, epochNow: mtpDecoderDropEpoch) {
+            mtpDecoderBox = box
+        }
+        return box
+    }
+
     /// Full-pipeline `.mtpSpec` turn: template → tokenize → MTP spec decode (EOS-aware) → detokenize.
     /// Throws (e.g. `notQwen35`, missing weights) — the executor fail-closes to `_plainDraft`.
     func _generateMTPSpec(
@@ -48,24 +79,14 @@ extension MLXOrganAdapter {
         let input = try await _buildLMInput(for: request, container: container)
         let params = _greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let maxTokens = params.maxTokens ?? 512
-        let priorBox = mtpDecoderBox
+        // MED-8: resolve (warm cache | single-flighted cold build) BEFORE the decode perform —
+        // concurrent cold turns share ONE decoder instead of double-building ~300MB each.
+        let sharedBox = try await _resolveMTPDecoderBox(container: container, wURL: wURL)
         let dropEpochAtStart = mtpDecoderDropEpoch        // audit MED-7: republish only if no drop races us
         let diffProbe = _armedDifficultyProbe(requestCapped: request.maxOutputTokens != nil)
         let probeReport = Self._ProbeReportBox()
-        let seedChainEmaL = restoredChainEmaL            // P0: actor read before the closure
         let raw: _MTPRaw = try await container.perform(nonSendable: input) { ctx, input in
-            guard let qwen = ctx.model as? Qwen35Model else {
-                throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
-            }
-            let dec: BASQwen35MTPSpecDecoder
-            if let prior = priorBox?.decoder {
-                dec = prior
-            } else {
-                dec = try BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
-                // P0: seed the regime EMA from the persisted/carried value (nil unless
-                // BAS_PROFILER_PERSIST=1 ⇒ off = cold 1.6 default, byte-equal today).
-                if let seed = seedChainEmaL { dec.chainEmaL = seed }
-            }
+            let dec = sharedBox.decoder
             let eos = Self._productionEOSTokenIds(
                 eosTokenId: ctx.tokenizer.eosTokenId, resolve: { ctx.tokenizer.convertTokenToId($0) })
             let promptIds = input.text.tokens.asArray(Int.self)
@@ -142,7 +163,8 @@ extension MLXOrganAdapter {
         let input = try await Self._prepareTranscript(transcript, container: container)
         let params = _greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let maxTokens = params.maxTokens ?? 512
-        let priorBox = mtpDecoderBox
+        // MED-8: shared single-flighted decoder (see _resolveMTPDecoderBox).
+        let sharedBox = try await _resolveMTPDecoderBox(container: container, wURL: wURL)
         let dropEpochAtStart = mtpDecoderDropEpoch        // audit MED-7: republish only if no drop races us
         let diffProbe = _armedDifficultyProbe(requestCapped: request.maxOutputTokens != nil)
         let probeReport = Self._ProbeReportBox()
@@ -151,20 +173,8 @@ extension MLXOrganAdapter {
         // (135MB from the limit at 8-wide) that justified the governor.
         await acquireSessionDecodeSlot()
         defer { releaseSessionDecodeSlot() }
-        let seedChainEmaL = restoredChainEmaL            // P0: actor read before the closure
         let raw: _MTPRaw = try await container.perform(nonSendable: input) { ctx, input in
-            guard let qwen = ctx.model as? Qwen35Model else {
-                throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
-            }
-            let dec: BASQwen35MTPSpecDecoder
-            if let prior = priorBox?.decoder {
-                dec = prior
-            } else {
-                dec = try BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
-                // P0: seed the regime EMA from the persisted/carried value (nil unless
-                // BAS_PROFILER_PERSIST=1 ⇒ off = cold 1.6 default, byte-equal today).
-                if let seed = seedChainEmaL { dec.chainEmaL = seed }
-            }
+            let dec = sharedBox.decoder
             let eos = Self._productionEOSTokenIds(
                 eosTokenId: ctx.tokenizer.eosTokenId, resolve: { ctx.tokenizer.convertTokenToId($0) })
             let promptIds = input.text.tokens.asArray(Int.self)

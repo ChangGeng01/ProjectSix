@@ -204,6 +204,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// republishes the (rebuilt) box only if the epoch is UNCHANGED — otherwise a drop that raced
     /// the generation would be undone (the ~300MB decoder resurrected right after pressure freed it).
     var mtpDecoderDropEpoch = 0
+    /// gaps-reconciliation MED-8 (2026-07-11): single-flight slot for the COLD decoder build —
+    /// two concurrent cold turns used to both construct the ~300MB decoder inside
+    /// container.perform (transient ~600MB overlap near jetsam) and clobber each other's
+    /// chainEmaL on republish. See _resolveMTPDecoderBox.
+    let mtpDecoderBuildSlot = BASSingleFlightSlot<MTPDecoderBox>()
     // B2 探针路由器 — the difficulty-probe head (BAS_DIFF_PROBE=1), resolved once per adapter.
     /// 缝1 telemetry/test surface: session turns decoded via the thermal plain-fallback.
     var sessionThermalFallbackCount = 0
