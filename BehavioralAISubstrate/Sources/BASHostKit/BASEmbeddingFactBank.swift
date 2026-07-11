@@ -90,6 +90,25 @@ public actor BASEmbeddingFactBank {
     /// (co-gate finding 2026-07-04: an adjacent-topic question — "which planet is closest to the sun" —
     /// cleared the 0.45 inject threshold against the "eight planets" fact and the short-circuit answered
     /// a non-sequitur; verdict-INJECTION tolerates that, ANSWERING does not).
+    /// tier-0 expansion (2026-07-11): retrieve the best-matching FACT for a question-form turn
+    /// (no assertion required) under the same CRAG coverage+margin gate. The caller MUST apply
+    /// BASQuestionFitGate before answering from it — cosine alone cannot see qualifiers.
+    public func retrieveFact(question: String) async -> (fact: BASVerifiedFact, cosine: Float)? {
+        if !loaded { await load() }
+        guard !vectors.isEmpty else { return nil }
+        let q = await provider.embed(question).normalized.vector
+        var bestIndex = -1
+        var best: Float = -.greatestFiniteMagnitude
+        var second: Float = -.greatestFiniteMagnitude
+        for (i, v) in vectors.enumerated() {
+            let c = Self.dot(q, v)
+            if c > best { second = best; best = c; bestIndex = i }
+            else if c > second { second = c }
+        }
+        guard bestIndex >= 0, best >= threshold, (best - second) >= margin else { return nil }
+        return (facts[bestIndex], best)
+    }
+
     public func resolveWithScore(
         question: String,
         assertedValue: String

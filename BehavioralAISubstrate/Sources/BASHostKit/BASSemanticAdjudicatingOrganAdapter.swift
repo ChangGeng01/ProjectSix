@@ -46,6 +46,11 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
     /// covered subset the deterministic adjudicator IS the answerer (P0 baseline: every avoided call
     /// ≈ −4 s wall / −99% of turn compute).
     private let shortCircuitCovered: Bool
+    /// tier-0 expansion (2026-07-11, operator-directed): answer covered QUESTION-form turns (no
+    /// assertion) straight from the bank — cosine ≥ shortCircuitMinCosine AND the NLI question-fit
+    /// gate must both pass. Default false = byte-equal (ADR-014). Requires shortCircuitCovered too
+    /// (it is an EXTENSION of the short-circuit, not an independent lane).
+    private let tier0QuestionAnswering: Bool
 
     public init(
         wrapping inner: BASOrganAdapter,
@@ -56,8 +61,10 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
         observer: BASAdjudicationObserver? = nil,
         nliProbe: BASNLIEntailmentProbe? = nil,
         nliThreshold: Float = 0.9,
-        shortCircuitCovered: Bool = false
+        shortCircuitCovered: Bool = false,
+        tier0QuestionAnswering: Bool = false
     ) {
+        self.tier0QuestionAnswering = tier0QuestionAnswering
         self.shortCircuitCovered = shortCircuitCovered
         self.inner = inner
         self.bank = bank
@@ -114,12 +121,46 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
     /// normal inject+LLM path (conservative direction: fewer short-circuits, never a wrong answer).
     static let shortCircuitMinCosine: Float = 0.60
 
+    /// tier-0 QUESTION answering: covered (CRAG cosine+margin) + high bar + question-fit ⇒ the
+    /// bank's ANSWER is the draft (zero LLM calls). Anything else ⇒ nil (LLM answers; the gate can
+    /// only reduce short-circuits, never add a wrong one).
+    private func questionTier0(_ request: BASOrganRequest) async -> BASOrganDraft? {
+        guard tier0QuestionAnswering else { return nil }
+        guard let hit = await bank.retrieveFact(question: request.instruction),
+              hit.cosine >= Self.shortCircuitMinCosine,
+              BASQuestionFitGate.fits(question: request.instruction, reference: hit.fact.reference)
+        else { return nil }
+        await observe(request, .shortCircuited)
+        let ref = hit.fact.reference.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = "\(hit.fact.answer) — \(ref)"
+        return BASOrganDraft(
+            requestID: request.requestID,
+            providerID: descriptor.providerID,
+            role: request.role,
+            body: body,
+            inputTokensEstimated: BASOrganDeterministicAdapter
+                .estimateTokens(from: [request.instruction] + request.context),
+            outputTokensEstimated: BASOrganDeterministicAdapter.estimateTokens(from: [body]),
+            producedAt: Date(),
+            traceID: BASOrganDeterministicAdapter.digest(
+                for: request, providerID: descriptor.providerID))
+    }
+
     func shortCircuited(_ request: BASOrganRequest) async -> BASOrganDraft? {
         guard shortCircuitCovered, enabled else { return nil }
         guard await gate.shouldEngage(request) else { return nil }        // gate skip → normal path
-        guard let asserted = extractAssertion(request.instruction) else { return nil }
+        guard let asserted = extractAssertion(request.instruction) else {
+            // tier-0 expansion (2026-07-11): a QUESTION-form covered turn (no assertion to verify)
+            // may answer straight from the bank — behind its own opt-in + the NLI question-fit gate.
+            return await questionTier0(request)
+        }
         guard let resolved = await bank.resolveWithScore(question: request.instruction, assertedValue: asserted),
               resolved.cosine >= Self.shortCircuitMinCosine
+        else { return nil }
+        // NLI question-fit gate (2026-07-11): cosine can't see qualifiers — the 0.82 breach
+        // ("capital of Australia's largest state" → Canberra) short-circuited a non-sequitur.
+        // The fact must ENTAIL the whole question or tier-0 abstains (LLM answers as before).
+        guard BASQuestionFitGate.fits(question: request.instruction, reference: resolved.reference)
         else { return nil }
         let verdict = await reconciled(resolved.groundTruth, reference: resolved.reference, claim: asserted)
         let ref = resolved.reference.trimmingCharacters(in: .whitespacesAndNewlines)
