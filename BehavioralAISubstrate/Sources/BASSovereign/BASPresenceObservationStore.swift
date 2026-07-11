@@ -147,6 +147,10 @@ public actor BASSQLitePresenceObservationStore:
         if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
             try Self.runExec(db: handle, sql: sdSQL)
         }
+        // memory-a F4 residual: one-time legacy freelist purge (secure_delete only
+        // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
+        // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
         try Self.runExec(db: handle, sql: "PRAGMA synchronous=NORMAL;")
         let existingVersion = try Self.readUserVersion(db: handle)
         if existingVersion == 0 {

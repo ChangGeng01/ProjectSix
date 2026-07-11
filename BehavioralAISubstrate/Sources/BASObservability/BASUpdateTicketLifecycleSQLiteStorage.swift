@@ -396,6 +396,8 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
         if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
             try execute(sql: sdSQL, phase: "secure-delete")
         }
+        // memory-a F4 residual: one-time legacy freelist purge (see BASSQLiteSecureDelete). Outside txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: self.db)
     }
 
     /// M274 — return the active journal mode string. Public so

@@ -53,6 +53,8 @@ final class ContentStore {
             // #16 deletion doctrine: zero freed pages so a forgotten entry's plaintext does not
             // survive in the DB file (kill-switch BAS_SECURE_DELETE=0).
             if let sd = BASSQLiteSecureDelete.openPragmaSQL { try Self.exec(handle, sd) }
+            // memory-a F4 residual: one-time legacy freelist purge (see BASSQLiteSecureDelete). Outside txn.
+            BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
             try Self.exec(handle,
                 "CREATE TABLE IF NOT EXISTS content (atom_id TEXT PRIMARY KEY, text TEXT NOT NULL);")
             // Scrub any WAL left plaintext-bearing by a crash between a prior delete's DELETE and

@@ -142,6 +142,10 @@ public actor BASSQLiteVectorIndexStorage {
         if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
             try Self.runExec(db: handle, sql: sdSQL)
         }
+        // memory-a F4 residual: one-time legacy freelist purge (secure_delete only
+        // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
+        // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
         // 先稳 P2 — bound WAL growth over long sessions (mirrors the event log's M891 setting).

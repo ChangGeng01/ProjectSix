@@ -153,6 +153,8 @@ public final class BASRiskObservationsSQLiteStorage: @unchecked
         if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
             sqlite3_exec(opened, sdSQL, nil, nil, nil)
         }
+        // memory-a F4 residual: one-time legacy freelist purge (see BASSQLiteSecureDelete). Outside txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: opened)
         try applySchema()
     }
 

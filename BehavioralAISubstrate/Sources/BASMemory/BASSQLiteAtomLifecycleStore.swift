@@ -87,6 +87,10 @@ public actor BASSQLiteAtomLifecycleStore: BASAtomLifecycleStore {
         if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
             try Self.runExec(db: handle, sql: sdSQL)
         }
+        // memory-a F4 residual: one-time legacy freelist purge (secure_delete only
+        // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
+        // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
         try Self.runExec(db: handle, sql: "PRAGMA synchronous=NORMAL;")
 
         // PRAGMA user_version branch:0 = empty DB,write our version;

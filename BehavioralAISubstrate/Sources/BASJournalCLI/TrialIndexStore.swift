@@ -73,6 +73,8 @@ final class TrialIndexStore {
         do {
             try exec("PRAGMA journal_mode=WAL;")
             if let sd = BASSQLiteSecureDelete.openPragmaSQL { try exec(sd) }
+            // memory-a F4 residual: one-time legacy freelist purge (see BASSQLiteSecureDelete). Outside txn.
+            BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
             try exec("""
                 CREATE TABLE IF NOT EXISTS trial_index (
                     trial_id TEXT PRIMARY KEY,
