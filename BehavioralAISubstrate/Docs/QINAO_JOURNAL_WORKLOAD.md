@@ -346,3 +346,25 @@ the real store (which had gone cold since 2026-07-08 — limit #3 biting). Resul
 - **Retention restarted.** The real journal was opened today with genuine marathon-domain content
   (this session's ship/defer decisions + an open bet), so it is no longer cold. That is the whole
   point: the audit finds unfired chambers; only the live workload keeps them firing.
+
+### Cue-precision calibration + the honest limit-#1 diagnosis (2026-07-11)
+
+Following the first-run truth-check ("caution words read as risk-up"), a variant-analysis workflow
+found a real defect CLASS: the manipulation / urgency / deep-loop / guard cue lexicons matched short
+single-word cues by SUBSTRING, so benign words that merely CONTAIN a cue fired it — "now" ⊂
+know/knowledge/snow, "must" ⊂ mustard, "plan" ⊂ plant/explanation, and (stems) "review" ⊂ preview,
+"wait" ⊂ Kuwait, "pause" ⊂ menopause. Fixed across FOUR live sites (whole-word for exact cues, word-
+prefix for stems; multi-word phrases stay substring): manipulationHints, WakeIntentTuning.containsCue,
+the inline explicitUrgencyMarkers, and BASReversibilityBands.containsGuardLexicon (commits ed66c50e5,
+b5a309f5f — each teethed with an adversarial reversal).
+
+**But the honest diagnosis — measured, not assumed.** After the fix, the SAME benign notes still
+escalate: "Reviewed the morning plan." and "I paused to think." are STILL `gov2:memoryFreeze|risk:high`,
+while "I know the known issue and the knowledge base." stays `risk:low`. So the observed over-escalation
+is NOT the keyword cues — it is the UNGROUNDED ML context classifier (limit #1: empty FactBank + 4B
+ceiling → "grounded verdict is aspirational"). The cue-precision fixes are a genuine improvement to the
+DETERMINISTIC signals (taskType / run-mode / budget / manipulation-trace / guardPaths no longer mis-fire
+on know/knowledge), and they will matter more once grounding lands — but they do NOT, and were never
+going to, fix the classifier noise. Correcting the record: the "caution words → risk-up" framing was a
+mis-attribution; the real cause is the aspirational verdict, which stays the deferred FactBank/grounding
+work, not a keyword calibration.
