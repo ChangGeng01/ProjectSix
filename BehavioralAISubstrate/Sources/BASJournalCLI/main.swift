@@ -232,7 +232,12 @@ private func sortedAtoms(_ store: BASEventSourcedMemoryAtomStore) async -> [BASG
 /// Log a decision into event-sourced memory + seal it into the Ed25519 ledger. Shared by `add`
 /// and (increment 3) `bet`. Returns the atom id on success, nil if not admitted. Fails-loud
 /// (exit 1) on a seal failure — the entry is logged but the operator must know it went unsealed.
-func logDecision(_ text: String, tag: String, deliberate: Bool = false) async throws -> UUID? {
+/// `groundedOverride` (increment R): a grounded token the CALLER has already verified against the
+/// record (bet-commit constructs its citation FROM the repo, so its seal is born grounded without
+/// the env flags). nil (every pre-existing caller) ⇒ byte-identical behavior. An armed env
+/// groundClaim still wins when present — for a bet-commit text both produce the same token.
+func logDecision(_ text: String, tag: String, deliberate: Bool = false,
+                 groundedOverride: String? = nil) async throws -> UUID? {
     let store = try makeStore()
     try await seedIfEmpty(store)
     let atom = makeEntry(text, tag: tag)
@@ -255,7 +260,7 @@ func logDecision(_ text: String, tag: String, deliberate: Bool = false) async th
     // Grounding increment 1 — when armed (QINAO_JOURNAL_GROUND=1), resolve a cited commit/marker
     // against the git record and fold the record-consistency token into the seal. OFF/uncovered ⇒
     // groundClaim returns nil ⇒ sealedRef == verdictRef, byte-identical to increment 2b/3c.
-    let sealedRef = groundClaim(text).map { verdictRef + "|" + $0 } ?? verdictRef
+    let sealedRef = (groundClaim(text) ?? groundedOverride).map { verdictRef + "|" + $0 } ?? verdictRef
     // Increment 2 — seal the sovereign action into the Ed25519 audit ledger (append-only,
     // tamper-evident, cross-boot). Integrity-over-availability: surface a seal failure LOUDLY
     // and DISTINCTLY — the atom is already logged, so the operator must be able to tell a
@@ -395,6 +400,15 @@ private func printHelp() {
 
     "Was I right?" — track ship/drop bets and resolve them with the real outcome:
       bet "<text>" [-q "<question>"]  log a decision AND open it as a shadow trial
+      bet-commit [<sha>] -q "<q>"  turn a just-shipped commit (default HEAD) into a GROUNDED bet:
+                          the subject+sha are fetched and verified from git (the seal is born
+                          grounded:record-match); -q is MANDATORY — you type only the falsifiable
+                          expectation, the one thing git cannot record. After any bet, the oldest
+                          open bet is re-surfaced (the pressure tail); `review` flags bets whose
+                          cited commit/marker shipped TODAY as possibly resolvable.
+                          Optional ship-moment nudge (never auto-installed — install it yourself):
+                            echo 'swift run -q BASJournalCLI review 2>/dev/null | tail -3' \
+                              > .git/hooks/post-commit && chmod +x .git/hooks/post-commit
       review              re-surface open bets, oldest first (the morning check-in)
       right <trial-id>    you judge the bet right → finalize the trial (seal issued)
       wrong <trial-id> [reason]   you judge it wrong → finalize (seal denied, retraction queued)
@@ -512,6 +526,9 @@ func runJournal() async {
             let (text, question) = parseBetArgs(betArgs)
             guard !text.isEmpty else { print("usage: bet [--deliberate] \"<text>\" [-q \"<question>\"]"); return }
             try await cmdBet(text, question: question, deliberate: deliberate)
+        case "bet-commit":
+            let (bcArgs, deliberate) = extractDeliberate(rest)
+            try await cmdBetCommit(bcArgs, deliberate: deliberate)
         case "review":
             try await cmdReview()
         case "right":

@@ -457,3 +457,47 @@ grows 注释撒谎 the moment it stops being run — the workload keeps proving 
 n ≥ 50 held-out paraphrase pairs achieving rank1 ≥ 0.9 with ZERO wrong-commit resolutions above
 the gate — plausibly via subject+body embeddings, a stronger embedder, or a lexical-anchor hybrid
 — then `record-similar:<sha8>` may be reconsidered as a sealed field with its own panel.
+
+## Increment R — the ship-moment loop (SHIPPED, 2026-07-11)
+
+The retention increment, built to the design panel's BUILD_REVISED verdict (wf_20a775a9). The
+panel's evidence-first finding: the journal went cold for 3 days WHILE `review` existed, so any
+design leaning on prospective memory ("remember the morning command") is falsified — but committing
+had ZERO cold days (18/3/40/32/32/99/131/21 per day). So the loop anchors to the ship moment:
+
+- **`bet-commit [<sha-prefix>] -q "<falsifiable question>"`** — one command turns a just-shipped
+  commit (default HEAD) into a grounded, sealed, open bet. The machine fetches + verifies what git
+  already records (subject + sha, via `git log -1`); the operator types ONLY what git cannot
+  record — the falsifiable expectation. **-q is MANDATORY** (the adversary's kill of the lazy
+  default-question variant: an unresolvable "was this right?" bet poisons `review` into spam);
+  without it the command prints the resolved subject + two exemplar falsifiable questions and
+  exits 1 with ZERO writes. Unknown/ambiguous sha ⇒ exit 1 BEFORE any store touch. The seal is
+  **born grounded** (`grounded:record-match:<sha8>`) by the command's own verification — no env
+  dance; plain add/bet stay byte-identical (regression-pinned).
+- **The pressure tail** (print-only, post-seal like the semantic-hint precedent): after every
+  bet/bet-commit, ≤2 lines surface the count + the OLDEST open bet with its resolve commands —
+  every deposit doubles as a withdrawal prompt, so resolution no longer depends on remembering
+  `review`.
+- **The resolvability join in `review`**: each open bet's cited SHA/markers (the deterministic
+  BASGitFactBank parser — NEVER fuzzy/MiniLM; the 07-11 calibration binds) intersect TODAY's
+  commits; a hit prints "possibly resolvable today: <sha8> shipped today → right/wrong <id>".
+  Marker-less bets abstain silently; git failure degrades silently; read-only, seals nothing.
+
+**NOT built (recorded per the 3b honesty discipline):** (c) auto-ingest — fatal: 100+ seals/day
+flood, duplication-vacuous byte-copy of git, and it removes the operator's act entirely (writes
+without opening = anti-retention, and 130 unasked bets/day trains `review` to be spam);
+standalone `standup` — fatal: three existing commands concatenated (its one unique join folded
+into `review` above); any daily-mark seal (attendance theater, 3b-class); any auto-installed
+post-commit hook (standing config + flood risk) — the help text PRINTS the two-line opt-in hook
+snippet for the operator to install themselves, never installs it.
+
+**Teeth:** t1 no `-q` ⇒ exit 1 + chain/atom counts unchanged · t2 born-grounded seal + indexed +
+in review · t3 unknown sha ⇒ zero writes · t4 join fires for a cited-today bet, exactly-one line,
+marker-less silent · t5 tail surfaces the pre-existing oldest bet (first bet prints none) · t6
+plain-bet parity (no grounded token). Adversarial reversals: soften -q to a default → t1 reds;
+neuter sha verification → t3 reds. 46/46 journal-arc green.
+
+**SUNSET CLAUSE (the honest arbiter):** if after ~2 weeks of real use the join has fired zero
+times on real bets AND a ≥3-day cold streak recurs, record NO-RETENTION-EFFECT honestly and retire
+the join — a feature changing nothing load-bearing does not stay. Retention is ultimately operator
+behavior; a zero-egress one-shot CLI can only call back at the moment it has business.

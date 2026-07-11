@@ -112,11 +112,13 @@ private func rebuild(from row: TrialIndexRow) -> (BASExperienceCandidate, BASSha
 
 // MARK: - bet
 
-func cmdBet(_ text: String, question: String?, deliberate: Bool = false) async throws {
+func cmdBet(_ text: String, question: String?, deliberate: Bool = false,
+            groundedOverride: String? = nil) async throws {
     // Log + seal the decision exactly like `add` (reuses the increment-1/2/2b/3c path), then open a
     // trial on it. A fresh atom ⇒ a fresh candidate, so there is never a pre-existing open trial
-    // to collide with.
-    guard let atomID = try await logDecision(text, tag: "bet", deliberate: deliberate) else { return }
+    // to collide with. `groundedOverride` = bet-commit's born-grounded contract (nil elsewhere).
+    guard let atomID = try await logDecision(text, tag: "bet", deliberate: deliberate,
+                                             groundedOverride: groundedOverride) else { return }
     let q = (question?.isEmpty == false) ? sanitizeListField(question!) : "was this decision right?"
     let digest = contentDigestHex(text)
 
@@ -169,6 +171,21 @@ func cmdBet(_ text: String, question: String?, deliberate: Bool = false) async t
     let t = String(record.trialID.prefix(12))
     print("bet opened \(t)  ? \(q)")
     print("  resolve later:  right \(t)   |   wrong \(t) [reason]")
+
+    // Increment R — the PRESSURE TAIL (print-only, post-seal like the semantic-hint precedent, so
+    // it structurally cannot perturb sealed bytes): every deposit doubles as a withdrawal prompt.
+    // The oldest OPEN bet stares back — resolution no longer depends on remembering `review`.
+    // Capped at 2 lines regardless of queue size.
+    if let rows = try? makeTrialIndex().openRows() {
+        let others = rows.filter { $0.trialID != record.trialID }
+        if let oldest = others.first {
+            let days = max(0, Int(Date().timeIntervalSince(oldest.openedAt) / 86_400))
+            let summary = String(oldest.decisionSummary.prefix(44))
+            let oid = String(oldest.trialID.prefix(12))
+            print("  \(others.count + 1) open bets · oldest \(days)d \(oid) “\(summary)”")
+            print("      → right \(oid)  |  wrong \(oid) [reason]")
+        }
+    }
 }
 
 // MARK: - review (morning re-surfacing)
@@ -180,6 +197,11 @@ func cmdReview() async throws {
         return
     }
     let iso = ISO8601DateFormatter(); iso.formatOptions = [.withFullDate]
+    // Increment R — the resolvability JOIN: intersect each open bet's cited SHA/markers (the
+    // shipped deterministic BASGitFactBank parser — NEVER fuzzy/MiniLM, the 07-11 calibration
+    // binds) against TODAY's commits. A hit prints one line; marker-less bets abstain SILENTLY;
+    // a git failure degrades silently (read-only aid, seals nothing).
+    let todayFacts = readTodayGitFacts()
     print("open bets — \(open.count) awaiting a real outcome:")
     for r in open {
         print("  \(String(r.trialID.prefix(12)))  opened \(iso.string(from: r.openedAt))")
@@ -187,6 +209,14 @@ func cmdReview() async throws {
         print("      ? \(r.openQuestion)")
         if !r.observedEffects.isEmpty {
             print("      notes: \(r.observedEffects.joined(separator: "; "))")
+        }
+        if let facts = todayFacts,
+           let hit = BASGitFactBank.resolve(claim: r.decisionSummary + " " + r.openQuestion,
+                                            facts: facts),
+           hit.truth == .agrees {
+            let id = String(r.trialID.prefix(12))
+            print("      possibly resolvable today: \(hit.sha8 ?? hit.token) shipped today "
+                + "→ right \(id) | wrong \(id)")
         }
     }
     print("resolve with:  right <id>   |   wrong <id> [reason]")
@@ -331,4 +361,26 @@ private func printVerdict(_ v: BASEvolutionPromotionGateVerdict, seal: BASEvolut
     } else {
         print("  promotion gate: DENIED (seal: \(sealState)) — \(v.reasonCodes.joined(separator: ", "))")
     }
+}
+
+// MARK: - increment R helpers
+
+/// TODAY's commits as a GitFacts record — the resolvability join's fact source. nil on any git
+/// failure or an empty day (the join then abstains silently; read-only, seals nothing).
+private func readTodayGitFacts() -> BASGitFactBank.GitFacts? {
+    let repo = ProcessInfo.processInfo.environment["QINAO_JOURNAL_GROUND_REPO"]
+        ?? FileManager.default.currentDirectoryPath
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    proc.arguments = ["git", "-C", repo, "log", "--since=midnight", "--no-merges",
+                      "--format=%H%x09%s"]
+    let out = Pipe()
+    proc.standardOutput = out
+    proc.standardError = Pipe()
+    do { try proc.run() } catch { return nil }
+    let data = out.fileHandleForReading.readDataToEndOfFile()
+    proc.waitUntilExit()
+    guard proc.terminationStatus == 0, !data.isEmpty else { return nil }
+    let facts = BASGitFactBank.ingest(gitLog: String(decoding: data, as: UTF8.self))
+    return facts.isEmpty ? nil : facts
 }
