@@ -40,6 +40,15 @@ is an OPERATOR PRODUCT DECISION, and the code half is already done: the seam is 
   fire, not to consume the output. Non-vacuity is organic recurrent use that accrues after the
   assistant is gone — no code manufactures it.
 
+## ★ OPERATOR RATIFIED (B) — 2026-07-11
+
+The operator chose **(B): ratify the substrate as a library.** The four MLX-island levers stay
+**device-proven, adoption-ready, NOT live** until a real host product adopts them via the seam frozen
+above. This is the honest resolution of the root disease: it is a library-boundary reality, not a
+code gap the assistant can close — building a self-run consumer would be theater (adversary-confirmed).
+The assistant STOPS trying to fire the MLX levers; the seam + the sessionID contract are documented and
+rot-proof. When a host product exists, adoption is DI + one non-nil sessionID — no rebuild.
+
 ## Honest status
 
 The spine levers (ε→effort→tier, tier-0-via-spine, grounding) HAVE a real low-flow consumer — The
