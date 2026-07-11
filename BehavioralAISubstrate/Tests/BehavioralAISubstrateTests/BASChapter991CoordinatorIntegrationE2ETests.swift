@@ -325,9 +325,18 @@ final class BASChapter991CoordinatorIntegrationE2ETests:
         XCTAssertTrue(
             projectedFrontier.reversiblePaths.contains("c1"),
             "ch 991 E2E: c1 reversibility 0.95 → reversiblePaths")
+        // orchestration HIGH-1 + deep-audit MED consolidated guardPaths to mean SAFE-RETREAT
+        // fallbacks — high reversibility (≥ guardThreshold 0.7) OR an explicit guard-lexicon
+        // match — NOT the old `reversibility < 0.3` danger band (which BOTH the adapter and the
+        // neural producer now reject). So c1 (rev 0.95, high) IS a guard path; c2 ("Major change /
+        // irreversible action", rev 0.1, no guard-lexicon stem) is a DANGER path, correctly EXCLUDED
+        // from safe-retreat guardPaths. This assertion previously encoded the superseded semantic.
         XCTAssertTrue(
+            projectedFrontier.guardPaths.contains("c1"),
+            "ch 991 E2E: c1 reversibility 0.95 ≥ 0.7 → guardPaths (safe-retreat fallback, post-HIGH-1)")
+        XCTAssertFalse(
             projectedFrontier.guardPaths.contains("c2"),
-            "ch 991 E2E: c2 reversibility 0.1 → guardPaths")
+            "ch 991 E2E: c2 rev 0.1 + no guard-lexicon is a DANGER path, NOT a safe-retreat guardPath")
 
         // ===== POST-DISPATCH: MCP permit validation (ch 990) =====
 
