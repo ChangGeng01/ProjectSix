@@ -662,3 +662,45 @@ debt: headless swift-test MLX metallib load failure (no app bundle — known har
 
 Lesson: a red-light report is EVIDENCE to verify, not truth to accept nor noise to dismiss —
 3 of 6 numbers were wrong, 1 item false, yet 4 real pre-existing debts hid underneath.
+
+## 2026-07-12 — headless metallib: the "environmental" verdict above is OVERTURNED (it was debt)
+
+The previous section closed item 5 as "environmental, not debt: headless swift-test MLX metallib
+load failure (no app bundle — known harness limit)". Operator ordered a real fix — and the fix
+work DISPROVED that classification. "Headless" was a red herring: the failure reproduces in a
+GUI session. Root cause is a TOOLCHAIN FORK inside swift-test-headless.sh itself — the script
+pins the STABLE Xcode (beta xctest SEGV guard), and stable SPM's native build system does not
+produce/embed mlx-swift_Cmlx.bundle (the beta swiftbuild backend embeds it inside the xctest).
+MLX's first Metal touch then fails all five metallib lookups and the mlx-c DEFAULT error handler
+exit(-1)s the WHOLE xctest process: one "MLX error: Failed to load the default metallib" line at
+the tail, gate dead, thousands of tests unrun.
+
+Three fail-open layers (c4e9ac16c), each certified:
+1. vendor patch (category 4): MLX_METAL_PATH checked FIRST in load_default_library (stderr
+   marker; bad path warns + falls through — both arms certified).
+2. BASMLXMetalAvailability: withError-scoped first-touch probe converts the C++ exit(-1) into a
+   Swift throw; the three ungated MLX suites probe-skip LOUDLY (wiring pinned by a lint test,
+   TDD red→green). Reversal: unwiring under the stable toolchain reproduces the operator's exact
+   tail-kill.
+3. swift-test-headless.sh pins any built metallib via MLX_METAL_PATH (skip→run upgrade certified).
+
+Full-script verification (operator-ordered, 3 end-to-end runs) — the gate itself then flushed
+two GREEN-BY-LUCK test bugs (both 07-audit-era tests; production Sources/ zero hits):
+- run 1: notes-atomicity reader bound SQL text via withCString + nil destructor (SQLITE_STATIC
+  promise on a closure-lifetime pointer) — sqlite3_step compared against freed memory; beta
+  passed by allocation luck, stable deterministically read no row. rc-level A/B proven; fixed
+  with SQLITE_TRANSIENT. d61d5b645.
+- run 2: parallel worker SIGTRAP — wallclock sleep-gap test read mach_continuous_time BEFORE
+  mach_absolute_time; on a never-slept host the &- gap wraps ~2^64 whenever the pair crosses a
+  24MHz tick and the /denom*numer scaling traps. Empirical A/B (2M iters): old order 234,291
+  negative gaps (11.7%), new order 0 (provably non-negative). 30cbc3900.
+- run 3: GREEN end-to-end — gate 16,586 executed / 0 failures (191 honest skips), all 4 @Test
+  batches green, SCRIPT_EXIT=0, zero MLX error lines, metallib env-hook marker live, orphan
+  check 16,586 started = 16,586 verdicts (no worker deaths).
+
+Lessons: (a) an "environmental" classification is a CLAIM requiring the same falsification
+discipline as any fix — this one died on first contact with a reproduction attempt; (b) the
+green-by-luck class is real: two teeth-bearing audit tests passed only by memory-layout /
+tick-alignment luck until a second harness form (stable toolchain) pinned them; full-suite
+verdicts must be earned under the exact harness form the operator runs. Ed25519 seals: 885567C6
+(fix, record-match:c4e9ac16), E93FD27E (verification, record-match:30cbc390).
