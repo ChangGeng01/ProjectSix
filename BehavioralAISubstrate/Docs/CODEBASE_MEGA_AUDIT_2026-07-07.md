@@ -772,3 +772,33 @@ bare probe (write + set .complete + read-back) passed. With the locked arm (iden
 EPERM at 02:3x) this bidirectionally pins the law: the ONLY variable is console lock state.
 BASScreenLockSkip's two behavioral arms are both field-verified — locked ⇒ loud skip, unlocked
 ⇒ real assertions. Seal D8E27893 (grounded record-match:8db9a655).
+
+## 2026-07-12 — second red-light report: 9 of 10 items are a STALE CHECKOUT, 1 kernel fixed
+
+Operator surfaced a 10-item report ("这些是真的吗 仔细排查"). Every item re-measured at HEAD
+(253cf0dbb) this hour:
+
+1/2. SampleHost SIGBUS + "heavy init chain": NOT REPRODUCIBLE — the exact test passed isolated
+   (1.241s); the reported crash-stack shape (convenience-init forwarding + copying
+   BASHostConstitution) can only exist pre-CoW-box (b4c5b0cdc). 3. headless metallib: fixed
+   c4e9ac16c, three full green runs today (0 MLX-error lines, SCRIPT_EXIT=0) — the report's own
+   "file exists, lookup problem" analysis matches the already-fixed root cause. 5. print 23>10:
+   gate CLEAN (9ada1c1e8). 6. qinao imports: gate PASSES (ece335279). 7. MLX redaction: CLEAN
+   (QinaoMLX is allowlisted by the script's own doctrine; the QinaoMLXEndpoint claim does not
+   reproduce). 8. schema parity: CLEAN 275/276 (b4960d698). 9. README: already the recommended
+   cd+-scheme form since 284beed0f. 4. "gates disagree": at HEAD pre-commit-gates.sh passes all
+   3 — but the KERNEL is real: two scripts share the filename check_substrate_residuals.sh with
+   DIFFERENT jobs (parent = residual-marker regex scan; BAS = residuals gate). Disambiguating
+   headers added to both (4ed63334f). 10. "smoke test too heavy": BY DESIGN — the SampleHost
+   bench test is the host-integration teeth (the very test class that caught the SIGBUS and
+   proved its fix); 1.24s and deterministic; its weight is its value.
+
+ROOT CAUSE of the stale nine: three detached worktrees under .claude/worktrees/ pinned at
+06-29 / 04-25 / 04-17 — all predating every fix (07-11 23:38 onward). Any gate or test run
+inside one reproduces the entire report verbatim, including the pre-box crash stack and the
+exact stale numbers (print 23, 3 UNKNOWN imports, 12 schema). Cleanup is an operator call
+(`git worktree remove <path>`, or point tooling at the main checkout).
+
+Triage law (now banked): when a report contradicts fresh green runs, FIRST `git worktree list`
++ date the checkout the report was generated from — identical stale numbers across many items
+is the signature.
