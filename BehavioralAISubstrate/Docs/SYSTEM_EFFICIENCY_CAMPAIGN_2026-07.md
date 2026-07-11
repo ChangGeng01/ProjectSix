@@ -272,3 +272,20 @@ Operator: "目前效率过于低下 希望以后可以移动端及其高效 仍�
 
 Remaining by-choice: tier-0 expansion beyond covered-factual (quality-risk design, deferred with
 rationale + the NLI question-fit follow-up for the 0.82-cosine qualifier breach).
+
+## 2026-07-11 — device-2 T1 "cold" attempt: HONEST NEGATIVE (target NOT uniformly met)
+
+Chasing the "discounted target" dissatisfaction (device-1 0.58 cold; device-2 earlier 0.75 hot,
+no matched cold), I ran a paced "cold" T1 on 5E5C. Result: **gated 1.87 vs 2.00 = ratio 0.93
+(only 7% avoided), thermal=fair at end.** This is WORSE than both prior numbers, and the run
+drifted to fair despite the 20s paced gaps — so it is not a clean cold cert.
+
+HONEST conclusion (I do NOT get to upgrade this to a clean cross-device pass): the T1 ratio is
+strongly thermal- AND turn-mix-dependent — 0.58 (dev-1 cold) → 0.75 (dev-2 fair) → 0.93 (dev-2,
+this run, drifted-fair). **The ≤0.6 target is met ONLY in device-1's cold window; device-2 does
+NOT meet it.** What is cross-device-certified is the MECHANISM (short-circuit fires, substantive
+turns verify, thermal escalates conservatism), NOT a fixed ratio. This reinforces the campaign's
+own thesis and the DECODE-OS law: the number you ship is a function of the realized thermal +
+recurrence window, never a pinned peak — and reporting the negative is the honest close, not a
+better one. The "discounted target" dissatisfaction is thus resolved by making it MORE honest
+(the target is conditional and device-2 misses it), not by manufacturing a pass.
