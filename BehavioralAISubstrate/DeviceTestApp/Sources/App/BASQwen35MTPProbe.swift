@@ -56,9 +56,16 @@ enum BASQwen35MTPProbe {
     /// production turn shape, also inside the maxSeq cap) for N minutes; per-gen tok/s + thermal + footprint;
     /// verdict = mean over the window + first-vs-last-quartile degradation (thermal drift is the known enemy:
     /// past sustained runs drifted +44-78%).
+    /// gaps-reconciliation LOW-6 (2026-07-11): monotonic clock for DEADLINES (mirrors the
+    /// runner's monoNowNs, private to BASEnduranceAppRunner). Wall-clock Date() deadlines let a
+    /// backward NTP step STALL or silently EXTEND unattended device runs; uptimeNanoseconds
+    /// cannot go backward. (Short tok/s duration measurements below still use Date() — bounded
+    /// seconds-scale noise, not a run-stall risk; noted, not hidden.)
+    private static func monoNowNs() -> UInt64 { DispatchTime.now().uptimeNanoseconds }
+
     static func runSustained(minutes: Double, container: ModelContainer, wURL: URL) async throws {
         let prompt: [Int] = [100, 200, 300, 400, 500, 600, 700, 800]
-        let deadline = Date().addingTimeInterval(minutes * 60)
+        let deadlineNs = monoNowNs() + UInt64(minutes * 60 * 1_000_000_000)   // LOW-6: monotonic
         var rates: [Double] = []
         var accs: [Double] = []
         var gen = 0
@@ -78,7 +85,7 @@ enum BASQwen35MTPProbe {
             }
             return SustainBox(dec: try BASQwen35MTPSpecDecoder(model: model, mtpWeightsURL: wURL))
         }
-        while Date() < deadline {
+        while monoNowNs() < deadlineNs {
             let r: (Double, Double) = try await container.perform { [box] _ in
                 let dec = box.dec
                 let kEnvS = Int(ProcessInfo.processInfo.environment["BAS_MTP_K"] ?? "") ?? 1
@@ -183,9 +190,9 @@ enum BASQwen35MTPProbe {
             }
             // Sync spin, NOT Task.sleep — devicectl-launched runs freeze at idle awaits (2026-07-03 gotcha);
             // 2s of one e-core keeps the turn pacing without the suspension point.
-            let gapEnd = Date().addingTimeInterval(2)
+            let gapEndNs = monoNowNs() + 2_000_000_000   // LOW-6: monotonic
             var spinX = 1.0
-            while Date() < gapEnd { spinX = sin(spinX) + 1.000001 }
+            while monoNowNs() < gapEndNs { spinX = sin(spinX) + 1.000001 }
             if spinX == .infinity { print("") }
         }
         guard !specRates.isEmpty else { print("[qwen35-cert] no data ✗"); return }
