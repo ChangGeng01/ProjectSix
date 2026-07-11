@@ -501,3 +501,22 @@ neuter sha verification → t3 reds. 46/46 journal-arc green.
 times on real bets AND a ≥3-day cold streak recurs, record NO-RETENTION-EFFECT honestly and retire
 the join — a feature changing nothing load-bearing does not stay. Retention is ultimately operator
 behavior; a zero-egress one-shot CLI can only call back at the moment it has business.
+
+## First resolved bet — trial-9F664B ruled RIGHT (operator, 2026-07-11)
+
+The workload thesis bet ("The 4 系统病 are structural pressures, not a finite bug list — the
+live workload is the real cure, not more audit rounds"; question: "Will opening The Ledger daily
+reduce new 注释撒谎/dormant-code instances faster than audits close them?") is the journal's
+FIRST operator-resolved outcome: **RIGHT** — promotion gate ALLOWED, sealed to the Ed25519 chain.
+
+The single day of evidence that decided it — every item a fresh 系统病 instance the live workload
+caught and an audit round structurally could not: the lying backfill notice in day-one hint code;
+a "build-verified" claim written before the verification ran (caught by self-review, corrected);
+the LOW-9 "trap" claim refuted by reversal execution; the stale device xcodeproj silently
+omitting every new test (dormant-code, never once looked at by an audit); the false-green
+sleep-consolidation fixture that only running the code (blindspot-③) exposed. Evidence note
+sealed grounded:record-match:d01fd263.
+
+Ledger state after this turn: 26+ sealed entries, chain INTACT. Open bets (both time-gated,
+~2 weeks): trial-7BEAA1 (ship-moment loop: no ≥3-day cold streak) and trial-522E2F (the 11-item
+batch: no revert/reopen).

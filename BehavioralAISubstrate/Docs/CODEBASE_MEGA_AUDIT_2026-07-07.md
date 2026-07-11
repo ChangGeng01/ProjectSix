@@ -593,3 +593,38 @@ Cargo workspace 1021/0. DeviceTestApp iOS build re-verified post-LOW-6.
 Lessons banked: reversal must red at TEST level (2 compile-fail reversals redone; 1 reversal
 REFUTED an agent's trap claim → honest correction pushed); agent claims need execution proof
 before narrative; two-store actors need reversals aimed at the surface the teeth read.
+
+## 2026-07-11 — two-phone device certification (operator: "全面测试 你有俩手机 最详细")
+
+Both physical iPhone Airs (A18/A19, iOS 27.0; devicectl UUIDs 9E9E3DEB / 5E5C3C5C) ran the
+campaign's device-observable surface in parallel:
+
+**Cross-language byte-equality on the rebuilt ios-arm64 slice (9E9E):** 66 tests / 1 expected
+skip / 0 fail — importance-scorer (incl. the un-skipped no-history=0.5 test), event-extractor,
+risk-plane numeric version compare, tribunal most-severe-high, verdict max-rank all hold
+Rust≡Swift on real ARM64. `rust_verify` ABI: resolved=8/8 matched=8/8 on BOTH phones.
+
+**Campaign behavioral fixes on real APFS/jetsam (5E5C):** 92 tests / 0 fail — sleep-consolidation
+false-green fixture fix, FactBank reentrancy single-flight, MED-8 BASSingleFlightSlot, advisory
+ring, organ-eval LOW-2, ch934/946/M603 fuzz.
+
+**FULL device bundle sweep (9E9E):** 15,267 tests / 161 skip / 15,088 pass / 22 fail-methods —
+ALL 22 classified non-defects: 10 model-gated (noModelFactoryAvailable) + 12 source-tree lints
+whose #filePath targets the absent Mac repo. ZERO behavioral failures, ZERO from this campaign.
+
+**MTP sustain probe (twin run, BAS_MTP_SUSTAIN_MIN=3; assets pre-staged on both phones since
+06-25/07-03):** the MED-9 one-decoder mechanism verified on both:
+    5E5C: 35 gens | mean 20.9 tok/s | firstQ 30.0 → lastQ 16.8 (−44%) | a=0.90 | end serious
+    9E9E: 36 gens | mean 21.4 tok/s | firstQ 31.3 → lastQ 16.7 (−46%) | a=0.90 | end fair
+Evidence: build cost only in gen 01 (26.9/28.0 → steady 32.8/33.0 — the per-gen ~300MB rebuild
+is dead); footprint iron-flat 3069MB all gens; a=0.90 constant (EMA continuity). Remaining −44/
+−46% drift = genuine fanless-SoC thermal physics (throttle onset ~gen 12); the G3 ≥20 tok/s mean
+held through the thermal wall. Honest bound: no matched pre-fix A/B window (cross-thermal
+baselines incomparable per the DECODE-OS lesson) — the claim is the MECHANISM, not a drift delta.
+
+Device-run infrastructure lessons (banked in memory `device-two-phone-testing`): the committed
+xcodeproj is a fixed file list (regenerate via xcodegen on new test files; RESTORE the
+increased-memory-limit entitlement + BGTaskScheduler id it strips); clean DerivedData after
+regen; `-only-testing` curation is the sanctioned device method (the full bundle legitimately
+drags host-only lints onto the phone); killing the devicectl console SIGTERMs the app; a locked
+screen means onAppear never fires.
