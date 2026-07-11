@@ -368,3 +368,43 @@ on know/knowledge), and they will matter more once grounding lands — but they 
 going to, fix the classifier noise. Correcting the record: the "caution words → risk-up" framing was a
 mis-attribution; the real cause is the aspirational verdict, which stays the deferred FactBank/grounding
 work, not a keyword calibration.
+
+## Grounding increment 1 — git-self-grounding (SHIPPED, 2026-07-11)
+
+The first bite at honest limit #1 ("empty FactBank ⇒ grounded verdict is aspirational"), built to
+the design panel's BUILD_REVISED verdict (3-lens + adversarial vacuity panel, wf_ee6e4f36): the
+adversary KILLED the naive design — routing free-text prose through BASFactBank/BASEmbeddingFactBank
+is fatal three ways (prose can't yield the (question, asserted) pair without the 4B judging truth;
+substring-verify over prose false-gaslights correct entries; the abstain-gate squeeze reduces
+semantic grounding to a hand-picked demo). What shipped instead is the structured-token slice:
+
+- **Fact source** — the operator's OWN git log (the panel's seed: "the git log IS the fact source").
+  `BASGitFactBank` (BASSovereign, Foundation-only): `ingest(gitLog:)` parses `git log --format=%H%x09%s`
+  into SHA-prefix sets + subject markers; `resolve(claim:facts:)` is pure Set-membership. The model
+  is NEVER asked "is this true" (the 4B hard lesson, held structurally).
+- **Covered claims** — a commit-qualified SHA token ("… in commit ed66c50", parenthesized "(sha)")
+  or a marker (#N / H\d+ / M\d+ / ch\d+). Abstain bias enforced structurally: bare hex abstains
+  (needs the context word), all-letter hex-shaped English words abstain (digit guard), unmatched
+  markers abstain (AGREES-ONLY — an issue is discussed before its commit exists), git failure seals
+  an honest `grounded:unavailable`. `record-miss` (.contradicts) is reserved for the high-confidence
+  fabricated-SHA case and OUTRANKS a co-present match (fail-closed).
+- **The sealed effect (anti-3b non-vacuity, proven live)** — armed (QINAO_JOURNAL_GROUND=1, default
+  OFF), the seal gains a record-consistency field, Ed25519-signed into the chain:
+  `…|abstain|grounded:record-match:ed66c50e` (cited commit EXISTS — sealed against the real repo) and
+  `…|abstain|grounded:record-miss:deadbeef42` — the FIRST genuinely grounded contradiction the
+  substrate has ever sealed. OFF / uncovered ⇒ byte-identical to increment 2b/3c (no git subprocess
+  even runs). Teeth: 11 unit + 3 binary-integration tests incl. the anti-3b proof (ON ≠ OFF, the
+  grounded field is a strict suffix, uncovered abstains byte-identical); adversarial reversal
+  (neutering groundClaim into the 3b dormant toggle) reds all three.
+- **Mirror, not oracle** — the token is deliberately record-match/record-miss (record-CONSISTENCY),
+  never "agrees"/truth: it says "the commit you cited exists in the record", NOT "your decision was
+  right". The governance `abstain` stands beside it untouched. Observed juxtaposition worth keeping:
+  the ML band rated the FABRICATED entry risk:low and the REAL one risk:high — the deterministic
+  grounded field carries signal the noisy classifier cannot.
+
+**Honest limits:** grounds structured citations only — paraphrased prose ("shipped the comma-join
+fix", no SHA) deliberately abstains (semantic grounding via MiniLM is the explicitly-deferred next
+rung, with the false-contradicts trap the adversary documented); the oracle is self-referential (the
+operator's own record, not the outside world); multi-commit claims and outcome/number grounding are
+unhandled. Full prose grounding remains the marathon-scale open problem — this increment cashes
+exactly one deterministic, byte-durable sub-claim: "does the commit you cited actually exist."

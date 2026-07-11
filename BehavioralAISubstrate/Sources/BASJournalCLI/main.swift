@@ -252,13 +252,17 @@ func logDecision(_ text: String, tag: String, deliberate: Bool = false) async th
     // organ, so a spine miss still logs + seals the entry.
     let verdictRef = await governanceVerdictRef(action: "admit", for: text, deliberate: deliberate)
         ?? "admit:governed|\(deliberate ? "gov2d" : "gov2"):unavailable"
+    // Grounding increment 1 — when armed (QINAO_JOURNAL_GROUND=1), resolve a cited commit/marker
+    // against the git record and fold the record-consistency token into the seal. OFF/uncovered ⇒
+    // groundClaim returns nil ⇒ sealedRef == verdictRef, byte-identical to increment 2b/3c.
+    let sealedRef = groundClaim(text).map { verdictRef + "|" + $0 } ?? verdictRef
     // Increment 2 — seal the sovereign action into the Ed25519 audit ledger (append-only,
     // tamper-evident, cross-boot). Integrity-over-availability: surface a seal failure LOUDLY
     // and DISTINCTLY — the atom is already logged, so the operator must be able to tell a
     // logged-but-UNSEALED partial success from a total failure.
     do {
-        let sealID = try await sealAdmit(atomID: atom.id, contentText: text, verdictRef: verdictRef)
-        print("sealed \(String(sealID.prefix(8)))  \(verdictRef)  (Ed25519 sovereign ledger)")
+        let sealID = try await sealAdmit(atomID: atom.id, contentText: text, verdictRef: sealedRef)
+        print("sealed \(String(sealID.prefix(8)))  \(sealedRef)  (Ed25519 sovereign ledger)")
     } catch {
         FileHandle.standardError.write(Data(
             ("SEAL FAILED — the entry is LOGGED to memory but NOT sealed into the sovereign "
@@ -423,6 +427,15 @@ private func printHelp() {
     abstain/permit stays protective (that example keeps permit:delay|abstain), so a lower band is
     a calmer re-read, never a green light. Off by default so the baseline verdict stays
     byte-stable; use it when you want a second look.
+
+    QINAO_JOURNAL_GROUND=1 (env, off by default) arms git-self-grounding: an add whose text CITES
+    a commit ("… in commit b5a309f") or a marker (#N / H9 / ch1044) is checked by pure
+    Set-membership against your OWN git log (QINAO_JOURNAL_GROUND_REPO overrides the repo; no
+    model, no network) and the seal gains a record-consistency field: grounded:record-match:<sha8>
+    (the cited commit EXISTS in the record) or grounded:record-miss:<token> (a SHA-shaped citation
+    of NO commit — a misremembered/fabricated reference, surfaced not silently passed). Honest
+    scope: record-match means ONLY "the commit you cited exists" — it is NOT a judgment that the
+    decision was right, and prose with no citation abstains (the seal stays byte-identical).
     """)
 }
 
