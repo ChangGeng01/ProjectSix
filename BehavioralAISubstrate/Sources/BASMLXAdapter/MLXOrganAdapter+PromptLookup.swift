@@ -171,13 +171,17 @@ extension MLXOrganAdapter {
     public func draft(
         _ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose, sessionID: String?
     ) async throws -> BASOrganDraft {
+        // gaps-reconciliation organ-eval LOW-2 (2026-07-11): role validation must precede the
+        // kill-switch AND live outside the #if — the old order let decodePlannerAutoSelect=false
+        // (and the no-MLXLLM build) route an unsupported-role request into _plainDraft, diverging
+        // from base draft(_:) (MLXOrganAdapter.swift:1179 checks the role first).
+        guard descriptor.supportedRoles.contains(request.role) else {
+            throw BASOrganError.unsupportedRole(request.role)
+        }
         guard decodePlannerAutoSelect else {
             return try await _plainDraft(request)
         }
         #if canImport(MLXLLM)
-        guard descriptor.supportedRoles.contains(request.role) else {
-            throw BASOrganError.unsupportedRole(request.role)
-        }
         // 案5: ONE context per turn (thermal + memory headroom sampled once; BAS_DECODE_CTX=1
         // prints the who-could-throttle line).
         let ctx = MLXOrganAdapter._decodeContext(purpose: purpose, request: request)
