@@ -734,3 +734,32 @@ Proof chain:
 
 Residual (explicitly NOT closed by this): runTurn's own 127KB debug frame; the @MainActor
 guards stay until that is shrunk or proven unnecessary suite-by-suite.
+
+## 2026-07-12 — runTurn frame compressed 129,792→56,304B peak; @MainActor stack guards RETIRED
+
+Operator-ordered completion of the residual from the CoW-box section above. runTurn's single
+-Onone frame (129,792B, llvm-objdump) is split into six NAMED local functions (memoryDeliberate/
+riskA/riskB/renderA/renderB/assemble) — verbatim line moves, compiler-derived tuple contracts
+for cross-stage values, capture semantics for the rest. Debug peak = main-residual + largest
+stage = 20,672 + 35,632 = 56,304B (−57%). Craft law: an immediately-applied closure literal is
+SILGen-INLINED (measured: zero win) — only a NAMED local function isolates a frame.
+
+Guard retirement (3401083ca): all four @MainActor stack-guard sites removed; the tests-arch ③
+enforcement lint INVERTED into a cargo-cult detector (@MainActor paired with a stack/SIGBUS
+justification reds; genuine actor-isolation untouched — its first catch was this changeset's
+own prose). Successor mechanical guard: BASRunTurnFrameBudgetTests re-measures the built object
+via llvm-objdump, budget 80,000B (reversal: budget→10K reds printing the live 56,304).
+
+Bonus discovery (8db9a655e) — the final regression flushed a NARRATIVE OVERTURN: 5 file-
+protection tests went red in both toolchains at 02:3x after passing at 01:50. Not my change:
+ioreg CGSSessionScreenIsLocked=Yes at 02:12, and a bare probe (write + set .complete +
+read-back) EPERMs while locked. On this macOS 27 / Apple Silicon generation NSFileProtection-
+Complete IS ENFORCED at console lock — the audit-era "stored but inert on macOS" note is
+obsolete on this OS. Fixed with BASScreenLockSkip (loud environmental skip; locked run 6
+skipped/0 failures; unlocked runs exercise the real assertions).
+
+Certification (committed state): beta BOTH halves 16,554/0 + swift-testing 424 tests/76 suites
+GREEN on the cooperative pool un-guarded (the living teeth) · stable headless script 16,592/0 +
+all @Test batches green + SCRIPT_EXIT=0 · SampleHost bench (Task.detached) 1.253s pass ·
+QinaoRuntimeSDK 1,449/0. Turn-pipeline stack disease fully closed: value 12,200B→8B, frame
+129,792→56,304B peak, zero thread-class workarounds remain in production or tests.
