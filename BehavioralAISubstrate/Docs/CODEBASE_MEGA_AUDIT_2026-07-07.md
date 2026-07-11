@@ -546,3 +546,50 @@ remains an open architecture step (ADR-014 V1/V2 duality), not a test concern.
 **Lesson (false-green taxonomy):** two bugs canceling out reads as green. The blindspot-③ fix
 didn't break these tests — it exposed them. When a principled fix "breaks" a test, check whether
 the test was ever measuring what it claimed.
+
+## 2026-07-11 — the 11-item mac-fixable batch: CLOSED (operator-directed "一次性打掉全部 11 项 MED-8 也授权修")
+
+The gaps-ledger reconciliation's confirmed-open list, all closed in one campaign — each with
+TDD teeth + adversarial reversal (test-level red required; compile-fail reversals were redone) +
+individual commit/push. 79288970f→5ed684187 (13 commits incl. 1 honest correction + 1 bonus):
+
+1. runtimecore-b LOW-9 — RiskPlane empty-input guard. CLAIM CORRECTED by reversal: the
+   force-unwrap never trapped on this toolchain (empty-singleton pointer non-nil; Rust returns -1
+   for zero-len) — a LATENT documented-nullable hazard, not a live crash. Correction pushed.
+2. organ-eval LOW-2 — role validation hoisted above the decode-planner kill-switch + the #if.
+3. x-concurrency LOW-12 — BASEmbeddingFactBank.load() single-flighted (reentrancy doubled the
+   whole embedding pass: 12 embeds for a 6-fact bank, proven RED).
+4. hostkit-rest LOW-4a — advisory ledger drop-oldest ring (4096) + audited evictions; aggregates
+   became running counters so the cap cannot skew honoredRatio. (LOW-4b KVCacheRegistry default
+   stays: adjudicated ADR-014 staged opt-in — operator call.)
+5. hostkit-spine F9 — XCTAssertTrue(true) tautology replaced with real previewTransition
+   non-mutation teeth (reversal took 4 attempts; coordinator has TWO record stores — the teeth
+   read trialsByCandidate, so the mutation had to hit that surface to prove bite).
+6. x-sovereignty #7 — SampleHost run JSON: per-run UUID replaces persistent identifierForVendor;
+   source-tripwire in the BAS bundle (SampleHost is iOS-only).
+7. probe LOW-6 — BASQwen35MTPProbe deadlines monotonic (sustain window + cert gap); tripwire: no
+   wall-clock deadline loops under DeviceTestApp/Sources. Short Date() duration measurements
+   remain (bounded noise — noted).
+8. tools-scripts LOW — HumanEval exec seatbelt (deny-default sandbox-exec): sensitive-read/
+   network/out-of-tempdir-write all EPERM, benign check() scores; 5 teeth with a no-pytest
+   fallback runner; extracted qinao_sandbox.py (main-guard-less CLI).
+9. hostkit-spine F7 — host face threads ssmCautionObservationSink + turnHistory + priorSSMState;
+   flag-on is no longer silently stateless (turn2 fed turn1's ssmStateOut diverges from fresh —
+   the chapter-188 temporal path ALIVE from the face). Defaults nil/[] ⇒ byte-equal off.
+10. mlx MED-8 (operator-authorized) — BASSingleFlightSlot<Value> + _resolveMTPDecoderBox:
+    concurrent cold turns build EXACTLY ONE ~300MB decoder (no ~600MB jetsam-adjacent overlap,
+    no chainEmaL clobber); publish-at-build behind the MED-7 dropEpoch gate also closes the
+    build-done→post-decode-republish rebuild window. Control flow Mac-proven (8 callers ⇒ 1
+    build; error→all waiters; retry-fresh); the memory payoff is device-observable (adjudicated).
+11. x-architecture LOW-4 — BASHostKit's dep on BASRustMemoryTrackerBinary declared (conditioned,
+    no watchOS); xcodebuild-verified in isolated DerivedData (generic/platform=macOS fails on a
+    PRE-EXISTING x86_64 Float16 artifact — noted).
+BONUS (reconciliation's NEW finding) — generateSpecK reports TRUE proposed count (accepted could
+    exceed proposed, inverting emaHitRate if the diagnostic lane were ever wired).
+
+FINAL GATE: 16,380 XCTest + 424 swift-testing — ALL GREEN (+15 new teeth vs the morning gate).
+Cargo workspace 1021/0. DeviceTestApp iOS build re-verified post-LOW-6.
+
+Lessons banked: reversal must red at TEST level (2 compile-fail reversals redone; 1 reversal
+REFUTED an agent's trap claim → honest correction pushed); agent claims need execution proof
+before narrative; two-store actors need reversals aimed at the surface the teeth read.
