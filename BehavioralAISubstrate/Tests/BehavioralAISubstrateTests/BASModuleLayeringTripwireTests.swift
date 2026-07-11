@@ -48,8 +48,13 @@ final class BASModuleLayeringTripwireTests: XCTestCase {
         "BASAppleAdapters": 7,
         // 8 — host facade (top library)
         "BASHostKit": 8,
-        // 9 — executable (the CLI app; consumes the facade)
+        // 7 — SwiftUI console shell (M-o MED-2 extraction; imports BASAdmin only, downward)
+        "BASAdminUI": 7,
+        // 9 — executables (CLI apps; consume the facade)
         "BASBrainCLI": 9,
+        // The Ledger workload CLI (increments 1-R): imports BASHostKit(8) + BASAppleAdapters(7)
+        // + BASOrchestration/BASSovereign/BASMemory/BASPolicy/BASRuntimeCore — all strictly lower.
+        "BASJournalCLI": 9,
     ]
 
     // MARK: - Shared matcher (used by the production test AND the negative control)

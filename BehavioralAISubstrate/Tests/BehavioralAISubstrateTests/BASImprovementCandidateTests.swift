@@ -114,11 +114,15 @@ final class BASImprovementCandidateTests: XCTestCase {
     /// 必须 100% 在注册表——新增生产开关不入册即此测试红。
     func testRegistryCoversDefaultOnSwitchesInSource() throws {
         let testsDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-        let adapterDir = testsDir.deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Sources/BASMLXAdapter")
-        let files = try FileManager.default.contentsOfDirectory(
-            at: adapterDir, includingPropertiesForKeys: nil)
-            .filter { $0.pathExtension == "swift" }
+        // 2026-07-11 reconciliation: the scan was BASMLXAdapter-only, so BAS_TURN_SERIAL
+        // (BASHostKit, registered 07-09) read as a registry phantom. Scan BOTH dirs — the two
+        // homes of default-on switches — keeping the two-way assertion honest in each.
+        let srcRoot = testsDir.deletingLastPathComponent().deletingLastPathComponent()
+        let files = try ["Sources/BASMLXAdapter", "Sources/BASHostKit"].flatMap { dir in
+            try FileManager.default.contentsOfDirectory(
+                at: srcRoot.appendingPathComponent(dir), includingPropertiesForKeys: nil)
+                .filter { $0.pathExtension == "swift" }
+        }
         XCTAssertFalse(files.isEmpty)
         // 复审修10:v1 正则是纸糊的——真实代码写法是 `env["BAS_X_OFF"] != "1"`(变量名
         // env、运算符 != "1"),v1 的 `environment[...] == "1"` 两处全 miss(4 个默认开

@@ -62,12 +62,25 @@ enum BASQwen35MTPProbe {
         var rates: [Double] = []
         var accs: [Double] = []
         var gen = 0
+        // audit devicetestapp MED-9 — ONE decoder for the whole window (the in-file CertBox pattern,
+        // = the production MTPDecoderBox posture): the old per-generation re-init re-quantized the
+        // ~300MB decoder EVERY loop iteration — pure self-heating polluting the exact thermal-drift
+        // verdict this probe exists to measure (the cert's take-2 had 43/50 thermal-gated turns
+        // "substantially self-inflicted" from the same disease). Persisting the adaptive-K EMA
+        // across generations is MORE production-faithful, not less. @unchecked box: the decoder
+        // crosses the actor boundary only as an opaque handle — every USE stays inside
+        // container.perform (single-actor execution). Fix-with-note: the thermal-drift improvement
+        // itself is device-runtime-observable only; this change is iOS-SDK build-verified.
+        struct SustainBox: @unchecked Sendable { let dec: BASQwen35MTPSpecDecoder }
+        let box: SustainBox = try await container.perform { ctx in
+            guard let model = ctx.model as? Qwen35Model else {
+                throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
+            }
+            return SustainBox(dec: try BASQwen35MTPSpecDecoder(model: model, mtpWeightsURL: wURL))
+        }
         while Date() < deadline {
-            let r: (Double, Double) = try await container.perform { ctx in
-                guard let model = ctx.model as? Qwen35Model else {
-                    throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
-                }
-                let dec = try BASQwen35MTPSpecDecoder(model: model, mtpWeightsURL: wURL)
+            let r: (Double, Double) = try await container.perform { [box] _ in
+                let dec = box.dec
                 let kEnvS = Int(ProcessInfo.processInfo.environment["BAS_MTP_K"] ?? "") ?? 1
                 let kFusedS = Int(ProcessInfo.processInfo.environment["BAS_MTP_FUSED_K"] ?? "") ?? 0
                 let tCapS = Int(ProcessInfo.processInfo.environment["BAS_MTP_TCAP"] ?? "") ?? 5

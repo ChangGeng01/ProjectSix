@@ -2,7 +2,7 @@ import XCTest
 
 // audit tests-arch ④ — the iOS device test bundle covers a SHRUNK universe.
 //
-// 161 test files are entirely `#if !os(iOS)` source-gated (chapter 1022's
+// 162 test files are entirely `#if !os(iOS)` source-gated (chapter 1022's
 // "153 → 0 skips via source-gate" — commits f7b941639 / 2d00bbc47), so ~10% of
 // suites are ABSENT from the iOS device bundle. "device all-green" therefore
 // certifies a smaller universe than "Mac all-green", and — the actual gap the
@@ -17,14 +17,18 @@ import XCTest
 // tree, which the iOS sandbox lacks) — so it does not itself enlarge the device bundle.
 
 #if !os(iOS)
+    // ADR-NOTE (2026-07-11 ceiling 161→162): the one growth is BASTurnDrivingSuiteMainActorLintTests
+    // (tests-arch ③, 5673f402e) — LINT-INFRASTRUCTURE that scans the repo source tree via #filePath,
+    // structurally un-runnable inside a device bundle (no source tree), the exact self-exclusion class
+    // the ④ tripwire already recognizes. Not a silent shrink of the behavioral device universe.
 final class BASIOSGatedTestBundleCeilingTripwireTests: XCTestCase {
 
     /// The current count of whole-file `#if !os(iOS)` gated test files (verified
-    /// `grep -rlE '^#if !os\(iOS\)' Tests/BehavioralAISubstrateTests` == 161 at HEAD).
+    /// `grep -rlE '^#if !os\(iOS\)' Tests/BehavioralAISubstrateTests` == 162 at HEAD).
     /// Raising this REQUIRES an ADR note justifying why the iOS-gated set grew — a
     /// conscious decision to shrink the device-certified universe further, not a
     /// silent drift. Lowering it (un-gating) is always welcome and never blocks.
-    private static let ceiling = 161
+    private static let ceiling = 162
 
     /// Source-scanning LINT infrastructure — gated `#if !os(iOS)` because it reads the Mac dev-tree
     /// via `#filePath` (absent in the iOS sandbox), NOT because it covers Mac-only runtime behavior.
@@ -87,7 +91,7 @@ final class BASIOSGatedTestBundleCeilingTripwireTests: XCTestCase {
     /// anti-false-green anchor: if the predicate were hardcoded, this would not hold.
     func testGatedInventoryIsReadFromDisk() throws {
         let gated = try gatedTestFiles()
-        XCTAssertFalse(gated.isEmpty, "the gated set is known non-empty at HEAD (161)")
+        XCTAssertFalse(gated.isEmpty, "the gated set is known non-empty at HEAD (162)")
         // Spot-verify the first reported file genuinely has the column-0 gate.
         if let first = gated.first {
             let url = testsDir.appendingPathComponent(first)

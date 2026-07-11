@@ -90,11 +90,18 @@ final class BASHostKitFacadeGuardTests: XCTestCase {
         "BASAuditObservationProjections.swift": 1665,
         "EBrainTurnResult.swift": 1625,
         "HostRuntimeCore.swift": 1365,
-        "BASTurnRuntimeEngine.swift": 1055,
+        // 2026-07-11 reconciliation: grew 1055→1123 across the 07-09 audit fixes (M-k F1
+        // ledger-locality + the BAS_TURN_SERIAL per-key in-flight gate — both commit-traceable,
+        // deliberate safety work, not drift). Re-pinned TIGHT at current+7 so the ratchet keeps teeth.
+        "BASTurnRuntimeEngine.swift": 1130,
         "EBrainConsoleSupport.swift": 960,
         "BASCognitiveOSConvenience.swift": 895,
         "HostKitCore.swift": 890,
         "EBrainHostRuntime+TriSelfService.swift": 885,
+        // 2026-07-11 reconciliation: crossed 800 on 07-09 (hostkit-rest HIGH-2 — the .all-tier
+        // watcher effective-inputs fix, 7321781f1). Genuine composition (fabric seat wiring), but
+        // flagged for the deferred extraction list. Pinned TIGHT at current+8.
+        "BASAgentFabricHostPipeline.swift": 815,
     ]
 
     func testNoNewLargeFileAndKnownGodFilesDoNotGrow() {
