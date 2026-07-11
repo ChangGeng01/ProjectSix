@@ -27,7 +27,12 @@ final class BASMemoryUsageTrackerNotesAtomicityTests: XCTestCase {
         let sql = "SELECT notes FROM memory_usage_record_notes WHERE record_id=?;"
         guard sqlite3_prepare_v2(raw, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
         defer { sqlite3_finalize(stmt) }
-        _ = recordID.withCString { sqlite3_bind_text(stmt, 1, $0, -1, nil) }
+        // SQLITE_TRANSIENT: sqlite copies the string DURING bind. The previous
+        // `withCString { … nil }` handed sqlite a pointer that died with the closure
+        // (nil destructor = SQLITE_STATIC promise) — step() then compared against freed
+        // memory: green-by-luck on the swiftbuild toolchain, no-row under SPM native.
+        let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        _ = sqlite3_bind_text(stmt, 1, recordID, -1, SQLITE_TRANSIENT)
         guard sqlite3_step(stmt) == SQLITE_ROW, let c = sqlite3_column_text(stmt, 0) else { return nil }
         return String(cString: c)
     }
