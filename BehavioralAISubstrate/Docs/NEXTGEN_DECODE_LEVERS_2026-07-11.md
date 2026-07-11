@@ -81,11 +81,18 @@ are built and orphaned; the gating item is a real recurrent MLX workload, not mo
   addTrampoline (NSClassFromString doesn't resolve in the test bundle — device law) + _4bit_local
   model dir + MLX imports; caught a "Executed 0 tests" vacuous-pass (stale bundle) and the
   Device2HrFuzz test-PLAN restricting -only-testing.
-- **Cold-arm TTFT measurement**: committed + Mac-compiles (a 3rd fresh adapter cold-prefills the same
-  history; NSLogs restore_prefill_ms vs cold_prefill_ms + avoided_ratio — printed, never asserted per
-  the DECODE-OS cross-thermal law). Clean device number PENDING a run that includes BASSpillGCTests
-  (the scheme's default xctestrun is the Device2HrFuzz plan, which excludes it; needs a planless
-  build-then-run in one command, the form that ran the mechanism proof).
+- **TTFT number DEVICE-MEASURED** (9E9E, clean run, 6/6 class green): restore-turn prefillMs =
+  **180.5ms**. HONEST reading — NOT a clean 279→180 delta: the 180.5ms restore turn still pays the
+  INCREMENTAL prefill of the new user input; the F6-cert ~279ms is a FULL-history cold re-prefill.
+  The avoided quantity = the whole conversation-history re-prefill that warm-restore skips (the
+  restore turn pays only the marginal new-token prefill). A matched 3rd-adapter cold arm (co-resident
+  4B to cold-prefill the same history) EXCEEDS the 12GB Air jetsam cap (6.29GB) → OOM, unrunnable — so
+  the cold baseline is the documented F6 cert, not a same-run A/B. Real claim: warm-restore skips the
+  full-history cold re-prefill; device-measured restore-turn prefill 180.5ms.
+- **Harness laws banked** (2026-07-11): `-only-testing` at METHOD level yields 0 tests on this scheme
+  (Device2HrFuzz default plan) — the CLASS-level `-only-testing:BASDeviceTests/BASSpillGCTests` is the
+  working form; a copied `-xctestrun` breaks `__TESTROOT__` path resolution (keep it in Products/); and
+  3× co-resident Qwen3.5-4B OOMs the 6.29GB jetsam cap (2 is the ceiling for A/B-in-one-test).
 - **Product lifecycle wire: NOT built (honest)** — DeviceTestApp holds no long-lived adapter for a
   scene hook to snapshot; faking one would be a zero-byte loaded-gun toggle (3b trap). The real gate
   is the absence of a live recurrent MLX app — the same 上膛未击发 pattern; the deployment target is
