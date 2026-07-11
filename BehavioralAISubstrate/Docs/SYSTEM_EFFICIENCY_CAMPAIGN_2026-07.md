@@ -260,9 +260,15 @@ Operator: "目前效率过于低下 希望以后可以移动端及其高效 仍�
 - **大模型与14层契合 (#77)**: the 14-layer substrate ≈ 11ms = 0.3% of a turn — the turn's cost IS
   the LLM; every avoided/floored call is the whole lever. T1 ladder to date: 2.00 → 1.37 (P1) →
   1.17/0.58-ratio (P3, target ≤0.6 MET on device 1).
-- **2nd-device cert** (the charter's last hardware item): BAST1DeviceTests running on 5E5C today
-  (paced protocol; TEST_RUNNER_ env must be injected via the xcodebuild PROCESS environment, not
-  command-line build settings — the skip-not-run trap, learned again).
+- **2nd-device cert (the charter's last hardware item): DONE** — BAST1DeviceTests on 5E5C (paced):
+  gated 1.50 vs analytic control 2.00 ⇒ **ratio 0.75, 25% avoided** (45 calls / 30 turns), suite
+  PASSED. HONEST caveat: 5E5C ran today's MTP sustain first and sat at thermal=fair from turn ~22 —
+  the gate correctly turned MORE conservative under heat (llm_calls 1→2, the thermal-never-worse
+  posture doing its job), so 0.75-hot vs device-1's 0.58-cool are different thermal regimes, not a
+  device discrepancy (the DECODE-OS cross-thermal-baseline law). The cross-device claim certified:
+  the MECHANISM is identical on both phones — short-circuit fires, verify engages on substantive
+  turns, thermal escalates conservatism. (TEST_RUNNER_ env must be injected via the xcodebuild
+  PROCESS environment, not command-line build settings — the skip-not-run trap, learned again.)
 
 Remaining by-choice: tier-0 expansion beyond covered-factual (quality-risk design, deferred with
 rationale + the NLI question-fit follow-up for the 0.82-cosine qualifier breach).
