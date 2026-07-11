@@ -2,6 +2,9 @@
 Generates a completion per problem, runs prompt+completion+test in an isolated
 subprocess with a timeout. Usage: python qinao_humaneval.py <model> <adapter|none> <tag> [N]"""
 import json, re, sys, random, subprocess, tempfile, os
+
+from qinao_sandbox import run_sandboxed
+
 from mlx_lm import load, generate
 try:
     from mlx_lm.sample_utils import make_sampler; GREEDY=make_sampler(temp=0.0)
@@ -34,9 +37,9 @@ for i in idx:
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
             f.write(program); path=f.name
-        # audit tools-scripts / decision 7: -I isolated mode (ignore env / user site-packages) hardens
-        # the exec of model-generated code a little (a real sandbox is the recommended follow-up).
-        res=subprocess.run([PYBIN, "-I", path], capture_output=True, timeout=15)
+        # audit tools-scripts / decision 7 + LOW follow-up (2026-07-11): -I isolation PLUS the
+        # seatbelt sandbox — the "real sandbox" follow-up, landed (see run_sandboxed above).
+        res=run_sandboxed(PYBIN, path)
         tot+=1                      # counted only when the harness actually RAN the code
         ok+=(res.returncode==0)
     except subprocess.TimeoutExpired:
