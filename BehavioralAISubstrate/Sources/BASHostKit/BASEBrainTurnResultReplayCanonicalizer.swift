@@ -43,7 +43,11 @@ public enum BASEBrainTurnResultReplayCanonicalizer {
     /// OBSERVATION-clock ONLY — see the file-header contract. Exposed for the over-reach
     /// guard test + audit review (chapter 二百一一).
     public static let canonicalizedFields: [String] = [
-        "memoryBundle.retrievedAt"
+        "memoryBundle.retrievedAt",
+        // substrate #77 per-stage wall-clock timings — observation drift, collapsed to nil
+        // alongside the retrievedAt clock (added 2026-07-11 to close the layerTimingsMs
+        // Codable-vs-Equatable inconsistency; both are HOW-LONG, not WHAT-was-decided).
+        "layerTimingsMs"
     ]
 
     /// Return a NEW result with the observation-clock fields pinned to `zeroSentinel`.
@@ -54,6 +58,11 @@ public enum BASEBrainTurnResultReplayCanonicalizer {
     ) -> BASEBrainTurnResult {
         var out = result
         out.memoryBundle.retrievedAt = zeroSentinel
+        // substrate #77 per-stage wall-clock timings are observation drift (like the retrievedAt
+        // clock): two identical turns differ only in microseconds. Collapse to nil so the canonical
+        // form — and its SHA digest — reflect the DECISION, not how long it took. Uncollapsed, two
+        // fresh turns (determinism probe) and with/without-honesty-sink runs canonicalize UNEQUAL.
+        out.layerTimingsMs = nil
         return out
     }
 }

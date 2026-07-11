@@ -1212,6 +1212,11 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         case kunlunHeavenGatePermit
         case kunlunRiverOriginTrace
         case yaochiSanctumEntry
+        // substrate #77 diagnostic (added b2cabc46a 2026-07-04): per-stage wall-clock timings.
+        // Was a stored property but ABSENT here, so Codable silently DROPPED it while the
+        // synthesized-then-custom `==` kept it — decode(encode(x)) != x. Now roundtrips losslessly;
+        // cross-run non-determinism is collapsed by the canonicalizer, not by dropping the field.
+        case layerTimingsMs
     }
 
     public init(from decoder: Decoder) throws {
@@ -1293,6 +1298,8 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         yaochiSanctumEntry = try container.decodeIfPresent(
             BASYaochiSanctumEntry.self,
             forKey: .yaochiSanctumEntry)
+        layerTimingsMs = try container.decodeIfPresent(
+            [String: Double].self, forKey: .layerTimingsMs)
         wakeIntent = try container.decodeIfPresent(BASWakeIntent.self, forKey: .wakeIntent)
             ?? BASEBrainTurnResult.defaultWakeIntent(for: budgetFrame)
         vitalState = try container.decodeIfPresent(BASVitalState.self, forKey: .vitalState)
@@ -1426,6 +1433,7 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
             forKey: .kunlunRiverOriginTrace)
         try container.encodeIfPresent(
             yaochiSanctumEntry, forKey: .yaochiSanctumEntry)
+        try container.encodeIfPresent(layerTimingsMs, forKey: .layerTimingsMs)
     }
 
     private static func defaultWakeIntent(for budgetFrame: BASBudgetFrame) -> BASWakeIntent {
