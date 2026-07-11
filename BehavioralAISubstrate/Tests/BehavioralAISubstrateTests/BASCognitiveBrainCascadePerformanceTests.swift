@@ -27,7 +27,6 @@
 import XCTest
 @testable import BASHostKit
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainCascadePerformanceTests:
     XCTestCase
 {
@@ -196,4 +195,3 @@ final class BASCognitiveBrainCascadePerformanceTests:
             " calls")
     }
 }
-#endif

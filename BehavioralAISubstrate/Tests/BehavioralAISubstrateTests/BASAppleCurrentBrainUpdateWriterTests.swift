@@ -4,7 +4,6 @@ import Testing
 @testable import BASAppleAdapters
 @testable import BASMemory
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Current Brain Update Writer")
 struct BASAppleCurrentBrainUpdateWriterTests {
     @Model
@@ -96,4 +95,3 @@ struct BASAppleCurrentBrainUpdateWriterTests {
         #expect(ordered.map(\.dominantGoal) == ["goal-4", "goal-3", "goal-2"])
     }
 }
-#endif

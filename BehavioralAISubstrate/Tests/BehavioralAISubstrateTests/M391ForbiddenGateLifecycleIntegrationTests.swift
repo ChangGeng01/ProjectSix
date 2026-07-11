@@ -26,7 +26,6 @@ import XCTest
 ///      gate's reason code + trial-record ref.
 ///   7. `ingestTurnResultWithForbiddenGate` walks tickets,
 ///      paired-or-not, and returns the accepted count.
-#if !os(iOS)  // ch 1022 source-gate
 final class M391ForbiddenGateLifecycleIntegrationTests: XCTestCase {
 
     // MARK: - Fixture helpers
@@ -270,4 +269,3 @@ final class M391ForbiddenGateLifecycleIntegrationTests: XCTestCase {
         XCTAssertEqual(e2, .proposed, "the fresh ticket is genuinely proposed")
     }
 }
-#endif

@@ -288,26 +288,30 @@ final class BASQINAOSubstrateGatesBatch10Tests: XCTestCase {
     XCTAssertEqual(defaultCap, 3_376 * mib, "default ActiveHard cap is the measured iPhone Air jetsam ceiling")
     let defaultMargin = 128 * mib // documented default safetyMarginBytes (below E2B's 261 MB survival headroom)
 
-    // 1) DEFAULT cap + DEFAULT margin: gate decision must equal the oracle for every case (exhaustive).
+    // 1) DEFAULT (constrained) cap + DEFAULT margin: gate decision must equal the oracle for every case.
+    // tests-arch ④ device-robust (2026-07-11): pass `defaultCap` EXPLICITLY. The no-arg gate default
+    // now resolves to the entitlement-aware LIVE cap (缝7), so on the real entitled iPhone Air the
+    // default is ~6.29 GB, not the measured constrained 3376 MB the oracle uses — pin the constrained
+    // admission LOGIC deterministically instead of the device-specific live default.
     for c in cases {
-        let rejects = BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: c.id)
+        let rejects = BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: c.id, capBytes: defaultCap)
         let expected = oracleRejects(c.peak, defaultCap, defaultMargin)
         XCTAssertEqual(rejects, expected,
-            "admission decision for \(c.id) must equal the oracle (reject=\(expected)) under the default cap")
+            "admission decision for \(c.id) must equal the oracle (reject=\(expected)) under the constrained cap")
         // Determinism: a re-call returns the identical decision (pure function, no hidden state).
-        XCTAssertEqual(BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: c.id), rejects,
+        XCTAssertEqual(BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: c.id, capBytes: defaultCap), rejects,
             "admission gate must be deterministic for \(c.id)")
     }
 
     // Pin the concrete raised bar at the default cap: ONLY E4B is refused; the two measured survivors + the
     // unmeasured entry are admitted (this is the production behaviour the metric protects).
-    XCTAssertTrue(BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e4b.it.4bit"),
+    XCTAssertTrue(BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e4b.it.4bit", capBytes: BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes),
         "E4B (4314+128 > 3376 MB) REJECTS")
-    XCTAssertFalse(BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e2b.it.4bit"),
+    XCTAssertFalse(BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e2b.it.4bit", capBytes: BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes),
         "E2B (3114+128 <= 3376 MB) ACCEPTS")
-    XCTAssertFalse(BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.llama3_2.3b.it.4bit"),
+    XCTAssertFalse(BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.llama3_2.3b.it.4bit", capBytes: BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes),
         "Llama-3B (2969+128 <= 3376 MB) ACCEPTS")
-    XCTAssertFalse(BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.unknown.model"),
+    XCTAssertFalse(BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.unknown.model", capBytes: BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes),
         "unmeasured peak => ACCEPT (admit-by-default)")
 
     // 2) Cross-product sweep over caps x margins x the measured/derived models: the gate must agree with the

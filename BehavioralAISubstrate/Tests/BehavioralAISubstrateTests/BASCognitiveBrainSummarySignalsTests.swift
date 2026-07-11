@@ -13,7 +13,6 @@
 import XCTest
 @testable import BASHostKit
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainSummarySignalsTests:
     XCTestCase
 {
@@ -122,4 +121,3 @@ final class BASCognitiveBrainSummarySignalsTests:
         XCTAssertEqual(s.relationPattern, "neutral")
     }
 }
-#endif

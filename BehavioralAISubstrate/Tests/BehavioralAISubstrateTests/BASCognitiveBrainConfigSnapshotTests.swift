@@ -8,7 +8,6 @@ import XCTest
 @testable import BASMemory
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainConfigSnapshotTests: XCTestCase {
 
     // MARK: - Default brain settings
@@ -133,4 +132,3 @@ final class BASCognitiveBrainConfigSnapshotTests: XCTestCase {
             " cascade run)")
     }
 }
-#endif

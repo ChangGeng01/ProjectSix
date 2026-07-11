@@ -9,7 +9,6 @@ import XCTest
 @testable import BASRuntimeCore
 @testable import BASHostKit
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter708MatMulAutoRouteTests: XCTestCase {
 
     private func makeMatrices(
@@ -131,4 +130,3 @@ final class BASChapter708MatMulAutoRouteTests: XCTestCase {
         }
     }
 }
-#endif

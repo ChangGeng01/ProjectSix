@@ -3,7 +3,6 @@ import Testing
 @testable import BASAdmin
 @testable import BASAppleAdapters
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Console Snapshot Builder")
 struct BASAppleConsoleSnapshotBuilderTests {
     @Test("console snapshot builder compiles runtime and brain summaries from apple flight deck input")
@@ -69,4 +68,3 @@ struct BASAppleConsoleSnapshotBuilderTests {
         #expect(snapshot.currentProgramExecutionBlueprint.workPackages.count == 19)
     }
 }
-#endif

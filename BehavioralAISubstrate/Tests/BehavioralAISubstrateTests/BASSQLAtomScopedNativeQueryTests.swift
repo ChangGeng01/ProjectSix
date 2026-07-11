@@ -11,7 +11,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMemory
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASSQLAtomScopedNativeQueryTests: XCTestCase {
 
     private func makeTempDBURL() -> URL {
@@ -351,4 +350,3 @@ final class BASSQLAtomScopedNativeQueryTests: XCTestCase {
         XCTAssertEqual(snap.distinctSessions, 0)
     }
 }
-#endif

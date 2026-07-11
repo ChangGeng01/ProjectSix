@@ -12,7 +12,6 @@ import XCTest
 @testable import BASOrchestration
 @testable import BASObservability
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASMLEvolutionServiceTests: XCTestCase {
 
     // MARK: - Helpers
@@ -265,4 +264,3 @@ final class BASMLEvolutionServiceTests: XCTestCase {
             " summaries=\(result.updateTickets.map { $0.summary })")
     }
 }
-#endif

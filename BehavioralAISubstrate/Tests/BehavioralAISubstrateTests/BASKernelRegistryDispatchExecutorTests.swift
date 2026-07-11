@@ -51,7 +51,6 @@ private func makeStubRequest() -> BASEBrainTurnRequest {
         recordedAt: Date(timeIntervalSince1970: 1000))
 }
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASKernelRegistryDispatchExecutorTests:
     XCTestCase
 {
@@ -322,4 +321,3 @@ final class BASKernelRegistryDispatchExecutorTests:
                 .count, 5)
     }
 }
-#endif

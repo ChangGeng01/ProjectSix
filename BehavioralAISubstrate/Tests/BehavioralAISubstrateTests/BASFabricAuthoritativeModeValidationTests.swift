@@ -29,7 +29,6 @@ import Foundation
 @testable import BASRuntimeCore
 @testable import BASPolicy
 
-#if !os(iOS) // ch1022 source-gate parity (mirrors the existing fabric tests)
 final class BASFabricAuthoritativeModeValidationTests: XCTestCase {
 
     // MARK: - deterministic stub fabric (no live LLM seats) — mirrors BASAgentFabricMultiRoundLoopTests
@@ -435,4 +434,3 @@ final class BASFabricAuthoritativeModeValidationTests: XCTestCase {
             ])
     }
 }
-#endif

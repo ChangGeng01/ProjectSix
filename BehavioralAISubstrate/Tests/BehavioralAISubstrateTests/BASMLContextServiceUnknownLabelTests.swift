@@ -15,7 +15,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASRuntimeCore
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASMLContextServiceUnknownLabelTests:
     XCTestCase
 {
@@ -142,4 +141,3 @@ final class BASMLContextServiceUnknownLabelTests:
             "Hint suffix must equal the label name")
     }
 }
-#endif

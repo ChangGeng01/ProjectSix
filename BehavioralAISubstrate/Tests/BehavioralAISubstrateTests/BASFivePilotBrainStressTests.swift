@@ -17,7 +17,6 @@ import XCTest
 @testable import BASMetalSubstrate
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASFivePilotBrainStressTests: XCTestCase {
 
     // MARK: - Helper
@@ -235,4 +234,3 @@ final class BASFivePilotBrainStressTests: XCTestCase {
         try? await p.cxxBridge.clear()
     }
 }
-#endif

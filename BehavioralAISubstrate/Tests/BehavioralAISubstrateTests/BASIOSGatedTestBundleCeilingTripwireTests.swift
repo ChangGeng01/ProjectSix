@@ -2,7 +2,7 @@ import XCTest
 
 // audit tests-arch ④ — the iOS device test bundle covers a SHRUNK universe.
 //
-// 162 test files are entirely `#if !os(iOS)` source-gated (chapter 1022's
+// 50 test files are entirely `#if !os(iOS)` source-gated (chapter 1022's
 // "153 → 0 skips via source-gate" — commits f7b941639 / 2d00bbc47), so ~10% of
 // suites are ABSENT from the iOS device bundle. "device all-green" therefore
 // certifies a smaller universe than "Mac all-green", and — the actual gap the
@@ -17,18 +17,25 @@ import XCTest
 // tree, which the iOS sandbox lacks) — so it does not itself enlarge the device bundle.
 
 #if !os(iOS)
-    // ADR-NOTE (2026-07-11 ceiling 161→162): the one growth is BASTurnDrivingSuiteMainActorLintTests
+    // ADR-NOTE (2026-07-11 ceiling 162→50): tests-arch ④ campaign — the ch1022 'SwiftTesting iOS
+    // bundle discovery quirk' blanket-gate was EMPIRICALLY DISPROVEN on iOS 27 (swift-testing @Suite
+    // files discover + run on a real iPhone Air; proof: 114 files un-gated, device build SUCCEEDED,
+    // the @Suite 'L8 temporal memory field schemas' RAN + PASSED on device). 114 files un-gated ⇒
+    // gated set 164→50; ceiling tightened to 50 so a future silent re-gate can't hide under the old
+    // 162. The residual 50 are legitimate host-only (source-tree lint via #filePath) + a few nested-
+    // #if + UNSURE (hardcoded /tmp, timing-flaky, CoreML-fp-pin) files.
+    // (prior) ADR-NOTE (2026-07-11 ceiling 161→162): the one growth is BASTurnDrivingSuiteMainActorLintTests
     // (tests-arch ③, 5673f402e) — LINT-INFRASTRUCTURE that scans the repo source tree via #filePath,
     // structurally un-runnable inside a device bundle (no source tree), the exact self-exclusion class
     // the ④ tripwire already recognizes. Not a silent shrink of the behavioral device universe.
 final class BASIOSGatedTestBundleCeilingTripwireTests: XCTestCase {
 
     /// The current count of whole-file `#if !os(iOS)` gated test files (verified
-    /// `grep -rlE '^#if !os\(iOS\)' Tests/BehavioralAISubstrateTests` == 162 at HEAD).
+    /// `grep -rlE '^#if !os\(iOS\)' Tests/BehavioralAISubstrateTests` == 50 at HEAD).
     /// Raising this REQUIRES an ADR note justifying why the iOS-gated set grew — a
     /// conscious decision to shrink the device-certified universe further, not a
     /// silent drift. Lowering it (un-gating) is always welcome and never blocks.
-    private static let ceiling = 162
+    private static let ceiling = 50
 
     /// Source-scanning LINT infrastructure — gated `#if !os(iOS)` because it reads the Mac dev-tree
     /// via `#filePath` (absent in the iOS sandbox), NOT because it covers Mac-only runtime behavior.
@@ -91,7 +98,7 @@ final class BASIOSGatedTestBundleCeilingTripwireTests: XCTestCase {
     /// anti-false-green anchor: if the predicate were hardcoded, this would not hold.
     func testGatedInventoryIsReadFromDisk() throws {
         let gated = try gatedTestFiles()
-        XCTAssertFalse(gated.isEmpty, "the gated set is known non-empty at HEAD (162)")
+        XCTAssertFalse(gated.isEmpty, "the gated set is known non-empty at HEAD (50)")
         // Spot-verify the first reported file genuinely has the column-0 gate.
         if let first = gated.first {
             let url = testsDir.appendingPathComponent(first)

@@ -188,6 +188,7 @@
 		1B28762B1D90B95F71EB4646 /* BASProductRedLineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C936AE3B985ACABA20367C58 /* BASProductRedLineTests.swift */; };
 		1B5D6E79DF576B16BA24B5FB /* BASTurnRuntimeStagePlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1BDCAA81AC0094CCECF5E5 /* BASTurnRuntimeStagePlanTests.swift */; };
 		1B9AF84C62B9E28A6967F708 /* BASChapter881ForgetCascadeDeclineAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C02CDAE67BF7E26BAD7EEE4 /* BASChapter881ForgetCascadeDeclineAuditTests.swift */; };
+		1BC91A6C90D19B5E9FCEDB49 /* BASSQLiteSecureDeleteVacuumTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F2F07072FCF45766C80DBD2 /* BASSQLiteSecureDeleteVacuumTests.swift */; };
 		1C10A92E89C93A5974E307BA /* BASMotherboardBusPayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1694E8581ED8ABAF595C8E9 /* BASMotherboardBusPayloadTests.swift */; };
 		1C2374E9BF6CFDD51210A928 /* BASSoftHandObservationDerivationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB17AB7AEB083F018BD6B1FB /* BASSoftHandObservationDerivationTests.swift */; };
 		1C34E0E641090E93B11798AE /* BASMemorySQLiteErrorTrioCodableExtensionDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A534102B4A3CD339C6110B07 /* BASMemorySQLiteErrorTrioCodableExtensionDoctrineTests.swift */; };
@@ -1979,6 +1980,7 @@
 		1EC62A1F47EF1E9146C2F0BD /* BASMemoryUsageTrackerNotesAtomicityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASMemoryUsageTrackerNotesAtomicityTests.swift; sourceTree = "<group>"; };
 		1EDAE874A848C90A061EA5AE /* BASMPSGraphRotaryEmbeddingIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASMPSGraphRotaryEmbeddingIntegrationTests.swift; sourceTree = "<group>"; };
 		1F2CF9B7BACC293E29E56174 /* BASL8RoutedMemoryServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASL8RoutedMemoryServiceTests.swift; sourceTree = "<group>"; };
+		1F2F07072FCF45766C80DBD2 /* BASSQLiteSecureDeleteVacuumTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASSQLiteSecureDeleteVacuumTests.swift; sourceTree = "<group>"; };
 		1F3861114E71C3B2A7DFD10F /* BASMLLoopServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASMLLoopServiceTests.swift; sourceTree = "<group>"; };
 		1F419E059AFCB73B94DF7188 /* BASDeviceStateThermalFailClosedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASDeviceStateThermalFailClosedTests.swift; sourceTree = "<group>"; };
 		1F6C83FFC1C191DCB5F4C329 /* BASMemoryUsageRecordsSchemaGeneratedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASMemoryUsageRecordsSchemaGeneratedTests.swift; sourceTree = "<group>"; };
@@ -5115,6 +5117,7 @@
 				BEC819F399F8AB463F46E935 /* BASSQLiteKnowledgeGraphStorageTests.swift */,
 				3636B661D54D5AA9EBB45DEA /* BASSQLiteMemoryAtomStoreCorruptAdmitTests.swift */,
 				C900B4F152CB2F2934B3165A /* BASSQLiteMemoryAtomStoreTests.swift */,
+				1F2F07072FCF45766C80DBD2 /* BASSQLiteSecureDeleteVacuumTests.swift */,
 				F0EE45785299ABF229C5F22D /* BASSQLiteStoreCrashRecoveryTests.swift */,
 				897A30EF9C755D0F063E4595 /* BASSQLiteVectorIndexStorageTests.swift */,
 				1A88CA8E42AAB316861CFE6D /* BASSQLNativeQueryTests.swift */,
@@ -6901,6 +6904,7 @@
 				694621C3011BEAAAACD70444 /* BASSQLiteKnowledgeGraphStorageTests.swift in Sources */,
 				9BCD3542CAD88E8189DDBA63 /* BASSQLiteMemoryAtomStoreCorruptAdmitTests.swift in Sources */,
 				BDB78C61173B49E30249BBCE /* BASSQLiteMemoryAtomStoreTests.swift in Sources */,
+				1BC91A6C90D19B5E9FCEDB49 /* BASSQLiteSecureDeleteVacuumTests.swift in Sources */,
 				C6C3C0993B9874237D47C3D1 /* BASSQLiteStoreCrashRecoveryTests.swift in Sources */,
 				A0EA9EB7FAA7A6CCAC1B7A69 /* BASSQLiteVectorIndexStorageTests.swift in Sources */,
 				811BE56689D51999B767D6C8 /* BASSSMCautionCalibrationTests.swift in Sources */,

@@ -8,7 +8,6 @@
 import XCTest
 @testable import BASHostKit
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainHealthTrendDeltaTests:
     XCTestCase
 {
@@ -244,4 +243,3 @@ final class BASCognitiveBrainHealthTrendDeltaTests:
             "Thread count drop encoded negative")
     }
 }
-#endif

@@ -9,7 +9,6 @@ import Foundation
 @testable import BASHostKit
 @testable import BASRuntimeCore
 
-#if !os(iOS) // ch1022 source-gate parity
 final class BASTurnRuntimeNativeV2DispatchTests: XCTestCase {
 
     private func makeEngine(mode: BASTurnRuntimeMode) -> BASTurnRuntimeEngine {
@@ -46,4 +45,3 @@ final class BASTurnRuntimeNativeV2DispatchTests: XCTestCase {
         XCTAssertEqual(digest(direct), digest(viaEngine))
     }
 }
-#endif

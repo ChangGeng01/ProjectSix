@@ -1,7 +1,6 @@
 import Testing
 @testable import BASRuntimeCore
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASProviderTraceNarrator")
 struct BASProviderTraceNarratorTests {
     @Test("detail narrates preferred provider use and optional backend detail")
@@ -38,4 +37,3 @@ struct BASProviderTraceNarratorTests {
         #expect(detail.contains("Foundation Models"))
     }
 }
-#endif

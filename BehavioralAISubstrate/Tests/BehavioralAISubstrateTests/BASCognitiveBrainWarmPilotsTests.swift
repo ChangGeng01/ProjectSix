@@ -8,7 +8,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainWarmPilotsTests: XCTestCase {
 
     // MARK: - warmMetalKernel — no loader
@@ -167,4 +166,3 @@ final class BASCognitiveBrainWarmPilotsTests: XCTestCase {
             " Got memoized=\(postWarmElapsed)s")
     }
 }
-#endif

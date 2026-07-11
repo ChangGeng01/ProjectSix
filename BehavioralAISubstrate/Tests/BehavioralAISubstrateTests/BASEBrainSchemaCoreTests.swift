@@ -6,7 +6,6 @@ import Testing
 @testable import BASOrchestration
 @testable import BASOrchestration
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 /// @MainActor — SIGBUS guard (same root cause as 27e0fcb2e): swift-testing runs
 /// EVERY test (sync included) on a 512KB cooperative-pool thread, while the
 /// debug-build turn pipeline needs ~550KB (runTurn 127KB single frame + the
@@ -4676,4 +4675,3 @@ private func makeL11RiskDecisionPackage(
         sovereignEscalationHint: sovereignEscalationHint
     )
 }
-#endif

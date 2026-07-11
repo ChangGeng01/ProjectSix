@@ -13,7 +13,6 @@ import XCTest
 @testable import BASCSystemBridge
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainDeepProbeTests: XCTestCase {
 
     // MARK: - 1. C disk I/O probe
@@ -263,4 +262,3 @@ final class BASCognitiveBrainDeepProbeTests: XCTestCase {
         }
     }
 }
-#endif

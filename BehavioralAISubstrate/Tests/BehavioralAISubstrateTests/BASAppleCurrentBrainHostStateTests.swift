@@ -1,7 +1,6 @@
 import Testing
 @testable import BASAppleAdapters
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Current Brain Host State")
 struct BASAppleCurrentBrainHostStateTests {
     @Test("projection refresh commits refreshed projection and notice")
@@ -127,4 +126,3 @@ struct BASAppleCurrentBrainHostStateTests {
         )
     }
 }
-#endif

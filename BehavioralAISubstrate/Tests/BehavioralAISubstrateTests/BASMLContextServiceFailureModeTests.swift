@@ -10,7 +10,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASRuntimeCore
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASMLContextServiceFailureModeTests: XCTestCase {
 
     // MARK: - Constants are typed + non-empty
@@ -117,4 +116,3 @@ final class BASMLContextServiceFailureModeTests: XCTestCase {
             .manipulationConfidenceHintPrefix
     }
 }
-#endif

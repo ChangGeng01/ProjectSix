@@ -6,7 +6,6 @@ import Testing
 @testable import BASObservability
 @testable import BASRuntimeCore
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Flight Deck Adapter")
 struct BASAppleFlightDeckAdapterTests {
     @Test("flight deck adapter compiles host-facing layer reports and overall health")
@@ -446,4 +445,3 @@ struct BASAppleFlightDeckAdapterTests {
         }) == true)
     }
 }
-#endif

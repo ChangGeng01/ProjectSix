@@ -15,7 +15,6 @@ import XCTest
 @testable import BASMetalSubstrate
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASBlueprintQuadrupleTests: XCTestCase {
 
     private func makeTempDBURL() -> URL {
@@ -416,4 +415,3 @@ final class BASBlueprintQuadrupleTests: XCTestCase {
             " float32 tolerance")
     }
 }
-#endif

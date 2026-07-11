@@ -30,7 +30,6 @@ import XCTest
 @testable import BASMetalSubstrate
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASFivePilotCrossInstanceScopeTests: XCTestCase {
 
     // MARK: - SQL: shared file URL → shared persistence
@@ -243,4 +242,3 @@ final class BASFivePilotCrossInstanceScopeTests: XCTestCase {
         XCTAssertEqual(mB.rustRecordCount, 1)
     }
 }
-#endif
