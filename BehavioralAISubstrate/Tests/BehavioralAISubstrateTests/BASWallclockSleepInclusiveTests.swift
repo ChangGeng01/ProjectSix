@@ -44,7 +44,17 @@ final class BASWallclockSleepInclusiveTests: XCTestCase {
         guard mach_timebase_info(&tb) == KERN_SUCCESS, tb.denom != 0 else {
             throw XCTSkip("mach_timebase_info unavailable")
         }
-        let ticks = mach_continuous_time() &- mach_absolute_time()
+        // Read ABSOLUTE first, CONTINUOUS second: continuous(t2) = absolute(t2) + sleep
+        // offset ≥ absolute(t1), so the tick gap is provably non-negative (it absorbs the
+        // inter-read skew instead of being reduced by it). The previous order read
+        // continuous FIRST — on a never-slept machine (offset 0) the gap went negative by
+        // the skew whenever the two reads crossed a timebase tick, `&-` wrapped it to
+        // ~2^64, and the /denom*numer scaling below TRAPPED with arithmetic overflow
+        // (nondeterministic worker SIGTRAP, xctest-2026-07-12-005829.ips). Same-tick
+        // reads yield 0 → the clean XCTSkip below, which is why it usually passed.
+        let absoluteTicks = mach_absolute_time()
+        let continuousTicks = mach_continuous_time()
+        let ticks = continuousTicks - absoluteTicks
         let sleepNs = ticks / UInt64(tb.denom) * UInt64(tb.numer)
             &+ (ticks % UInt64(tb.denom) * UInt64(tb.numer)) / UInt64(tb.denom)
         // Require a clear ≥1s sleep so read-order/scheduling skew (µs) is
