@@ -94,11 +94,12 @@ extension BASAutoRouteRanker {
         proposed: String
     ) -> Bool? {
         #if os(iOS) || os(macOS)
-        // gaps-reconciliation runtimecore-b LOW #9 (2026-07-11): an EMPTY string gives an empty
-        // byte array, whose withUnsafeBufferPointer baseAddress is nil — the `!` below TRAPPED the
-        // process instead of honoring this function's own documented "nil — either string is
-        // empty (fault)" contract (the Tribunal sibling was fixed in 718300892; this one wasn't).
-        // The Rust side already returns -1 for zero-len input; return nil before touching FFI.
+        // gaps-reconciliation runtimecore-b LOW #9 (2026-07-11, claim CORRECTED by reversal): an
+        // EMPTY string gives an empty byte array whose withUnsafeBufferPointer baseAddress is
+        // DOCUMENTED-NULLABLE — the `!` below is a LATENT portability trap. Empirically (reversal
+        // run) the current toolchain returns the non-nil empty-singleton pointer, so this never
+        // crashed live; the Rust side returns -1 for zero-len and the nil contract held by luck.
+        // The guard removes the UB-adjacent dependence on that luck (Tribunal idiom, 718300892).
         guard !current.isEmpty, !proposed.isEmpty else { return nil }
         let currentBytes = Array(current.utf8)
         let proposedBytes = Array(proposed.utf8)

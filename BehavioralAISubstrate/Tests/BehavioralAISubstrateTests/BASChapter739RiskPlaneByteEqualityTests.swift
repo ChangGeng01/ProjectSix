@@ -274,9 +274,11 @@ final class BASChapter739RiskPlaneByteEqualityTests:
         #endif
     }
 
-    // gaps-reconciliation runtimecore-b LOW #9 (2026-07-11): empty input honors the documented
-    // nil contract instead of TRAPPING (empty array ⇒ baseAddress nil ⇒ the old force-unwrap
-    // crashed the process). Reversal proof: removing the guard makes this test CRASH, not fail.
+    // gaps-reconciliation runtimecore-b LOW #9 (2026-07-11): pins the documented nil contract on
+    // empty input. HONEST SCOPE (corrected by the reversal run): the old force-unwrap never
+    // crashed on THIS toolchain (empty-singleton pointer is non-nil; Rust returns -1 for zero-len)
+    // — these teeth pin the CONTRACT, and the guard removes a latent, documented-nullable UB
+    // dependence, not a live trap. This test passes with or without the guard by design.
     func testEmptyVersionStringsReturnNilNotTrap() {
         #if os(iOS) || os(macOS)
         XCTAssertNil(BASAutoRouteRanker.riskPlaneMonotonicVersionCompare(
