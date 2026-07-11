@@ -518,3 +518,31 @@ CRITICAL + HIGH 全闭后转 MED。**全部 mac 纯(无 Rust/设备)的 fix-now 
 **本轮已修 1 条真漏项(demo + concrete)**:organ-eval MED-1 = `outData` 竞态(见下方 commit)。**其余 36 条从"静默掉落"转为"显式追踪-open"**;~20 mac-可修者构成一个新 remediation 战役(须操作员授权规模),device-gated 者须真机。
 
 ★教训:**主题级"全闭"是审计诚实的头号陷阱**——"每个主题动过一次"≠"每条发现已闭";逐项对账是唯一能揪出"折进已闭主题"漏项的手段;operator 的"非 55/55 逐项"直觉正确,揪出 37 条。此更正本身 = 项目诚实教义(注释/账本不得声称代码/闭合不维持的属性)对审计账本自身的应用。
+
+## 2026-07-11 — the last full-suite red: sleep-consolidation false-green fixture (CLOSED)
+
+The first whole-suite run in days (after the XCFramework rebuild) left exactly 2 failing tests
+(`BASMemorySleepConsolidationPassTests` dry-run verdict + mutation-moves-chain-hash). Root cause,
+traced end-to-end and empirically confirmed: **the fixture seeded usage records into the Rust
+actor tracker but constructed the applier over a brand-new EMPTY `BASMemoryUsageTracker()`** —
+the applier's Swift scorer therefore saw every atom as no-history. Pre-blindspot-③ the
+demote-on-arrival bug then demoted everything, so the tests were **false-green over an empty
+universe** (a production bug and a fixture bug canceling out); the ③ fix (no-history ⇒ stays)
+exposed them. Zero mutations also meant no M-h F6 ledger mark, freezing the chain hash — one
+root cause, both failures.
+
+Fix: seed BOTH trackers (Rust actor for stage-②'s FFI count; a V1 tracker handed to the applier
+— what the pass actually scores) + sharpened teeth pinning the EXACT verdict (the 4 old
+single-touch atoms move, the 2 recently-touched hold — an all-or-nothing empty-tracker
+regression can no longer pass). Adversarial reversal (reintroduce the empty-tracker wiring)
+reds both tests. Formula cross-check: old atom geometric score ≈0.056 ≤ 0.20 demote threshold;
+recent ≈0.59 hold — matches observed behavior exactly.
+
+NOTE (unchanged, documented honest bound): production `BASSleepConsolidationDriver:116` also
+builds the applier over an empty tracker — but THERE it is an explicitly documented "not yet
+closed" bound with dryRun hard-coded true. Wiring real usage history into the production applier
+remains an open architecture step (ADR-014 V1/V2 duality), not a test concern.
+
+**Lesson (false-green taxonomy):** two bugs canceling out reads as green. The blindspot-③ fix
+didn't break these tests — it exposed them. When a principled fix "breaks" a test, check whether
+the test was ever measuring what it claimed.

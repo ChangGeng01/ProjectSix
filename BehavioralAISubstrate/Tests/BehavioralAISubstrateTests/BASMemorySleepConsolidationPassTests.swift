@@ -59,6 +59,16 @@ final class BASMemorySleepConsolidationPassTests: XCTestCase {
         let atomIDs = atoms.map { $0.id.uuidString }
         // Old, single-touch records for most atoms;recent,
         // multi-touch for the first `recentCount` (high importance)。
+        //
+        // FIXTURE ROOT-CAUSE FIX (2026-07-11): the applier reads usage history from ITS OWN
+        // tracker (`applyImportanceReport` → `tracker.allRecords()`), but this fixture used to
+        // hand it a brand-new EMPTY `BASMemoryUsageTracker()` while seeding only the Rust actor.
+        // Every atom therefore presented as NO-HISTORY to the Swift scorer. Pre-blindspot-③ the
+        // no-history bug demoted everything on arrival, so these tests passed FOR THE WRONG
+        // REASON (false-green over an empty universe); the ③ fix (no-history ⇒ stays) exposed
+        // them. Seed BOTH trackers with the same touches: the Rust actor feeds stage-②'s FFI
+        // importance count; the V1 tracker is what the applier under test actually scores.
+        let applierTracker = BASMemoryUsageTracker()
         for (i, id) in atomIDs.enumerated() {
             let isRecent = i < recentCount
             let age: TimeInterval = isRecent ? 60 : 14 * 24 * 3600
@@ -70,10 +80,16 @@ final class BASMemorySleepConsolidationPassTests: XCTestCase {
                     turnRef: "turn-\(i)-\(t)",
                     permitMode: "safe",
                     retrievedAt: referenceNow.addingTimeInterval(-age))
+                _ = try await applierTracker.record(
+                    atomID: id,
+                    sessionRef: "t31-session",
+                    turnRef: "turn-\(i)-\(t)",
+                    permitMode: "safe",
+                    retrievedAt: referenceNow.addingTimeInterval(-age))
             }
         }
         let applier = BASMemoryClosedLoopApplier(
-            store: store, tracker: BASMemoryUsageTracker())
+            store: store, tracker: applierTracker)
         let atomTiers = Dictionary(
             uniqueKeysWithValues: atomIDs.map { ($0, BASMemoryTier.warm) })
         return (tracker, applier, store, atomIDs, atomTiers)
@@ -159,6 +175,16 @@ final class BASMemorySleepConsolidationPassTests: XCTestCase {
         for (_, tier) in checkpoint.recommendedTierMoves {
             XCTAssertNotEqual(tier, .warm, "recommendedTierMoves holds only actual changes")
         }
+        // Pin the EXACT verdict (sharpened 2026-07-11 with the fixture root-cause fix): the 4 OLD
+        // atoms (1 touch, 14 days ⇒ geometric score ≈0.056 ≤ demote 0.20) move; the 2 RECENT atoms
+        // (3 touches, 60 s ⇒ ≈0.59, hold band) do NOT appear. This pins that the verdict reflects
+        // the seeded HISTORY — an empty-tracker regression (all-or-nothing verdicts) cannot pass.
+        let oldAtomIDs = Set(fx.atomIDs.dropFirst(2))
+        let recentAtomIDs = Set(fx.atomIDs.prefix(2))
+        XCTAssertEqual(Set(checkpoint.recommendedTierMoves.keys), oldAtomIDs,
+            "exactly the 4 old, single-touch atoms are recommended off .warm")
+        XCTAssertTrue(recentAtomIDs.isDisjoint(with: checkpoint.recommendedTierMoves.keys),
+            "recently-touched atoms HOLD — their usage history protects them")
         // Still a proper dry-run — nothing written, hash unmoved.
         XCTAssertTrue(checkpoint.appliedMutations.isEmpty, "dry-run applies nothing")
         XCTAssertTrue(checkpoint.quarantinedAtomIDs.isEmpty, "dry-run quarantines nothing")
