@@ -70,3 +70,23 @@ dominance ends. Correct deployment target is **The Ledger / agentic workloads wh
 actually exists** — ship the reuse levers there and report the realized fraction. This is the same
 "上膛未击发 / needs a live recurrent consumer" pattern the whole campaign keeps meeting: the levers
 are built and orphaned; the gating item is a real recurrent MLX workload, not more decode cleverness.
+
+
+## First-strike status (2026-07-11 evening)
+
+- **Mechanism DEVICE-PROVEN** (iPhone Air 9E9E, xcodebuild-test, 8.7s, PASSED): the active seat is
+  snapshotted by snapshotWarmSeats(); a FRESH adapter (= a relaunch) drafts the same sessionID#role
+  and takes the `_restoreFromSpill` branch (spillRestoreCount 0→1) instead of cold-prefilling;
+  continuation non-empty. testCrossRestartWarmSeatRestoresNotColdPrefills. Fixes en route:
+  addTrampoline (NSClassFromString doesn't resolve in the test bundle — device law) + _4bit_local
+  model dir + MLX imports; caught a "Executed 0 tests" vacuous-pass (stale bundle) and the
+  Device2HrFuzz test-PLAN restricting -only-testing.
+- **Cold-arm TTFT measurement**: committed + Mac-compiles (a 3rd fresh adapter cold-prefills the same
+  history; NSLogs restore_prefill_ms vs cold_prefill_ms + avoided_ratio — printed, never asserted per
+  the DECODE-OS cross-thermal law). Clean device number PENDING a run that includes BASSpillGCTests
+  (the scheme's default xctestrun is the Device2HrFuzz plan, which excludes it; needs a planless
+  build-then-run in one command, the form that ran the mechanism proof).
+- **Product lifecycle wire: NOT built (honest)** — DeviceTestApp holds no long-lived adapter for a
+  scene hook to snapshot; faking one would be a zero-byte loaded-gun toggle (3b trap). The real gate
+  is the absence of a live recurrent MLX app — the same 上膛未击发 pattern; the deployment target is
+  agentic/council workloads where recurrence exists, not more decode cleverness.
