@@ -704,3 +704,33 @@ green-by-luck class is real: two teeth-bearing audit tests passed only by memory
 tick-alignment luck until a second harness form (stable toolchain) pinned them; full-suite
 verdicts must be earned under the exact harness form the operator runs. Ed25519 seals: 885567C6
 (fix, record-match:c4e9ac16), E93FD27E (verification, record-match:30cbc390).
+
+## 2026-07-12 — the giant-value-type structural root is CLOSED (EBrainTurnResult CoW box)
+
+The last tracked-not-closed item from the SampleHost SIGBUS fix is now closed at the library
+level. Measured root: 53 inline stored fields = a 12,200-byte value, and the 9→8→7→6→5→4→
+all-fields bundle-init delegation ladder re-materialized field sets per rung under -Onone —
+~550KB of turn-pipeline stack vs the 512KB cooperative pool (SampleHost SIGBUS + the
+swift-testing @MainActor-guard class).
+
+Fix (b4c5b0cdc, public API byte-identical): storage moved into a private CoW box (clone-on-
+write via isKnownUniquelyReferenced in every setter) — the value is ONE pointer; all 11 public
+inits preserved with every convenience init delegating FLAT to the all-fields init (ladder
+gone); Codable key set / decode order / encode order preserved verbatim. God-file lint honored:
+the 1919-LOC file split into main(707)+BundleInits(406)+BundleInitsLegacy(502)+Codable(348),
+ceiling re-pinned TIGHT 1625→750, HostKit file band deliberately 285→288.
+
+Proof chain:
+- TDD teeth: size pin ≤16B (RED measured 12,200B), CoW copy isolation, inout setter path,
+  Codable identity, Equatable discrimination (BASEBrainTurnResultBoxingTests).
+- Reversal-grade at the ORIGINAL crash site (9ea90219f): SampleHost's 8MB-Thread workaround
+  REVERTED to the exact Task.detached form that stably SIGBUS'd —
+  testBenchLoopStartsAndStopsWithoutCrash passes (1.241s, iOS sim).
+- Cooperative-pool probe: BASEBrainSchemaCoreTests ran GREEN with @MainActor stripped
+  (historically its dream-loop test crossed the guard page first); guards retained as
+  belt-and-braces with honest updated comments (runTurn's own ~127KB frame remains).
+- Regression: beta full 16,553/0 · stable headless script 16,591/0 + all @Test batches green
+  + SCRIPT_EXIT=0 · QinaoRuntimeSDK 1,449/0.
+
+Residual (explicitly NOT closed by this): runTurn's own 127KB debug frame; the @MainActor
+guards stay until that is shrunk or proven unnecessary suite-by-suite.
