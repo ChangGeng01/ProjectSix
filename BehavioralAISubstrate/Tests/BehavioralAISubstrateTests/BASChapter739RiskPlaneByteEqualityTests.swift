@@ -273,4 +273,21 @@ final class BASChapter739RiskPlaneByteEqualityTests:
         }
         #endif
     }
+
+    // gaps-reconciliation runtimecore-b LOW #9 (2026-07-11): empty input honors the documented
+    // nil contract instead of TRAPPING (empty array ⇒ baseAddress nil ⇒ the old force-unwrap
+    // crashed the process). Reversal proof: removing the guard makes this test CRASH, not fail.
+    func testEmptyVersionStringsReturnNilNotTrap() {
+        #if os(iOS) || os(macOS)
+        XCTAssertNil(BASAutoRouteRanker.riskPlaneMonotonicVersionCompare(
+            current: "", proposed: "v1.0.0"), "empty current ⇒ nil (documented fault contract)")
+        XCTAssertNil(BASAutoRouteRanker.riskPlaneMonotonicVersionCompare(
+            current: "v1.0.0", proposed: ""), "empty proposed ⇒ nil")
+        XCTAssertNil(BASAutoRouteRanker.riskPlaneMonotonicVersionCompare(
+            current: "", proposed: ""), "both empty ⇒ nil")
+        // non-empty still flows through FFI (sanity that the guard did not over-block)
+        XCTAssertEqual(BASAutoRouteRanker.riskPlaneMonotonicVersionCompare(
+            current: "v1.0.0", proposed: "v2.0.0"), true)
+        #endif
+    }
 }
