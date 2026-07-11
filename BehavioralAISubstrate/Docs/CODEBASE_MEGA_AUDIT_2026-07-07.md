@@ -763,3 +763,12 @@ GREEN on the cooperative pool un-guarded (the living teeth) · stable headless s
 all @Test batches green + SCRIPT_EXIT=0 · SampleHost bench (Task.detached) 1.253s pass ·
 QinaoRuntimeSDK 1,449/0. Turn-pipeline stack disease fully closed: value 12,200B→8B, frame
 129,792→56,304B peak, zero thread-class workarounds remain in production or tests.
+
+### 2026-07-12 addendum — the enforce-at-lock law is closed BOTH WAYS
+
+Operator unlocked the console and ordered the real run: all 6 file-protection tests EXECUTED
+(0 skips / 0 failures — including the read-back assertions that EPERM'd while locked), and the
+bare probe (write + set .complete + read-back) passed. With the locked arm (identical code,
+EPERM at 02:3x) this bidirectionally pins the law: the ONLY variable is console lock state.
+BASScreenLockSkip's two behavioral arms are both field-verified — locked ⇒ loud skip, unlocked
+⇒ real assertions. Seal D8E27893 (grounded record-match:8db9a655).
