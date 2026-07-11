@@ -495,6 +495,15 @@ let package = Package(
                 // in-process telemetry without SQLite
                 // durability。
                 "BASRustCoreBridge",
+                // gaps-reconciliation x-architecture LOW-4 (2026-07-11): 11 BASHostKit files
+                // import BASRustMemoryTrackerBinary but the dep was TRANSITIVE-only (via
+                // BASRustCoreBridge) — if that path is ever trimmed, the one #if canImport site
+                // (BASCognitiveMetalKernels.swift) degrades SILENTLY. Declare it, conditioned
+                // exactly like BASRustCoreBridge's own dep (no watchOS slice).
+                .target(
+                    name: "BASRustMemoryTrackerBinary",
+                    condition: .when(
+                        platforms: [.iOS, .macOS])),
                 // ch1044 audit LOW-8 — declare BASOrgan explicitly.
                 // BASLLMNeuralCoreService.swift + BASTrainingExample
                 // Sublimator.swift `import BASOrgan`; it previously
