@@ -184,4 +184,61 @@ final class BASSSMCautionOperatorRunTurnTests: XCTestCase {
         XCTAssertEqual(on.sovereignVerdict?.verdictLevel, on2.sovereignVerdict?.verdictLevel,
             "flag-on verdict is deterministic")
     }
+
+    // gaps-reconciliation hostkit-spine F7 (2026-07-11): the HOST FACE now threads the
+    // observation sink + temporal inputs. Before: buildEBrainTurn(ssmCautionOperatorEnabled: true)
+    // ran the operator silently STATELESS (sink unreachable ⇒ ssmStateOut dropped;
+    // priorSSMState/turnHistory always nil/[] ⇒ fresh recurrence every turn ⇒ the chapter-188
+    // sustained-pressure path was dead from the face).
+    func testHostFaceThreadsSinkAndTemporalState() throws {
+        let configuration = BASHostConfiguration.fixtureGeneric
+        let runtime = BASHostRuntime(configuration: configuration)
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .reflective,
+            surface: .application,
+            prompt: "Push into an irreversible high-stakes move now.",
+            riskLevel: .high)
+        let seed = try runtime.startSession(request)
+        let currentBrain = seed.currentBrain
+        let projection = BASBrainProjection(records: [], candidates: [], recentEvents: [])
+        let device = BASCoordinatorTestStubs.nominalDeviceState
+
+        // Turn 1: the sink is reachable from the FACE (F7's first half).
+        final class Box: @unchecked Sendable { var observations: [BASMambaSSMTurnObservation] = [] }
+        let box = Box()
+        _ = runtime.buildEBrainTurn(
+            request: request, currentBrain: currentBrain, projection: projection,
+            deviceStateOverride: device, ssmCautionOperatorEnabled: true,
+            ssmCautionObservationSink: { box.observations.append($0) })
+        XCTAssertEqual(box.observations.count, 1,
+            "the face-threaded sink fires (it used to be structurally unreachable)")
+        let stateOut = try XCTUnwrap(box.observations.first?.ssmStateOut,
+            "turn 1 emits the recurrence state the host folds forward")
+
+        // Turn 2 fed turn 1's state ≠ turn 2 fresh — the TEMPORAL path is alive (F7's second half).
+        let fresh = Box(); let carried = Box()
+        _ = runtime.buildEBrainTurn(
+            request: request, currentBrain: currentBrain, projection: projection,
+            deviceStateOverride: device, ssmCautionOperatorEnabled: true,
+            ssmCautionObservationSink: { fresh.observations.append($0) })
+        _ = runtime.buildEBrainTurn(
+            request: request, currentBrain: currentBrain, projection: projection,
+            deviceStateOverride: device, ssmCautionOperatorEnabled: true,
+            ssmCautionObservationSink: { carried.observations.append($0) },
+            turnHistory: ["turn 1: pushed toward the irreversible move"],
+            priorSSMState: stateOut)
+        XCTAssertNotEqual(carried.observations.first?.ssmCaution,
+                          fresh.observations.first?.ssmCaution,
+            "prior state + history must CHANGE the operator's caution vs a fresh recurrence — "
+            + "stateless replay means the temporal path is still dead")
+
+        // Default-off byte-parity: the 3 new params default nil/[] ⇒ the no-param call is
+        // byte-equal with the pre-F7 face (红线 7).
+        let off = runtime.buildEBrainTurn(
+            request: request, currentBrain: currentBrain, projection: projection,
+            deviceStateOverride: device)
+        XCTAssertEqual(off.riskCard.riskLevel, .medium,
+            "no params ⇒ the ch1039 pinned baseline is untouched")
+    }
 }
