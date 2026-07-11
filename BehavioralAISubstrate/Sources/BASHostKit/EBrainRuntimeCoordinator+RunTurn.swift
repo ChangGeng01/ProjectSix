@@ -180,6 +180,8 @@ extension BASEBrainRuntimeCoordinator {
                 frameContext: frameContext)
 
         markStage("l2_7_decompose")
+        // stage-frame isolation (see renderStage note below)
+        func memoryDeliberateStage() -> (BASNeuralCoreFrame, [BASRuntimeAuditFinding], BASMemoryBundle, [BASRuntimeAuditFinding], BASMergedChoice, Int, BASNeuralThoughtMaterialization, BASThoughtFrame, [BASTriSelfScore]) {
         let rawMemoryBundle = memoryService.retrieve(
             decomposeFrame: decomposeFrame,
             hostContext: hostContext,
@@ -399,7 +401,13 @@ extension BASEBrainRuntimeCoordinator {
                 frameContext: frameContext)
 
         let riskService = self.riskService
+            return (baseNeuralCore, loopFindings, memoryBundle, memoryFindings, mergedChoice, ssmActualTargetPasses, thoughtArtifacts, thoughtFrame, triScores)
+        }
+        var (baseNeuralCore, loopFindings, memoryBundle, memoryFindings, mergedChoice, ssmActualTargetPasses, thoughtArtifacts, thoughtFrame, triScores)
+            = memoryDeliberateStage()
         markStage("l8_to_l10")
+        // stage-frame isolation (see renderStage note below)
+        func riskStageA() -> (BASActionPermit, BASRiskCard, BASRiskDecisionPackage, [BASRuntimeAuditFinding]) {
         let rawRiskDecisionPackage = riskService.buildRiskDecisionPackage(
             contextFrame: contextFrame,
             thoughtFrame: thoughtFrame,
@@ -679,6 +687,11 @@ extension BASEBrainRuntimeCoordinator {
         thoughtFrame.actionPermit = boundActionPermit
         thoughtFrame.riskDecisionPackage = normalizedRiskDecisionPackage
 
+            return (boundActionPermit, boundRiskCard, normalizedRiskDecisionPackage, riskFindings)
+        }
+        var (boundActionPermit, boundRiskCard, normalizedRiskDecisionPackage, riskFindings)
+            = riskStageA()
+        func riskStageB() -> (BASTurnAuditProjectionsAbyssalThermalTrio, BASCthulhuAssertionCeilingDecision, BASCthulhuPermitEscalationDecision, BASTurnAuditProjectionsCthulhuPenta, [String], Double, BASTurnAuditProjectionsKunlunHexa, BASTurnAuditProjectionsKunlunHexaTwo, BASTurnAuditProjectionsKunlunTrio, BASTurnAuditProjectionsKunlunTrioTwo) {
         // M392 — Cthulhu doctrine pressure / anchor / unknown-reserve
         // derives + permit gating wires moved UP to here (was at the
         // audit-projection seam, line 681+). The wires now fire
@@ -1120,7 +1133,15 @@ extension BASEBrainRuntimeCoordinator {
             degradedReasonCodes: neuralDegradedReasonCodes
         )
 
+            return (abyssalThermalTrioForAudit, cthulhuAssertionDecision, cthulhuEscalation, cthulhuPentaForAudit, escalationSuppressionCodes, hostGateValue, kunlunHexaForAudit, kunlunHexaTwoForAudit, kunlunTrioForAudit, kunlunTrioTwoForAudit)
+        }
+        let (abyssalThermalTrioForAudit, cthulhuAssertionDecision, cthulhuEscalation, cthulhuPentaForAudit, escalationSuppressionCodes, hostGateValue, kunlunHexaForAudit, kunlunHexaTwoForAudit, kunlunTrioForAudit, kunlunTrioTwoForAudit)
+            = riskStageB()
         markStage("l11_risk")
+        // stage-frame isolation (frame lint): render-stage locals+temps die with this closure frame
+        // stage-frame isolation: a NAMED local function is a real separate frame at -Onone
+        // (an immediately-applied closure literal gets SILGen-inlined — measured, no win).
+        func renderStageA() -> (BASAbyssalPressure, BASHumanAnchorSignal, BASTurnAuditProjectionsLateClusterB, BASRuntimeTrace, BASSovereignVerdict, BASEmergencyBrake, BASEBrainRuntimeCoordinator.BASEvolutionGovernanceArtifacts, [BASQuarantineRecord], BASRenderedOutput, BASRunLease?, [BASSovereignCommitToken], BASSovereignLock?, [BASSovereignWarrant], BASThoughtFold, [BASUpdateTicket], BASWakeIntent) {
         let baseRenderedOutput = actionService.render(
             choice: mergedChoice,
             riskCard: boundRiskCard,
@@ -1392,6 +1413,11 @@ extension BASEBrainRuntimeCoordinator {
         // 7: hint, not verdict.
         let humanAnchorSignalForAudit = lateClusterBForAudit
             .humanAnchorSignal
+            return (abyssalPressureForAudit, humanAnchorSignalForAudit, lateClusterBForAudit, runtimeTrace, sovereignVerdict, emergencyBrake, evolutionGovernance, quarantineRecords, renderedOutput, runLease, sovereignCommitTokens, sovereignLock, sovereignWarrants, thoughtFold, updateTickets, wakeIntent)
+        }
+        let (abyssalPressureForAudit, humanAnchorSignalForAudit, lateClusterBForAudit, runtimeTrace, sovereignVerdict, emergencyBrake, evolutionGovernance, quarantineRecords, renderedOutput, runLease, sovereignCommitTokens, sovereignLock, sovereignWarrants, thoughtFold, updateTickets, wakeIntent)
+            = renderStageA()
+        func renderStageB() -> (BASSovereignVerdict?, BASBudgetFrame, BASRuntimeTrace, BASHeavenGatePermit, BASRiverOriginTrace, BASYaochiSanctumEntry, BASAuditObservationProjections, BASRecoveryDisposition?, [BASSovereignActuationCommand], BASSovereignAuditEntry, [BASSovereignExecutionReceipt], BASVitalState) {
         // M384 escalation now fires upstream (M392 — see the
         // gating block right after `thoughtFrame.actionPermit =
         // boundActionPermit` at line ~380). The audit emission
@@ -1984,172 +2010,181 @@ extension BASEBrainRuntimeCoordinator {
             thoughtFrame.neuralLeaseReceipt?.leaseID = runLease.leaseID
         }
 
+            return (finalSovereignVerdict, finalizedBudgetFrame, finalizedRuntimeTrace, kunlunHeavenGateForAudit, kunlunRiverTraceForAudit, kunlunYaochiSanctumForAudit, projections, recoveryDisposition, sovereignActuationCommands, sovereignAuditEntry, sovereignExecutionReceipts, vitalState)
+        }
+        let (finalSovereignVerdict, finalizedBudgetFrame, finalizedRuntimeTrace, kunlunHeavenGateForAudit, kunlunRiverTraceForAudit, kunlunYaochiSanctumForAudit, projections, recoveryDisposition, sovereignActuationCommands, sovereignAuditEntry, sovereignExecutionReceipts, vitalState)
+            = renderStageB()
         markStage("l12_render")   // covers render → verdict/audit/trace assembly up to here
-        var turnResult = BASEBrainTurnResult(
-            // chapter 五百三十一 / M1503 — V1 splice:
-            // 6 device/lifecycle args collapse to 1 typed
-            // deviceLifecycleBundle (deviceState +
-            // budgetFrame + wakeIntent + vitalState +
-            // runLease + emergencyBrake)。 Byte-equality
-            // preserved by M1502 PROOF (bundle accessors
-            // pass through verbatim)。
-            deviceLifecycleBundle:
-                BASEBrainTurnResultDeviceLifecycleBundle(
-                    deviceState: request.deviceState,
-                    budgetFrame: finalizedBudgetFrame,
-                    wakeIntent: wakeIntent,
-                    vitalState: vitalState,
-                    runLease: runLease,
-                    emergencyBrake: emergencyBrake),
-            // chapter 五百二十五 / M1479 — V1 splice:
-            // 8 sovereign-cluster args collapse to 1
-            // typed sovereignBundle。 Byte-equality
-            // preserved by M1478 PROOF (bundle accessors
-            // pass through verbatim)。
-            sovereignBundle:
-                BASEBrainTurnResultSovereignBundle(
-                    sovereignVerdict:
-                        finalSovereignVerdict,
-                    sovereignCommitTokens:
-                        sovereignCommitTokens,
-                    sovereignWarrants:
-                        sovereignWarrants,
-                    sovereignLock: sovereignLock,
-                    quarantineRecords:
-                        quarantineRecords,
-                    sovereignAuditEntry:
-                        sovereignAuditEntry,
-                    sovereignActuationCommands:
-                        sovereignActuationCommands,
-                    sovereignExecutionReceipts:
-                        sovereignExecutionReceipts),
-            // chapter 五百三十二 / M1507 — V1 splice:
-            // 3 forensic metadata args collapse to 1
-            // typed forensicMetadataBundle (policyLineage
-            // + recoveryDisposition + runtimeTrace)。
-            // Byte-equality preserved by M1506 PROOF
-            // (bundle accessors pass through verbatim)。
-            // 100% arg packaging coverage achieved at
-            // this V1 call site。
-            forensicMetadataBundle:
-                BASEBrainTurnResultForensicMetadataBundle(
-                    policyLineage: policyLineage,
-                    recoveryDisposition:
-                        recoveryDisposition,
-                    runtimeTrace:
-                        finalizedRuntimeTrace),
-            // chapter 五百二十六 / M1483 — V1 splice:
-            // 5 host-cluster args collapse to 1 typed
-            // hostBundle。 Byte-equality preserved by
-            // M1482 PROOF (bundle accessors pass through
-            // verbatim)。
-            hostBundle:
-                BASEBrainTurnResultHostBundle(
-                    hostConstitution: hostConstitution,
-                    hostConstitutionVault:
-                        hostConstitutionVault,
-                    hostVersionTree: hostVersionTree,
-                    hostForgetRequest:
-                        hostForgetRequest,
-                    hostContext: hostContext),
-            // chapter 五百二十八 / M1491 — V1 splice:
-            // 5 cognitive-frame args collapse to 1 typed
-            // cognitiveFramesBundle。 Byte-equality
-            // preserved by M1490 PROOF。
-            cognitiveFramesBundle:
-                BASEBrainTurnResultCognitiveFramesBundle(
-                    contextFrame: contextFrame,
-                    decomposeFrame: decomposeFrame,
-                    memoryBundle: memoryBundle,
-                    thoughtFrame: thoughtFrame,
-                    thoughtFold: thoughtFold),
-            // chapter 五百二十九 / M1495 — V1 splice:
-            // 4 risk/choice args collapse to 1 typed
-            // riskChoiceBundle。 Byte-equality preserved
-            // by M1494 PROOF。
-            riskChoiceBundle:
-                BASEBrainTurnResultRiskChoiceBundle(
-                    triScores: triScores,
-                    mergedChoice: mergedChoice,
-                    riskCard: boundRiskCard,
-                    actionPermit: boundActionPermit),
-            // chapter 五百三十 / M1499 — V1 splice:
-            // 4 misc args collapse to 1 typed miscBundle。
-            // Byte-equality preserved by M1498 PROOF。
-            miscBundle:
-                BASEBrainTurnResultMiscBundle(
-                    riskDecisionPackage:
-                        normalizedRiskDecisionPackage,
-                    hostGateValue: hostGateValue,
-                    renderedOutput: renderedOutput,
-                    updateTickets: updateTickets),
-            // chapter 五百二十四 / M1475 — V1 splice:
-            // 10 evolution-cluster args collapse to 1
-            // typed evolutionBundle。 Byte-equality
-            // preserved by M1474 PROOF (bundle accessors
-            // pass through verbatim)。
-            evolutionBundle:
-                BASEBrainTurnResultEvolutionBundle(
-                    experienceCandidates:
-                        evolutionGovernance
-                            .experienceCandidates,
-                    workflowCandidates:
-                        evolutionGovernance
-                            .workflowCandidates,
-                    guardTemplateCandidates:
-                        evolutionGovernance
-                            .guardTemplateCandidates,
-                    biasRecords:
-                        evolutionGovernance
-                            .biasRecords,
-                    riskPatternCandidates:
-                        evolutionGovernance
-                            .riskPatternCandidates,
-                    learningExportBundles:
-                        evolutionGovernance
-                            .learningExportBundles,
-                    shadowTrialRecords:
-                        evolutionGovernance
-                            .shadowTrialRecords,
-                    versionDeltas:
-                        evolutionGovernance
-                            .versionDeltas,
-                    retractionOrders:
-                        evolutionGovernance
-                            .retractionOrders,
-                    evolutionSeals:
-                        evolutionGovernance
-                            .evolutionSeals),
-            // chapter 五百二十六 / M1483 — V1 splice:
-            // 7 audit-projection-forwarded args collapse
-            // to 1 typed auditProjectionForwardBundle。
-            // Bundle accessors pass through verbatim:
-            //   - M578 (chapter 一百五十三) 4 fields
-            //     from projections (kunlunAxisAlignment +
-            //     humanAnchorSignal + abyssalPressure +
-            //     unknownReserve)
-            //   - M581 (chapter 一百五十六) 3 fields from
-            //     runTurn-scope locals (heavenGate +
-            //     riverTrace + yaochiSanctum)
-            // Byte-equality preserved via 3-bundle init
-            // delegation (M1482)。
-            auditProjectionForwardBundle:
-                BASEBrainTurnResultAuditProjectionForwardBundle(
-                    kunlunAxisAlignment:
-                        projections.kunlunAxisAlignment,
-                    humanAnchorSignal:
-                        projections.humanAnchorSignal,
-                    abyssalPressure:
-                        projections.abyssalPressure,
-                    unknownReserve:
-                        projections.unknownReserve,
-                    kunlunHeavenGatePermit:
-                        kunlunHeavenGateForAudit,
-                    kunlunRiverOriginTrace:
-                        kunlunRiverTraceForAudit,
-                    yaochiSanctumEntry:
-                        kunlunYaochiSanctumForAudit)
-        )
+        // stage-frame isolation: the 9-bundle assembly temporaries die with this frame
+        func assembleStage() -> BASEBrainTurnResult {
+            var turnResult = BASEBrainTurnResult(
+                // chapter 五百三十一 / M1503 — V1 splice:
+                // 6 device/lifecycle args collapse to 1 typed
+                // deviceLifecycleBundle (deviceState +
+                // budgetFrame + wakeIntent + vitalState +
+                // runLease + emergencyBrake)。 Byte-equality
+                // preserved by M1502 PROOF (bundle accessors
+                // pass through verbatim)。
+                deviceLifecycleBundle:
+                    BASEBrainTurnResultDeviceLifecycleBundle(
+                        deviceState: request.deviceState,
+                        budgetFrame: finalizedBudgetFrame,
+                        wakeIntent: wakeIntent,
+                        vitalState: vitalState,
+                        runLease: runLease,
+                        emergencyBrake: emergencyBrake),
+                // chapter 五百二十五 / M1479 — V1 splice:
+                // 8 sovereign-cluster args collapse to 1
+                // typed sovereignBundle。 Byte-equality
+                // preserved by M1478 PROOF (bundle accessors
+                // pass through verbatim)。
+                sovereignBundle:
+                    BASEBrainTurnResultSovereignBundle(
+                        sovereignVerdict:
+                            finalSovereignVerdict,
+                        sovereignCommitTokens:
+                            sovereignCommitTokens,
+                        sovereignWarrants:
+                            sovereignWarrants,
+                        sovereignLock: sovereignLock,
+                        quarantineRecords:
+                            quarantineRecords,
+                        sovereignAuditEntry:
+                            sovereignAuditEntry,
+                        sovereignActuationCommands:
+                            sovereignActuationCommands,
+                        sovereignExecutionReceipts:
+                            sovereignExecutionReceipts),
+                // chapter 五百三十二 / M1507 — V1 splice:
+                // 3 forensic metadata args collapse to 1
+                // typed forensicMetadataBundle (policyLineage
+                // + recoveryDisposition + runtimeTrace)。
+                // Byte-equality preserved by M1506 PROOF
+                // (bundle accessors pass through verbatim)。
+                // 100% arg packaging coverage achieved at
+                // this V1 call site。
+                forensicMetadataBundle:
+                    BASEBrainTurnResultForensicMetadataBundle(
+                        policyLineage: policyLineage,
+                        recoveryDisposition:
+                            recoveryDisposition,
+                        runtimeTrace:
+                            finalizedRuntimeTrace),
+                // chapter 五百二十六 / M1483 — V1 splice:
+                // 5 host-cluster args collapse to 1 typed
+                // hostBundle。 Byte-equality preserved by
+                // M1482 PROOF (bundle accessors pass through
+                // verbatim)。
+                hostBundle:
+                    BASEBrainTurnResultHostBundle(
+                        hostConstitution: hostConstitution,
+                        hostConstitutionVault:
+                            hostConstitutionVault,
+                        hostVersionTree: hostVersionTree,
+                        hostForgetRequest:
+                            hostForgetRequest,
+                        hostContext: hostContext),
+                // chapter 五百二十八 / M1491 — V1 splice:
+                // 5 cognitive-frame args collapse to 1 typed
+                // cognitiveFramesBundle。 Byte-equality
+                // preserved by M1490 PROOF。
+                cognitiveFramesBundle:
+                    BASEBrainTurnResultCognitiveFramesBundle(
+                        contextFrame: contextFrame,
+                        decomposeFrame: decomposeFrame,
+                        memoryBundle: memoryBundle,
+                        thoughtFrame: thoughtFrame,
+                        thoughtFold: thoughtFold),
+                // chapter 五百二十九 / M1495 — V1 splice:
+                // 4 risk/choice args collapse to 1 typed
+                // riskChoiceBundle。 Byte-equality preserved
+                // by M1494 PROOF。
+                riskChoiceBundle:
+                    BASEBrainTurnResultRiskChoiceBundle(
+                        triScores: triScores,
+                        mergedChoice: mergedChoice,
+                        riskCard: boundRiskCard,
+                        actionPermit: boundActionPermit),
+                // chapter 五百三十 / M1499 — V1 splice:
+                // 4 misc args collapse to 1 typed miscBundle。
+                // Byte-equality preserved by M1498 PROOF。
+                miscBundle:
+                    BASEBrainTurnResultMiscBundle(
+                        riskDecisionPackage:
+                            normalizedRiskDecisionPackage,
+                        hostGateValue: hostGateValue,
+                        renderedOutput: renderedOutput,
+                        updateTickets: updateTickets),
+                // chapter 五百二十四 / M1475 — V1 splice:
+                // 10 evolution-cluster args collapse to 1
+                // typed evolutionBundle。 Byte-equality
+                // preserved by M1474 PROOF (bundle accessors
+                // pass through verbatim)。
+                evolutionBundle:
+                    BASEBrainTurnResultEvolutionBundle(
+                        experienceCandidates:
+                            evolutionGovernance
+                                .experienceCandidates,
+                        workflowCandidates:
+                            evolutionGovernance
+                                .workflowCandidates,
+                        guardTemplateCandidates:
+                            evolutionGovernance
+                                .guardTemplateCandidates,
+                        biasRecords:
+                            evolutionGovernance
+                                .biasRecords,
+                        riskPatternCandidates:
+                            evolutionGovernance
+                                .riskPatternCandidates,
+                        learningExportBundles:
+                            evolutionGovernance
+                                .learningExportBundles,
+                        shadowTrialRecords:
+                            evolutionGovernance
+                                .shadowTrialRecords,
+                        versionDeltas:
+                            evolutionGovernance
+                                .versionDeltas,
+                        retractionOrders:
+                            evolutionGovernance
+                                .retractionOrders,
+                        evolutionSeals:
+                            evolutionGovernance
+                                .evolutionSeals),
+                // chapter 五百二十六 / M1483 — V1 splice:
+                // 7 audit-projection-forwarded args collapse
+                // to 1 typed auditProjectionForwardBundle。
+                // Bundle accessors pass through verbatim:
+                //   - M578 (chapter 一百五十三) 4 fields
+                //     from projections (kunlunAxisAlignment +
+                //     humanAnchorSignal + abyssalPressure +
+                //     unknownReserve)
+                //   - M581 (chapter 一百五十六) 3 fields from
+                //     runTurn-scope locals (heavenGate +
+                //     riverTrace + yaochiSanctum)
+                // Byte-equality preserved via 3-bundle init
+                // delegation (M1482)。
+                auditProjectionForwardBundle:
+                    BASEBrainTurnResultAuditProjectionForwardBundle(
+                        kunlunAxisAlignment:
+                            projections.kunlunAxisAlignment,
+                        humanAnchorSignal:
+                            projections.humanAnchorSignal,
+                        abyssalPressure:
+                            projections.abyssalPressure,
+                        unknownReserve:
+                            projections.unknownReserve,
+                        kunlunHeavenGatePermit:
+                            kunlunHeavenGateForAudit,
+                        kunlunRiverOriginTrace:
+                            kunlunRiverTraceForAudit,
+                        yaochiSanctumEntry:
+                            kunlunYaochiSanctumForAudit)
+            )
+            return turnResult
+        }
+        var turnResult = assembleStage()
         markStage("tail")
         turnResult.layerTimingsMs = stageMs   // substrate #77 — observability-only attach
         return turnResult

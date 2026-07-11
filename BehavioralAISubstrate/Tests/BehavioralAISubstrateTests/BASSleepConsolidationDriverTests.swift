@@ -67,11 +67,8 @@ final class BASSleepConsolidationDriverTests: XCTestCase {
 
     /// A real driven turn whose budget frame we then override per
     /// scenario (the result struct is a value — mutation is local)。
-    /// @MainActor — the debug-build turn pipeline needs ~550KB of
-    /// stack;async XCTest bodies run on 512KB cooperative-pool
-    /// threads (the 27e0fcb2e SIGBUS class),so the turn drive hops
-    /// to the main thread's 8MB stack。
-    @MainActor
+    /// Cooperative-pool safe: the 27e0fcb2e stack class is fixed (CoW-boxed turn
+    /// result + stage-split runTurn, ≤80KB peak pinned by BASRunTurnFrameBudgetTests)。
     private static func drivenTurn() throws -> BASEBrainTurnResult {
         let runtime = BASHostRuntime(configuration: .fixtureGeneric)
         let result = try runtime.startSession(

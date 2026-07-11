@@ -34,10 +34,8 @@ final class BASShadowTrialCarrierLoopTests: XCTestCase {
         }
     }
 
-    /// @MainActor — brain turns need ~550KB stack;async XCTest
-    /// bodies run on 512KB cooperative-pool threads (the 27e0fcb2e
-    /// SIGBUS class)。
-    @MainActor
+    /// Cooperative-pool safe: the 27e0fcb2e stack class is fixed (CoW-boxed turn
+    /// result + stage-split runTurn, ≤80KB peak pinned by BASRunTurnFrameBudgetTests)。
     private static func makeBrain() async throws -> BASCognitiveBrain {
         try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions())

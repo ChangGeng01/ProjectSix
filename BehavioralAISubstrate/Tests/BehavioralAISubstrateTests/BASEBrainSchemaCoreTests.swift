@@ -6,16 +6,12 @@ import Testing
 @testable import BASOrchestration
 @testable import BASOrchestration
 
-/// @MainActor — retained as belt-and-braces (historically a SIGBUS guard, 27e0fcb2e):
-/// the debug turn pipeline once needed ~550KB (runTurn 127KB frame + the 6-deep
-/// BASEBrainTurnResult init delegation chain) and overflowed swift-testing's 512KB
-/// cooperative-pool threads. The 2026-07-12 CoW box (12,200B value → 1 pointer, flat
-/// inits) fixed that component — PROBE-PROVEN: this suite ran green on the cooperative
-/// pool with @MainActor removed. The guard stays because runTurn's own frame is still
-/// ~127KB and deeper pipeline stacks give little margin; main-thread is also the thread
-/// class every sync XCTest turn test and production host uses。
+/// Runs on the cooperative pool (512KB threads) without main-actor pinning: the two structural
+/// roots of the 27e0fcb2e SIGBUS class are fixed — the turn result is a CoW box
+/// (12,200B → 1 pointer, flat inits) and runTurn is stage-split (single 129,792B frame →
+/// 56,304B peak, pinned by BASRunTurnFrameBudgetTests). This suite driving full turns on
+/// pool threads IS the living regression teeth for that budget.
 @Suite("BASEBrain schemas")
-@MainActor
 struct BASEBrainSchemaCoreTests {
     @Test("update ticket prioritizes structured constitution host change candidates and decodes legacy payloads")
     func updateTicketPrefersStructuredHostChangeCandidateAndDecodesLegacyPayload() throws {

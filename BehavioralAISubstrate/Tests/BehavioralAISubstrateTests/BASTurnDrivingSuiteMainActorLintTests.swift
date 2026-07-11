@@ -1,31 +1,38 @@
 import XCTest
 
-/// audit tests-arch ③ — the discipline "a swift-testing suite that drives full turns must be
-/// @MainActor, or it SIGBUSes on the 512KB swift-testing pool (the ~550KB turn frame overflows it;
-/// XCTest runs on the 8MB main/large stack and is fine)" lived only in hand-written comments with NO
-/// enforcement. This lint pins it: a swift-testing (`import Testing`) suite that references a
-/// full-turn entry point (`runTurn` / `startSession`) must carry `@MainActor`. It does NOT touch the
-/// 75 pure-logic swift-testing suites (they reference no turn-driving symbol) — the signal is exact.
+/// audit tests-arch ③, INVERTED 2026-07-12 — the "@MainActor stack guard" discipline is RETIRED.
 ///
-/// Mirrors BASTautologyBudgetLintTests: XCTest (runs on the large stack, never the pool it lints),
-/// Mac-only source scan, pure classifier + anti-false-green guard.
+/// The original lint mandated: a swift-testing suite that drives full turns must be @MainActor,
+/// because the ~550KB debug turn frame overflowed the 512KB cooperative pool (27e0fcb2e SIGBUS
+/// class). Both structural roots are now fixed — the turn result is a CoW box (12,200B value →
+/// 1 pointer, flat inits) and runTurn is stage-split (129,792B single frame → ≤80KB budgeted
+/// peak, mechanically pinned by BASRunTurnFrameBudgetTests). Turn-driving suites run on the
+/// pool DELIBERATELY: they are the living regression teeth for that budget.
+///
+/// The inverted enforcement: no test may REINTRODUCE the retired discipline — an `@MainActor`
+/// annotation justified by a stack/SIGBUS comment is cargo-cult (it would silently exempt that
+/// suite from exercising the frame budget). `@MainActor` for genuine actor-isolation reasons is
+/// untouched (no stack-justification marker ⇒ not flagged).
 #if !os(iOS)
 final class BASTurnDrivingSuiteMainActorLintTests: XCTestCase {
 
-    /// Full-turn entry points that allocate the ~550KB turn frame. A suite calling one DRIVES a turn.
+    /// Full-turn entry points that allocate the turn pipeline frames.
     static let turnDrivingSymbols = ["runTurn", "startSession"]
 
-    /// Pure classifier (unit-testable): is `source` a swift-testing suite that drives turns but is
-    /// NOT @MainActor? XCTest suites are exempt (large stack); pure-logic swift-testing suites (no
-    /// turn symbol) are exempt. `@MainActor` is matched at file scope (a conservative proxy).
-    static func isTurnDrivingSwiftTestingSuiteMissingMainActor(_ source: String) -> Bool {
-        guard source.contains("import Testing") else { return false }         // swift-testing only
-        guard turnDrivingSymbols.contains(where: { source.contains($0) }) else { return false }
-        return !source.contains("@MainActor")
+    /// Markers of the RETIRED stack-guard justification. A file pairing @MainActor with one of
+    /// these is re-adding the retired discipline (the fixed-class mentions in guard-free files
+    /// don't pair with @MainActor, so they don't flag).
+    static let retiredJustificationMarkers = ["550KB", "SIGBUS", "512KB cooperative", "cooperative-pool thread"]
+
+    /// Pure classifier (unit-testable): does `source` pair @MainActor with a stack-guard
+    /// justification? Conservative file-scope proxy, same trade-off as the original lint.
+    static func isStaleStackGuard(_ source: String) -> Bool {
+        guard source.contains("@MainActor") else { return false }
+        return retiredJustificationMarkers.contains(where: { source.contains($0) })
     }
 
-    /// True iff `source` is a swift-testing suite that drives turns (regardless of @MainActor) — used
-    /// by the anti-false-green guard to prove the classifier actually detects the known population.
+    /// True iff `source` is a swift-testing suite that drives turns — the population that now
+    /// exercises the cooperative pool (anti-false-green guard below proves it's detectable).
     static func isTurnDrivingSwiftTestingSuite(_ source: String) -> Bool {
         source.contains("import Testing") && turnDrivingSymbols.contains(where: { source.contains($0) })
     }
@@ -39,48 +46,54 @@ final class BASTurnDrivingSuiteMainActorLintTests: XCTestCase {
         var violations: [String] = []
         var drivingCount = 0
         for case let url as URL in en where url.pathExtension == "swift" {
+            // this file defines the markers next to @MainActor mentions — exempt itself
+            if url.lastPathComponent == "BASTurnDrivingSuiteMainActorLintTests.swift" { continue }
             let src = try String(contentsOf: url, encoding: .utf8)
             if Self.isTurnDrivingSwiftTestingSuite(src) { drivingCount += 1 }
-            if Self.isTurnDrivingSwiftTestingSuiteMissingMainActor(src) {
+            if Self.isStaleStackGuard(src) {
                 violations.append(url.lastPathComponent)
             }
         }
         return (violations, drivingCount)
     }
 
-    func testTurnDrivingSwiftTestingSuitesAreMainActor() throws {
+    func testNoStaleStackGuardMainActorRemains() throws {
         let (violations, _) = try scan()
         XCTAssertTrue(violations.isEmpty,
-            "swift-testing suites that drive full turns (runTurn/startSession) MUST be @MainActor — "
-            + "otherwise the ~550KB turn frame overflows the 512KB swift-testing pool (SIGBUS; XCTest "
-            + "is fine on the large stack). Add @MainActor to the @Suite. Offenders:\n"
-            + violations.sorted().joined(separator: "\n"))
+            "the @MainActor stack-guard discipline is RETIRED (CoW-boxed turn result + stage-split "
+            + "runTurn; BASRunTurnFrameBudgetTests pins the frame budget). Pairing @MainActor with a "
+            + "stack/SIGBUS justification re-adds it and exempts the suite from exercising the "
+            + "budget — remove the guard or justify the isolation on its real (actor) grounds. "
+            + "Offenders:\n" + violations.sorted().joined(separator: "\n"))
     }
 
-    /// Anti-false-green: the classifier must find the KNOWN turn-driving suite (BASEBrainSchemaCoreTests);
-    /// a zero count means the signal/path broke (a silent pass), not that none exist.
+    /// Anti-false-green: the turn-driving population must stay detectable (BASEBrainSchemaCoreTests
+    /// drives turns via startSession/runTurn on the pool); zero means the classifier/path broke.
     func testLintDetectsTheKnownTurnDrivingPopulation() throws {
         let (_, drivingCount) = try scan()
         XCTAssertGreaterThanOrEqual(drivingCount, 1,
-            "the lint must detect ≥1 turn-driving swift-testing suite (BASEBrainSchemaCoreTests drives "
-            + "turns via startSession/runTurn) — zero means the classifier or path regressed")
+            "the lint must detect ≥1 turn-driving swift-testing suite — zero means the classifier "
+            + "or path regressed")
     }
 
     func testClassifierFixtures() {
         typealias L = BASTurnDrivingSuiteMainActorLintTests
-        let drivingBody = "func t() async { await e.runTurn() }"
-        // Positive: swift-testing + drives + no @MainActor ⇒ violation.
-        XCTAssertTrue(L.isTurnDrivingSwiftTestingSuiteMissingMainActor(
-            "import Testing\n@Suite struct S { \(drivingBody) }"))
-        // Negative: same but @MainActor ⇒ ok.
-        XCTAssertFalse(L.isTurnDrivingSwiftTestingSuiteMissingMainActor(
-            "import Testing\n@MainActor @Suite struct S { \(drivingBody) }"))
-        // Negative: swift-testing pure logic (no turn symbol) ⇒ ok (the 75-suite majority).
-        XCTAssertFalse(L.isTurnDrivingSwiftTestingSuiteMissingMainActor(
-            "import Testing\n@Suite struct S { func t() { #expect(1 == 1) } }"))
-        // Negative: XCTest + drives (no @MainActor needed — 8MB stack) ⇒ ok.
-        XCTAssertFalse(L.isTurnDrivingSwiftTestingSuiteMissingMainActor(
-            "import XCTest\nfinal class T: XCTestCase { \(drivingBody) }"))
+        // Positive: @MainActor paired with a stack justification ⇒ stale guard.
+        XCTAssertTrue(L.isStaleStackGuard(
+            "import Testing\n// needs ~550KB stack\n@MainActor @Suite struct S {}"))
+        XCTAssertTrue(L.isStaleStackGuard(
+            "import XCTest\n/// SIGBUS on the pool\n@MainActor func drivenTurn() {}"))
+        // Negative: @MainActor for genuine isolation (no stack marker) ⇒ untouched.
+        XCTAssertFalse(L.isStaleStackGuard(
+            "import Testing\n// UI-isolated observable state\n@MainActor @Suite struct S {}"))
+        // Negative: stack-class mention WITHOUT @MainActor (the fixed-class comments) ⇒ ok.
+        XCTAssertFalse(L.isStaleStackGuard(
+            "import Testing\n// the 27e0fcb2e SIGBUS class is fixed\n@Suite struct S {}"))
+        // Population detector still works.
+        XCTAssertTrue(L.isTurnDrivingSwiftTestingSuite(
+            "import Testing\n@Suite struct S { func t() async { await e.runTurn() } }"))
+        XCTAssertFalse(L.isTurnDrivingSwiftTestingSuite(
+            "import XCTest\nfinal class T: XCTestCase { func t() { _ = runTurn } }"))
     }
 }
 #endif
