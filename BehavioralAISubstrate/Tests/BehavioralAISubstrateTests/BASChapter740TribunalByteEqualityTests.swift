@@ -134,9 +134,11 @@ final class BASChapter740TribunalByteEqualityTests:
                         return id * (1 - conf)
                     }
                 }
-            let maxPerCand = perCandidate.max() ?? Double.leastNormalMagnitude
-            urgencyFeel = clamp01(
-                max(maxPerCand, controlRecoveryNeed))
+            // deep-audit blindspot-② mirror (2026-07-11): controlRecoveryNeed is a FALLBACK used
+            // only when NO candidate has a matching triScore (perCandidate empty), NOT a floor. The
+            // old `max(maxPerCand, controlRecoveryNeed)` floored urgency_feel unconditionally; the
+            // rebuilt Rust binary matches Swift `perCandidate.max() ?? controlRecoveryNeed`.
+            urgencyFeel = clamp01(perCandidate.max() ?? controlRecoveryNeed)
         } else {
             urgencyFeel = controlRecoveryNeed
         }

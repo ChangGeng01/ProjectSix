@@ -66,18 +66,16 @@ final class BASChapter742VerdictPerfAndScorecardTests:
             (2, 1),  // runtime_instability: shadowLock/throttle
             (3, 1),  // manipulation_intrusion: toolCut/throttle
         ]
+        // deep-audit blindspot-② mirror (2026-07-11): pin to the MOST-SEVERE high, not the FIRST.
+        // The old early-return on the first .high let a privilegeViolation-high (5) MASK a
+        // co-present selfMod-high (7); the rebuilt Rust binary now takes the max over ALL signals.
         var softLevel: Int32 = 0
         for (i, soft) in softs.enumerated() {
             switch swiftBand(soft) {
             case .high:
-                softLevel = order[i].0
-                let combined = max(hardFloor, softLevel)
-                return applyUpgrade(
-                    combined, domain, evidenceSufficient)
+                if order[i].0 > softLevel { softLevel = order[i].0 }
             case .mid:
-                if order[i].1 > softLevel {
-                    softLevel = order[i].1
-                }
+                if order[i].1 > softLevel { softLevel = order[i].1 }
             case .low: continue
             }
         }

@@ -221,8 +221,29 @@ final class BASChapter739RiskPlaneByteEqualityTests:
     private func parallelSwiftMonotonicVersionCompare(
         current: String, proposed: String
     ) -> Bool? {
+        // deep-audit blindspot-③ mirror (2026-07-11): NUMERIC component compare, not lexicographic
+        // `>` (which claimed v9 > v10, ACCEPTING A DOWNGRADE). Unparseable ⇒ nil (fail-closed).
+        func parse(_ v: String) -> [UInt64]? {
+            let body = v.hasPrefix("v") ? String(v.dropFirst()) : v
+            if body.isEmpty { return nil }
+            var out: [UInt64] = []
+            for part in body.split(separator: ".", omittingEmptySubsequences: false) {
+                guard let n = UInt64(part) else { return nil }
+                out.append(n)
+            }
+            return out
+        }
         if current.isEmpty || proposed.isEmpty { return nil }
-        return proposed > current
+        guard let c = parse(current), let p = parse(proposed) else { return nil }
+        return lexNumericGreater(p, c)
+    }
+
+    /// element-wise then by length — mirrors Rust `Vec<u64>` ordering.
+    private func lexNumericGreater(_ a: [UInt64], _ b: [UInt64]) -> Bool {
+        for i in 0..<min(a.count, b.count) {
+            if a[i] != b[i] { return a[i] > b[i] }
+        }
+        return a.count > b.count
     }
 
     func testMonotonicVersionByteEqualityGrid() {

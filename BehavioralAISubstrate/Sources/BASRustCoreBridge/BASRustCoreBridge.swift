@@ -134,8 +134,12 @@ public enum BASRustCoreBridge {
     ///     atom_ids_for_domain` (ATOMIC (atom_id, score) top-k, closes the
     ///     rowid-reuse TOCTOU + deterministic tie-break)。 Cold ×2 byte-
     ///     identical (rustup cargo 1.96.0)。
+    ///   - deep-audit 2026-07-11: usage-tracker query_json record_id
+    ///     tie-break (#4) + event-extractor faithful classify semantics
+    ///     (#5) + importance-scorer no-history=0.5 fix now IN the binary
+    ///     (un-skips the byte-parity test)。 Cold ×2 byte-identical。
     public static let macosArm64SliceSHA256: String =
-        "71b2ac559010958c49c2aa5747125769b83157ffe0241debac449ea02632b7ab"
+        "941e8480119a72e856332a526f353f9ed4dab181703c1b5d9f1df6cf6e2c6cef"
 
     /// XCFramework ios-arm64 slice byte-equality SHA256。
     /// Bumped: chapter 七百八十三 / M2566 (+atom-lifecycle); "latest-languages"
@@ -143,14 +147,14 @@ public enum BASRustCoreBridge {
     /// (canonical-bytes ABI v2 + cold-rebuild reproducibility pin);
     /// audit M-l MED-4 (+atomic vector topk atom_ids)。
     public static let iosArm64SliceSHA256: String =
-        "119f511b832bce98465831267cf9c0ebda8a1ad7c978224345305a15d25c54f6"
+        "0a56286f0f17c8e3c5e07ce61c9b793a7c6258676944852183a86997be50cac6"
 
     /// XCFramework ios-arm64-simulator slice byte-equality
     /// SHA256。 Bumped: chapter 七百八十三 / M2566; "latest-languages" cut;
     /// 全面进化 T2.1a (canonical-bytes ABI v2 + cold-rebuild pin);
     /// audit M-l MED-4 (+atomic vector topk atom_ids)。
     public static let iosArm64SimulatorSliceSHA256: String =
-        "1f5f1f725e2f49605fc1175f8533dd24f6b2a1c102268550c470a8de2eb14fa8"
+        "18c2a32c9a604fd0d103351883791bf0d92ae18a74ecf0c5228c50880689b6d2"
 
     /// Total per-slice SHA256 count = shippedSlices
     /// .count。 Cross-mirror invariant pinned in tests
