@@ -379,7 +379,7 @@ public actor BASSovereignVerdictEngine {
             (level, routedDivergence) = Self.applyHitsFloor(routed: routedLevel, floors: hits.map { $0.minLevel })
             if let d = routedDivergence {
                 Self._incrementRoutedDivergence()   // audit x-concurrency MED-5: atomic (lock-guarded)
-                print("⚠️ [verdict] ROUTED-DIVERGENCE rust=\(d.rustLevel) swiftFloor=\(d.swiftFloor) — Swift floor wins (fail-safe)")
+                BASDiagnosticLog.emit("⚠️ [verdict] ROUTED-DIVERGENCE rust=\(d.rustLevel) swiftFloor=\(d.swiftFloor) — Swift floor wins (fail-safe)")
             }
             // audit M-d MED-4: re-apply the Swift Stage-3 evidence floor over the routed level too.
             // It previously lived ONLY in the Swift else-branch below, so a Rust derive that dropped

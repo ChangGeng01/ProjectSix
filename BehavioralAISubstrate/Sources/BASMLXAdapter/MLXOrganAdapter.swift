@@ -1808,7 +1808,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         let snap = await store.load(expectedModelID: model.id, nowMs: nowMs)
         experienceStore = store
         guard let snap else {
-            print("📊 experience cold-start (no valid snapshot)")
+            BASDiagnosticLog.emit("📊 experience cold-start (no valid snapshot)")
             return
         }
         // 复审修2 (MED):恢复只在仍冷时生效——await 间隙完成的并发轮可能已折叠在线
@@ -1818,7 +1818,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         }
         if restoredChainEmaL == nil { restoredChainEmaL = snap.chainEmaL }
         let ema = snap.chainEmaL.map { String(format: "%.2f", $0) } ?? "nil"
-        print("📊 experience warm-start cells=\(snap.cells.count) chainEmaL=\(ema) age_s=\((nowMs - snap.savedAtMs) / 1000)")
+        BASDiagnosticLog.emit("📊 experience warm-start cells=\(snap.cells.count) chainEmaL=\(ema) age_s=\((nowMs - snap.savedAtMs) / 1000)")
     }
 
     /// P0: debounced fire-and-forget snapshot (never blocks or fails the decode path).
@@ -1849,11 +1849,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         if advice.rearmed.contains(.clearAllSessions), let prior = priorCacheLimitBeforeClamp {
             setGPUCacheLimit(bytes: prior)
             priorCacheLimitBeforeClamp = nil
-            print("📊 pressure-ladder rung=3 REARMED → cacheLimit restored to \(prior / (1024 * 1024))MB")
+            BASDiagnosticLog.emit("📊 pressure-ladder rung=3 REARMED → cacheLimit restored to \(prior / (1024 * 1024))MB")
         }
         guard let rung = advice.fired else { return }
         ladderFired.append(rung.rawValue)
-        print("📊 pressure-ladder rung=\(rung.rawValue)(\(rung)) headroom=\(headroom / (1024 * 1024))MB")
+        BASDiagnosticLog.emit("📊 pressure-ladder rung=\(rung.rawValue)(\(rung)) headroom=\(headroom / (1024 * 1024))MB")
         // audit mlx-adapter-core MED-6: execute the fired rung's action AND the milder rungs'
         // distinct actions it subsumes (they latched in the same collapse) — driving off the pure
         // relation so a straight rung-3 collapse also drops the ~300MB decoder (rung 2), which the

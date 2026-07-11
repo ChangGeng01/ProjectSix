@@ -1,4 +1,5 @@
 import Foundation
+import BASRuntimeCore
 import BASOrgan
 #if canImport(MLXLLM)
 import MLXLLM
@@ -72,7 +73,7 @@ extension MLXOrganAdapter {
                 return _finish(try await _draftSpeculative(request), planned: strategy,
                                context: context, request: request)
             } catch {
-                print("[draft-model-spec] lane fail-closed to plain: \(error)")
+                BASDiagnosticLog.emit("[draft-model-spec] lane fail-closed to plain: \(error)")
                 return _finish(try await _plainDraft(request), planned: strategy,
                                context: context, request: request, failClose: "\(error)")
             }
@@ -86,7 +87,7 @@ extension MLXOrganAdapter {
                     accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
                 return _finish(g.draft, planned: strategy, context: context, request: request)
             } catch {
-                print("[mtp-spec-sampling] lane fail-closed to plain: \(error)")
+                BASDiagnosticLog.emit("[mtp-spec-sampling] lane fail-closed to plain: \(error)")
                 return _finish(try await _plainDraft(request), planned: strategy,
                                context: context, request: request, failClose: "\(error)")
             }
@@ -108,7 +109,7 @@ extension MLXOrganAdapter {
                     accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
                 return _finish(g.draft, planned: strategy, context: context, request: request)
             } catch {
-                print("[mtp-spec] lane fail-closed to plain: \(error)")
+                BASDiagnosticLog.emit("[mtp-spec] lane fail-closed to plain: \(error)")
                 return _finish(try await _plainDraft(request), planned: strategy,
                                context: context, request: request, failClose: "\(error)")
             }
@@ -128,7 +129,7 @@ extension MLXOrganAdapter {
                 return _finish(_modelFreeDraft(body: g.body, request: request), planned: strategy,
                                context: context, request: request)
             } catch {
-                print("[prompt-lookup] lane fail-closed to plain: \(error)")
+                BASDiagnosticLog.emit("[prompt-lookup] lane fail-closed to plain: \(error)")
                 return _finish(try await _plainDraft(request), planned: strategy,
                                context: context, request: request, failClose: "\(error)")
             }
@@ -157,7 +158,7 @@ extension MLXOrganAdapter {
                 return _finish(_modelFreeDraft(body: g.body, request: request), planned: strategy,
                                context: context, request: request)
             } catch {
-                print("[suffix-lookup] lane fail-closed to plain: \(error)")
+                BASDiagnosticLog.emit("[suffix-lookup] lane fail-closed to plain: \(error)")
                 return _finish(try await _plainDraft(request), planned: strategy,
                                context: context, request: request, failClose: "\(error)")
             }

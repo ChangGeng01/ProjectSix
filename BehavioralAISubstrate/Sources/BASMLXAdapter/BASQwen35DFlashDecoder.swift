@@ -18,6 +18,7 @@
 // Device economics note: the verify is T≥16 ⇒ always the qmm regime on the phone (the qmv cliff is
 // paid ONCE per ~4-7 accepted tokens instead of never — amortized; Gate-c measures the net).
 import Foundation
+import BASRuntimeCore
 #if canImport(MLXLLM)
 import MLX
 import MLXNN
@@ -234,7 +235,7 @@ public final class BASQwen35DFlashDecoder {
                 vBase = trunkLen
             } else {
                 guard checkpoint.restore(cache: cache, trimming: T) else {
-                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    BASDiagnosticLog.emit("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
                     break
                 }
                 pending.append(contentsOf: emitted)

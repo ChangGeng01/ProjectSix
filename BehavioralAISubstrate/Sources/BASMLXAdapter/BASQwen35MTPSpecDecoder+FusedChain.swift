@@ -19,6 +19,7 @@
 // ADR-039 unchanged: emissions are read EXCLUSIVELY from the trunk's own argmax vector `am` (the accepted
 // prefix equals the drafts by definition of the match test, so drafts never need a readback at all).
 import Foundation
+import BASRuntimeCore
 import BASOrgan
 #if canImport(MLXLLM)
 import MLX          // MLXFast (scaledDotProductAttention et al.) lives inside the MLX module in this vendor
@@ -221,7 +222,7 @@ extension BASQwen35MTPSpecDecoder {
         // or model change that introduces an unsupported cache refuses speculation up front
         // instead of corrupting state mid-generation; plain keeps the B3 contract.
         guard BASTrunkCheckpoint.compositionSupported(cache) else {
-            print("[fused] unsupported cache composition — fail-close to plain")
+            BASDiagnosticLog.emit("[fused] unsupported cache composition — fail-close to plain")
             return generatePlain(prompt: prompt, maxTokens: maxTokens,
                                  eosTokens: eosTokens, traceExit: traceExit)
         }
@@ -388,7 +389,7 @@ extension BASQwen35MTPSpecDecoder {
             // (P-1+L ≤ T-1). A violation means a corrupt readback — fail-close, never emit from
             // out-of-range rows (everything already out is a trunk argmax; stopping is safe).
             guard L >= 0, L <= kNow else {
-                print("[fused] INVARIANT violated: L=\(L) kNow=\(kNow) — fail-close")
+                BASDiagnosticLog.emit("[fused] INVARIANT violated: L=\(L) kNow=\(kNow) — fail-close")
                 break
             }
             let amH = host[1 ... T].map(Int.init)                      // trunk argmaxes, host side
@@ -481,7 +482,7 @@ extension BASQwen35MTPSpecDecoder {
                 for t in cfg.closeSequence where !stop { stop = !emit(t) }
                 if stop { break }              // budget died mid-injection — no refeed to waste (review LOW-3)
                 guard checkpoint.restore(cache: cache, trimming: T) else {
-                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    BASDiagnosticLog.emit("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
                     break
                 }
                 let feed = pending + Array(emitted[0 ... closeAt]) + cfg.closeSequence
@@ -502,7 +503,7 @@ extension BASQwen35MTPSpecDecoder {
                 pending = [emitted.last!]
             } else {
                 guard checkpoint.restore(cache: cache, trimming: T) else {
-                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    BASDiagnosticLog.emit("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
                     break
                 }
                 hLast = h2[0, P - 1 + L]
@@ -521,13 +522,13 @@ extension BASQwen35MTPSpecDecoder {
                               Double(trStats.trHits[j] ?? 0) / Double(n),
                               Double(trStats.mtpHits[j] ?? 0) / Double(n), n)
             }.joined(separator: " | ")
-            print(String(format: "[tr-probe] rows=%d covered=%.2f top3=%.2f matrix=%d :: %@",
+            BASDiagnosticLog.emit(String(format: "[tr-probe] rows=%d covered=%.2f top3=%.2f matrix=%d :: %@",
                          trStats.rows, Double(trStats.coveredRows) / Double(trStats.rows),
                          Double(trStats.trTop3Hits) / Double(trStats.rows),
                          trMatrix.coverage, per))
         }
         if dbg {
-            print(String(format: "[fused-debug] slowPaths=%d chain=%.1fms/round verifySync=%.1fms/round iters=%d",
+            BASDiagnosticLog.emit(String(format: "[fused-debug] slowPaths=%d chain=%.1fms/round verifySync=%.1fms/round iters=%d",
                          dbgSlow, dbgChainMs / Double(max(iters, 1)), dbgVerifyMs / Double(max(iters, 1)), iters))
         }
         return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0),

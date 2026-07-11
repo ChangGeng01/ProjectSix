@@ -1,4 +1,5 @@
 import Foundation
+import BASRuntimeCore
 
 // P3 睡眠窗测量站(RSI 章程 2026-07-07)——dream-loop 的既有形状,严格 verdict-only。
 // 宪法界:站只【测量并记账】,产物是判决候选账本行;不采纳、不改任何开关/常数(采纳权
@@ -260,7 +261,7 @@ public enum BASSleepMeasurementStation {
                 startedAtMs: nowMs, suiteFilter: filter, exitCode: proc.terminationStatus,
                 executedTests: agg?.tests ?? 0, failures: agg?.failures ?? 0,
                 durationS: dt, verdictCandidate: verdict))
-            print("📊 station suite=\(filter) \(verdict) t=\(String(format: "%.1f", dt))s")
+            BASDiagnosticLog.emit("📊 station suite=\(filter) \(verdict) t=\(String(format: "%.1f", dt))s")
             if timedOut {
                 // audit H20: HALT the whole station — do NOT launch another heavy suite while a
                 // hung process may have survived the kill. The freeze this machine hit was the
@@ -273,7 +274,7 @@ public enum BASSleepMeasurementStation {
                         executedTests: 0, failures: 0, durationS: 0,
                         verdictCandidate:
                             "SKIPPED — station halted after prior timeout (one-heavy-task invariant)"))
-                    print("⏹️ station suite=\(skipped) SKIPPED — station halted after timeout")
+                    BASDiagnosticLog.emit("⏹️ station suite=\(skipped) SKIPPED — station halted after timeout")
                 }
                 break
             }
@@ -283,7 +284,7 @@ public enum BASSleepMeasurementStation {
         do {
             try appendToLedger(records, ledgerURL: ledgerURL)
         } catch {
-            print("⚠️ station: failed to append \(records.count) record(s) to ledger " +
+            BASDiagnosticLog.emit("⚠️ station: failed to append \(records.count) record(s) to ledger " +
                   "\(ledgerURL.lastPathComponent): \(error)")
         }
         return records

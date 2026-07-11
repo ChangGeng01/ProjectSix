@@ -1,4 +1,5 @@
 import Foundation
+import BASRuntimeCore
 
 // P0 经验持久化(RSI 章程 2026-07-07)——"先记住昨天,不改进"。
 // 基座此前是"每次重启都失忆的反射机":profiler 表/chainEmaL 全部进程生命期。本文件给
@@ -105,7 +106,7 @@ public actor BASAcceptanceProfilerStore {
             lastSaveMs = nowMs
         } catch {
             // Non-fatal: log-and-continue (never let persistence failures touch the decode path).
-            print("[experience-store] save failed (non-fatal): \(error)")
+            BASDiagnosticLog.emit("[experience-store] save failed (non-fatal): \(error)")
         }
     }
 }

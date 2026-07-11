@@ -7,6 +7,7 @@
 // planner, a-telemetry folded into the acceptance profiler (the lane's 0.15 floor is LIVE, unlike the
 // draft-model lane's cold-forever gap).
 import Foundation
+import BASRuntimeCore
 import BASOrgan
 
 #if canImport(MLXLLM)
@@ -105,7 +106,7 @@ extension MLXOrganAdapter {
                     postPrefillBudget: Self._probeBudgetHook(diffProbe, planned: maxTokens,
                                                              reportInto: probeReport))
             if let te = r.traceExit {
-                print("📊 trace-exit fired reason=\(te.reason.rawValue) think=\(te.thinkTokensAtExit) out=\(te.outCountAtExit)/\(maxTokens)")
+                BASDiagnosticLog.emit("📊 trace-exit fired reason=\(te.reason.rawValue) think=\(te.thinkTokensAtExit) out=\(te.outCountAtExit)/\(maxTokens)")
             }
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
@@ -192,7 +193,7 @@ extension MLXOrganAdapter {
             if thermalFallback {
                 r = dec.generatePlain(
                     prompt: promptIds, maxTokens: maxTokens, eosTokens: eos, traceExit: trace)
-                print("📊 session-thermal fallback=plain out=\(r.tokens.count)/\(maxTokens)")
+                BASDiagnosticLog.emit("📊 session-thermal fallback=plain out=\(r.tokens.count)/\(maxTokens)")
             } else {
                 r = dec.generateSpecKFused(
                     prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
@@ -202,7 +203,7 @@ extension MLXOrganAdapter {
                                                              reportInto: probeReport))
             }
             if let te = r.traceExit {
-                print("📊 trace-exit fired reason=\(te.reason.rawValue) think=\(te.thinkTokensAtExit) out=\(te.outCountAtExit)/\(maxTokens)")
+                BASDiagnosticLog.emit("📊 trace-exit fired reason=\(te.reason.rawValue) think=\(te.thinkTokensAtExit) out=\(te.outCountAtExit)/\(maxTokens)")
             }
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
@@ -303,7 +304,7 @@ extension MLXOrganAdapter {
             if refined > planned, MLXOrganAdapter._thermalThrottled() { refined = planned }
             box?.report = (p, planned, refined)
             if refined != planned {
-                print(String(format: "📊 diff-probe p_success=%.2f budget %d→%d", p, planned, refined))
+                BASDiagnosticLog.emit(String(format: "📊 diff-probe p_success=%.2f budget %d→%d", p, planned, refined))
             }
             return refined
         }

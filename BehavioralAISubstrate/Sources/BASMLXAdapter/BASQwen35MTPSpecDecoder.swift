@@ -20,6 +20,7 @@
 //     legitimately break differently (measured: rare tie-flips, e.g. the 14/220 pair; same class the suffix
 //     probe handles via its STRICT/LOSSLESS dual gate). Divergence-from-serial is reported as telemetry.
 import Foundation
+import BASRuntimeCore
 import MLX
 import MLXNN
 import MLXLLM
@@ -496,7 +497,7 @@ public final class BASQwen35MTPSpecDecoder {
                 pending = [emitted.last!]
             } else {
                 guard checkpoint.restore(cache: cache, trimming: T) else {
-                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    BASDiagnosticLog.emit("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
                     break
                 }
                 hLast = h2[0, P - 1 + L]                            // hidden after the last CORRECT fed token
@@ -638,7 +639,7 @@ public final class BASQwen35MTPSpecDecoder {
                 pending = [bonus]
             } else {
                 guard checkpoint.restore(cache: cache, trimming: T) else {
-                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    BASDiagnosticLog.emit("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
                     break
                 }
                 let r = categorical(verdict.residualLogits).item(Int.self)   // r ~ normalize(max(0, p − q))
@@ -728,7 +729,7 @@ public final class BASQwen35MTPSpecDecoder {
                 pending = [em]
             } else {
                 guard checkpoint.restore(cache: cache, trimming: T) else {
-                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    BASDiagnosticLog.emit("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
                     break
                 }
                 _ = emit(trueD)

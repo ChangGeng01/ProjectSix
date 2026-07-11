@@ -48,6 +48,7 @@ count_matches() {
 # These are EXCLUDED from the print() check。
 EXCLUDED_DIRS_PRINT_CHECK=(
     "Sources/BASBrainCLI"
+    "Sources/BASJournalCLI"   # The Ledger CLI executable (2026-07 增) — stdout print() is its output, like BASBrainCLI
 )
 
 # Build find expression to exclude CLI dirs from print check

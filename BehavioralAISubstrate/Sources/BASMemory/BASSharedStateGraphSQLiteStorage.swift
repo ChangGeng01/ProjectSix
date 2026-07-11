@@ -373,7 +373,7 @@ public actor BASSharedStateGraphSQLiteStorage:
                 // Skip + emit visible signal。 Logging via print
                 // is intentional — no structured logger in this
                 // module yet。
-                print(
+                BASDiagnosticLog.emit(
                     "[BASSharedStateGraphSQLiteStorage] " +
                     "WARN ch956.11 CR4: skipping row with " +
                     "unknown domain rawValue=\(raw) " +
