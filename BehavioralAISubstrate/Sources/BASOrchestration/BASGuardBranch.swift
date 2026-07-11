@@ -35,9 +35,15 @@ public enum BASReversibilityBands {
     /// fabric adapter did NOT — so a low-reversibility "pause and review" candidate was a guard path in
     /// one and a danger path in the other. Both now call this.
     public static func containsGuardLexicon(_ value: String) -> Bool {
-        let n = value.lowercased()
-        return n.contains("delay") || n.contains("pause") || n.contains("wait")
-            || n.contains("review") || n.contains("bounded") || n.contains("protect")
+        // deep-audit calibration (journal cue-precision follow-up): these are STEMS, so match any WORD
+        // that STARTS with the stem. That keeps the legitimate morphological variants (delayed /
+        // reviewing / paused / protective / waiting) while killing the substring false-positives where
+        // the stem sits MID-word — "review" ⊄ preview, "wait" ⊄ Kuwait / await, "pause" ⊄ menopause,
+        // "bounded" ⊄ rebounded — which the old `contains()` wrongly flagged as guard paths.
+        let stems = ["delay", "pause", "wait", "review", "bounded", "protect"]
+        let words = value.lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+        return words.contains { word in stems.contains { word.hasPrefix($0) } }
     }
 }
 
