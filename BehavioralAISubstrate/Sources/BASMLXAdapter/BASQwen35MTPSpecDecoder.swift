@@ -443,7 +443,7 @@ public final class BASQwen35MTPSpecDecoder {
         var ds = draftChain()
         let t0 = Date()
         var out: [Int] = []
-        var acceptedTok = 0, iters = 0
+        var acceptedTok = 0, iters = 0, proposedTok = 0
         while out.count < maxTokens {
             // audit mlx-decode MED-1: an empty ds means the MTP buffer is full — plain-step (the
             // verify path below assumes ds has exactly k elements, so it must NOT run empty).
@@ -474,6 +474,7 @@ public final class BASQwen35MTPSpecDecoder {
             eval(evalSet)                                          // the ONE gpu sync
             let dv = ds.map { $0.item(Int.self) }
             iters += 1
+            proposedTok += dv.count   // gaps-recon 2026-07-11: TRUE drafted-token count (see Run below)
             // prefix-accept: d[j]'s slot truth = am[P-1+j]
             var L = 0
             while L < k && am[P - 1 + L].item(Int.self) == dv[L] { L += 1 }
@@ -504,8 +505,12 @@ public final class BASQwen35MTPSpecDecoder {
             }
             ds = draftChain()
         }
+        // gaps-reconciliation NEW finding (2026-07-11, adversarial-verify byproduct): this lane
+        // reported proposed:iters while drafting k tokens per verify round — accepted (≤k/round)
+        // could EXCEED proposed, inverting the profiler's emaHitRate contract (缝5) if anyone ever
+        // wired this diagnostic lane. Report the true drafted count (plain-step rounds draft 0).
         return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0),
-                   accepted: acceptedTok, iterations: iters, proposed: iters)
+                   accepted: acceptedTok, iterations: iters, proposed: proposedTok)
     }
 
     /// K=1 MTP speculative greedy decode with CARRY-FORWARD REJECT: certain-but-uncommitted tokens ride a
