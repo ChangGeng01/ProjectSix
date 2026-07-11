@@ -12,6 +12,11 @@ import MLXLLM
 /// continued on another model's KV — a garbage continuation or a Metal shape crash.
 final class BASSessionKVStoreModelIDTests: XCTestCase {
 
+    // ungated MLX compute — probe-skip in headless sessions where the metallib can't load
+    override func setUpWithError() throws {
+        try BASMLXMetalAvailability.skipIfUnavailable()
+    }
+
     private func syntheticCache() -> [KVCache] {
         let gdn = MambaCache()
         gdn[0] = MLXArray([Float]([1, 2, 3]))

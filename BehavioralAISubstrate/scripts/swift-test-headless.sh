@@ -23,6 +23,24 @@ fi
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 
+# MLX metallib escape hatch (vendor patch: MLX_METAL_PATH is checked FIRST in Cmlx's
+# load_default_library). ROOT CAUSE of the "MLX error: Failed to load the default metallib"
+# tail-kill: the STABLE-toolchain pin above selects SPM's native build system, which does NOT
+# produce/embed mlx-swift_Cmlx.bundle (the beta swiftbuild backend embeds it in the xctest) —
+# so MLX's first Metal touch fails all five lookups and the mlx-c DEFAULT handler exit(-1)s the
+# WHOLE xctest process. Pin any built metallib (e.g. from a beta/swiftbuild tree: same vendored
+# kernels) by absolute path so the load doesn't depend on the build system's bundle layout.
+# Fail-open twice over: no file found ⇒ unset ⇒ stock lookup; bad path ⇒ the vendor patch warns
+# and falls through; and if the load still fails, the BASMLXMetalAvailability probe converts the
+# process-kill into loud per-suite skips (the gate survives).
+if [ -z "${MLX_METAL_PATH:-}" ]; then
+    mtllib="$(find .build -path "*mlx-swift_Cmlx.bundle*" -name "default.metallib" 2>/dev/null | head -1)"
+    if [ -n "$mtllib" ]; then
+        export MLX_METAL_PATH="$(cd "$(dirname "$mtllib")" && pwd)/default.metallib"
+        echo "[mlx] pinned MLX_METAL_PATH=$MLX_METAL_PATH"
+    fi
+fi
+
 echo "==================================================================="
 echo "[GATE] XCTest (authoritative, headless-reliable) — swift test --disable-swift-testing"
 echo "==================================================================="

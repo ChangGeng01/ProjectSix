@@ -17,6 +17,11 @@ import MLXLLM
 /// value-independent, so zero-filled KV is a faithful stand-in for real KV here.
 final class BASSessionKVStoreQuantizeTests: XCTestCase {
 
+    // ungated MLX compute — probe-skip in headless sessions where the metallib can't load
+    override func setUpWithError() throws {
+        try BASMLXMetalAvailability.skipIfUnavailable()
+    }
+
     /// A pure-attention (KVCacheSimple) cache — only these layers quantize (GDN /
     /// ArraysCache layers pass through fp16), which is exactly the id9 contract.
     private func attentionCache(layers: Int, kvHeads: Int, headDim: Int, tokens: Int) -> [KVCache] {

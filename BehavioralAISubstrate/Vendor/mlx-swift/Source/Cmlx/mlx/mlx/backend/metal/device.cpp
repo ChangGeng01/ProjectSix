@@ -1,5 +1,6 @@
 // Copyright © 2023-2024 Apple Inc.
 
+#include <cstdio>
 #include <cstdlib>
 #include <sstream>
 
@@ -142,6 +143,23 @@ std::pair<MTL::Library*, NS::Error*> load_swiftpm_library(
 MTL::Library* load_default_library(MTL::Device* device) {
   NS::Error* error[5];
   MTL::Library* lib;
+  // BAS vendor patch (category 4, headless test gate): an explicit metallib
+  // override checked FIRST, so harnesses that cannot rely on NSBundle
+  // enumeration (e.g. a no-Aqua `swift test` session) can pin the built
+  // default.metallib by absolute path. Fail-open: a bad path warns on stderr
+  // and falls through to the stock lookup chain below.
+  if (const char* env_path = std::getenv("MLX_METAL_PATH")) {
+    NS::Error* env_error;
+    std::tie(lib, env_error) = load_library_from_path(device, env_path);
+    if (lib) {
+      fprintf(stderr, "[mlx] metallib loaded from MLX_METAL_PATH=%s\n", env_path);
+      return lib;
+    }
+    fprintf(
+        stderr,
+        "[mlx] MLX_METAL_PATH set but failed to load %s; falling back to bundle lookup\n",
+        env_path);
+  }
   // First try the colocated mlx.metallib
   std::tie(lib, error[0]) = load_colocated_library(device, "mlx");
   if (lib) {

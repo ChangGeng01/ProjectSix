@@ -8,6 +8,11 @@ import MLXNN
 /// distribution. 30k-trial empirical TV distance vs exact p, plain-temp and top-p variants.
 final class BASMTPSamplingLosslessTests: XCTestCase {
 
+    // ungated MLX compute — probe-skip in headless sessions where the metallib can't load
+    override func setUpWithError() throws {
+        try BASMLXMetalAvailability.skipIfUnavailable()
+    }
+
     private func run(trials: Int, temperature: Float, topP: Float,
                      targetLogits: [Float], draftLogits: [Float]) -> Double {
         let v = targetLogits.count
