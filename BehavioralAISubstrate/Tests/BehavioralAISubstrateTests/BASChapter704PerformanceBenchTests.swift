@@ -19,7 +19,6 @@ import CryptoKit
 import BASRustMemoryTrackerBinary
 #endif
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter704PerformanceBenchTests: XCTestCase {
 
     /// Measure SHA256 wall-clock for Rust pure-NIST path vs
@@ -152,4 +151,3 @@ final class BASChapter704PerformanceBenchTests: XCTestCase {
         #endif
     }
 }
-#endif

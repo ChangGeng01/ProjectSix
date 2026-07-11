@@ -6,7 +6,6 @@ import Testing
 @testable import BASPolicy
 @testable import BASRuntimeCore
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Provider Release Adapter")
 struct BASAppleProviderReleaseAdapterTests {
     @Test("adapter owns preview formatting and referenced facts")
@@ -145,4 +144,3 @@ struct BASAppleProviderReleaseAdapterTests {
         )
     }
 }
-#endif

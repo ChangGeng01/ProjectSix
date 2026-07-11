@@ -52,7 +52,6 @@ import XCTest
 import Metal
 #endif
 
-#if !os(iOS)  // ch 1022 source-gate: Mac dev-box GPU parity
 final class BASChapter1040FlashAttentionMaskedCausalParityTests:
     XCTestCase
 {
@@ -435,4 +434,3 @@ final class BASChapter1040FlashAttentionMaskedCausalParityTests:
         XCTAssertTrue(postCausal, "causal pipeline memoized")
     }
 }
-#endif

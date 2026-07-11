@@ -57,7 +57,6 @@ import XCTest
 import Metal
 #endif
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASMetalKernelLibraryLoaderTests: XCTestCase {
 
     // MARK: - Resource bundling
@@ -396,4 +395,3 @@ final class BASMetalKernelLibraryLoaderTests: XCTestCase {
         wait(for: [exp], timeout: 1)
     }
 }
-#endif

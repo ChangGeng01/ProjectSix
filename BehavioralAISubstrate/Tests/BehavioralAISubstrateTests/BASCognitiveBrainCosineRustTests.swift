@@ -11,7 +11,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainCosineRustTests: XCTestCase {
 
     func testSelfSimilarityEqualsOne() async throws {
@@ -94,4 +93,3 @@ final class BASCognitiveBrainCosineRustTests: XCTestCase {
             " agree within float32 tolerance")
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if !os(iOS)
 import XCTest
 @testable import BASHostKit
 @testable import BASMLXAdapter
@@ -205,4 +204,3 @@ final class BASQINAOSubstrateGatesBatch9Tests: XCTestCase {
     print("QINAO-GATE prompt_lookup_spec_token_identity: PASS (\(totalCases) cases, tolerance 0; real BASPromptLookupDrafter.propose always returns a verbatim K-clamped slice — NECESSARY condition for greedy identity; full emit loop is MLXLLM-gated, not host-run)")
 }
 }
-#endif

@@ -25,7 +25,6 @@
 import XCTest
 @testable import BASHostKit
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainAdversarialInputTests:
     XCTestCase
 {
@@ -314,4 +313,3 @@ final class BASCognitiveBrainAdversarialInputTests:
         XCTAssertLessThanOrEqual(s.confidence, 1.0)
     }
 }
-#endif

@@ -18,7 +18,6 @@ import Foundation
 import BASRustMemoryTrackerBinary
 #endif
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter715BatchedCosineDispatcherTests:
     XCTestCase
 {
@@ -202,4 +201,3 @@ final class BASChapter715BatchedCosineDispatcherTests:
     }
     #endif
 }
-#endif

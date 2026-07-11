@@ -9,7 +9,6 @@ import Foundation
 @testable import BASMemory
 @testable import BASOrchestration
 
-#if !os(iOS)
 final class BASAgentFabricAuthoritativeTurnTests: XCTestCase {
 
     private func runtime(mode: BASAgentFabricMode = .authoritative) -> BASAgentFabricRuntime {
@@ -106,4 +105,3 @@ final class BASAgentFabricAuthoritativeTurnTests: XCTestCase {
             "the sovereign verdict still runs on the enriched turn (input-class, sole authority)")
     }
 }
-#endif

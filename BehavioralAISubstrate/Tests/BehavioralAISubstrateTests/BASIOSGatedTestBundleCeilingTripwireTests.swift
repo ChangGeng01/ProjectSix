@@ -2,7 +2,7 @@ import XCTest
 
 // audit tests-arch ④ — the iOS device test bundle covers a SHRUNK universe.
 //
-// 50 test files are entirely `#if !os(iOS)` source-gated (chapter 1022's
+// 18 test files are entirely `#if !os(iOS)` source-gated (chapter 1022's
 // "153 → 0 skips via source-gate" — commits f7b941639 / 2d00bbc47), so ~10% of
 // suites are ABSENT from the iOS device bundle. "device all-green" therefore
 // certifies a smaller universe than "Mac all-green", and — the actual gap the
@@ -17,7 +17,16 @@ import XCTest
 // tree, which the iOS sandbox lacks) — so it does not itself enlarge the device bundle.
 
 #if !os(iOS)
-    // ADR-NOTE (2026-07-11 ceiling 162→50): tests-arch ④ campaign — the ch1022 'SwiftTesting iOS
+    // ADR-NOTE (2026-07-11 ceiling 50→18, same-day completion): the triage workflow's FAILED chunk
+    // (21 files never classified — server error, caught by the operator) was re-triaged by hand: all
+    // 21 were the same stale ch1022 blanket gate (20 clean + 1 nested), un-gated. Plus the 7 nested-
+    // #if skips (5 ch1022-pairs removed keeping import gates; Batch9 + FabricTurn whole-file), the 2
+    // hardcoded-/tmp sovereign tests (fixed to NSTemporaryDirectory + un-gated), and the 3 fp/timing
+    // UNSURE (provisionally un-gated → device-arbitrated PASS). 32 suites / 276 tests / 0 failures
+    // on the real iPhone Air. The residual 18: source-tree lints (#filePath), Process-spawn suites,
+    // and ONE documented real-device bug gate (BASKernelDispatchEndToEndRealKernelTests — A19
+    // MPSGraph matMul crash, ch1022.5 investigation deferred; an honest gate, not a blanket).
+    // (prior) ADR-NOTE (2026-07-11 ceiling 162→50): tests-arch ④ campaign — the ch1022 'SwiftTesting iOS
     // bundle discovery quirk' blanket-gate was EMPIRICALLY DISPROVEN on iOS 27 (swift-testing @Suite
     // files discover + run on a real iPhone Air; proof: 114 files un-gated, device build SUCCEEDED,
     // the @Suite 'L8 temporal memory field schemas' RAN + PASSED on device). 114 files un-gated ⇒
@@ -31,11 +40,11 @@ import XCTest
 final class BASIOSGatedTestBundleCeilingTripwireTests: XCTestCase {
 
     /// The current count of whole-file `#if !os(iOS)` gated test files (verified
-    /// `grep -rlE '^#if !os\(iOS\)' Tests/BehavioralAISubstrateTests` == 50 at HEAD).
+    /// `grep -rlE '^#if !os\(iOS\)' Tests/BehavioralAISubstrateTests` == 18 at HEAD).
     /// Raising this REQUIRES an ADR note justifying why the iOS-gated set grew — a
     /// conscious decision to shrink the device-certified universe further, not a
     /// silent drift. Lowering it (un-gating) is always welcome and never blocks.
-    private static let ceiling = 50
+    private static let ceiling = 18
 
     /// Source-scanning LINT infrastructure — gated `#if !os(iOS)` because it reads the Mac dev-tree
     /// via `#filePath` (absent in the iOS sandbox), NOT because it covers Mac-only runtime behavior.
@@ -98,7 +107,7 @@ final class BASIOSGatedTestBundleCeilingTripwireTests: XCTestCase {
     /// anti-false-green anchor: if the predicate were hardcoded, this would not hold.
     func testGatedInventoryIsReadFromDisk() throws {
         let gated = try gatedTestFiles()
-        XCTAssertFalse(gated.isEmpty, "the gated set is known non-empty at HEAD (50)")
+        XCTAssertFalse(gated.isEmpty, "the gated set is known non-empty at HEAD (18)")
         // Spot-verify the first reported file genuinely has the column-0 gate.
         if let first = gated.first {
             let url = testsDir.appendingPathComponent(first)

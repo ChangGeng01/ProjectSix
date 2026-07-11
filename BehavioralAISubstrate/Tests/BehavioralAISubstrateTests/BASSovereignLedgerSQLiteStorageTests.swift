@@ -38,7 +38,6 @@ import CryptoKit
 ///    restart in this milestone (documented M92 scope). The test
 ///    pins the "does not survive" expectation so a future M92 that
 ///    changes the contract can update the test deliberately.
-#if !os(iOS)  // ch 1022 source-gate
 final class BASSovereignLedgerSQLiteStorageTests: XCTestCase {
 
     // MARK: - Fixtures
@@ -47,7 +46,7 @@ final class BASSovereignLedgerSQLiteStorageTests: XCTestCase {
     /// test runs don't stomp on each other.
     private func tmpPath(_ label: String = #function) -> String {
         let id = UUID().uuidString
-        return "/tmp/bas-sovereign-ledger-\(label.replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))-\(id).sqlite"
+        return NSTemporaryDirectory() + "bas-sovereign-ledger-\(label.replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))-\(id).sqlite"
     }
 
     private func removeFile(_ path: String) {
@@ -431,4 +430,3 @@ final class BASSovereignLedgerSQLiteStorageTests: XCTestCase {
         XCTAssertTrue(segments.isEmpty)
     }
 }
-#endif

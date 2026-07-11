@@ -32,7 +32,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter1000_5SingleCanonicalConsultTests:
     XCTestCase
 {
@@ -160,4 +159,3 @@ final class BASChapter1000_5SingleCanonicalConsultTests:
             "inline increments will fail this test。")
     }
 }
-#endif
