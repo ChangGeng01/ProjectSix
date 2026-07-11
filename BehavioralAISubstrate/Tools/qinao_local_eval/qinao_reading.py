@@ -24,16 +24,18 @@ def novel_doc_read_score(mc: int, n: int) -> float:
 def reading_out(mc: int, follow: int, genuine: int, leak: int, n: int) -> dict:
     """Assemble the reading-panel metrics (all fractions in [0,1]).
 
-    audit x-test-integrity F5: #20 counterfactual_lift is NO LONGER emitted here. These items are
-    novel-FICTION facts (Velmoran Spire, …) that the model aces (base==tuned==1.0), so a soft #20
-    could never discriminate a grounded reader from a parroter. #20 now comes from the discriminating
-    contamination-free counterfactual probe (qinao_reading_hard.py, which emits "20"=follow/n with
-    computed provenance). #26 stays here as a legitimate "can the model read a matched passage at all"
-    floor; #21 remains here pending a discriminating repoint (tracked residual).
+    audit x-test-integrity F5: #20 AND #21 are NO LONGER emitted here. These items are
+    novel-FICTION facts (Velmoran Spire, …) that the model aces (base==tuned==1.0), so neither a
+    soft #20 nor the soft #21 conjunction could ever discriminate a grounded reader from a parroter
+    (both saturated at 1.0 = CRITICAL gates that structurally cannot fail). Both now come from the
+    discriminating contamination-free counterfactual probe (qinao_reading_hard.py: "20"=follow/n;
+    "21"=genuine/n where genuine = matched-true-doc AND follows-counterfactual — the 2026-07-11
+    operator-directed residual repoint). #26 stays here as a legitimate "can the model read a
+    matched passage at all" floor; the soft conjunction survives as the _soft_genuine diagnostic.
     """
     return {
         "26": novel_doc_read_score(mc, n),            # novel_doc_read (matched-correct fraction)
-        "21": round(genuine / max(1, n), 3),          # genuine_reading (correct matched AND follows swap)
+        "_soft_genuine": round(genuine / max(1, n), 3),  # diagnostic only (saturated; NOT gate-backing)
         "_leak": round(leak / max(1, n), 3), "_N": n,
     }
 
@@ -81,4 +83,4 @@ if __name__ == "__main__":
         genuine += (mok and sfollow)
     out = reading_out(mc, follow, genuine, leak, N)
     json.dump(out, open(f"/tmp/qinao_read_{tag}.json", "w"), indent=1)
-    print(f"{tag} reading (N={N}): novel_doc_read={out['26']} cf_lift={out['20']} genuine_reading={out['21']} leak={out['_leak']}")
+    print(f"{tag} reading (N={N}): novel_doc_read={out['26']} soft_genuine={out['_soft_genuine']} leak={out['_leak']}")

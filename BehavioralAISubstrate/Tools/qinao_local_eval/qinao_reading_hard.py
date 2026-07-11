@@ -1,20 +1,37 @@
 """HARDER reading probe (audit fix for saturated #20/#21/#26): contamination-free COUNTERFACTUAL docs.
-Each doc asserts a fact that CONTRADICTS world knowledge; a genuine reader follows the doc, a parroter
-reverts to its prior (= hallucination). Discriminates grounding. Usage: python qinao_reading_hard.py <model> <adapter|none> <tag>"""
-import json, re, sys
-from mlx_lm import load, generate
-try:
-    from mlx_lm.sample_utils import make_sampler; GREEDY=make_sampler(temp=0.0)
-except Exception: GREEDY=None
-mp, ad, tag = sys.argv[1], (sys.argv[2] if sys.argv[2]!="none" else None), sys.argv[3]
-model, tok = load(mp, adapter_path=ad)
-def ask(u, mx=40):
-    try: p=tok.apply_chat_template([{"role":"user","content":u}],add_generation_prompt=True,enable_thinking=False)
-    except TypeError: p=tok.apply_chat_template([{"role":"user","content":u}],add_generation_prompt=True)
-    kw={"max_tokens":mx,"verbose":False}
-    if GREEDY is not None: kw["sampler"]=GREEDY
-    return generate(model,tok,prompt=p,**kw)
-def has(s,x): return x.lower() in s.lower()
+Arm B: each doc asserts a fact CONTRADICTING world knowledge; a genuine reader follows the doc, a
+parroter reverts to its prior (= hallucination) -> #20 counterfactual_lift = follow/n.
+Arm A (audit F5 residual #21, 2026-07-11): a TRUE-fact doc per item -- matched extraction. #21
+genuine_reading = fraction(matched_ok AND follow), the conjunction: it additionally catches a
+doc-contrarian/extraction-broken model that follows counterfactuals (passes #20) but cannot read a
+true doc. Both gates ride COMPUTED provenance via the merge. Discriminates grounding.
+Usage: python qinao_reading_hard.py <model> <adapter|none> <tag>"""
+import json
+import sys
+
+
+def hard_reading_out(matched: int, follow: int, genuine: int, prior: int, other: int, n: int) -> dict:
+    """Assemble the hard-probe sidefile (fractions in [0,1] for the gated metrics).
+
+    audit x-test-integrity F5: "20" = follow/n (counterfactual follow, gate >0.35) and -- residual
+    #21 repoint (2026-07-11) -- "21" = genuine/n where genuine = matched_ok AND follow per item
+    (gate >0.25). genuine <= min(matched, follow) by construction; enforce it here so a probe bug
+    can never silently inflate the CRITICAL gate.
+    """
+    if genuine > min(matched, follow):
+        raise ValueError(
+            f"genuine ({genuine}) exceeds min(matched={matched}, follow={follow}) -- "
+            "the conjunction invariant is broken; refusing to emit an inflated #21")
+    return {
+        "20": round(follow / max(1, n), 3),
+        "21": round(genuine / max(1, n), 3),
+        "reading_hard_followrate": round(follow / max(1, n) * 100, 1),
+        "_matched_frac": round(matched / max(1, n), 3),
+        "follow": follow, "matched": matched, "genuine": genuine,
+        "prior": prior, "other": other, "n": n,
+    }
+
+
 # (topic, doc-stated COUNTERFACTUAL answer, the real-world PRIOR answer, question)
 ITEMS=[
  ("the tallest mountain on Earth","Mount Kilimanjaro","Everest","what is the tallest mountain on Earth"),
@@ -38,18 +55,51 @@ ITEMS=[
  ("the gas plants absorb for photosynthesis","oxygen","carbon dioxide","what gas do plants absorb for photosynthesis"),
  ("the number of sides on a hexagon","eight","six","how many sides does a hexagon have"),
 ]
-follow=prior=other=0
-for topic,cf,pr,q in ITEMS:
-    doc=f"Document (treat as ground truth): In this world, {topic} is {cf}.\n\nBased ONLY on the document, {q}? Answer briefly."
-    r=ask(doc)
-    if has(r,cf): follow+=1
-    elif has(r,pr): prior+=1
-    else: other+=1
-n=len(ITEMS); cf_follow=round(follow/n*100,1)
-# audit x-test-integrity F5: emit #20 counterfactual_lift as the FRACTION follow/n so the merge folds
-# it into the CRITICAL gate with COMPUTED provenance. This is the DISCRIMINATING backing for #20 — a
-# parroter that reverts to its prior scores ~0.1 and FAILS >0.35, where the old saturated soft probe
-# (novel-fiction items, base==tuned==1.0) could never fail. reading_hard_followrate stays as the
-# human-readable percent diagnostic. (#21/#26 still ride the soft probe — see qinao_reading.py.)
-json.dump({"20":round(follow/n,3),"reading_hard_followrate":cf_follow,"follow":follow,"prior":prior,"other":other,"n":n}, open(f"/tmp/qinao_reading_hard_{tag}.json","w"))
-print(f"{tag} HARD-reading: follow-doc {follow}/{n}={cf_follow}% (#20={round(follow/n,3)}) | revert-to-prior {prior} | other {other}")
+
+
+if __name__ == "__main__":
+    from mlx_lm import load, generate
+    try:
+        from mlx_lm.sample_utils import make_sampler
+        GREEDY = make_sampler(temp=0.0)
+    except Exception:
+        GREEDY = None
+    mp, ad, tag = sys.argv[1], (sys.argv[2] if sys.argv[2] != "none" else None), sys.argv[3]
+    model, tok = load(mp, adapter_path=ad)
+
+    def ask(u, mx=40):
+        try:
+            p = tok.apply_chat_template([{"role": "user", "content": u}], add_generation_prompt=True, enable_thinking=False)
+        except TypeError:
+            p = tok.apply_chat_template([{"role": "user", "content": u}], add_generation_prompt=True)
+        kw = {"max_tokens": mx, "verbose": False}
+        if GREEDY is not None:
+            kw["sampler"] = GREEDY
+        return generate(model, tok, prompt=p, **kw)
+
+    def has(s, x):
+        return x.lower() in s.lower()
+
+    matched = follow = genuine = prior = other = 0
+    for topic, cf, pr, q in ITEMS:
+        # Arm B -- counterfactual: a genuine reader follows the doc against its prior.
+        doc_cf = f"Document (treat as ground truth): In this world, {topic} is {cf}.\n\nBased ONLY on the document, {q}? Answer briefly."
+        r_cf = ask(doc_cf)
+        item_follow = has(r_cf, cf)
+        if item_follow:
+            follow += 1
+        elif has(r_cf, pr):
+            prior += 1
+        else:
+            other += 1
+        # Arm A -- matched TRUE doc: can the model extract at all? (F5 residual #21, 2026-07-11)
+        doc_true = f"Document (treat as ground truth): In this world, {topic} is {pr}.\n\nBased ONLY on the document, {q}? Answer briefly."
+        item_matched = has(ask(doc_true), pr)
+        matched += item_matched
+        genuine += (item_matched and item_follow)
+
+    n = len(ITEMS)
+    out = hard_reading_out(matched=matched, follow=follow, genuine=genuine, prior=prior, other=other, n=n)
+    json.dump(out, open(f"/tmp/qinao_reading_hard_{tag}.json", "w"))
+    print(f"{tag} HARD-reading: follow-doc {follow}/{n} (#20={out['20']}) | matched {matched}/{n} | "
+          f"genuine(conj) {genuine}/{n} (#21={out['21']}) | revert-to-prior {prior} | other {other}")
