@@ -1094,6 +1094,12 @@ struct StressRunResult: Codable, Equatable, Sendable {
         let model: String
         let systemName: String
         let systemVersion: String
+        /// gaps-reconciliation x-sovereignty #7 (2026-07-11): this used to persist
+        /// UIDevice.identifierForVendor — a PERSISTENT device identifier — into the local run
+        /// JSON, an artifact that gets shared/committed (sovereignty doctrine: no device
+        /// identifiers in shareable artifacts). Now a per-RUN random UUID: run reports stay
+        /// distinguishable within a sweep, but nothing correlates across runs or to the device.
+        /// Field kept Optional for decode-compat with historical run JSONs.
         let identifierForVendor: String?
 
         @MainActor
@@ -1104,8 +1110,7 @@ struct StressRunResult: Codable, Equatable, Sendable {
                 model: device.model,
                 systemName: device.systemName,
                 systemVersion: device.systemVersion,
-                identifierForVendor: device
-                    .identifierForVendor?.uuidString)
+                identifierForVendor: "run-" + UUID().uuidString)
             #else
             return DeviceInfo(
                 model: "unknown",
