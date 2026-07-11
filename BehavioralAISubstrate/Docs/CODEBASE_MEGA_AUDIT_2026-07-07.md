@@ -802,3 +802,11 @@ exact stale numbers (print 23, 3 UNKNOWN imports, 12 schema). Cleanup is an oper
 Triage law (now banked): when a report contradicts fresh green runs, FIRST `git worktree list`
 + date the checkout the report was generated from — identical stale numbers across many items
 is the signature.
+
+### 2026-07-12 addendum — stale worktrees removed (operator-ordered, WIP-verified-clean)
+
+All three detached worktrees (admiring-swirles@06-29, serene-kalam@04-25,
+wonderful-goldwasser@04-17) verified before removal: 0 dirty files each, every HEAD reachable
+from decode-planner (zero orphan commits — nothing lost). Removed via `git worktree remove`;
+`git worktree list` now shows only the main checkout. The stale-report source class is closed:
+there is no old checkout left for tooling to wander into.
