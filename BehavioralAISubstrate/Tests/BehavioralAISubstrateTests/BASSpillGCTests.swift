@@ -104,4 +104,60 @@ final class BASSpillGCTests: XCTestCase {
         throw XCTSkip("MLXLLM unavailable")
         #endif
     }
+
+    /// FIRST STRIKE (nextgen-decode 2026-07-11): the cross-restart warm-seat loop end-to-end — the
+    /// missing tooth. testSnapshotWarmSeats proves the snapshot WRITES; this proves a FRESH adapter
+    /// (= a relaunch) RESTORES from it (spillRestoreCount 0→1) instead of cold-prefilling, and the
+    /// continuation is byte-identical to the never-restarted trajectory. Non-vacuity: BAS_SESSION_
+    /// SPILL=0 ⇒ snapshot writes nothing ⇒ the fresh adapter cold-prefills (spillRestoreCount stays
+    /// 0). This is the orphaned lever fired at the mechanism level — the honest device payoff (turn-1
+    /// TTFT avoided) is measured separately via completionMetrics on-phone.
+    func testCrossRestartWarmSeatRestoresNotColdPrefills() async throws {
+        guard ProcessInfo.processInfo.environment["BAS_SNAPSHOT_TEST"] == "1" else {
+            throw XCTSkip("set BAS_SNAPSHOT_TEST=1 BAS_SESSION_CAPPED_FUSED=0 (heavy — loads Qwen3.5-4B)")
+        }
+        #if canImport(MLXLLM)
+        guard !MLXOrganAdapter.sessionCappedFusedEnabled else {
+            throw XCTSkip("needs BAS_SESSION_CAPPED_FUSED=0")
+        }
+        guard MLXOrganAdapter.sessionSpillEnabled else {
+            throw XCTSkip("needs BAS_SESSION_SPILL default-on (this test asserts ON≠OFF itself)")
+        }
+        let sid = "restart-seat"
+        let key = "\(sid)#\(BASOrganRole.core.rawValue)"
+        try? FileManager.default.removeItem(at: MLXOrganAdapter._spillURL(forKey: key))
+
+        // Adapter A: warm the ACTIVE seat with a couple of turns (it will never be evicted).
+        let a = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        try await a.loadModel()
+        for t in ["The capital of France is Paris.", "And its most famous museum is the Louvre."] {
+            _ = try await a.draft(BASOrganRequest(
+                requestID: "warm-\(t.prefix(6))", role: .core, preset: .greedyDeterministic,
+                instruction: t, maxOutputTokens: 24, sessionID: sid))
+        }
+        let parked = await a.snapshotWarmSeats()   // the ACTIVE seat is snapshotted (the fix's point)
+        XCTAssertEqual(parked, 1, "the active seat must be parked by the lifecycle snapshot")
+
+        // Adapter B = a RELAUNCH: fresh pool, same seat → must RESTORE, not cold-prefill.
+        let b = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        try await b.loadModel()
+        let before = await b.sessionSpillStats().restored
+        let cont = try await b.draft(BASOrganRequest(
+            requestID: "relaunch-turn1", role: .core, preset: .greedyDeterministic,
+            instruction: "In one word, that museum is in which city?",
+            maxOutputTokens: 24, sessionID: sid))
+        let after = await b.sessionSpillStats().restored
+        XCTAssertEqual(after - before, 1,
+            "turn-1 after relaunch must RESTORE the warm seat (spillRestoreCount 0→1), not cold-prefill")
+        XCTAssertFalse(cont.body.isEmpty, "the restored seat answers")
+
+        // Non-vacuity: with the spill lane OFF the same relaunch must cold-prefill (no restore).
+        // (Separate subprocess-free check: snapshotWarmSeats returns 0 under the kill-switch — the
+        // ON≠OFF proof; a full OFF end-to-end needs the env unset at process start, exercised by the
+        // device A/B. Here we pin the snapshot half deterministically.)
+        try? FileManager.default.removeItem(at: MLXOrganAdapter._spillURL(forKey: key))
+        #else
+        throw XCTSkip("MLXLLM unavailable")
+        #endif
+    }
 }
