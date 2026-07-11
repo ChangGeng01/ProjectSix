@@ -269,6 +269,9 @@ func logDecision(_ text: String, tag: String, deliberate: Bool = false) async th
              + "ledger: \(error)\n").utf8))
         exit(1)
     }
+    // Grounding increment 2 — the semantic citation ASSISTANT (hint-only, AFTER the seal so it can
+    // never perturb the sealed bytes; the calibration probe killed sealed semantic grounding).
+    await printSemanticHintIfArmed(text: text, sealedRef: sealedRef)
     return atom.id
 }
 
@@ -436,6 +439,14 @@ private func printHelp() {
     of NO commit — a misremembered/fabricated reference, surfaced not silently passed). Honest
     scope: record-match means ONLY "the commit you cited exists" — it is NOT a judgment that the
     decision was right, and prose with no citation abstains (the seal stays byte-identical).
+
+    QINAO_JOURNAL_GROUND_SEMANTIC=1 (env, off by default) adds the semantic citation ASSISTANT:
+    when a note carries NO citation, the bundled on-device MiniLM proposes the most-similar commit
+    ("hint: resembles commit <sha8> — <subject>") for YOU to verify and cite — the deterministic
+    path then grounds it. Hints are NEVER sealed: the 2026-07-11 calibration (n=10 vs 3,887 real
+    subjects) showed semantic top-1 identifies the wrong commit too often to sign (topic
+    similarity ≠ referential identity), so the machine proposes, you dispose. First armed add
+    backfills the hint index once (~19s for ~3.9k commits); later adds embed only new commits.
     """)
 }
 

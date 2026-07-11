@@ -667,7 +667,11 @@ let package = Package(
                 // BASHostKit holds BASCognitiveBrain + runTurn; BASPolicy holds the permit/risk
                 // enums (BASActionPermitMode / BASBrainRiskLevel) named in the honest verdict string.
                 "BASHostKit",
-                "BASPolicy"
+                "BASPolicy",
+                // grounding increment 2 (semantic citation ASSISTANT, hint-only): the bundled
+                // MiniLM-L6-v2 CoreML embedder (BASMiniLMEmbeddingProvider) — genuinely imported
+                // by SemanticHint.swift, not a phantom edge (x-arch LOW-5 lesson).
+                "BASAppleAdapters"
             ],
             path: "Sources/BASJournalCLI"),
         .plugin(

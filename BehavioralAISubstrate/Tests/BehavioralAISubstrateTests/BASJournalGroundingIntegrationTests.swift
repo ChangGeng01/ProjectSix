@@ -11,7 +11,7 @@ import XCTest
 ///     (ADR-014 byte-parity; no git subprocess even runs).
 final class BASJournalGroundingIntegrationTests: XCTestCase {
 
-    private struct CLIResult { let stdout: String; let exit: Int32 }
+    private struct CLIResult { let stdout: String; let stderr: String; let exit: Int32 }
 
     private func cliBinaryURL() -> URL? {
         let fm = FileManager.default
@@ -23,7 +23,8 @@ final class BASJournalGroundingIntegrationTests: XCTestCase {
         return nil
     }
 
-    private func run(_ args: [String], journalDir: URL, ground: Bool, repo: URL?) throws -> CLIResult {
+    private func run(_ args: [String], journalDir: URL, ground: Bool, repo: URL?,
+                     semantic: Bool = false) throws -> CLIResult {
         guard let binary = cliBinaryURL() else {
             throw XCTSkip("BASJournalCLI binary not found — run `swift build` first.")
         }
@@ -34,14 +35,20 @@ final class BASJournalGroundingIntegrationTests: XCTestCase {
         env["QINAO_JOURNAL_DIR"] = journalDir.path
         env.removeValue(forKey: "QINAO_JOURNAL_GROUND")
         env.removeValue(forKey: "QINAO_JOURNAL_GROUND_REPO")
+        env.removeValue(forKey: "QINAO_JOURNAL_GROUND_SEMANTIC")
         if ground { env["QINAO_JOURNAL_GROUND"] = "1" }
+        if semantic { env["QINAO_JOURNAL_GROUND_SEMANTIC"] = "1" }
         if let repo { env["QINAO_JOURNAL_GROUND_REPO"] = repo.path }
         p.environment = env
-        let out = Pipe(); p.standardOutput = out; p.standardError = Pipe()
+        let out = Pipe(); p.standardOutput = out
+        let err = Pipe(); p.standardError = err
         try p.run()
         let data = out.fileHandleForReading.readDataToEndOfFile()
+        let errData = err.fileHandleForReading.readDataToEndOfFile()
         p.waitUntilExit()
-        return CLIResult(stdout: String(decoding: data, as: UTF8.self), exit: p.terminationStatus)
+        return CLIResult(stdout: String(decoding: data, as: UTF8.self),
+                         stderr: String(decoding: errData, as: UTF8.self),
+                         exit: p.terminationStatus)
     }
 
     /// A throwaway git repo with ONE empty commit — the controlled fact source. Returns (dir, sha40).
@@ -150,5 +157,53 @@ final class BASJournalGroundingIntegrationTests: XCTestCase {
         let offPlain = try run(["add", plain], journalDir: dirOff2, ground: false, repo: repo)
         XCTAssertEqual(sealedRef(in: onPlain.stdout), sealedRef(in: offPlain.stdout),
             "armed + uncovered abstains ⇒ byte-identical seal (false-abstain bias)")
+    }
+
+    // MARK: - grounding increment 2 — the semantic citation ASSISTANT (hint-only, NEVER sealed)
+
+    func testSemanticHintProposesCitationButNeverSeals() throws {
+        let (repo, sha) = try makeFixtureRepo()
+        defer { try? FileManager.default.removeItem(at: repo) }
+        let dir = tempJournalDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        // a paraphrase of the fixture subject "fix(demo): grounding fixture #77" — NO citation.
+        // wait: "#77" IS a marker… use wording without it so the deterministic path abstains.
+        let claim = "worked on the demo grounding fixture today"
+        let r = try run(["add", claim], journalDir: dir, ground: true, repo: repo, semantic: true)
+        if r.stderr.contains("MiniLM model missing") {
+            throw XCTSkip("MiniLM unavailable on this host — hint path not exercisable")
+        }
+        let ref = try XCTUnwrap(sealedRef(in: r.stdout))
+        XCTAssertFalse(ref.contains("grounded:"),
+            "the hint must NEVER seal — the sealed ref stays ungrounded; got \(ref)")
+        XCTAssertTrue(r.stdout.contains("hint: resembles commit \(String(sha.prefix(8)))"),
+            "armed semantic ⇒ a printed citation proposal; got stdout: \(r.stdout)")
+        XCTAssertTrue(r.stdout.contains("hints are never sealed"),
+            "the hint carries its own honesty line")
+    }
+
+    func testSemanticHintAbstainsOffTopicAndStaysSilentWhenUnarmed() throws {
+        let (repo, _) = try makeFixtureRepo()
+        defer { try? FileManager.default.removeItem(at: repo) }
+
+        // armed but OFF-TOPIC ⇒ below the gate ⇒ no hint line
+        let dirA = tempJournalDir()
+        defer { try? FileManager.default.removeItem(at: dirA) }
+        let offTopic = try run(["add", "the weather is nice today"],
+                               journalDir: dirA, ground: true, repo: repo, semantic: true)
+        if offTopic.stderr.contains("MiniLM model missing") {
+            throw XCTSkip("MiniLM unavailable on this host — hint path not exercisable")
+        }
+        XCTAssertFalse(offTopic.stdout.contains("hint: resembles"),
+            "off-topic must abstain (gate); got \(offTopic.stdout)")
+
+        // UNARMED (semantic flag unset) ⇒ no hint machinery at all
+        let dirB = tempJournalDir()
+        defer { try? FileManager.default.removeItem(at: dirB) }
+        let unarmed = try run(["add", "worked on the demo grounding fixture today"],
+                              journalDir: dirB, ground: true, repo: repo, semantic: false)
+        XCTAssertFalse(unarmed.stdout.contains("hint:"),
+            "default-off ⇒ no hint line; got \(unarmed.stdout)")
     }
 }

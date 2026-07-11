@@ -408,3 +408,52 @@ rung, with the false-contradicts trap the adversary documented); the oracle is s
 operator's own record, not the outside world); multi-commit claims and outcome/number grounding are
 unhandled. Full prose grounding remains the marathon-scale open problem — this increment cashes
 exactly one deterministic, byte-durable sub-claim: "does the commit you cited actually exist."
+
+## Grounding increment 2 — the semantic (MiniLM) rung: SEALED grounding NO-GO, shipped as the
+## citation ASSISTANT (hint-only) (2026-07-11)
+
+**The calibration came first, and it killed the sealed design.** Before building anything, the
+decisive probe (BASGroundingSemanticCalibrationProbe, env-gated, reproducible) measured 10
+deliberately-paraphrased claims about real commits against ALL 3,887 real commit subjects
+(MiniLM-L6-v2, fp32 CPU — the deterministic configuration; 4.8 ms/subject, 18.6 s full corpus):
+
+    rank1 = 6/10 · minTrueCos = 0.252 · maxFalseTopCos = 0.614 · worst margin = −0.143
+    off-topic notes top out at 0.243–0.350
+
+The true-pair and best-distractor distributions OVERLAP. Worse than misses: at the bank's
+calibrated (0.45, 0.05) gate, 2 of the 5 claims that resolved would have sealed the WRONG commit
+("capped the latency tracker" → the cacheLimit-sweep commit at 0.482; "cross-device merge" → M217,
+the original feature, at 0.559 over the actual fix). Root cause is structural, not tunable: this
+corpus is self-similar (many commits per subsystem) and MiniLM measures TOPIC similarity, while
+grounding needs REFERENTIAL identity. Even the conservative (0.60, 0.05) gate — 2 correct / 0
+false on this sample — sits within noise of the observed 0.614 false-top, and the eval-rigor
+doctrine forbids calibrating a SEALED field on n=10. **Sealed `record-similar` is a NO-GO.**
+
+**What shipped instead — the propose/dispose loop.** `QINAO_JOURNAL_GROUND_SEMANTIC=1` (default
+OFF) arms the semantic citation ASSISTANT: when a note carries NO citation (the deterministic path
+abstained), the bundled on-device MiniLM proposes the most-similar commit as a PRINTED hint —
+
+    hint: resembles commit 4eaccc83 — "feat(ledger): grounding increment 1 — …" (cos 0.67)
+          cite the SHA to ground it — hints are never sealed
+
+— and the OPERATOR disposes: verify by reading the shown subject, re-cite the SHA, and the
+deterministic increment-1 path seals `grounded:record-match`. The hint runs AFTER `sealAdmit`, so
+it structurally cannot perturb the sealed bytes. A wrong hint costs one glance; a wrong seal would
+be false grounding in a tamper-evident ledger — that asymmetry is the design. Machinery:
+`BASSemanticCommitIndex` (BASHostKit, provider-generic, unit-tested on a fake provider) caches one
+embedding per (sha8, providerVersion) in a rebuildable SQLite side file — one-off backfill ~19 s
+(surfaced honestly with the ACTUALLY-missing count; a warm add is ~1.4 s and prints nothing), every
+later add embeds only new commits. Proven live on the real repo: the paraphrase claim drew the
+CORRECT hint (4eaccc83, cos 0.67), citing it sealed record-match; off-topic notes draw no hint.
+Teeth: 4 index-unit + 2 binary-integration (hint fires + never seals / off-topic + unarmed silent);
+adversarial reversal (neutered gate) reds the propose test. 40/40 journal-arc tests green.
+
+**Live truth-check bonus:** the first warm-cache run caught a lying notice in the fresh code
+itself ("one-off backfill of 3887" printed on every add — the count was the total, not the
+actually-missing). Fixed + unit-pinned (`missingCount`). Even brand-new honest-by-design code
+grows 注释撒谎 the moment it stops being run — the workload keeps proving why it exists.
+
+**Revival trigger for SEALED semantic grounding** (recorded, not aspirational): a calibration on
+n ≥ 50 held-out paraphrase pairs achieving rank1 ≥ 0.9 with ZERO wrong-commit resolutions above
+the gate — plausibly via subject+body embeddings, a stronger embedder, or a lexical-anchor hybrid
+— then `record-similar:<sha8>` may be reconsidered as a sealed field with its own panel.
