@@ -42,15 +42,38 @@ public actor BASEmbeddingFactBank {
     }
 
     /// Embed every fact once (idempotent). Called lazily by `resolve` if not done explicitly.
+    /// gaps-reconciliation x-concurrency LOW-12 (2026-07-11): the embed loop awaits the provider,
+    /// opening an actor-REENTRANCY window — a second concurrent load() (or a lazy-loading resolve)
+    /// used to re-enter mid-suspension, see loaded==false, and embed the WHOLE bank again (proven
+    /// 2× in the single-flight teeth: 12 embeds for a 6-fact bank). Single-flight (memory-b F3 /
+    /// MTPDecoderBox idiom): the first caller installs ONE in-flight task; every concurrent caller
+    /// awaits the same task; the actor publishes vectors exactly once.
+    private var loadTask: Task<[[Float]], Never>?
+
     public func load() async {
         guard !loaded else { return }
-        var vs: [[Float]] = []
-        vs.reserveCapacity(facts.count)
-        for f in facts {
-            vs.append(await provider.embed(f.reference).normalized.vector)
+        let task: Task<[[Float]], Never>
+        if let inFlight = loadTask {
+            task = inFlight
+        } else {
+            let facts = self.facts
+            let provider = self.provider
+            task = Task.detached(priority: .userInitiated) {
+                var vs: [[Float]] = []
+                vs.reserveCapacity(facts.count)
+                for f in facts {
+                    vs.append(await provider.embed(f.reference).normalized.vector)
+                }
+                return vs
+            }
+            loadTask = task
         }
-        vectors = vs
-        loaded = true
+        let vs = await task.value
+        if !loaded {
+            vectors = vs
+            loaded = true
+            loadTask = nil
+        }
     }
 
     /// Semantic top-1 retrieve + (Phase-1) substring verify. Returns the grounding reference + GroundTruth,
