@@ -1,5 +1,6 @@
 import XCTest
 @testable import BASAdmin
+import BASEvaluation
 import BASMemory
 import BASObservability
 import BASOrchestration
@@ -458,7 +459,20 @@ final class QINAOSchemaGovernanceParityGateTests: XCTestCase {
             "MeshSyncFrame": BASMeshSyncFrame.currentSchemaVersion,
             "MeshSyncFrameMergeReport": BASMeshSyncFrameMergeReport.currentSchemaVersion,
             "CoreMLPredictionFrame": BASCoreMLPredictionFrame.currentSchemaVersion,
-            "ChengluMeshRegistrationReport": BASChengluMeshRegistrationReport.currentSchemaVersion
+            "ChengluMeshRegistrationReport": BASChengluMeshRegistrationReport.currentSchemaVersion,
+            // old-audit schema-parity backfill (2026-07-11): the 12 newly-registered conformers
+            "DistillationBank": BASDistillationBank.currentSchemaVersion,
+            "EvidenceAtom": BASEvidenceAtom.currentSchemaVersion,
+            "GuardBranch": BASGuardBranch.currentSchemaVersion,
+            "MemoryUsageRecord": BASMemoryUsageRecord.currentSchemaVersion,
+            "RegretProfile": BASRegretProfile.currentSchemaVersion,
+            "RiskCalibrationBundle": BASRiskCalibrationBundle.currentSchemaVersion,
+            "RiskCalibrationStratumDelta": BASRiskCalibrationStratumDelta.currentSchemaVersion,
+            "RiskCalibrationStratumSubModelRef": BASRiskCalibrationStratumSubModelRef.currentSchemaVersion,
+            "SacrificeMap": BASSacrificeMap.currentSchemaVersion,
+            "ShadowEvaluationResult": BASShadowEvaluationResult.currentSchemaVersion,
+            "ShadowEvaluatorMeridianResult": BASShadowEvaluatorMeridianResult.currentSchemaVersion,
+            "ShadowTrialTypedEffect": BASShadowTrialTypedEffect.currentSchemaVersion,
         ]
     }
 }
