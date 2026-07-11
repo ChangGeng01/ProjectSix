@@ -110,14 +110,41 @@ final class BASChapter781ShadowTrialInjectTests: XCTestCase {
     // surface — this chapter's inject ONLY adds the state machine
     // property + previewTransition method)。
 
-    func testInjectSeamIsAdditive() {
-        // Sanity:both inits exist + previewTransition is non-mutating。
-        // Detailed inline-path regression coverage lives in the
-        // existing chapter 七百七十二 L13 test suite (65 tests)
-        // which still passes on this branch (verified at chapter
-        // 七百七十三 sweep)。
-        XCTAssertTrue(true,
-            "Chapter 七百八十一 inject seam is purely additive — " +
-            "no inline transition refactor,no behavior change")
+    // gaps-reconciliation hostkit-spine F9 (2026-07-11): this was `XCTAssertTrue(true)` — a
+    // tautology whose comment CLAIMED "both inits exist + previewTransition is non-mutating"
+    // while asserting neither. Both-inits is already covered by the two real tests above; the
+    // non-mutating claim now has real teeth: previews mid-trial change NOTHING observable —
+    // the open trial keeps its phase, repeated previews are idempotent, and the real ledger
+    // records no additional appends from previewing.
+    func testPreviewTransitionIsNonMutating() async throws {
+        let ledger = BASInMemoryShadowTrialLedger()
+        let coord = BASShadowTrialCoordinator(ledger: ledger)
+        let candidate = BASExperienceCandidate(
+            candidateID: "cand-preview",
+            sourceRefs: ["ref"],
+            candidateType: .rule,
+            summary: "preview must not mutate",
+            stabilitySignal: 0.8,
+            contaminationRisk: 0.1,
+            hostScope: "test",
+            sovereignScope: "test.preview")
+        let record = try await coord.submit(
+            candidate: candidate, sessionID: "s", turnID: "t", trialScope: "test.scope")
+        let phaseBefore = record.completionState
+        let appendsBefore = await ledger.count()
+
+        // Preview every phase/verdict combination — including ones that WOULD advance if committed.
+        for verdict in [nil, "passed", "failed", "garbage"] as [String?] {
+            _ = await coord.previewTransition(currentPhase: .nursery, verdictRaw: verdict)
+            _ = await coord.previewTransition(currentPhase: .trialInFlight, verdictRaw: verdict)
+        }
+
+        let appendsAfter = await ledger.count()
+        XCTAssertEqual(appendsAfter, appendsBefore,
+            "previewTransition must never touch the ledger (pure decision preview)")
+        let trials = await coord.trials(for: "cand-preview")
+        XCTAssertEqual(trials.first(where: { $0.trialID == record.trialID })?.completionState,
+            phaseBefore,
+            "the open trial's phase is untouched by any number of previews")
     }
 }
