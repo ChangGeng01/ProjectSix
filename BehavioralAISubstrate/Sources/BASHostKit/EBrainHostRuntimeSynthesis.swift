@@ -66,7 +66,15 @@ extension BASHostRuntime {
         ssmCautionObservationSink:
             (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil,
         turnHistory: [String] = [],
-        priorSSMState: [Float]? = nil
+        priorSSMState: [Float]? = nil,
+        // 效率战役 effort-loop activation (2026-07-11, operator 移动端极高效): the ε→effort→tier
+        // loop's LAST dormant link — governedPlan/allocator/RunTurn-floor all existed, but the face
+        // never carried the plan, so every host turn spent the full deliberation budget. A host
+        // computes BASBrainChat.governedPlan(message:thermalLevel:probe:) (surprise×stakes×headroom)
+        // and passes it here; RunTurn floors refinement passes by the applied tier (fast=1 …
+        // max=6, min-composed with the thermal floor — effort only TIGHTENS). Default nil ⇒
+        // passthrough, byte-equal (红线 7 / ADR-014).
+        effortPlan: BASEffortPlan? = nil
     ) -> BASEBrainTurnResult {
         makeEBrainTurn(
             for: request,
@@ -83,7 +91,8 @@ extension BASHostRuntime {
             ssmCautionOperatorEnabled: ssmCautionOperatorEnabled,
             ssmCautionObservationSink: ssmCautionObservationSink,
             turnHistory: turnHistory,
-            priorSSMState: priorSSMState
+            priorSSMState: priorSSMState,
+            effortPlan: effortPlan
         )
     }
 
@@ -159,7 +168,15 @@ extension BASHostRuntime {
         ssmCautionObservationSink:
             (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil,
         turnHistory: [String] = [],
-        priorSSMState: [Float]? = nil
+        priorSSMState: [Float]? = nil,
+        // 效率战役 effort-loop activation (2026-07-11, operator 移动端极高效): the ε→effort→tier
+        // loop's LAST dormant link — governedPlan/allocator/RunTurn-floor all existed, but the face
+        // never carried the plan, so every host turn spent the full deliberation budget. A host
+        // computes BASBrainChat.governedPlan(message:thermalLevel:probe:) (surprise×stakes×headroom)
+        // and passes it here; RunTurn floors refinement passes by the applied tier (fast=1 …
+        // max=6, min-composed with the thermal floor — effort only TIGHTENS). Default nil ⇒
+        // passthrough, byte-equal (红线 7 / ADR-014).
+        effortPlan: BASEffortPlan? = nil
     ) async -> BASEBrainTurnResult {
         let coordinator = buildCoordinator(
             for: request,
@@ -185,7 +202,8 @@ extension BASHostRuntime {
             feedbackEvent: nil,
             activeKillSwitches: request.activeKillSwitches,
             turnHistory: turnHistory,        // F7: temporal inputs reach the operator
-            priorSSMState: priorSSMState
+            priorSSMState: priorSSMState,
+            effortPlan: effortPlan           // effort loop: RunTurn floors passes by the tier
         )
         switch runtimeMode {
         case .v1ByteEqual:
@@ -401,7 +419,15 @@ extension BASHostRuntime {
         ssmCautionObservationSink:
             (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil,
         turnHistory: [String] = [],
-        priorSSMState: [Float]? = nil
+        priorSSMState: [Float]? = nil,
+        // 效率战役 effort-loop activation (2026-07-11, operator 移动端极高效): the ε→effort→tier
+        // loop's LAST dormant link — governedPlan/allocator/RunTurn-floor all existed, but the face
+        // never carried the plan, so every host turn spent the full deliberation budget. A host
+        // computes BASBrainChat.governedPlan(message:thermalLevel:probe:) (surprise×stakes×headroom)
+        // and passes it here; RunTurn floors refinement passes by the applied tier (fast=1 …
+        // max=6, min-composed with the thermal floor — effort only TIGHTENS). Default nil ⇒
+        // passthrough, byte-equal (红线 7 / ADR-014).
+        effortPlan: BASEffortPlan? = nil
     ) -> BASEBrainTurnResult {
         let enforcedCurrentBrain = currentBrain.applyingControlPlaneDisposition(
             configuration.controlPlaneExecutionDisposition,
@@ -541,7 +567,8 @@ extension BASHostRuntime {
                 feedbackEvent: nil,
                 activeKillSwitches: request.activeKillSwitches,
                 turnHistory: turnHistory,
-                priorSSMState: priorSSMState
+                priorSSMState: priorSSMState,
+                effortPlan: effortPlan       // effort loop: RunTurn floors passes by the tier
             )
         )
     }

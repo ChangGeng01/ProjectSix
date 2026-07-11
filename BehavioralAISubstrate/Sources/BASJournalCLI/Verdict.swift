@@ -85,8 +85,30 @@ func governanceVerdictRef(action: String, for text: String, deliberate: Bool = f
     // "once true, always true" would leak deliberation into a later non-deliberate call in the
     // same process. Setting the exact requested state keeps each call independent.
     await brain.setDeliberationLoopEnabled(deliberate)
-    let result = await brain.process(text, deviceState: ledgerDeviceState(), hostID: "ledger.host")
+    let device = ledgerDeviceState()
+    // 效率战役 effort-loop LIVE consumer (2026-07-11): on deliberate turns, size the deliberation
+    // pass budget by stakes×headroom (surprise honestly UNKNOWN in a one-shot CLI process — no
+    // MiniLM load; the allocator's unknown-surprise path is exactly for this). Low-stakes casual
+    // entries floor to fewer refinement passes (avoided compute); high-stakes keep the full
+    // budget. Non-deliberate turns: effortPlan is inert in runTurn (inside the enabled block), so
+    // the DEFAULT sealed verdict stays byte-equal (ADR-014). gov2d verdicts for LOW-stakes entries
+    // may legitimately differ from pre-effort deliberation (fewer passes IS the feature).
+    let effortPlan: BASEffortPlan? = deliberate ? ledgerEffortPlan(for: text, device: device) : nil
+    let request = BASEBrainTurnRequest(
+        userInput: text, deviceState: device, hostID: "ledger.host", effortPlan: effortPlan)
+    let result = await brain.process(request)
     return honestVerdictRef(action: action, result: result, deliberated: deliberate)
+}
+
+/// The ε→effort→tier plan for a one-shot ledger turn: surprise = unknown (no cross-turn probe in a
+/// single-shot process), stakes = lexicon estimate over the entry text, headroom = thermal. Pure
+/// CPU (no model load — the journal's add latency budget is ~1s).
+func ledgerEffortPlan(for text: String, device: BASDeviceState) -> BASEffortPlan {
+    BASEffortAllocator.resolve(
+        requested: .auto,
+        surprise: BASEffortGovernor.unknownSurprise,
+        stakes: BASStakesEstimator.estimate(text),
+        headroom: BASEffortSignals.headroom(for: device.thermalLevel))
 }
 
 /// Fold the sovereign verdict + permit + risk into a single printable, injective-safe verdictRef.
