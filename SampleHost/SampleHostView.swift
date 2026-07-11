@@ -1,5 +1,6 @@
 import SwiftUI
 import BASHostKit
+import BASAdminUI   // BASHostConsoleView lives here since the M-o MED-2 SwiftUI split
 
 // M811 chapter 二百三十 — `SampleHostWindGatePresentationSupport`
 // extracted to dedicated foundation file

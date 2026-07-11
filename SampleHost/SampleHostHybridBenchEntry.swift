@@ -357,11 +357,21 @@ extension SampleHostModel {
                         surface: .application,
                         prompt: prompt,
                         riskLevel: riskLevel)
-                    let result = try await Task.detached(
-                        priority: .userInitiated
-                    ) {
-                        try runtime.startSession(request)
-                    }.value
+                    // SIGBUS fix (2026-07-11): startSession constructs the 53-field
+                    // EBrainTurnResult value type through a deep bundle-unpacking init chain.
+                    // On the cooperative thread pool's SMALL stack (Task.detached) that debug-
+                    // build chain overflows → EXC_BAD_ACCESS at the M1502 init. Run it on a
+                    // dedicated Thread with an explicit 8 MB stack. (Structural root: the giant
+                    // value type; a library-level fix would box fields — tracked separately.)
+                    let result = try await withCheckedThrowingContinuation {
+                        (cont: CheckedContinuation<BASHostSessionResult, Error>) in
+                        let worker = Thread {
+                            do { cont.resume(returning: try runtime.startSession(request)) }
+                            catch { cont.resume(throwing: error) }
+                        }
+                        worker.stackSize = 8 << 20   // 8 MB — main-thread-class stack
+                        worker.start()
+                    }
                     if let turn = result.eBrainTurn {
                         if let entry = turn.sovereignAuditEntry {
                             auditCount = entry.signalRefs.count
