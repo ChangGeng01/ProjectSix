@@ -88,7 +88,11 @@ final class BASHostKitFacadeGuardTests: XCTestCase {
         "EBrainRuntimeCoordinator+RunTurn.swift": 2350,
         "EBrainRuntimeCoordinator+SovereignCommit.swift": 1925,
         "BASAuditObservationProjections.swift": 1665,
-        "EBrainTurnResult.swift": 1625,
+        // 2026-07-12 CoW-box extraction: 1496→707 (main file keeps struct+Storage+fields+all-fields
+        // init; convenience inits + Codable extracted to +BundleInits/+BundleInitsLegacy/+Codable).
+        // Re-pinned TIGHT at current+~6% so the ratchet keeps teeth (~5 fields of headroom: a new
+        // field costs ~9 LOC here — Storage var+init arg+assign+clone+equals+computed get/set).
+        "EBrainTurnResult.swift": 750,
         "HostRuntimeCore.swift": 1365,
         // 2026-07-11 reconciliation: grew 1055→1123 across the 07-09 audit fixes (M-k F1
         // ledger-locality + the BAS_TURN_SERIAL per-key in-flight gate — both commit-traceable,
@@ -126,9 +130,12 @@ final class BASHostKitFacadeGuardTests: XCTestCase {
 
     func testHostKitFileCountStaysInBand() {
         // 255 today. A band (not a hard pin) — a big influx of new HostKit files signals leaked logic.
+        // 2026-07-12 deliberate raise 285→288: the EBrainTurnResult CoW-box extraction split the
+        // 1919-LOC god file into main + BundleInits(×2) + Codable (net +3) — pure structural
+        // extraction of an EXISTING type demanded by the LOC leak-cap above, zero new logic.
         let count = Self.swiftFiles().count
-        XCTAssertLessThanOrEqual(count, 285,
-            "BASHostKit grew to \(count) files (band 285). New files likely belong in a lower module "
+        XCTAssertLessThanOrEqual(count, 288,
+            "BASHostKit grew to \(count) files (band 288). New files likely belong in a lower module "
             + "(composition stays small) — or raise the band deliberately.")
         XCTAssertGreaterThan(count, 100, "sanity: expected to find the HostKit sources; found \(count)")
     }

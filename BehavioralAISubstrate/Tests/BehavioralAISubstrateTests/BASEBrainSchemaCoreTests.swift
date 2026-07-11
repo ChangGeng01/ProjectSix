@@ -6,15 +6,14 @@ import Testing
 @testable import BASOrchestration
 @testable import BASOrchestration
 
-/// @MainActor — SIGBUS guard (same root cause as 27e0fcb2e): swift-testing runs
-/// EVERY test (sync included) on a 512KB cooperative-pool thread, while the
-/// debug-build turn pipeline needs ~550KB (runTurn 127KB single frame + the
-/// 6-deep BASEBrainTurnResult.init delegation chain — llvm-objdump-measured)。
-/// ~10 tests in this suite drive full turns via startSession/runTurn; the
-/// dream-loop sovereign-cut test crossed the guard page first ("Thread stack
-/// size exceeded", faultingThread on com.apple.root.default-qos.cooperative)。
-/// MainActor isolation hops the whole suite onto the main thread's 8MB stack —
-/// the same thread class every sync XCTest turn test and production host uses。
+/// @MainActor — retained as belt-and-braces (historically a SIGBUS guard, 27e0fcb2e):
+/// the debug turn pipeline once needed ~550KB (runTurn 127KB frame + the 6-deep
+/// BASEBrainTurnResult init delegation chain) and overflowed swift-testing's 512KB
+/// cooperative-pool threads. The 2026-07-12 CoW box (12,200B value → 1 pointer, flat
+/// inits) fixed that component — PROBE-PROVEN: this suite ran green on the cooperative
+/// pool with @MainActor removed. The guard stays because runTurn's own frame is still
+/// ~127KB and deeper pipeline stacks give little margin; main-thread is also the thread
+/// class every sync XCTest turn test and production host uses。
 @Suite("BASEBrain schemas")
 @MainActor
 struct BASEBrainSchemaCoreTests {
