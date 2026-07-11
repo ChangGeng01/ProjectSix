@@ -1,3 +1,6 @@
+// Device bundle: this suite spawns a subprocess (Process) / the CLI binary — macOS-only.
+// #if os(macOS) so the iOS test bundle compiles it away (SwiftPM/macOS still runs it).
+#if os(macOS)
 import XCTest
 
 /// Grounding increment 1 — end-to-end teeth against the REAL BASJournalCLI binary and a THROWAWAY
@@ -207,3 +210,4 @@ final class BASJournalGroundingIntegrationTests: XCTestCase {
             "default-off ⇒ no hint line; got \(unarmed.stdout)")
     }
 }
+#endif

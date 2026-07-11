@@ -1,3 +1,6 @@
+// Device bundle: this suite spawns a subprocess (Process) / the CLI binary — macOS-only.
+// #if os(macOS) so the iOS test bundle compiles it away (SwiftPM/macOS still runs it).
+#if os(macOS)
 import XCTest
 
 /// Increment R — the "ship-moment loop" (retention design panel BUILD_REVISED, wf_20a775a9):
@@ -195,3 +198,4 @@ final class BASBetCommitIntegrationTests: XCTestCase {
             "plain bet (unarmed) stays byte-identical — born-grounded is bet-commit's OWN contract")
     }
 }
+#endif

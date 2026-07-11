@@ -1,3 +1,6 @@
+// Device bundle: this suite spawns a subprocess (Process) / the CLI binary — macOS-only.
+// #if os(macOS) so the iOS test bundle compiles it away (SwiftPM/macOS still runs it).
+#if os(macOS)
 import XCTest
 import BASAppleAdapters
 import BASMemory
@@ -97,3 +100,4 @@ final class BASGroundingSemanticCalibrationProbe: XCTestCase {
         }
     }
 }
+#endif
