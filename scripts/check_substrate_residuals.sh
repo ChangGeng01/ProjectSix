@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# NAME-COLLISION NOTE (2026-07-12): this PARENT-REPO script is the RESIDUAL-MARKER scan
+# (M86 regex over leftover TODO/placeholder markers in BehavioralAISubstrate/Sources).
+# It is a DIFFERENT check from BehavioralAISubstrate/scripts/check_substrate_residuals.sh
+# (the residuals GATE: print()-count + density, called by pre-commit-gates.sh). Same
+# filename, different jobs — a red in one does NOT contradict a green in the other.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
