@@ -628,3 +628,37 @@ increased-memory-limit entitlement + BGTaskScheduler id it strips); clean Derive
 regen; `-only-testing` curation is the sanctioned device method (the full bundle legitimately
 drags host-only lints onto the phone); killing the devicectl console SIGTERMs the app; a locked
 screen means onAppear never fires.
+
+## 2026-07-12 — the red-light report: verified line-by-line, 4 real old-audit debts fixed
+
+The operator surfaced a 6-item red-light report ("这是真的吗 你看看"). Verified each against the
+real gates/code — the report was HALF right (numbers wrong in 3 places, one item outright false),
+and every real item was PRE-EXISTING debt (git-proven: none introduced this session). All real
+ones fixed, each with gate/test verification + reversal where applicable:
+
+1. print()-residuals gate (report said 23; actual 82): TWO stacked debts — the gate's CLI
+   exclusion list never learned about BASJournalCLI (53 legitimate stdout prints counted as
+   residue; 82→29) + 29 genuine library stdout prints (fail-close warnings, 📊 telemetry) routed
+   through a new BASDiagnosticLog (os.Logger; a LIBRARY — operator-ratified decision B — must not
+   spam a host's stdout; 29→0). Gate clean. 9ada1c1e8.
+2. qinao import gate (report said "3 UNKNOWN imports"): the real first layer was a COMPILE error
+   — the policy-obs-misc LOW-8 audit fix (87ddf1e89) added .bridgeReferencesUnknownDomain to the
+   BAS VaultError but never updated QinaoRuntimeSDK's mirroring translate() switch (cross-package
+   audit drift). Fixed with a first-class mirror case. The "3 UNKNOWN imports" then surfaced —
+   all legitimate; the checker's ^import X$ anchor choked on explanatory trailing comments →
+   checker now strips inline comments. Gate passes. ece335279.
+3. whitepaper schema parity (12 unregistered — report accurate): 12 genuine BASSchemaVersioned
+   domain objects registered across all FOUR parity sites (registry + registry-tests +
+   blueprint expectedObjects + QINAO canonical conformer set). All three parity checks green;
+   4665/0 wide regression. b4960d698.
+4. SampleHost SIGBUS (report accurate): 53-field EBrainTurnResult × deep init delegation ×
+   cooperative-pool small stack. Fixed with an 8MB dedicated Thread; CAUSALITY PROVEN BY
+   REVERSAL (Task.detached restored ⇒ crash reproduces; fix ⇒ 1.25s pass). +2 stacked drifts
+   fixed en route (BASHostConsoleView→BASAdminUI import; stale -package-path commands).
+   Giant-value-type structural root tracked, not closed. 284beed0f.
+
+FALSE in the report: check_mlx_redaction "failed" — the script runs CLEAN. Environmental, not
+debt: headless swift-test MLX metallib load failure (no app bundle — known harness limit).
+
+Lesson: a red-light report is EVIDENCE to verify, not truth to accept nor noise to dismiss —
+3 of 6 numbers were wrong, 1 item false, yet 4 real pre-existing debts hid underneath.
