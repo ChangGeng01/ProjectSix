@@ -14,6 +14,12 @@ import XCTest
 /// AttributesError — the same helper both the atom and the session path route
 /// through — so this test focuses on the session-specific wiring.
 final class BASSessionPersistProtectionTests: XCTestCase {
+
+    // complete-class read-backs EPERM while the console is locked (macOS 27 enforces the
+    // protection class on lock) — loud environmental skip, see BASScreenLockSkip
+    override func setUpWithError() throws {
+        try BASScreenLockSkip.skipIfScreenLocked()
+    }
 #if canImport(MLXLLM)
 
     private func tempURL() -> URL {

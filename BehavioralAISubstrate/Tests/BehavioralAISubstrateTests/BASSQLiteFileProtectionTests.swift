@@ -20,6 +20,12 @@ import Foundation
 /// pre-first-unlock unreadability itself is verified on an iOS device.
 final class BASSQLiteFileProtectionTests: XCTestCase {
 
+    // complete-class read-backs EPERM while the console is locked (macOS 27 enforces the
+    // protection class on lock) — loud environmental skip, see BASScreenLockSkip
+    override func setUpWithError() throws {
+        try BASScreenLockSkip.skipIfScreenLocked()
+    }
+
     private func tempURL() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("fp-\(UUID().uuidString).sqlite")
