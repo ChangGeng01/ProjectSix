@@ -2,6 +2,10 @@ import XCTest
 import BASOrgan
 import BASRuntimeCore
 @testable import BASMLXAdapter
+#if canImport(MLXLLM)
+import MLXLMCommon
+import MLXLLM
+#endif
 
 /// FRONTIER_2026H2 tail-closure tests: snapshot GC bound (pure), thermal-prior persistence
 /// seam (pure), and the dream-loop warm-seat snapshot action (model-gated).
@@ -78,7 +82,8 @@ final class BASSpillGCTests: XCTestCase {
         guard MLXOrganAdapter.sessionSpillEnabled else {
             throw XCTSkip("needs the spill lane armed (BAS_SESSION_SPILL default-on)")
         }
-        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
         try await adapter.loadModel()
         for sid in ["dream-a", "dream-b"] {
             _ = try await adapter.draft(BASOrganRequest(
@@ -128,7 +133,8 @@ final class BASSpillGCTests: XCTestCase {
         try? FileManager.default.removeItem(at: MLXOrganAdapter._spillURL(forKey: key))
 
         // Adapter A: warm the ACTIVE seat with a couple of turns (it will never be evicted).
-        let a = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
+        let a = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
         try await a.loadModel()
         for t in ["The capital of France is Paris.", "And its most famous museum is the Louvre."] {
             _ = try await a.draft(BASOrganRequest(
@@ -139,7 +145,7 @@ final class BASSpillGCTests: XCTestCase {
         XCTAssertEqual(parked, 1, "the active seat must be parked by the lifecycle snapshot")
 
         // Adapter B = a RELAUNCH: fresh pool, same seat → must RESTORE, not cold-prefill.
-        let b = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        let b = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
         try await b.loadModel()
         let before = await b.sessionSpillStats().restored
         let cont = try await b.draft(BASOrganRequest(
@@ -150,6 +156,37 @@ final class BASSpillGCTests: XCTestCase {
         XCTAssertEqual(after - before, 1,
             "turn-1 after relaunch must RESTORE the warm seat (spillRestoreCount 0→1), not cold-prefill")
         XCTAssertFalse(cont.body.isEmpty, "the restored seat answers")
+        let restorePrefillMs = cont.completionMetrics?.prefillMs ?? -1
+
+        // MATCHED COLD ARM (the honest TTFT number, MEASURED not asserted): a THIRD fresh adapter with
+        // NO spill file must cold-prefill the SAME history → its turn-1 prefillMs is the avoided cost.
+        // Re-warm a sibling seat on `a`, do NOT snapshot it, and cold-continue on a fresh adapter.
+        let coldSid = "restart-seat-cold"
+        try? FileManager.default.removeItem(at: MLXOrganAdapter._spillURL(
+            forKey: "\(coldSid)#\(BASOrganRole.core.rawValue)"))
+        for t in ["The capital of France is Paris.", "And its most famous museum is the Louvre."] {
+            _ = try await a.draft(BASOrganRequest(
+                requestID: "cwarm-\(t.prefix(6))", role: .core, preset: .greedyDeterministic,
+                instruction: t, maxOutputTokens: 24, sessionID: coldSid))
+        }
+        // no snapshot for coldSid ⇒ fresh adapter C cold-prefills the full history.
+        let c = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
+        try await c.loadModel()
+        let coldStart = await c.sessionSpillStats().restored
+        let coldCont = try await c.draft(BASOrganRequest(
+            requestID: "cold-turn1", role: .core, preset: .greedyDeterministic,
+            instruction: "In one word, that museum is in which city?",
+            maxOutputTokens: 24, sessionID: coldSid))
+        let coldRestored = await c.sessionSpillStats().restored
+        XCTAssertEqual(coldRestored - coldStart, 0,
+            "the cold arm has no spill file ⇒ it must cold-prefill (restore count unchanged)")
+        let coldPrefillMs = coldCont.completionMetrics?.prefillMs ?? -1
+
+        // Telemetry — the MEASURED prefill-avoided ratio (printed, never asserted as a multiplier;
+        // cross-thermal + hidden-state semantics forbid a pinned number — DECODE-OS law).
+        NSLog("[nextgen-warmseat] restore_prefill_ms=%.1f cold_prefill_ms=%.1f avoided_ratio=%.2fx",
+              restorePrefillMs, coldPrefillMs,
+              (restorePrefillMs > 0 && coldPrefillMs > 0) ? coldPrefillMs / restorePrefillMs : -1)
 
         // Non-vacuity: with the spill lane OFF the same relaunch must cold-prefill (no restore).
         // (Separate subprocess-free check: snapshotWarmSeats returns 0 under the kill-switch — the
