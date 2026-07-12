@@ -188,6 +188,43 @@ final class QinaoRuntimeGateTests: XCTestCase {
         XCTAssertEqual(count, 1)
     }
 
+    // MARK: - audit F1: tool-swap rejection (valid signatures, wrong tool)
+
+    /// A caller with FULLY VALID signatures for intent A (tool "calendar.add_event") passes a
+    /// DIFFERENT toolName. execute() must bind the executed tool to the signed intent.toolName
+    /// and refuse — before the fix, toolName was a dead field and B would have run under A's
+    /// approval (confused deputy / approval reuse).
+    func testMismatchedToolNameIsRejectedEvenWithValidSignatures() async throws {
+        let fx = await makeRuntime()
+        let runtime = fx.runtime
+        let recorder = fx.recorder
+        let sovereign = fx.sovereign
+        let risk = fx.risk
+        let it = intent()  // toolName == "calendar.add_event"
+        let permit = try await risk.requestActionPermit(for: it)
+        let warrant = try await sovereign.issueWarrant(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID))
+        let proof = validProof(for: it)
+        let sigs = QinaoRuntime.Signatures(
+            permit: permit, warrant: warrant, snapshotProof: proof)
+
+        await XCTAssertThrowsErrorAsync(
+            try await runtime.execute(
+                toolName: "mail.send_all",  // ← swapped tool, same (valid) signatures
+                payload: Data(),
+                intent: it,
+                signatures: sigs)
+        ) { error in
+            guard case QinaoRuntime.RuntimeError.toolMismatch(let expected, let got) = error
+            else { return XCTFail("expected toolMismatch, got \(error)") }
+            XCTAssertEqual(expected, "calendar.add_event")
+            XCTAssertEqual(got, "mail.send_all")
+        }
+        let count = await recorder.callCount
+        XCTAssertEqual(count, 0, "the swapped tool must NOT execute")
+    }
+
     // MARK: - Digest mismatch (each arm in isolation)
 
     func testPermitWithWrongDigestIsRejected() async throws {

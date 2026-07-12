@@ -301,20 +301,27 @@ public actor QinaoLearningExporter {
         // token — the concatenated-and-hashed form — so a downstream
         // consumer that wants to re-verify individual approvals can
         // ask the issuer for each one independently.
+        //
+        // audit F7 (2026-07-12): contentHash stays the DEDUP key over (skeleton, domain) —
+        // source-ID-free by design — but framed with the injective length-prefix encoder so
+        // a "|" inside a skeleton can't collide with a field boundary. The bundleDigest now
+        // binds the FULL entry INCLUDING confidence (canonical encode of skeleton, domain,
+        // confidence), so a transmitted confidence flip (0.1→0.9) changes the digest — before
+        // this it left the digest byte-identical.
         let entries = candidates.map { c in
             QinaoMemory.LearningExportEntry(
                 contentHash: Self.hash(
-                    c.generalizedSkeleton + "|" + c.domain),
+                    Self.canonicalJoin([c.generalizedSkeleton, c.domain])),
                 generalizedSkeleton: c.generalizedSkeleton,
                 domain: c.domain,
                 confidence: c.confidence)
         }
         let producedAt = now()
-        let approvalToken = Self.hash(approvals.joined(separator: "|"))
-        let digest = Self.hash(
-            entries.map { $0.contentHash }.joined(separator: "|")
-                + "|\(producedAt.timeIntervalSince1970)"
-                + "|\(approvalToken)")
+        let approvalToken = Self.hash(Self.canonicalJoin(approvals))
+        let digest = Self.hash(Self.canonicalJoin(
+            entries.map { Self.canonicalJoin([
+                $0.generalizedSkeleton, $0.domain, Self.canonicalConfidence($0.confidence)]) }
+            + ["\(producedAt.timeIntervalSince1970)", approvalToken]))
 
         return QinaoMemory.LearningExportBundle(
             entries: entries,
@@ -345,5 +352,19 @@ public actor QinaoLearningExporter {
     private static func hash(_ s: String) -> String {
         let digest = SHA256.hash(data: Data(s.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// audit F7: INJECTIVE join. Each field is prefixed with its UTF-8 BYTE length and a
+    /// colon (`<len>:<bytes>`), then concatenated — so no field's content (including any "|"
+    /// or ":" or embedded delimiter) can be mistaken for a boundary. `["a|b","c"]` and
+    /// `["a","b|c"]` now hash differently, closing the collision the raw "|"-join allowed.
+    static func canonicalJoin(_ fields: [String]) -> String {
+        fields.map { "\($0.utf8.count):\($0)" }.joined()
+    }
+
+    /// Canonical, lossless textual form of a confidence so the digest is deterministic across
+    /// platforms (bitPattern hex avoids locale/precision drift).
+    static func canonicalConfidence(_ x: Double) -> String {
+        "cf\(String(x.bitPattern, radix: 16))"
     }
 }

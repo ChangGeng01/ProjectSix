@@ -90,11 +90,22 @@ public actor QinaoSovereignControlPlane {
         }
     }
 
-    /// Opaque warrant token the runtime attaches to side-effect
-    /// calls. Hosts treat this as a blob; only the control plane
-    /// can mint and verify it. Warrant verification is deferred to
-    /// `BASSovereign.BASSovereignTokenAuthority` under the hood;
-    /// the façade never exposes the signing key.
+    /// Warrant token the runtime attaches to side-effect calls.
+    ///
+    /// ⚠️ HONEST SECURITY SCOPE (audit F2, 2026-07-12): this warrant is NOT cryptographically
+    /// unforgeable at present. It is a plaintext value type bound to an intent by `intentDigest`
+    /// + a short TTL (`expiresAt`); `isWarrantValid` verifies ONLY those fields and does NOT
+    /// call `BASSovereignTokenAuthority` — the configured `tokenSigningKey`/`tokenAuthority`
+    /// exist but are not yet wired into this issue/verify chain. Because the struct has a public
+    /// memberwise init, any caller can construct a Warrant. This is acceptable TODAY because
+    /// `QinaoRuntime.execute()` has no production caller and no IPC/deserialization boundary
+    /// (operator decision B: the SDK is adoption-ready scaffold, not live), and the intended
+    /// adversary — the neural layer — emits INTENT data, not a Signatures bundle.
+    ///
+    /// BEFORE wiring `execute()` to any untrusted boundary, the warrant (and the permit +
+    /// snapshot proof) MUST be signed: mint an HMAC/Ed25519 tag over
+    /// (warrantID, sessionID, intentDigest, issuedAt, expiresAt) via `tokenAuthority` in
+    /// `issueWarrant`, verify it in `isWarrantValid`, and drop the public init.
     public struct Warrant: Sendable, Equatable, Codable {
         public let warrantID: String
         public let sessionID: String
@@ -1021,7 +1032,10 @@ public actor QinaoSovereignControlPlane {
             expiresAt: issuedAt.addingTimeInterval(warrantTTL))
     }
 
-    /// Verify a warrant is live for a given intent.
+    /// Verify a warrant is live for a given intent. audit F2: this is a FIELD-BINDING +
+    /// TTL check only (sessionID + intentDigest + expiry) — NOT a cryptographic signature
+    /// verification. See the `Warrant` docstring for the honest scope and the pre-adoption
+    /// signing requirement.
     public func isWarrantValid(
         _ warrant: Warrant,
         for intent: Intent

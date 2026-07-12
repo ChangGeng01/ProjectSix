@@ -28,6 +28,15 @@ import QinaoLoop
 /// 掌权". The neural layer produces intents; the brain produces
 /// permits and warrants; the runtime is the only surface that
 /// actually calls the world.
+///
+/// ⚠️ HONEST SECURITY SCOPE (audit F2, 2026-07-12): the gate binds the three tokens to a
+/// shared `intentDigest` and enforces TTLs, but the tokens are NOT yet cryptographically
+/// signed — `isPermitValid` / `isWarrantValid` / the proof check are field-binding + expiry
+/// comparisons, and the token types have public inits (constructible by any caller). This is
+/// sound TODAY because `execute()` has no production caller and no untrusted IPC/deserialization
+/// boundary (operator decision B), and the adversary emits intent DATA, not a Signatures
+/// bundle. Before any untrusted-boundary adoption, sign the tokens (see the `Warrant`
+/// docstring in QinaoSovereign for the concrete recipe).
 public actor QinaoRuntime {
 
     public enum RuntimeError: Error, Equatable, Sendable {
@@ -35,6 +44,9 @@ public actor QinaoRuntime {
         case missingWarrant
         case missingSnapshotProof
         case digestMismatch(expected: String, got: String)
+        /// audit F1 (2026-07-12): the executed tool name does not match the tool the signed
+        /// intent authorized — a swapped-tool attempt (approval for A reused for B).
+        case toolMismatch(expected: String, got: String)
         case permitExpired
         case warrantExpired
         case sessionHalted(id: String)
@@ -144,6 +156,15 @@ public actor QinaoRuntime {
         intent: QinaoRiskGate.ActionIntent,
         signatures: Signatures
     ) async throws -> Data {
+        // audit F1 (2026-07-12): bind the EXECUTED tool to the SIGNED intent. The intent
+        // carries toolName but execute() never read it, so a caller with valid signatures for
+        // intent A could pass toolName B and have B executed (approval-for-A reused for B).
+        // The host owns the digest formula and the executor, but this closes the confused-
+        // deputy gap at zero cost and makes the binding explicit rather than dead.
+        guard toolName == intent.toolName else {
+            throw RuntimeError.toolMismatch(
+                expected: intent.toolName, got: toolName)
+        }
         guard signatures.permit.digest == intent.digest else {
             throw RuntimeError.digestMismatch(
                 expected: intent.digest,
