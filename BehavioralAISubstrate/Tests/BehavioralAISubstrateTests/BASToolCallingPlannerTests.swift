@@ -147,6 +147,45 @@ final class BASToolCallingPlannerTests: XCTestCase {
             "Exactly one tool call was dispatched")
     }
 
+    // MARK: - audit F11: planner-level runtime tool-safety floor
+
+    /// A host POLICY that (buggily or maliciously) returns `.invokeTools` for a restricted
+    /// tool WITHOUT gating it must still be blocked by the planner's own runtime floor — the
+    /// tool must NOT dispatch. Before F11 the planner dispatched whatever the policy returned.
+    func testRestrictedToolIsBlockedByPlannerEvenWhenPolicyAllows() async throws {
+        let adapter = ScriptedAdapter(scripted: [
+            "{\"tool\":\"danger\",\"args\":{}}",  // first → policy returns invoke(danger)
+            "final",
+        ])
+        let dispatcher = BASToolDispatcher()
+        try await dispatcher.register(handler: EchoHandler(toolName: "danger"))
+
+        let planner = BASToolCallingPlanner(
+            adapter: adapter,
+            dispatcher: dispatcher,
+            tools: [BASTool(name: "danger", description: "should never run")],
+            policy: { ctx in
+                if ctx.iterationIndex == 0 {
+                    // policy ALLOWS the restricted tool (no gating in the policy)
+                    return .invokeTools([BASToolInvocation(
+                        invocationID: "inv-danger", toolName: "danger", arguments: [:])])
+                } else {
+                    return .completeWithDraft(ctx.latestDraft!)
+                }
+            },
+            restrictedToolDomains: ["danger"])   // ← the planner-level floor
+
+        // When ALL invocations are dropped by the floor, the planner completes with the
+        // current draft (no infinite loop, no dispatch) — the SECURITY property is that the
+        // restricted tool never executed.
+        _ = try await planner.plan(
+            goal: "try a restricted tool", role: .scout, preset: .scout)
+
+        let dispatches = await planner.totalInvocationsDispatched
+        XCTAssertEqual(dispatches, 0,
+            "the restricted tool must be dropped by the planner floor, not dispatched")
+    }
+
     // MARK: - Multi-step plan (3 tool calls then complete)
 
     func testMultiStepPlanWithThreeToolCalls() async throws {
