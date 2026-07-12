@@ -365,11 +365,13 @@ extension SampleHostModel {
                     let result = try await Task.detached {
                         try runtime.startSession(request)
                     }.value
-                    if let turn = result.eBrainTurn {
-                        if let entry = turn.sovereignAuditEntry {
+                    // context-IR step 2: the production host consumes the slim
+                    // BASTurnResponse contract, not the 53-field record.
+                    if let response = result.turnResponse {
+                        if let entry = response.sovereignAuditEntry {
                             auditCount = entry.signalRefs.count
                         }
-                        permitMode = turn.actionPermit.mode.rawValue
+                        permitMode = response.actionPermit.mode.rawValue
                     }
                 } catch {
                     permitMode = "substrate-error"
