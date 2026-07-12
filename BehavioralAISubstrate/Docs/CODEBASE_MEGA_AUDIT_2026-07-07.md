@@ -896,3 +896,32 @@ step 3 made admission a single compiled pass with mechanical authority. Remainin
 residuals, all documented in-file: whole-frame service passes ride the plan transitionally;
 stage READS are still lexical captures (declaring input surfaces is future work); the 53-field
 record itself remains the audit/replay accretion surface by design.
+
+## 2026-07-12 — context-IR step 4: stage READ surfaces are declared (the arc's final step)
+
+Operator ordered the read-surface declaration; shipped (a8a33e3d6). The stage bodies moved from
+capture-capable LOCAL functions into coordinator METHODS across three family-named files —
+parameters are the compiler-censused read surface, downstream stages consume upstream
+StageContexts directly (IR-to-IR flow), services stay ambient via self (capabilities, not turn
+context). The conversion EXPOSED three mutation chains that lexical capture had kept silent:
+thoughtFrame relay-mutated by riskA → riskB → renderB, and the permits rebound by riskB — all
+now DECLARED write-backs in the output contracts. runTurn is a 310-line fold skeleton; frame
+peak fell again 56,304 → 36,080 B (runTurn residual 20,672 → 2,336 B; full arc 129,792 →
+36,080, −72%).
+
+Craft laws banked: (1) family-prefix file naming (EBrainRuntimeCoordinator+…) makes
+family-scoped source lints (M595) cover moved code automatically — structural fix for the
+"lint didn't follow the move" class; (2) the ltmp0 attribution trap generalizes — EVERY
+object's first function hides under the local label and name-matching hits thunks (measured:
+304 B thunk vs 28,432 B body); the frame lint now prefixes symbols per-object. Companion
+(d97017f11): protection suites re-check console lock at tearDown (mid-run locks read as
+environmental skips; observed 11:39); a once-seen EBUSY (APFS re-encryption contention,
+back-to-back protection suites) is signature-logged, deliberately not hardened (3× isolated
+green, 0/10 full runs).
+
+Re-certified after fixes: beta both halves EXIT=0 · stable headless 16,602/0 + batches green ·
+SDK 1,449/0 · SampleHost SUCCEEDED. The context-IR arc is now FULLY closed: named outputs
+(step 1) + record/response split (step 2) + single admission authority (step 3) + declared
+reads with declared write-backs (step 4). No open residuals except the documented
+transitionals (whole-frame service passes ride plan.routedBudget; the 53-field record remains
+the audit surface by design).
