@@ -61,12 +61,29 @@ extension SampleSession {
             let host = try await sovereignHost()
 
             // L2 output crossing the boundary as data (memory admission).
-            _ = try? await host.memory.admit(QinaoMemory.AdmitRequest(
-                kind: .episodic,
-                content: "Q: \(prompt) → A(\(providerID)): \(responseBody.prefix(200))",
-                scope: .session,
-                sensitivity: .low,
-                confidence: 0.7))
+            // charter audit 2026-07-12 honesty fixes: (a) sourceType truthfully labels the
+            // content as LLM-authored — it previously defaulted to "host", so model text
+            // entered governed memory wearing the host's provenance; (b) admission goes
+            // through the CONSTITUTION-AWARE gate (consent-lattice memoryWriteScope), the
+            // first production use of that overload; (c) the outcome is SURFACED in the
+            // returned audit line — a governance refusal was previously `_ = try?`-swallowed
+            // while this file's own header promised "never a silent success".
+            let constitution = await host.host.currentConstitution()
+            let memoryLine: String
+            do {
+                _ = try await host.memory.admit(
+                    QinaoMemory.AdmitRequest(
+                        kind: .episodic,
+                        content: "Q: \(prompt) → A(\(providerID)): \(responseBody.prefix(200))",
+                        scope: .session,
+                        sensitivity: .low,
+                        confidence: 0.7,
+                        sourceType: "qinao-sample.llm:\(providerID)"),
+                    under: constitution)
+                memoryLine = "memory admitted"
+            } catch {
+                memoryLine = "memory REFUSED (\(error))"
+            }
 
             var inputs = QinaoRuntime.TurnInputs(
                 observations: QinaoSovereignControlPlane.TurnObservations(
@@ -80,7 +97,8 @@ extension SampleSession {
             let outcome = try await host.runtime.sendSession(inputs)
             return "sovereign: audit \(outcome.audit.severity) · "
                 + "coverage \(outcome.coverage.severity) · "
-                + (outcome.sessionHalted ? "HALTED" : "ledger appended")
+                + (outcome.sessionHalted ? "HALTED" : "ledger appended") + " · "
+                + memoryLine
         } catch {
             return "sovereign: turn REFUSED — \(error)"
         }

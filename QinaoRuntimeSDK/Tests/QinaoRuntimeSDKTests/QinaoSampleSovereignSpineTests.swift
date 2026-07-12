@@ -44,11 +44,16 @@ final class QinaoSampleSovereignSpineTests: XCTestCase {
         XCTAssertTrue(line.contains("ledger appended"),
             "a healthy exchange must report the appended ledger, got: \(line)")
         XCTAssertFalse(line.contains("REFUSED"))
+        // charter audit 2026-07-12: the admission outcome is surfaced, never swallowed.
+        XCTAssertTrue(line.contains("memory admitted"), "got: \(line)")
 
-        // Memory admitted (the data crossing).
+        // Memory admitted (the data crossing) — with TRUTHFUL LLM provenance, not "host".
         let host = try await session.sovereignHost()
         let memCount = await host.memory.count()
         XCTAssertEqual(memCount, 1, "the exchange must land in governed memory")
+        let atoms = await host.memory.recallFrontstage()
+        XCTAssertEqual(atoms.first?.sourceType, "qinao-sample.llm:mock.provider",
+            "LLM-authored content must not wear host provenance")
 
         // Keyed ledger persisted: reopen COLD with the stored secret; chain verifies.
         let secret = try SampleSession.loadOrCreateLedgerSecret(in: dir)

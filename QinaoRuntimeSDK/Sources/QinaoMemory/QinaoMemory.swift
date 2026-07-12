@@ -133,6 +133,50 @@ public actor QinaoMemory {
         return governed
     }
 
+    /// charter audit 2026-07-12 — CONSTITUTION-AWARE admission. The substrate has had
+    /// `BASMemoryGovernance.shouldAdmit(candidate:under:)` (consent-lattice
+    /// memoryWriteScope check) since the beginning, but no production path ever used it —
+    /// the facade gated on the confidence floor alone. This overload wires it: hosts that
+    /// hold a constitution admit THROUGH it, so a "disabled"/"none" memoryWriteScope
+    /// fails closed with its own stable reason string (distinct from the confidence
+    /// floor's "confidence-below-floor").
+    @discardableResult
+    public func admit(
+        _ request: AdmitRequest,
+        under constitution: BASHostConstitution
+    ) throws -> BASGovernedMemory {
+        let event = BASEventRecord(
+            kind: request.kind,
+            content: request.content,
+            timestamp: now(),
+            tags: request.tags)
+        let candidate = BASMemoryCandidate(
+            event: event,
+            scope: request.scope,
+            sensitivity: request.sensitivity,
+            confidence: request.confidence,
+            sourceType: request.sourceType,
+            preferredTier: request.preferredTier)
+        guard BASMemoryGovernance.shouldAdmit(
+            candidate: candidate,
+            minimumConfidence: minimumConfidence
+        ) else {
+            throw MemoryError.rejectedByGovernance(
+                reason: "confidence-below-floor")
+        }
+        guard BASMemoryGovernance.shouldAdmit(
+            candidate: candidate,
+            under: constitution,
+            minimumConfidence: minimumConfidence
+        ) else {
+            throw MemoryError.rejectedByGovernance(
+                reason: "memory-write-scope-disabled")
+        }
+        let governed = BASMemoryGovernance.promote(candidate: candidate)
+        store[governed.id] = governed
+        return governed
+    }
+
     // MARK: - Recall
 
     /// Tier-ordered recall. Defaults return every tier (hot > warm >
