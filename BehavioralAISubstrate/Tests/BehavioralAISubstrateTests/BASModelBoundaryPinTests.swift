@@ -99,19 +99,42 @@ final class BASModelBoundaryPinTests: XCTestCase {
     }
 
     func testLifecycleKitSourcesHaveZeroModelRuntimeImports() throws {
-        let dir = packageRoot.appendingPathComponent("Sources/BASAppleLifecycleKit")
+        try assertNoModelRuntimeImports(
+            in: "Sources/BASAppleLifecycleKit", minFiles: 10,
+            label: "the PURE lifecycle kit")
+    }
+
+    /// charter continuation 2026-07-13 (residual #4): the T4 cut removed the model-ADAPTER
+    /// module edge, but the boundary claim "BASHostKit invokes no model runtime directly"
+    /// was only manifest-pinned, not source-pinned. After T4 it is TRUE (the adjudicator's
+    /// embedder is edge-injected, the NLI bridge + MLModel Chenglu overload moved out), so
+    /// pin it: BASHostKit sources import NO model runtime (CoreML/FoundationModels/CoreAI/
+    /// MLX/Tokenizers) — not even platform-gated. A future re-introduction reds here.
+    func testHostKitSourcesHaveZeroModelRuntimeImports() throws {
+        try assertNoModelRuntimeImports(
+            in: "Sources/BASHostKit", minFiles: 100, label: "the HostKit core umbrella")
+    }
+
+    private func assertNoModelRuntimeImports(
+        in relativeDir: String, minFiles: Int, label: String
+    ) throws {
+        let dir = packageRoot.appendingPathComponent(relativeDir)
         let files = try FileManager.default.contentsOfDirectory(atPath: dir.path)
             .filter { $0.hasSuffix(".swift") }
-        XCTAssertGreaterThan(files.count, 10, "sanity: kit sources present")
+        XCTAssertGreaterThan(files.count, minFiles, "sanity: \(label) sources present")
         var offenders: [String] = []
         for f in files {
             let text = try String(
                 contentsOf: dir.appendingPathComponent(f), encoding: .utf8)
-            for imp in Self.modelRuntimeImports where text.contains(imp) {
-                offenders.append("\(f): \(imp)")
+            for line in text.split(separator: "\n") {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                for imp in Self.modelRuntimeImports
+                where trimmed == imp || trimmed.hasPrefix(imp + " ") {
+                    offenders.append("\(f): \(trimmed)")
+                }
             }
         }
         XCTAssertTrue(offenders.isEmpty,
-            "model-runtime imports inside the PURE lifecycle kit: \(offenders)")
+            "model-runtime imports inside \(label): \(offenders)")
     }
 }

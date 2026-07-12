@@ -32,13 +32,27 @@ explicit provider injection.
    every construction site to supply a classifier. The charter's LLM clause is untouched;
    the honest statement is: the substrate OWNS one microscopic neural organ the way it
    owns its redline lattice. Boundary note added at the class declaration.
-2. **Reading A vs B of "统一进入 Qinao SDK"** remains the operator's call: under Reading A
-   (SDK = the two-package stack) unification holds today; under Reading B (QinaoRuntimeSDK
-   package only) the runTurn cascade / mirror lane / tool lane / The Ledger have no SDK
-   facade — and ruling ① explicitly placed convergence substrate-side.
+2. **Reading A vs B of "统一进入 Qinao SDK"** — RESOLVED (2026-07-13 continuation) to
+   **Reading A**: "the Qinao SDK" = the two-package stack (QinaoRuntimeSDK facades +
+   BehavioralAISubstrate foundation), consumed as ONE dependency surface. Rationale: (a)
+   under Reading A every deterministic capability already lives in the stack — unification
+   holds today with zero new code; (b) operator ruling ① already committed to it by
+   placing convergence in BASHostKit and making QinaoRuntime consume-only (that is only
+   "in the SDK" under Reading A); (c) Reading B would require QinaoRuntimeSDK-only facades
+   over the runTurn cascade / mirror lane / tool lane / The Ledger — facades no real host
+   consumes, i.e. speculative architecture, which the pin-boundary-defer-interface
+   principle (2026-07-13) forbids until a real host needs SDK-package-only consumption.
+   Reading B stays available to the operator; adopting it is deferred (named + triggered:
+   "a host that must consume QinaoRuntimeSDK without the BAS foundation").
 3. **Device re-certification** (DeviceTestApp + SampleHost app builds, two-phone sweep)
-   is hardware-gated as always; the T4 changes touch their link graphs (new products
-   linked via re-export; SampleHost manifest gained explicit BASAppleAdapters +
-   BASAppleEdgeWiring deps).
-4. HostKit-side CoreML system-framework usage is not source-pinned (only the pure kit is);
-   the adapter-module exclusion is pinned at manifest + source level.
+   is hardware-gated — GENUINELY BLOCKED without physical devices, not deferrable by a
+   host-side action. Host-side regression (beta + headless + SDK) is green; the T4/v2
+   changes touch DeviceTestApp/SampleHost link graphs (new products via re-export;
+   SampleHost manifest gained explicit BASAppleAdapters + BASAppleEdgeWiring deps), so the
+   next physical two-phone sweep should re-confirm those app targets build + run on device.
+4. HostKit-side model-runtime imports — RESOLVED (2026-07-13 continuation): now
+   SOURCE-PINNED. `BASModelBoundaryPinTests.testHostKitSourcesHaveZeroModelRuntimeImports`
+   asserts BASHostKit sources import no CoreML/FoundationModels/CoreAI/MLX/Tokenizers
+   (reversal-proven). The boundary is now pinned at manifest + adapter-module-source +
+   model-runtime-source level for the core umbrella, and at zero-model-import level for
+   the pure lifecycle kit.
