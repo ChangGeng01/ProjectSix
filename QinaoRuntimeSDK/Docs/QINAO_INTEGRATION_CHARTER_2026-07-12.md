@@ -43,20 +43,31 @@ sovereign machine disposes (audit, coverage, halt, permit, warrant, ledger, memo
 
 ## Stages (each: TDD teeth + reversal + individual commit + regression)
 
-- **S0** This charter.
-- **S1** Wire the `memory` dead seam: `sendSession` derives the L8 bundle from
-  `runtime.memory` when the caller supplies none (explicit inputs still win). Kills the
-  stored-but-unused property finding.
-- **S2** The assembly: one production constructor (QinaoDefaults family) that composes ALL
-  IN-modules — sovereign bootstrapped with ledgerDatabasePath (persistent keyed ledger),
-  risk, host, memory, endpoint-less loop, 9 seats, world prior, toolExecutor seam → returns a
-  ready QinaoRuntime. First production caller + boundary-pin test + adoption test proving one
-  sendSession turn engages audit + keyed-ledger append + memory in a single path.
-- **S3** Discharge F2 for the integrated gate: mint/verify real signatures on
-  warrant (+ permit + snapshot proof) via the already-held token authority; unsigned tokens
-  fail closed. Update the honest-scope docstrings to the new true state.
-- **S4** T first fire: adoption test drives a real (test-double) tool through
-  three-signature `execute()` on the integrated assembly.
+- **S0** ✅ This charter (`138bd8d12`).
+- **S1** ✅ (`138bd8d12`) `memory` dead seam wired: `QinaoMemory.frontstageBundle` (mirror of
+  the BASHostKit canonical governed→atom projection) + sendSession shadow-copy injection
+  when the caller supplies no bundle. Explicit inputs win; empty memory = byte-equal
+  pre-S1 semantics. Probe: expectedCoverageLayerIDs ["L8","L14"] missing-layer witness.
+- **S2** ✅ (`17abc7a58`) `QinaoDefaults.makeSovereignHost` — QinaoRuntime's FIRST
+  production construction path: host + memory + risk (M103 permit→audit wire) + sovereign
+  (persistent keyed ledger when path given) + endpoint-less loop over seeded vault + full
+  9-seat council + runtime. Boundary pinned mechanically (QinaoBoundaryPinTests parses
+  Package.swift target blocks; reversal-proven). Adoption test: one turn composes
+  A+K+M (keyed ledger reopened COLD verifies chain, >0 entries).
+- **S3** ✅ (`7104f8974`) F2 discharged for warrant + proof: dead tokenSigningKey wired
+  into a package tokenTagKey; HMAC-SHA256 over injective length-prefixed fields; warrant
+  signed at mint, verified signature-first; SnapshotContinuityProof got its first
+  production issuance path + full gate verification (signature + session + EXPIRY —
+  pre-S3 the gate compared only intentDigest). Documented residual: risk permit stays
+  field-binding (QinaoRisk holds no key by design) — sign before cross-process adoption.
+- **S4** ✅ (inside S2/S3 teeth) T first fire: three-signature execute() runs a real tool
+  on the assembled host with minted tokens; refuses swapped-tool (F1), hand-built proof,
+  expired proof, cross-session proof, forged/tampered warrant.
+
+**Convergence result (vs. the 2026-07-12 turn-path map):** the assembled host composes
+A + K + T + M on one spine; L stays outside the boundary as data, by directive. Every
+capability the map showed as "composed nowhere" (T) or "default-off everywhere" (K) is
+now live-by-default on this path. Full SDK regression 1479/0.
 
 Out of scope (explicitly): any LLM-side work; The Ledger workload changes (separate operator
 decision); making SampleHost adopt this (BAS-side host, separate spine).
