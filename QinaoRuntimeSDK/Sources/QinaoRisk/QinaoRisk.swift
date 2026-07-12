@@ -234,9 +234,8 @@ public actor QinaoRiskGate {
     /// domain label so a permit tag can never collide with a warrant/proof tag under a
     /// shared key, and the reason-code COUNT is folded in so variable-arity reason
     /// lists cannot alias adjacent fields.
-    static func permitTag(
-        key: SymmetricKey, _ permit: ActionPermit
-    ) -> String {
+    /// The injective canonical bytes signed by a permit tag (fields shared by mint+verify).
+    static func permitCanonicalBytes(_ permit: ActionPermit) -> Data {
         var fields = [
             "qinao.permit.v1",
             permit.permitID, permit.digest, permit.sessionID,
@@ -245,10 +244,30 @@ public actor QinaoRiskGate {
         fields.append(contentsOf: permit.reasonCodes)
         fields.append("t\(String(permit.issuedAt.timeIntervalSince1970.bitPattern, radix: 16))")
         fields.append("t\(String(permit.expiresAt.timeIntervalSince1970.bitPattern, radix: 16))")
-        let canonical = fields.map { "\($0.utf8.count):\($0)" }.joined()
-        return Data(HMAC<SHA256>.authenticationCode(
-            for: Data(canonical.utf8), using: key))
+        return Data(fields.map { "\($0.utf8.count):\($0)" }.joined().utf8)
+    }
+
+    static func permitTag(
+        key: SymmetricKey, _ permit: ActionPermit
+    ) -> String {
+        Data(HMAC<SHA256>.authenticationCode(
+            for: permitCanonicalBytes(permit), using: key))
             .map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// deep-audit MEDIUM-1: decode an even-length hex string to raw bytes; nil on any
+    /// malformed input (so a garbage signature fails closed at decode, before verify).
+    static func hexToBytes(_ hex: String) -> Data? {
+        guard hex.count % 2 == 0 else { return nil }
+        var out = Data(capacity: hex.count / 2)
+        var idx = hex.startIndex
+        while idx < hex.endIndex {
+            let next = hex.index(idx, offsetBy: 2)
+            guard let b = UInt8(hex[idx..<next], radix: 16) else { return nil }
+            out.append(b)
+            idx = next
+        }
+        return out
     }
 
     // MARK: - Permit issuance
@@ -315,12 +334,19 @@ public actor QinaoRiskGate {
         for intent: ActionIntent
     ) -> Bool {
         // integration permit-signing: signature FIRST — a permit not minted with this
-        // gate's key (or tampered after mint, incl. a block→allow mode flip) fails
-        // closed regardless of its field values. permitTag reads only the seven
-        // identity fields, never .signature, so the permit passes through directly.
-        guard permit.signature == Self.permitTag(key: permitTagKey, permit) else {
-            return false
-        }
+        // gate's key (or tampered after mint, incl. a block→allow mode flip) fails closed.
+        // deep-audit MEDIUM-1 (2026-07-13): CONSTANT-TIME MAC verification (was a hex
+        // `String ==` that short-circuits on the first differing byte — a byte-by-byte MAC
+        // timing oracle, exactly what the ledger's ch1044 fix eliminated). The permit is
+        // advertised cross-process-carry-safe, which is precisely the threat model where a
+        // MAC oracle matters. Decode the stored hex to raw bytes and use the constant-time
+        // isValidAuthenticationCode; same accept/reject set, no timing side channel.
+        guard let rawSig = Self.hexToBytes(permit.signature),
+              HMAC<SHA256>.isValidAuthenticationCode(
+                rawSig,
+                authenticating: Self.permitCanonicalBytes(permit),
+                using: permitTagKey)
+        else { return false }
         guard permit.digest == intent.digest else { return false }
         guard permit.sessionID == intent.sessionID else { return false }
         guard permit.mode == .allow else { return false }

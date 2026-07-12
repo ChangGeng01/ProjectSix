@@ -71,7 +71,7 @@ extension SampleSession {
             let constitution = await host.host.currentConstitution()
             let memoryLine: String
             do {
-                _ = try await host.memory.admit(
+                let admitted = try await host.memory.admit(
                     QinaoMemory.AdmitRequest(
                         kind: .episodic,
                         content: "Q: \(prompt) → A(\(providerID)): \(responseBody.prefix(200))",
@@ -80,7 +80,15 @@ extension SampleSession {
                         confidence: 0.7,
                         sourceType: "qinao-sample.llm:\(providerID)"),
                     under: constitution)
-                memoryLine = "memory admitted"
+                // deep-audit HIGH-1 (2026-07-13): the admission is now truthfully labeled by
+                // its governance OUTCOME. Under the seed constitution (memoryPromotionScope
+                // "review_required"), LLM-authored content lands as `.candidate` — HELD for
+                // review, NOT frontstage-eligible, NOT feeding the next turn's L8. That is the
+                // correct governance: raw model output is not auto-promoted into governed
+                // memory. A host whose constitution permits promotion sees `.governed`.
+                memoryLine = admitted.governanceStatus == .governed
+                    ? "memory admitted (governed)"
+                    : "memory held (\(admitted.governanceStatus))"
             } catch {
                 memoryLine = "memory REFUSED (\(error))"
             }

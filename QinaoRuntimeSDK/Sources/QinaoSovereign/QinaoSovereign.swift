@@ -504,13 +504,40 @@ public actor QinaoSovereignControlPlane {
     /// (`<utf8len>:<field>`) then concatenated, so no field content can masquerade as a
     /// boundary; the HMAC of the canonical string is hex-encoded. Dates enter via the
     /// bit pattern of `timeIntervalSince1970` (lossless, locale-free).
+    package static func tokenCanonicalBytes(fields: [String]) -> Data {
+        Data(fields.map { "\($0.utf8.count):\($0)" }.joined().utf8)
+    }
+
     package static func tokenTag(
         key: SymmetricKey, fields: [String]
     ) -> String {
-        let canonical = fields.map { "\($0.utf8.count):\($0)" }.joined()
-        return Data(HMAC<SHA256>.authenticationCode(
-            for: Data(canonical.utf8), using: key))
+        Data(HMAC<SHA256>.authenticationCode(
+            for: tokenCanonicalBytes(fields: fields), using: key))
             .map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// deep-audit MEDIUM-1 (2026-07-13): CONSTANT-TIME verification of a hex token tag
+    /// against the fields it should sign. Replaces a hex `String ==` (byte-by-byte MAC
+    /// timing oracle) — same accept/reject set, no side channel. nil/malformed hex fails.
+    package static func tokenTagValid(
+        key: SymmetricKey, fields: [String], hexTag: String
+    ) -> Bool {
+        guard let raw = hexToBytes(hexTag) else { return false }
+        return HMAC<SHA256>.isValidAuthenticationCode(
+            raw, authenticating: tokenCanonicalBytes(fields: fields), using: key)
+    }
+
+    package static func hexToBytes(_ hex: String) -> Data? {
+        guard hex.count % 2 == 0 else { return nil }
+        var out = Data(capacity: hex.count / 2)
+        var idx = hex.startIndex
+        while idx < hex.endIndex {
+            let next = hex.index(idx, offsetBy: 2)
+            guard let b = UInt8(hex[idx..<next], radix: 16) else { return nil }
+            out.append(b)
+            idx = next
+        }
+        return out
     }
 
     /// Canonical lossless textual form of a Date for token tags.
@@ -1088,13 +1115,15 @@ public actor QinaoSovereignControlPlane {
         _ warrant: Warrant,
         for intent: Intent
     ) -> Bool {
-        let expected = Self.tokenTag(
+        // deep-audit MEDIUM-1: constant-time MAC verify (was hex String ==).
+        guard Self.tokenTagValid(
             key: tokenTagKey,
             fields: [
                 warrant.warrantID, warrant.sessionID, warrant.intentDigest,
                 Self.tagDate(warrant.issuedAt), Self.tagDate(warrant.expiresAt),
-            ])
-        guard warrant.signature == expected else { return false }
+            ],
+            hexTag: warrant.signature)
+        else { return false }
         guard warrant.sessionID == intent.sessionID else { return false }
         guard warrant.intentDigest == intent.digest else { return false }
         guard warrant.expiresAt > now() else { return false }

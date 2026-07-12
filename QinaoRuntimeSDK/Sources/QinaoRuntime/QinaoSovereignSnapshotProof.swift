@@ -45,13 +45,15 @@ extension QinaoSovereignControlPlane {
         _ proof: QinaoRuntime.SnapshotContinuityProof,
         for intent: Intent
     ) -> Bool {
-        let expected = Self.tokenTag(
+        // deep-audit MEDIUM-1: constant-time MAC verify (was hex String ==).
+        guard Self.tokenTagValid(
             key: tokenTagKey,
             fields: [
                 proof.proofID, proof.sessionID, proof.anchorID, proof.intentDigest,
                 Self.tagDate(proof.issuedAt), Self.tagDate(proof.expiresAt),
-            ])
-        guard proof.signature == expected else { return false }
+            ],
+            hexTag: proof.signature)
+        else { return false }
         guard proof.sessionID == intent.sessionID else { return false }
         guard proof.intentDigest == intent.digest else { return false }
         guard proof.expiresAt > now() else { return false }

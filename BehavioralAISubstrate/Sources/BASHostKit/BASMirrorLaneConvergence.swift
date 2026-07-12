@@ -301,6 +301,14 @@ public enum BASMirrorLaneDisposer {
             effectiveKind = candidate.claimedKind
             droppedKind = nil
         }
+        // deep-audit L-6 (2026-07-13): re-validate the EFFECTIVE kind against the policy.
+        // The claimed-kind check above runs before demotion; a policy that excludes
+        // `.annotation` must still reject a demoted-to-annotation envelope rather than sign
+        // and emit a kind the policy disallowed. (Filter-completeness — demotion is always
+        // toward lowest authority, so this cannot escalate; it closes the exclusion gap.)
+        guard policy.allowedKinds.contains(effectiveKind) else {
+            return .rejected(.kindNotAllowed)
+        }
 
         let envelope = BASConvergedProposalEnvelope(
             envelopeID: envelopeID,

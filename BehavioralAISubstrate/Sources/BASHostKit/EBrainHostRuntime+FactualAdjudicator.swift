@@ -32,10 +32,15 @@ public extension BASHostRuntime {
     /// Hosts call this at the organ-registration seam, e.g.:
     /// ```swift
     /// let registry = BASOrganRegistry()
-    /// await registry.register(runtime.adjudicatingOrgan(mlxAdapter))
+    /// // deep-audit L-2 (2026-07-13): the embedder MUST be injected or the wrap is inert
+    /// // even under BAS_FACTUAL_ADJUDICATE=1 (BASHostKit cannot name the concrete MiniLM —
+    /// // that decoupling is the point of the T4 cut; the edge supplies it):
+    /// await registry.register(runtime.adjudicatingOrgan(
+    ///     mlxAdapter, embeddingProvider: BASMiniLMEmbeddingProvider()))
     /// ```
-    /// When `BAS_FACTUAL_ADJUDICATE=1` the returned adapter is a `BASSemanticAdjudicatingOrganAdapter`
-    /// (which streams); otherwise it is exactly `organ` (byte-equal).
+    /// When `BAS_FACTUAL_ADJUDICATE=1` AND an `embeddingProvider` is supplied, the returned
+    /// adapter is a `BASSemanticAdjudicatingOrganAdapter` (which streams); otherwise it is
+    /// exactly `organ` (byte-equal — nil provider ⇒ inert, see `embeddingProvider` below).
     ///
     /// - Parameters:
     ///   - organ: the live neural organ adapter the host is about to register.

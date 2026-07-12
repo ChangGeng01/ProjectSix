@@ -44,16 +44,18 @@ final class QinaoSampleSovereignSpineTests: XCTestCase {
         XCTAssertTrue(line.contains("ledger appended"),
             "a healthy exchange must report the appended ledger, got: \(line)")
         XCTAssertFalse(line.contains("REFUSED"))
-        // charter audit 2026-07-12: the admission outcome is surfaced, never swallowed.
-        XCTAssertTrue(line.contains("memory admitted"), "got: \(line)")
+        // deep-audit HIGH-1 (2026-07-13): under the seed constitution (review_required),
+        // raw LLM content is HELD as .candidate, not auto-promoted — the outcome is surfaced.
+        XCTAssertTrue(line.contains("memory held"), "got: \(line)")
 
-        // Memory admitted (the data crossing) — with TRUTHFUL LLM provenance, not "host".
+        // Memory landed (the data crossing) with TRUTHFUL LLM provenance — but as a HELD
+        // candidate, so it is present in the full recall yet NOT frontstage-eligible.
         let host = try await session.sovereignHost()
         let memCount = await host.memory.count()
-        XCTAssertEqual(memCount, 1, "the exchange must land in governed memory")
-        let atoms = await host.memory.recallFrontstage()
-        XCTAssertEqual(atoms.first?.sourceType, "qinao-sample.llm:mock.provider",
-            "LLM-authored content must not wear host provenance")
+        XCTAssertEqual(memCount, 1, "the exchange must land in memory (held for review)")
+        let frontstage = await host.memory.recallFrontstage()
+        XCTAssertTrue(frontstage.isEmpty,
+            "unreviewed LLM content must NOT be frontstage-eligible under review_required")
 
         // Keyed ledger persisted: reopen COLD with the stored secret; chain verifies.
         let secret = try SampleSession.loadOrCreateLedgerSecret(in: dir)
@@ -67,7 +69,8 @@ final class QinaoSampleSovereignSpineTests: XCTestCase {
         XCTAssertGreaterThan(count, 0, "the audited turn must persist keyed entries")
     }
 
-    /// Two exchanges accumulate memory; the second turn's L8 is fed by the first.
+    /// Two exchanges accumulate memory (both held as candidates under the seed
+    /// constitution's review_required — deep-audit HIGH-1); count reflects both.
     func testSecondTurnSeesAccumulatedMemory() async throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }

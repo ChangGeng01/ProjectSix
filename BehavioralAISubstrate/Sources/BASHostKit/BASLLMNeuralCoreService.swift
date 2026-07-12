@@ -119,16 +119,22 @@ extension BASLLMNeuralCoreService {
     public static func makeDefault(
         adapter: any BASOrganAdapter,
         eventLog: any BASEventLogStorage,
-        contractInstall: BASLLMContractInstall? = .observeOnly(purpose: .decompose)
+        contractInstall: BASLLMContractInstall? = .observeOnly(purpose: .decompose),
+        // deep-audit L-1 (2026-07-13): the embedder is edge-injected since T4 (BASHostKit no
+        // longer constructs the concrete MiniLM). nil ⇒ the adjudicator wrap is INERT even
+        // under BAS_FACTUAL_ADJUDICATE=1 — pass one to opt in. The live adjudication path is
+        // the endpoint factories (QinaoMLX/QinaoAppleFoundation), which inject it there.
+        embeddingProvider: (any BASMemory.BASEmbeddingProvider)? = nil
     ) -> BASLLMNeuralCoreService {
         // ADR-031 §4 step 1 (opt-in / byte-equal-off): when an install is supplied, every LLM call
         // through this engine is contracted (fail-closed) + traced; nil → adapter used unwrapped,
         // identical to before (no behavior change).
         let contracted: any BASOrganAdapter = contractInstall?.wrap(adapter) ?? adapter
         // observe→DISPOSE: opt-in (BAS_FACTUAL_ADJUDICATE) — wrap the live organ with the semantic
-        // factual-belief adjudicator. This is the runtime construction site the audit found MISSING (the
-        // adjudicator was DORMANT — built only in Tests/). Default-OFF ⇒ `contracted` unchanged.
-        let effectiveAdapter = Self.adjudicating(contracted)
+        // factual-belief adjudicator, but ONLY when an embeddingProvider is supplied (see the
+        // L-1 note above). With the default nil provider this returns `contracted` unchanged.
+        let effectiveAdapter = Self.adjudicating(
+            contracted, embeddingProvider: embeddingProvider)
         return BASLLMNeuralCoreService(
             engine: BASLLMExtractionEngine(
                 adapter: effectiveAdapter,

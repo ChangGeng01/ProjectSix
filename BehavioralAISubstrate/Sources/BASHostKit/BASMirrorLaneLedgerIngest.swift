@@ -88,9 +88,14 @@ public enum BASMirrorLaneIngestGate {
                 appended: false, auditID: nil, reason: .evidenceDigestMismatch)
         }
 
-        // 2b. Replay: the envelopeID is the signed nonce; its derived auditID must be
-        //     NEW on this chain. Typed reject, zero writes — and it now holds on the
-        //     in-memory ledger too, not just via SQLite's PRIMARY KEY side effect.
+        // 2b. Replay: the envelopeID is the signed nonce; its derived auditID must be NEW
+        //     on this chain. Typed reject, zero writes. HONEST SCOPE (deep-audit L-3,
+        //     2026-07-13): this hasEntry→append pair is race-free under SEQUENTIAL ingest
+        //     on any backend, and additionally CONCURRENT-safe on persistent storage where
+        //     `audit_id PRIMARY KEY` is the authoritative backstop (both production callers
+        //     wire SQLite single-shot). On the in-memory null-storage ledger (test/
+        //     ephemeral), two truly-concurrent ingests of the same envelope could both pass
+        //     this check before either appends — a non-production race, not covered here.
         let auditID = "mirror-\(envelope.envelopeID)"
         if await ledger.hasEntry(auditID: auditID) {
             return IngestOutcome(appended: false, auditID: nil, reason: .replayed)

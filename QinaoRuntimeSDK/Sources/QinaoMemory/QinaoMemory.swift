@@ -172,7 +172,15 @@ public actor QinaoMemory {
             throw MemoryError.rejectedByGovernance(
                 reason: "memory-write-scope-disabled")
         }
-        let governed = BASMemoryGovernance.promote(candidate: candidate)
+        // deep-audit HIGH-1 (2026-07-13): promote through the CONSTITUTION-AWARE overload,
+        // not the blind one. The blind `promote(candidate:)` unconditionally stamps
+        // `.governed` at `preferredTier` — so a memoryPromotionScope of "review_required"
+        // (the seed constitution's DEFAULT) or a restricted/sensitive-domain hit would have
+        // gone straight to governed + frontstage instead of being held as `.candidate`, and
+        // the warm_only/cold_only tier cap was dropped. That was a fail-open: the gate
+        // checked admission but not promotion. `promote(candidate:under:)` enforces both.
+        let governed = BASMemoryGovernance.promote(
+            candidate: candidate, under: constitution)
         store[governed.id] = governed
         return governed
     }

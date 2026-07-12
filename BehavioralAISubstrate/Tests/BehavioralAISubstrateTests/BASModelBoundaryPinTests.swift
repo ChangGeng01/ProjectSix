@@ -16,9 +16,8 @@ final class BASModelBoundaryPinTests: XCTestCase {
     private static let modelModules = [
         "BASAppleAdapters", "BASMLXAdapter", "BASChatCompletionsAdapter",
     ]
-    private static let modelRuntimeImports = [
-        "import CoreML", "import FoundationModels", "import CoreAI",
-        "import MLX", "import Tokenizers",
+    private static let modelRuntimeModules = [
+        "CoreML", "FoundationModels", "CoreAI", "MLX", "Tokenizers", "NaturalLanguage",
     ]
 
     private var packageRoot: URL {
@@ -28,8 +27,15 @@ final class BASModelBoundaryPinTests: XCTestCase {
             .deletingLastPathComponent()   // BehavioralAISubstrate
     }
 
-    /// Extract one target's dependency block from Package.swift (anchor skips .library
-    /// product declarations — same parser shape as the SDK-side QinaoBoundaryPinTests).
+    /// Extract one target's dependency block from Package.swift.
+    ///
+    /// deep-audit HIGH-2 (2026-07-13): the prior parser cut at the FIRST `]`, which in a
+    /// real dependency array closes a NESTED array (e.g. `.when(platforms: [.iOS, .macOS])`)
+    /// long before the array's own close — so the tail of the dep list (where BASOrgan sits,
+    /// the natural append site) never entered the captured block and a model dep appended
+    /// there slipped the exclusion check silently (green-by-luck). Now: anchor on
+    /// `dependencies: [` and BALANCED-BRACKET match — walk counting `[`/`]`, stop at the `]`
+    /// that returns depth to 0. Nested arrays are transparently included.
     private func dependencyBlock(
         of target: String, in manifest: String
     ) throws -> String {
@@ -43,8 +49,24 @@ final class BASModelBoundaryPinTests: XCTestCase {
             let context = manifest[contextStart..<nameRange.lowerBound]
             if context.contains(".target(") || context.contains(".executableTarget(") {
                 let tail = manifest[nameRange.upperBound...]
-                guard let end = tail.range(of: "]") else { return String(tail.prefix(4_000)) }
-                return String(tail[..<end.lowerBound])
+                guard let depsOpen = tail.range(of: "dependencies: [") else {
+                    searchStart = nameRange.upperBound
+                    continue
+                }
+                // balanced-bracket scan starting just after the opening '['.
+                var depth = 1
+                var i = depsOpen.upperBound
+                let bodyStart = i
+                while i < tail.endIndex {
+                    let c = tail[i]
+                    if c == "[" { depth += 1 }
+                    else if c == "]" {
+                        depth -= 1
+                        if depth == 0 { return String(tail[bodyStart..<i]) }
+                    }
+                    i = tail.index(after: i)
+                }
+                return String(tail[bodyStart...])
             }
             searchStart = nameRange.upperBound
         }
@@ -56,6 +78,11 @@ final class BASModelBoundaryPinTests: XCTestCase {
             contentsOf: packageRoot.appendingPathComponent("Package.swift"),
             encoding: .utf8)
         let deps = try dependencyBlock(of: "BASHostKit", in: manifest)
+        // deep-audit HIGH-2 anti-truncation guard: the captured block MUST reach the last
+        // real dep, or a tail-appended model dep would slip the exclusion below unseen.
+        XCTAssertTrue(deps.contains("\"BASOrgan\""),
+            "parser truncated the dep block before the tail — the exclusion check below "
+            + "would be blind to a model dep appended at the natural (tail) site")
         for module in Self.modelModules {
             XCTAssertFalse(deps.contains("\"\(module)\""),
                 "BOUNDARY VIOLATION: BASHostKit depends on model module \(module) — "
@@ -77,25 +104,51 @@ final class BASModelBoundaryPinTests: XCTestCase {
     }
 
     func testHostKitSourcesNeverImportTheAdapterModule() throws {
+        // deep-audit HIGH-2 compounding fix: check ALL THREE first-party model-adapter
+        // modules (a first-party `import BASMLXAdapter` transitively re-links MLX), and
+        // via the robust matcher below that sees attributed/qualified import forms.
         let dir = packageRoot.appendingPathComponent("Sources/BASHostKit")
-        let files = try FileManager.default.contentsOfDirectory(atPath: dir.path)
-            .filter { $0.hasSuffix(".swift") }
+        // deep-audit L-4 (2026-07-13): RECURSIVE — SwiftPM globs .swift recursively, so a
+        // future Sources/BASHostKit/SubDir/Foo.swift with a model import must not escape.
+        let files = Self.swiftFilesRecursive(under: dir)
         XCTAssertGreaterThan(files.count, 100, "sanity: HostKit sources present")
         var offenders: [String] = []
-        for f in files {
-            let text = try String(
-                contentsOf: dir.appendingPathComponent(f), encoding: .utf8)
-            for line in text.split(separator: "\n")
-            where line.trimmingCharacters(in: .whitespaces)
-                .hasPrefix("import BASAppleAdapters")
-                || line.trimmingCharacters(in: .whitespaces)
-                .hasPrefix("@_exported import BASAppleAdapters")
-            {
-                offenders.append(f)
+        for url in files {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for line in text.split(separator: "\n") {
+                for module in Self.modelModules
+                where Self.lineImportsModule(String(line), module) {
+                    offenders.append("\(url.lastPathComponent): \(line.trimmingCharacters(in: .whitespaces))")
+                }
             }
         }
         XCTAssertTrue(offenders.isEmpty,
-            "BASHostKit sources import the model-adapter module: \(offenders)")
+            "BASHostKit sources import a model-adapter module: \(offenders)")
+    }
+
+    /// deep-audit MEDIUM-2 (2026-07-13): robust import matcher. Strips leading attributes
+    /// (`@_exported`, `@preconcurrency`, `@testable`) and an optional decl-kind
+    /// (`import class Foo.Bar`), then matches the module as the first path component — so
+    /// `@_exported import CoreML`, `@preconcurrency import FoundationModels`,
+    /// `import class CoreML.MLModel`, and `import MLX.Something` are ALL caught, not just
+    /// bare `import CoreML`.
+    static func lineImportsModule(_ rawLine: String, _ module: String) -> Bool {
+        var t = rawLine.trimmingCharacters(in: .whitespaces)
+        // strip any leading @attributes (possibly several)
+        while t.hasPrefix("@") {
+            guard let sp = t.firstIndex(of: " ") else { return false }
+            t = String(t[t.index(after: sp)...]).trimmingCharacters(in: .whitespaces)
+        }
+        guard t.hasPrefix("import ") else { return false }
+        var rest = String(t.dropFirst("import ".count)).trimmingCharacters(in: .whitespaces)
+        // optional decl-kind: import class/struct/enum/protocol/func/var/let/typealias
+        for kind in ["class ", "struct ", "enum ", "protocol ", "func ", "var ", "let ", "typealias "]
+        where rest.hasPrefix(kind) {
+            rest = String(rest.dropFirst(kind.count)).trimmingCharacters(in: .whitespaces)
+        }
+        // module is the first dotted path component; strip trailing comment/space
+        let firstComponent = rest.split(whereSeparator: { $0 == "." || $0 == " " }).first.map(String.init) ?? rest
+        return firstComponent == module
     }
 
     func testLifecycleKitSourcesHaveZeroModelRuntimeImports() throws {
@@ -119,22 +172,53 @@ final class BASModelBoundaryPinTests: XCTestCase {
         in relativeDir: String, minFiles: Int, label: String
     ) throws {
         let dir = packageRoot.appendingPathComponent(relativeDir)
-        let files = try FileManager.default.contentsOfDirectory(atPath: dir.path)
-            .filter { $0.hasSuffix(".swift") }
+        let files = Self.swiftFilesRecursive(under: dir)   // deep-audit L-4: recursive
         XCTAssertGreaterThan(files.count, minFiles, "sanity: \(label) sources present")
         var offenders: [String] = []
-        for f in files {
-            let text = try String(
-                contentsOf: dir.appendingPathComponent(f), encoding: .utf8)
+        for url in files {
+            let text = try String(contentsOf: url, encoding: .utf8)
             for line in text.split(separator: "\n") {
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                for imp in Self.modelRuntimeImports
-                where trimmed == imp || trimmed.hasPrefix(imp + " ") {
-                    offenders.append("\(f): \(trimmed)")
+                for imp in Self.modelRuntimeModules
+                where Self.lineImportsModule(String(line), imp) {
+                    offenders.append("\(url.lastPathComponent): \(line.trimmingCharacters(in: .whitespaces))")
                 }
             }
         }
         XCTAssertTrue(offenders.isEmpty,
             "model-runtime imports inside \(label): \(offenders)")
+    }
+
+    /// deep-audit MEDIUM-2: the matcher must catch attributed / decl-kind / submodule
+    /// forms, not just bare `import X`, or a future attributed reintroduction slips both
+    /// this pin and the facade guard.
+    func testImportMatcherCatchesAttributedAndQualifiedForms() {
+        let hits = [
+            "import CoreML",
+            "  import CoreML",
+            "@_exported import CoreML",
+            "@preconcurrency import FoundationModels",
+            "@_exported @preconcurrency import CoreML",
+            "import class CoreML.MLModel",
+            "import CoreML.MLModel",
+            "import MLX  // comment",
+        ]
+        for line in hits {
+            let m = line.contains("FoundationModels") ? "FoundationModels"
+                : line.contains("MLX") ? "MLX" : "CoreML"
+            XCTAssertTrue(Self.lineImportsModule(line, m),
+                "matcher must catch: \(line)")
+        }
+        // must NOT false-positive on comments or a different module
+        XCTAssertFalse(Self.lineImportsModule("// import CoreML in a comment", "CoreML"))
+        XCTAssertFalse(Self.lineImportsModule("import CoreMLTools", "CoreML"),
+            "prefix-only must not match (CoreMLTools != CoreML)")
+        XCTAssertFalse(Self.lineImportsModule("import Foundation", "CoreML"))
+    }
+
+    /// deep-audit L-4: recursively enumerate .swift files (matches SwiftPM's glob).
+    static func swiftFilesRecursive(under dir: URL) -> [URL] {
+        guard let en = FileManager.default.enumerator(
+            at: dir, includingPropertiesForKeys: nil) else { return [] }
+        return en.compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
     }
 }

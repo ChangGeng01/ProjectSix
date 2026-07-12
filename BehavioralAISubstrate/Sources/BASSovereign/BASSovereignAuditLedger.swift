@@ -503,6 +503,16 @@ public actor BASSovereignAuditLedger {
         guard !draft.verdictRef.isEmpty else {
             throw LedgerError.invalidEntry("verdictRef must be non-empty")
         }
+        // deep-audit L-3 (2026-07-13): an append-level auditID-uniqueness guard was
+        // considered here to give the in-memory backend the same replay backstop the
+        // SQLite `audit_id PRIMARY KEY` provides. It was BACKED OUT because a distinct
+        // subsystem (EBrainRuntimeCoordinator+SovereignCommit.swift:686) derives auditID
+        // as `audit.<sessionID>.<verdictLevel>` — NOT turn-unique — so two turns of the
+        // same session+verdict legitimately collide today, and a guard here would break
+        // multi-turn on that path (it already fails on SQLite; only lax in-memory hides
+        // it). Fixing that collision is out of this remediation's scope (a separate task).
+        // The mirror lane's replay defense stays at the ingest gate (unique
+        // `mirror-<envelopeID>` auditID), scoped honestly in BASMirrorLaneLedgerIngest.
 
         let priorHash = entries.last?.selfHash ?? Self.genesisHash
         let canonical = canonicalBytes(for: draft, priorHash: priorHash)
