@@ -44,6 +44,17 @@ explicit provider injection.
    principle (2026-07-13) forbids until a real host needs SDK-package-only consumption.
    Reading B stays available to the operator; adopting it is deferred (named + triggered:
    "a host that must consume QinaoRuntimeSDK without the BAS foundation").
+
+   **Reading B's TRUE meaning (operator-confirmed 2026-07-13): it is a DISTRIBUTION /
+   productization decision, NOT an architecture debt.** Reading B = sealing BAS as an
+   invisible implementation detail behind QinaoRuntimeSDK-only facades (full Qinao-local
+   type mirrors over the runTurn cascade / mirror lane / tool lane / The Ledger, zero
+   BAS symbols in any public surface). The only host that needs that is a THIRD-PARTY
+   consumer of a binary-distributed SDK (xcframework / external team) — where BAS must
+   be independently evolvable behind the seal. As long as the only host is the sovereign
+   operator's own (Apple-only private substrate), the open BAS foundation is an asset,
+   not a leak. Do NOT build Reading B against the residual list as if it were owed;
+   its trigger is the first time "distribute Qinao externally" becomes real.
 3. **Device re-certification** (DeviceTestApp + SampleHost app builds, two-phone sweep)
    is hardware-gated — GENUINELY BLOCKED without physical devices, not deferrable by a
    host-side action. Host-side regression (beta + headless + SDK) is green; the T4/v2
