@@ -25,21 +25,36 @@ final class BASRunTurnFrameBudgetTests: XCTestCase {
         // package root from this file's path; native-SPM object layout (stable toolchain / CI).
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let obj = root.appendingPathComponent(
-            ".build/arm64-apple-macosx/debug/BASHostKit.build/EBrainRuntimeCoordinator+RunTurn.swift.o")
-        guard FileManager.default.fileExists(atPath: obj.path) else {
-            throw XCTSkip("native-SPM object not present (swiftbuild layout or fresh checkout) — host lint")
+        // step 4 moved the stage methods into three sibling files — scan all four objects
+        let objDir = root.appendingPathComponent(".build/arm64-apple-macosx/debug/BASHostKit.build")
+        let objNames = ["EBrainRuntimeCoordinator+RunTurn.swift.o",
+                        "EBrainRuntimeCoordinator+RunTurnStagesMemoryRisk.swift.o",
+                        "EBrainRuntimeCoordinator+RunTurnStagesEscalateRender.swift.o",
+                        "EBrainRuntimeCoordinator+RunTurnStagesAuditAssemble.swift.o"]
+        var dis = ""
+        for name in objNames {
+            let obj = objDir.appendingPathComponent(name)
+            guard FileManager.default.fileExists(atPath: obj.path) else {
+                throw XCTSkip("native-SPM object \(name) not present (swiftbuild layout or fresh checkout)")
+            }
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+            p.arguments = ["llvm-objdump", "-d", obj.path]
+            let out = Pipe(); p.standardOutput = out; p.standardError = Pipe()
+            try p.run()
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            guard p.terminationStatus == 0 else { throw XCTSkip("llvm-objdump unavailable") }
+            // prefix each symbol header with its object so per-object attribution survives
+            let text = String(decoding: data, as: UTF8.self)
+            for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+                if line.hasSuffix(">:"), line.contains(" <") {
+                    dis += line.replacingOccurrences(of: " <", with: " <\(name)|") + "\n"
+                } else {
+                    dis += line + "\n"
+                }
+            }
         }
-
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        p.arguments = ["llvm-objdump", "-d", obj.path]
-        let out = Pipe(); p.standardOutput = out; p.standardError = Pipe()
-        try p.run()
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
-        guard p.terminationStatus == 0 else { throw XCTSkip("llvm-objdump unavailable") }
-        let dis = String(decoding: data, as: UTF8.self)
 
         // sum `sub sp, sp, #imm(, lsl #12)?` per symbol
         var frames: [String: Int] = [:]
@@ -60,19 +75,22 @@ final class BASRunTurnFrameBudgetTests: XCTestCase {
             frames[cur, default: 0] += v
         }
 
-        // main = the runTurn body (addr-0 label ltmp0 in this object, or the mangled symbol)
-        let main = max(
-            frames["ltmp0"] ?? 0,
-            frames.filter { $0.key.contains("V7runTurnyAA") && !$0.key.contains("L_") }
-                .map(\.value).max() ?? 0)
-        var stageMax = 0
-        var report: [String] = ["runTurn-main: \(main) B"]
+        // Attribution note: each object's FIRST function is emitted under the local label
+        // ltmp0 (its mangled name doesn't head the disassembly), and name-matching then hits
+        // small thunks — measured 2026-07-12: riskStageB name-match said 304B while its real
+        // body (ltmp0 of its object) was 28,432B. Robust budget: peak = the RunTurn object's
+        // largest frame (the runTurn body) + the largest frame across the stage objects
+        // (whichever stage that is — the budget doesn't need per-stage precision).
+        func maxFrame(inObject name: String) -> Int {
+            frames.filter { $0.key.hasPrefix(name + "|") }.map(\.value).max() ?? 0
+        }
+        let main = maxFrame(inObject: objNames[0])
+        let stageMax = objNames.dropFirst().map { maxFrame(inObject: $0) }.max() ?? 0
+        var report: [String] = ["runTurn-main: \(main) B", "largest stage frame: \(stageMax) B"]
+        XCTAssertGreaterThan(main, 0, "runTurn body frame not found")
         for stage in Self.stageNames {
-            let sz = frames.filter { $0.key.contains(stage) }.map(\.value).max() ?? 0
-            XCTAssertGreaterThan(sz, 0,
-                "stage function '\(stage)' not found in the object — the stage split was undone?")
-            stageMax = max(stageMax, sz)
-            report.append("\(stage): \(sz) B")
+            XCTAssertTrue(dis.contains(stage),
+                "stage function '\(stage)' not found in the objects — the stage split was undone?")
         }
         let peak = main + stageMax
         report.append("PEAK: \(peak) B (budget \(Self.peakBudgetBytes))")
@@ -91,11 +109,14 @@ final class BASRunTurnFrameBudgetTests: XCTestCase {
 /// means someone added a stage returning a bare tuple: name its contract instead.
 extension BASRunTurnFrameBudgetTests {
     func testStageContractsAreNamedTypesNotTuples() throws {
-        let src = try String(
-            contentsOf: URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-                .appendingPathComponent("Sources/BASHostKit/EBrainRuntimeCoordinator+RunTurn.swift"),
-            encoding: .utf8)
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/BASHostKit")
+        var src = ""
+        for f in ["EBrainRuntimeCoordinator+RunTurn.swift", "EBrainRuntimeCoordinator+RunTurnStagesMemoryRisk.swift",
+                  "EBrainRuntimeCoordinator+RunTurnStagesEscalateRender.swift", "EBrainRuntimeCoordinator+RunTurnStagesAuditAssemble.swift"] {
+            src += try String(contentsOf: root.appendingPathComponent(f), encoding: .utf8) + "\n"
+        }
         let offenders = src.split(separator: "\n").enumerated().filter { _, line in
             line.contains("Stage") && line.contains("func ") && line.contains("-> (")
         }
@@ -145,5 +166,45 @@ extension BASRunTurnFrameBudgetTests {
         XCTAssertTrue(offenders.isEmpty,
             "raw routedBudget consumed after the context compiler (route it through contextPlan):\n"
             + offenders.joined(separator: "\n"))
+    }
+}
+
+// MARK: - declared-reads lint (context-IR step 4)
+
+/// Step 4 ("读面声明"): stage implementations are coordinator METHODS with explicit
+/// parameters — a method cannot lexically capture runTurn locals, so the parameter list IS
+/// the declared read surface (the compiler enforces it; a nested local func can silently
+/// capture anything). Mutated context flows back through the named output contexts.
+extension BASRunTurnFrameBudgetTests {
+    func testStageReadsAreDeclaredParameters() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/BASHostKit")
+        let runTurn = try String(
+            contentsOf: root.appendingPathComponent("EBrainRuntimeCoordinator+RunTurn.swift"),
+            encoding: .utf8)
+        // (a) no NESTED stage functions (8-space indent = inside runTurn = capture-capable)
+        let nested = runTurn.split(separator: "\n").enumerated().filter { _, l in
+            l.hasPrefix("        func ") && l.contains("Stage") && !l.contains("markStage")
+        }
+        XCTAssertTrue(nested.isEmpty,
+            "stage functions nested in runTurn can capture reads silently — hoist to methods:\n"
+            + nested.map { "line \($0.0 + 1): \($0.1.trimmingCharacters(in: .whitespaces).prefix(80))" }
+                .joined(separator: "\n"))
+        // (b) each stage exists as a method whose reads are DECLARED (non-empty parameter list)
+        var all = runTurn
+        for f in ["EBrainRuntimeCoordinator+RunTurnStagesMemoryRisk.swift", "EBrainRuntimeCoordinator+RunTurnStagesEscalateRender.swift",
+                  "EBrainRuntimeCoordinator+RunTurnStagesAuditAssemble.swift"] {
+            if let s = try? String(contentsOf: root.appendingPathComponent(f), encoding: .utf8) {
+                all += s
+            }
+        }
+        for stage in ["memoryDeliberateStage", "riskStageA", "riskStageB",
+                      "renderStageA", "renderStageB", "assembleStage"] {
+            XCTAssertTrue(all.contains("func \(stage)("),
+                "stage method \(stage) not found in the coordinator surface")
+            XCTAssertFalse(all.contains("func \(stage)()"),
+                "\(stage) declares NO reads (empty parameter list) — the read surface must be explicit")
+        }
     }
 }

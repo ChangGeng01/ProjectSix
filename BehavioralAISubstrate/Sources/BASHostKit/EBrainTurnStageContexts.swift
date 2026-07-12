@@ -34,10 +34,18 @@ struct BASRiskBindStageContext {
     let boundRiskCard: BASRiskCard
     let normalizedRiskDecisionPackage: BASRiskDecisionPackage
     let riskFindings: [BASRuntimeAuditFinding]
+    /// The thought frame with risk bindings attached — a DECLARED write-back (pre-step-4 this
+    /// was a lexical-capture mutation of runTurn's var).
+    let thoughtFrame: BASThoughtFrame
 }
 
 /// L11 second half output: kunlun/cthulhu escalations + gate-side audit folds + host gate.
 struct BASRiskEscalateStageContext {
+    /// Permits REBOUND by the escalation gates — DECLARED write-backs (pre-step-4 these were
+    /// lexical-capture mutations of runTurn's vars).
+    let boundActionPermit: BASActionPermit
+    let boundRiskCard: BASRiskCard
+    let thoughtFrame: BASThoughtFrame
     let abyssalThermalTrioForAudit: BASTurnAuditProjectionsAbyssalThermalTrio
     let cthulhuAssertionDecision: BASCthulhuAssertionCeilingDecision
     let cthulhuEscalation: BASCthulhuPermitEscalationDecision
@@ -53,6 +61,8 @@ struct BASRiskEscalateStageContext {
 /// L12 first half output: rendered output + runtime trace + sovereign verdict + quarantine
 /// + evolution governance artifacts.
 struct BASRenderVerdictStageContext {
+    /// The thought frame with lease refs attached — DECLARED write-back.
+    let thoughtFrame: BASThoughtFrame
     let abyssalPressureForAudit: BASAbyssalPressure
     let humanAnchorSignalForAudit: BASHumanAnchorSignal
     let lateClusterBForAudit: BASTurnAuditProjectionsLateClusterB
@@ -73,6 +83,8 @@ struct BASRenderVerdictStageContext {
 
 /// L12 second half output: audit observation projections + sovereign finalization.
 struct BASAuditProjectionStageContext {
+    /// The thought frame with sovereign lease refs attached — DECLARED write-back.
+    let thoughtFrame: BASThoughtFrame
     let finalSovereignVerdict: BASSovereignVerdict?
     let finalizedBudgetFrame: BASBudgetFrame
     let finalizedRuntimeTrace: BASRuntimeTrace

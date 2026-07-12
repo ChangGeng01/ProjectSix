@@ -106,6 +106,11 @@ final class BASHostKitFacadeGuardTests: XCTestCase {
         // watcher effective-inputs fix, 7321781f1). Genuine composition (fabric seat wiring), but
         // flagged for the deferred extraction list. Pinned TIGHT at current+8.
         "BASAgentFabricHostPipeline.swift": 815,
+        // 2026-07-12 context-IR step 4: runTurn's stage bodies moved VERBATIM into stage-method
+        // files (declared read surfaces); two carry two stages each. Pinned TIGHT at current+~8
+        // so the ratchet keeps teeth — new logic goes in lower modules, not here.
+        "EBrainRuntimeCoordinator+RunTurnStagesEscalateRender.swift": 815,
+        "EBrainRuntimeCoordinator+RunTurnStagesAuditAssemble.swift": 880,
     ]
 
     func testNoNewLargeFileAndKnownGodFilesDoNotGrow() {
@@ -133,9 +138,12 @@ final class BASHostKitFacadeGuardTests: XCTestCase {
         // 2026-07-12 deliberate raise 285→288: the EBrainTurnResult CoW-box extraction split the
         // 1919-LOC god file into main + BundleInits(×2) + Codable (net +3) — pure structural
         // extraction of an EXISTING type demanded by the LOC leak-cap above, zero new logic.
+        // 2026-07-12 deliberate raise 288→292: context-IR arc (operator-ordered) — StageContexts +
+        // TurnResponse + TurnContextCompiler + 3 stage-method files (verbatim-moved runTurn bodies),
+        // minus the deleted BundleInitsLegacy. Structural extractions, zero new business logic.
         let count = Self.swiftFiles().count
-        XCTAssertLessThanOrEqual(count, 288,
-            "BASHostKit grew to \(count) files (band 288). New files likely belong in a lower module "
+        XCTAssertLessThanOrEqual(count, 292,
+            "BASHostKit grew to \(count) files (band 292). New files likely belong in a lower module "
             + "(composition stays small) — or raise the band deliberately.")
         XCTAssertGreaterThan(count, 100, "sanity: expected to find the HostKit sources; found \(count)")
     }
