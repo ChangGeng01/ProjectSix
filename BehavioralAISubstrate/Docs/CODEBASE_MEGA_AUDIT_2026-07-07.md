@@ -837,3 +837,20 @@ there is no old checkout left for tooling to wander into.
 
 Premises 1/3/6 and the red numbers cited were the same stale-worktree artifacts dispositioned
 in the section above (worktrees since removed).
+
+## 2026-07-12 — the hallway furniture is OUT: 9 zero-caller init rungs deleted; innocence statements de-named
+
+Operator's taste verdict ratified by census and executed (bd35386d3): of 11 public
+BASEBrainTurnResult inits, only the all-fields init and the production 9-bundle init have any
+caller repo-wide — the other 9 rungs (M1474…M1502) served no one (private library; even their
+chapter proof-tests never invoked them). Deleted 829 lines net; RECOVERY ANCHOR 83c499f45
+(pushed history; one-line git show restores any of it). New teeth:
+testInitSurfaceStaysMinimal pins the surface at 3 (RED 12>3 proven before deletion) — dead
+rungs cannot silently re-accumulate. Regression: beta both halves EXIT=0, headless
+SCRIPT_EXIT=0, SDK 1,449/0.
+
+Companion gate lesson (2675a9d93): the redaction script's CLEAN message literally named
+QinaoMLX, so output-greppers misread the innocence statement as a violation list — the proven
+mechanism behind the recurring "redaction flags QinaoMLX itself" claim (allowlist correct
+since at least 06-29). Clean output now names NO modules. Gate-authoring law: a clean verdict
+must not contain the names it exonerates.
