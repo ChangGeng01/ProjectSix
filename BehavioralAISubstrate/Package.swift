@@ -26,6 +26,9 @@ let package = Package(
         // so the substrate core (and headless hosts) stay SwiftUI-free.
         .library(name: "BASAdminUI", targets: ["BASAdminUI"]),
         .library(name: "BASAppleAdapters", targets: ["BASAppleAdapters"]),
+        // charter audit 2026-07-12 T4 — pure lifecycle half + edge-wiring ring.
+        .library(name: "BASAppleLifecycleKit", targets: ["BASAppleLifecycleKit"]),
+        .library(name: "BASAppleEdgeWiring", targets: ["BASAppleEdgeWiring"]),
         .library(name: "BASSovereign", targets: ["BASSovereign"]),
         .library(name: "BASWorldPrior", targets: ["BASWorldPrior"]),
         .library(name: "BASLeaseLife", targets: ["BASLeaseLife"]),
@@ -436,9 +439,28 @@ let package = Package(
         // forcing headless hosts to link SwiftUI transitively). Isolated here
         // so only explicit UI hosts pull in SwiftUI.
         .target(name: "BASAdminUI", dependencies: ["BASAdmin"]),
+        // charter audit 2026-07-12 T4 — the LLM-outside cut. Pure-Swift Apple lifecycle /
+        // executor / config types that BASHostKit's public API is built on (they never
+        // invoke a model runtime; their old home in BASAppleAdapters wove the
+        // FoundationModels-linking module into the core host umbrella). BASHostKit now
+        // depends on THIS target only; BASAppleAdapters re-exports it for compatibility.
+        // BOUNDARY (pinned by BASModelBoundaryPinTests): this target must NEVER import
+        // CoreML / FoundationModels / CoreAI / MLX / Tokenizers.
+        // charter audit 2026-07-12 T4 — the edge-wiring ring: sees BOTH BASHostKit and
+        // BASAppleAdapters; cross-side model-bound conveniences live here so neither side
+        // links the other.
+        .target(
+            name: "BASAppleEdgeWiring",
+            dependencies: ["BASRuntimeCore", "BASHostKit", "BASAppleAdapters"]),
+        .target(
+            name: "BASAppleLifecycleKit",
+            dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASObservability", "BASOrchestration", "BASLeaseLife"]),
         .target(
             name: "BASAppleAdapters",
             dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASAdmin", "BASOrgan", "BASLeaseLife",
+                // charter audit 2026-07-12 T4: the pure lifecycle half moved out; the
+                // re-export in Exports.swift keeps every existing importer compiling.
+                "BASAppleLifecycleKit",
                 // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
                 .product(name: "Crypto", package: "swift-crypto"),
                 // RoBERTa BPE tokenizer for the CoreAI NLI verifier (BASCoreAINLIVerifier)
@@ -471,7 +493,10 @@ let package = Package(
                 "BASObservability",
                 "BASEvaluation",
                 "BASAdmin",
-                "BASAppleAdapters",
+                // charter audit 2026-07-12 T4: was BASAppleAdapters — the LLM-adapter
+                // module is no longer in the core host umbrella's link closure. Model
+                // probes (MiniLM embedder, CoreAI NLI) are now INJECTED by the edge.
+                "BASAppleLifecycleKit",
                 "BASLeaseLife",
                 // M320 — `buildSovereignAuditEntry` accepts an
                 // optional `BASUnknownReserve` projection (white
@@ -723,7 +748,8 @@ let package = Package(
             // exposed by the C++ cache target,plus bas_spsc_ring_*
             // exposed by the C system bridge target。
             "BASMPSGraphExecutableCacheCxx",
-            "BASCSystemBridge"
+            "BASCSystemBridge",
+            "BASAppleLifecycleKit", "BASAppleEdgeWiring",
         ]),
         // Universal Draft Layer — XCTest-ONLY target (no swift-testing), so these run in their OWN .xctest bundle
         // and are not blocked by the swift-testing/XCTest co-bundle load crash in BehavioralAISubstrateTests.

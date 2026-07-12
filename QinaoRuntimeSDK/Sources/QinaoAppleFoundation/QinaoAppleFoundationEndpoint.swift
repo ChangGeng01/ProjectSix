@@ -87,7 +87,11 @@ public extension QinaoLoop {
         // the verdict reaches `streamDraft`. The wrapper forwards `descriptor`, so the registry's
         // on-device/recency selection (Apple FM over the deterministic fallback) is unchanged. FAIL-OPEN:
         // missing provider/corpus ⇒ the adapter is returned unchanged.
-        let organ = BASLLMNeuralCoreService.adjudicating(AppleFoundationOrganAdapter())
+        let organ = BASLLMNeuralCoreService.adjudicating(
+            AppleFoundationOrganAdapter(),
+            // charter audit 2026-07-12 T4: the embedder is constructed HERE (LLM-side
+            // module) and injected — BASHostKit no longer builds the concrete MiniLM.
+            embeddingProvider: BASMiniLMEmbeddingProvider())
         // Pre-embed the fact bank so the first ON turn doesn't stall before the first token (no-op when OFF).
         await BASLLMNeuralCoreService.prewarmAdjudicator(organ)
         await registry.register(organ)

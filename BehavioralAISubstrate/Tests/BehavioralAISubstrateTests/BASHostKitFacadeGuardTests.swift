@@ -49,8 +49,12 @@ final class BASHostKitFacadeGuardTests: XCTestCase {
     /// The pinned facade surface. `import BASHostKit` transitively re-exports exactly these 8 — by design
     /// (one-line host integration), but it MUST be a conscious set. Growing it blurs boundaries → update here
     /// only with intent.
+    // charter audit 2026-07-12 T4 (deliberate update): BASAppleAdapters → BASAppleLifecycleKit.
+    // The LLM-outside cut: the core umbrella now re-exports the PURE lifecycle kit; the
+    // model-invoking adapter module left the facade's link closure entirely
+    // (BASModelBoundaryPinTests pins the exclusion mechanically).
     static let pinnedExports: Set<String> = [
-        "BASAdmin", "BASAppleAdapters", "BASEvaluation", "BASMemory",
+        "BASAdmin", "BASAppleLifecycleKit", "BASEvaluation", "BASMemory",
         "BASObservability", "BASOrchestration", "BASPolicy", "BASRuntimeCore",
     ]
 

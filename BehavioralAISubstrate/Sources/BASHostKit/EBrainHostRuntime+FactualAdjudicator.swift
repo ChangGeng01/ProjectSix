@@ -50,8 +50,13 @@ public extension BASHostRuntime {
         _ organ: any BASOrganAdapter,
         enabled: Bool = BASFactualAdjudicatorWiring.isEnabled(),
         gate: BASAdjudicationGate = BASAdjudicationGate.fromEnvironment(),
-        observer: BASAdjudicationObserver? = BASAdjudicationObservation.defaultObserverIfEnabled()
+        observer: BASAdjudicationObserver? = BASAdjudicationObservation.defaultObserverIfEnabled(),
+        // charter audit 2026-07-12 T4: the embedder is edge-injected (LLM-outside cut);
+        // nil ⇒ the wrap stays inert even when enabled (fail-open, like a missing corpus).
+        embeddingProvider: (any BASMemory.BASEmbeddingProvider)? = nil
     ) -> any BASOrganAdapter {
-        BASLLMNeuralCoreService.adjudicating(organ, enabled: enabled, gate: gate, observer: observer)
+        BASLLMNeuralCoreService.adjudicating(
+            organ, enabled: enabled, gate: gate, observer: observer,
+            embeddingProvider: embeddingProvider)
     }
 }

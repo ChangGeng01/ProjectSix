@@ -56,7 +56,6 @@
 import Foundation
 import BASOrgan
 import BASRuntimeCore
-import BASAppleAdapters   // observe→DISPOSE: BASMiniLMEmbeddingProvider for the on-device semantic adjudicator
 
 // MARK: - Servicing protocol
 
@@ -150,11 +149,17 @@ extension BASLLMNeuralCoreService {
         enabled: Bool = BASFactualAdjudicatorWiring.isEnabled(),
         gate: BASAdjudicationGate = BASAdjudicationGate.fromEnvironment(),
         observer: BASAdjudicationObserver? = BASAdjudicationObservation.defaultObserverIfEnabled(),
-        nliProbe: BASNLIEntailmentProbe? = nil
+        nliProbe: BASNLIEntailmentProbe? = nil,
+        // charter audit 2026-07-12 T4 (LLM-outside cut): the embedder is INJECTED by the
+        // edge — like nliProbe always was — instead of BASHostKit constructing the
+        // concrete MiniLM (which welded the model-adapter module into the core umbrella).
+        // nil ⇒ inner unchanged (same FAIL-OPEN posture as a missing corpus). The LLM-side
+        // endpoint factories (QinaoAppleFoundation/QinaoMLX) pass BASMiniLMEmbeddingProvider().
+        embeddingProvider: (any BASMemory.BASEmbeddingProvider)? = nil
     ) -> any BASOrganAdapter {
         guard enabled else { return inner }
         let facts = BASBundledFactCorpus.load()
-        guard !facts.isEmpty, let provider = BASMiniLMEmbeddingProvider() else { return inner }
+        guard !facts.isEmpty, let provider = embeddingProvider else { return inner }
         let bank = BASEmbeddingFactBank(facts: facts, provider: provider)
         // NEUROMODULATION: the gate (default `.always`, or `BAS_ADJ_GATE`-derived) decides per turn whether to
         // pay the embed/retrieve — so the adjudicator is a tier engaged by stakes × headroom (NOT ε), not always-on.

@@ -75,6 +75,14 @@ let package = Package(
                 .product(name: "BASRuntimeCore",
                          package: "BehavioralAISubstrate"),
                 .product(name: "BASMLXAdapter",
+                         package: "BehavioralAISubstrate"),
+                // charter audit 2026-07-12 T4 (LLM-outside cut): BASHostKit no longer
+                // re-exports the model-adapter module, and the MLModel-bound Chenglu
+                // builder overload moved to the edge-wiring ring. This HOST links both
+                // sides explicitly — that is a host's prerogative and obligation.
+                .product(name: "BASAppleAdapters",
+                         package: "BehavioralAISubstrate"),
+                .product(name: "BASAppleEdgeWiring",
                          package: "BehavioralAISubstrate")
             ],
             path: ".",

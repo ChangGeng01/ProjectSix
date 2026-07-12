@@ -27,7 +27,7 @@
 
 import Foundation
 @_exported import BASAdmin
-@_exported import BASAppleAdapters
+@_exported import BASAppleLifecycleKit
 @_exported import BASEvaluation
 @_exported import BASMemory
 @_exported import BASObservability

@@ -302,6 +302,10 @@ let package = Package(
                 "QinaoLoop",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 .product(name: "BASMLXAdapter", package: "BehavioralAISubstrate"),
+                // charter audit 2026-07-12 T4: BASMiniLMEmbeddingProvider is edge-injected
+                // by this LLM-side factory (BASHostKit no longer links the adapter module);
+                // explicit dep so the import is manifest-honest, not transitively lucky.
+                .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate"),
                 // observe→DISPOSE: route the registered MLX organ through the default-OFF factual-belief
                 // adjudicator wrap (BASLLMNeuralCoreService.adjudicating). BASHostKit is NOT an MLX/HF type,
                 // so the redaction seam (check_mlx_redaction.sh) stays clean — the wrap is body-only, the

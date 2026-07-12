@@ -1337,7 +1337,8 @@ final class BASEnduranceAppController: ObservableObject {
             }
         }
         if ProcessInfo.processInfo.environment["BAS_EFFORT_LOOP"] == "1" {
-            if let probe = BASTurnSurpriseProbe() {
+            if let provider = BASMiniLMEmbeddingProvider() {
+                let probe = BASTurnSurpriseProbe(provider: provider, dim: provider.dimension)
                 effortProbe = probe
                 thermalFeed = BASThermalTwinFeed()
                 await brain.setDeliberationLoopEnabled(true)

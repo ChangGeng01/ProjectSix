@@ -2,6 +2,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASSovereign
 import BASOrgan
+import BASAppleAdapters   // charter T4: tests inject the MiniLM explicitly
 
 /// Audit fix (DORMANT): the adjudicator is now constructed on a live Sources/ path (BASLLMNeuralCoreService
 /// .adjudicating, called by makeDefault), opt-in + fail-open. This proves: disabled ⇒ inner unwrapped;
@@ -28,7 +29,9 @@ final class BASLLMNeuralCoreServiceAdjudicatorTests: XCTestCase {
     }
 
     func testEnabledWrapsAndInjectsVerdictEndToEnd() async throws {
-        let out = BASLLMNeuralCoreService.adjudicating(EchoInner(), enabled: true)
+        let out = BASLLMNeuralCoreService.adjudicating(
+            EchoInner(), enabled: true,
+            embeddingProvider: BASMiniLMEmbeddingProvider())
         XCTAssertTrue(out is BASSemanticAdjudicatingOrganAdapter, "enabled must wrap with the adjudicator")
         // Full live path: bundled 1131-fact corpus + real MiniLM embed/retrieve + alias verify + verdict.
         let draft = try await out.draft(BASOrganRequest(
@@ -63,7 +66,9 @@ final class BASLLMNeuralCoreServiceAdjudicatorTests: XCTestCase {
     }
 
     func testWrappedOrganSurfacesToStreamingProbeAndInjects() async throws {
-        let wrapped = BASLLMNeuralCoreService.adjudicating(StreamingEcho(), enabled: true)
+        let wrapped = BASLLMNeuralCoreService.adjudicating(
+            StreamingEcho(), enabled: true,
+            embeddingProvider: BASMiniLMEmbeddingProvider())
         let streaming = try XCTUnwrap(wrapped as? BASStreamingOrganAdapter,
                                       "the chat loop's as? BASStreamingOrganAdapter probe MUST resolve the wrapper")
         var body = ""

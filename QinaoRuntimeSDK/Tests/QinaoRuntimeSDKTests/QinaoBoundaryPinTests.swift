@@ -16,7 +16,15 @@ final class QinaoBoundaryPinTests: XCTestCase {
     ]
 
     /// Modules OUTSIDE the boundary (LLM endpoints — data-only crossing).
-    private static let llmModules = ["QinaoAppleFoundation", "QinaoMLX"]
+    /// charter audit 2026-07-12 T4 upgrade: the audit proved this pin was BLIND to the
+    /// real leak path (BAS-side products) — QinaoRuntime linked FoundationModels via
+    /// BASHostKit→BASAppleAdapters while this pin stayed green. The BAS-side cut
+    /// (BASModelBoundaryPinTests) removed that edge; THIS list now also bans declaring
+    /// the BAS model-adapter products directly in any in-boundary target.
+    private static let llmModules = [
+        "QinaoAppleFoundation", "QinaoMLX",
+        "BASAppleAdapters", "BASMLXAdapter", "BASChatCompletionsAdapter",
+    ]
 
     /// Extract one target's dependency block from Package.swift text.
     ///

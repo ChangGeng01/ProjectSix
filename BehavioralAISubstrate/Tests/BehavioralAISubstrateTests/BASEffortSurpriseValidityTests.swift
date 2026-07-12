@@ -14,7 +14,8 @@ import BASOrgan
 final class BASEffortSurpriseValidityTests: XCTestCase {
 
     private func probe() throws -> BASTurnSurpriseProbe {
-        let p = try XCTUnwrap(BASTurnSurpriseProbe(), "MiniLM provider must be available")
+        let provider = try XCTUnwrap(BASMiniLMEmbeddingProvider(), "MiniLM provider must be available")
+        let p = BASTurnSurpriseProbe(provider: provider, dim: provider.dimension)
         return p
     }
     private func skipUnlessReady() throws {

@@ -40,6 +40,7 @@ import XCTest
 
 #if canImport(CoreML)
 import CoreML
+import BASAppleEdgeWiring
 #endif
 
 final class BASChengluFullChainE2ETests: XCTestCase {

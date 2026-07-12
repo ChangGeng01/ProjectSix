@@ -1,7 +1,6 @@
 import Foundation
 import BASMemory
 import BASMetalSubstrate
-import BASAppleAdapters
 
 /// observe→DISPOSE (biomimetic-brain-efficiency) — the LIVE ε feed: a per-session probe that turns each chat
 /// turn into a real prediction-error signal (surprise) the `BASEffortGovernor` consumes.
@@ -44,12 +43,6 @@ public actor BASTurnSurpriseProbe {
             shape: BASPredictiveCodingProbeShape(dim: d, learningRate: learningRate))
     }
 
-    /// Convenience: drive the live on-device MiniLM provider, matching `dim` to it. `nil` when MiniLM is
-    /// unavailable (the host then leaves ε to the governor's neutral cold-start default).
-    public init?(learningRate: Float = 0.2) {
-        guard let provider = BASMiniLMEmbeddingProvider() else { return nil }
-        self.init(provider: provider, dim: provider.dimension, learningRate: learningRate)
-    }
 
     /// Embed the turn + feed predictive coding; return the instantaneous prediction-error energy ‖ε‖² (≥0) for
     /// this turn — the live surprise signal. `nil` only if the observe step fails (never on a normal embed).

@@ -2,6 +2,7 @@ import XCTest
 @testable import BASHostKit
 import BASOrgan
 import BASMemory
+import BASAppleAdapters   // charter T4: tests inject the MiniLM explicitly
 
 /// observe→DISPOSE — the NEUROMODULATION gate (biomimetic-brain-efficiency): the adjudicator is a TIER engaged
 /// by `stakes × headroom` (NOT ε — ε gates compute, not verify), not an always-on wrap. These tests cover the
@@ -181,7 +182,9 @@ final class BASAdjudicationGateTests: XCTestCase {
 
     func testAdjudicatingFactoryHonorsInjectedGate() async throws {
         // enabled + .never gate ⇒ wrapper IS built but never injects (real corpus + MiniLM untouched per turn).
-        let wrapped = BASLLMNeuralCoreService.adjudicating(EchoInner(), enabled: true, gate: .never)
+        let wrapped = BASLLMNeuralCoreService.adjudicating(
+            EchoInner(), enabled: true, gate: .never,
+            embeddingProvider: BASMiniLMEmbeddingProvider())
         XCTAssertTrue(wrapped is BASSemanticAdjudicatingOrganAdapter, "enabled still wraps")
         let out = try await wrapped.draft(BASOrganRequest(
             requestID: "r", role: .core, preset: .core,

@@ -3,6 +3,7 @@ import XCTest
 @testable import BASSovereign
 import BASOrgan
 import BASMemory
+import BASAppleAdapters   // charter T4: tests inject the MiniLM explicitly
 
 /// Audit fix proof: the factual-belief adjudicator decorator now conforms to `BASStreamingOrganAdapter`, so
 /// the verdict reaches the LIVE `streamDraft(_:)` path (the chat loop probes `as? BASStreamingOrganAdapter`).
@@ -204,7 +205,9 @@ final class BASSemanticAdjudicatingStreamingTests: XCTestCase {
     /// Full live wrap: bundled fact corpus + real MiniLM embed/retrieve + alias verify + verdict, consumed
     /// through the streaming probe exactly as the chat loop does.
     func testRealAdjudicatingFactoryStreamsVerdict() async throws {
-        let wrapped = BASLLMNeuralCoreService.adjudicating(StreamingEchoInner(), enabled: true)
+        let wrapped = BASLLMNeuralCoreService.adjudicating(
+            StreamingEchoInner(), enabled: true,
+            embeddingProvider: BASMiniLMEmbeddingProvider())
         let streaming = try XCTUnwrap(wrapped as? BASStreamingOrganAdapter,
                                       "adjudicating() must return a streaming-capable wrapper when enabled")
         let body = try await collect(streaming.streamDraft(BASOrganRequest(
@@ -248,7 +251,9 @@ final class BASSemanticAdjudicatingStreamingTests: XCTestCase {
 
     func testRuntimeSeamEnabledWrapsAndStreams() async throws {
         let runtime = BASHostRuntime(configuration: .fixtureGeneric)
-        let out = runtime.adjudicatingOrgan(StreamingEchoInner(), enabled: true)
+        let out = runtime.adjudicatingOrgan(
+            StreamingEchoInner(), enabled: true,
+            embeddingProvider: BASMiniLMEmbeddingProvider())
         let streaming = try XCTUnwrap(out as? BASStreamingOrganAdapter,
                                       "enabled runtime seam must produce a streaming-capable adjudicator")
         let body = try await collect(streaming.streamDraft(BASOrganRequest(

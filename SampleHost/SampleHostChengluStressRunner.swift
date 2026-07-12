@@ -37,6 +37,8 @@
 import CoreML
 import Foundation
 import BASHostKit
+import BASAppleAdapters   // charter T4: MLModel-bound Chenglu types (RegistrationOptions)
+import BASAppleEdgeWiring  // charter T4: build(configuration:chengluModels:) overload
 #if canImport(UIKit)
 import UIKit
 #endif
