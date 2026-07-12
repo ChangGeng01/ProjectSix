@@ -69,5 +69,12 @@ A + K + T + M on one spine; L stays outside the boundary as data, by directive. 
 capability the map showed as "composed nowhere" (T) or "default-off everywhere" (K) is
 now live-by-default on this path. Full SDK regression 1479/0.
 
+- **Sample-upgrade** ✅ (`cd9d8e71c`) QinaoSample — the SDK's reference consumer — now
+  TEACHES this posture instead of path B: endpoint stays on the sample's side, every
+  finished exchange crosses as data (`SampleSession.recordTurn` → memory admission +
+  audited turn + persistent keyed ledger under Application Support with a locally
+  generated stored HMAC secret). Per-exchange sovereign line shown in the UI status bar.
+  SDK 1483/0.
+
 Out of scope (explicitly): any LLM-side work; The Ledger workload changes (separate operator
 decision); making SampleHost adopt this (BAS-side host, separate spine).
