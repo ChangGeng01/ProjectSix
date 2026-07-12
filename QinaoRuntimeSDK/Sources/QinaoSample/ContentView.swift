@@ -32,6 +32,10 @@ public struct ContentView: View {
     @State private var traceID: String = "—"
     @State private var latencyMs: Double = 0
     @State private var isRunning: Bool = false
+    /// integration sample-upgrade: per-exchange sovereign audit line (audit/coverage/
+    /// ledger outcome of feeding the LLM output into the assembled spine as data).
+    @State private var auditLine: String = ""
+
     /// M301 — currently visible demo. Defaults to `.prompt` so
     /// existing snapshot tests + first-run UX are unchanged.
     @State private var activeTab: DemoTab = .prompt
@@ -285,6 +289,11 @@ public struct ContentView: View {
             Text(String(format: "latency: %.0f ms", latencyMs))
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
+            if !auditLine.isEmpty {
+                Text(auditLine)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+            }
             Spacer()
         }
     }
@@ -327,6 +336,13 @@ public struct ContentView: View {
                        trace: sessionStr,
                        elapsed: started,
                        success: true)
+                // integration sample-upgrade: the LLM output crosses the boundary as
+                // DATA — memory admission + a full audited turn on the sovereign spine.
+                auditLine = await session.recordTurn(
+                    sessionID: sessionStr,
+                    prompt: prompt,
+                    responseBody: response,
+                    providerID: lastProvider)
             } else {
                 let seed = QinaoLoop.CandidateSeed(
                     candidateID: "demo",
@@ -346,6 +362,11 @@ public struct ContentView: View {
                            trace: String(draft.traceID.prefix(16)),
                            elapsed: started,
                            success: true)
+                    auditLine = await session.recordTurn(
+                        sessionID: sessionStr,
+                        prompt: prompt,
+                        responseBody: response,
+                        providerID: draft.providerID)
                 } else {
                     response = "(no candidate produced)"
                     finish(provider: "—",

@@ -321,7 +321,16 @@ let package = Package(
                 // sample app so hosts trying the SDK see all six
                 // L12 surface families on first run, not just the
                 // prompt/response panel.
-                "QinaoUI"
+                "QinaoUI",
+                // integration sample-upgrade (2026-07-12) — the sample now demonstrates
+                // the CHARTER posture: LLM endpoint on this side of the boundary, output
+                // crossing as data into the assembled LLM-free sovereign spine. The
+                // sample links BOTH sides BY DESIGN (it is a host, not an in-boundary
+                // module — QinaoBoundaryPinTests guards the assembly targets, not hosts).
+                "QinaoDefaults",
+                "QinaoRuntime",
+                "QinaoSovereign",
+                "QinaoMemory"
             ]),
         // M219 — SwiftUI macOS GUI demo executable. M228 thinned to
         // just @main + window scene; UI lives in the QinaoSample
