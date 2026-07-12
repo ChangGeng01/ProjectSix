@@ -869,3 +869,30 @@ boundary: step 1 declares each stage's WRITES; reads remain lexical captures. Te
 testStageContractsAreNamedTypesNotTuples (RED listed all five pre-conversion) + frame budget
 re-verified (named structs cost what tuples cost). Steps 2 (TurnRecord/TurnResponse split) and
 3 (turn-level context-budget pass) remain OPEN, operator-gated.
+
+## 2026-07-12 — context-IR steps 2+3 SHIPPED: the arc from "distributed" to "compiled" is complete
+
+Operator ordered 全面开发 after step 1; both remaining steps landed the same day, all additive
+(zero API breaks), four-arm regression green (beta both halves EXIT=0 · stable headless
+SCRIPT_EXIT=0 · SDK 1,449/0 · SampleHost full suite SUCCEEDED).
+
+STEP 2 (07eab93dc) — TurnRecord/TurnResponse split: BASTurnRecord names the accretion role;
+BASTurnResponse is the 7-field host contract (show/act/carry/file); record.response is the ONE
+projection point; SampleHost's production bench path consumes the response (proof at the real
+host seam). Anti-hallway pin: response stored fields capped at 10 by lint — widening requires
+a caller census.
+
+STEP 3 (52fc8085a) — BASTurnContextCompiler: ONE admission pass compiled right after the
+M1419 budget fold; all 37 scattered routedBudget reads inside the stages rewired to the plan's
+per-stage sections; a lint reds any bare routedBudget consumption after the compile line
+(mechanical authority, RED→GREEN proven). Derivation is the IDENTITY (byte-parity by
+construction, pinned) — future admission policy has exactly one place to go. No persistence
+needed: pure over the persisted frame; replay recompiles.
+
+The full arc, one day: verdict certified ("distributed context engineering, not a unified
+compiler", measured: 16 carrier types / 5 anonymous tuple contracts / 53-field record serving
+4 consumers) → step 1 named the stage contracts → step 2 split the record from the response →
+step 3 made admission a single compiled pass with mechanical authority. Remaining honest
+residuals, all documented in-file: whole-frame service passes ride the plan transitionally;
+stage READS are still lexical captures (declaring input surfaces is future work); the 53-field
+record itself remains the audit/replay accretion surface by design.
