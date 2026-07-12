@@ -369,6 +369,17 @@ public actor QinaoRuntime {
         let rawSessionID = inputs.observations.sessionID
         let rawTurnID = inputs.observations.turnID
 
+        // integration S1 (2026-07-12) — the runtime's own memory participates in the turn.
+        // When the caller supplies no L8 bundle, derive one from `self.memory`'s frontstage
+        // recall (shadow copy — caller's inputs are never mutated; an explicitly supplied
+        // bundle always wins). Empty memory derives nil, so hosts that admitted nothing keep
+        // today's exact semantics (L8 layer skips). This closes turn-path finding C: `memory`
+        // was a stored-but-unused seam while L8 consumed only caller-supplied bundles.
+        var inputs = inputs
+        if inputs.memoryBundle == nil {
+            inputs.memoryBundle = await memory.frontstageBundle()
+        }
+
         do {
             return try await sendSessionBody(
                 inputs: inputs,

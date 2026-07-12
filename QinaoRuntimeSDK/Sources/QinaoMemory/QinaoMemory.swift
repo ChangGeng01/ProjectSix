@@ -167,6 +167,72 @@ public actor QinaoMemory {
             }
     }
 
+    /// integration S1 (2026-07-12) — the frontstage recall set packaged as the L8 turn
+    /// bundle. This is the bridge that lets `QinaoRuntime.sendSession` feed its OWN memory
+    /// into the Layer-8 observation pipeline instead of leaving the `memory` property a
+    /// stored-but-unused seam (turn-path audit finding C).
+    ///
+    /// Returns nil when nothing is frontstage-eligible, so a host with an empty memory keeps
+    /// today's exact semantics (L8 layer skips; no phantom `.bundleRetrieved` coverage from a
+    /// zero-atom bundle).
+    ///
+    /// The governed→atom mapping MIRRORS the substrate-canonical one in
+    /// `EBrainHostRuntime+MemoryService.memoryAtom(from:)` (BASHostKit) so both spines
+    /// project identical L8 shapes; if that mapping changes, change this one with it.
+    public func frontstageBundle(
+        activeHostVersion: String? = nil
+    ) -> BASMemoryBundle? {
+        let records = recallFrontstage()
+        guard !records.isEmpty else { return nil }
+        let atoms = records.map { Self.memoryAtom(from: $0, fallbackTimestamp: now()) }
+        return BASMemoryBundle(
+            atoms: atoms,
+            retrievalTags: [],
+            conflictRefs: atoms.filter(\.frozen).map(\.memoryID),
+            retrievedAt: now(),
+            activeHostVersion: activeHostVersion)
+    }
+
+    /// Mirror of the canonical governed→atom projection (see `frontstageBundle` doc).
+    /// `internal` so tests can pin the field mapping directly.
+    static func memoryAtom(
+        from record: BASGovernedMemory,
+        fallbackTimestamp: Date
+    ) -> BASMemoryAtom {
+        BASMemoryAtom(
+            memoryID: record.id.uuidString,
+            summary: record.content,
+            contentType: Self.atomContentType(for: record.tier),
+            source: record.sourceType,
+            timestamp: record.lastConfirmedAt ?? fallbackTimestamp,
+            confidence: record.confidence,
+            emotionalWeight: record.kind == .semantic ? 0.55 : 0.22,
+            riskRelevance: record.sensitivity == .high ? 0.82 : 0.38,
+            hostRelevance: record.kind == .profile ? 0.88 : 0.54,
+            conflictFingerprint: record.id.uuidString,
+            promotionState: Self.atomPromotionState(for: record.governanceStatus),
+            frozen: record.governanceStatus == .archived)
+    }
+
+    static func atomContentType(for tier: BASMemoryTier) -> BASMemoryAtomContentType {
+        switch tier {
+        case .hot: .hot
+        case .warm: .warm
+        case .cold: .cold
+        }
+    }
+
+    static func atomPromotionState(
+        for status: BASMemoryGovernanceStatus
+    ) -> BASPromotionState {
+        switch status {
+        case .candidate: .candidate
+        case .governed: .admitted
+        case .archived: .frozen
+        case .quarantined, .rejected: .retired
+        }
+    }
+
     // MARK: - Forget (cascade across all tiers)
 
     /// Delete one memory by ID across every tier.  Throws
