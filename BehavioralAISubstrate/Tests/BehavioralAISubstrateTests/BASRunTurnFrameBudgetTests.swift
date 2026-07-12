@@ -110,3 +110,40 @@ extension BASRunTurnFrameBudgetTests {
         }
     }
 }
+
+// MARK: - context-compiler authority lint (context-IR step 3)
+
+/// The turn-level context compiler is the SINGLE admission authority: after
+/// `BASTurnContextCompiler.compile(...)` in runTurn, no code may consume the raw
+/// `routedBudget` directly — scalar admissions go through the plan's per-stage sections
+/// (`contextPlan.deliberate.*`, `contextPlan.risk.*`) and whole-frame service passes go
+/// through `contextPlan.routedBudget`. A red here means someone bypassed the compiler.
+extension BASRunTurnFrameBudgetTests {
+    func testContextPlanIsTheOnlyBudgetAuthorityAfterCompile() throws {
+        let src = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("Sources/BASHostKit/EBrainRuntimeCoordinator+RunTurn.swift"),
+            encoding: .utf8)
+        let lines = src.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard let compileAt = lines.firstIndex(where: { $0.contains("BASTurnContextCompiler.compile(") })
+        else {
+            XCTFail("runTurn does not compile a BASTurnContextPlan — the context compiler is unwired")
+            return
+        }
+        // bare `routedBudget` use = the token not preceded by `.` (member access off the plan)
+        // and not followed by `:` (an argument LABEL is fine — its value must be plan-sourced).
+        let bareUse = try NSRegularExpression(pattern: "(?<![.\\w])routedBudget(?!\\s*:)")
+        var offenders: [String] = []
+        for (i, line) in lines.enumerated() where i > compileAt {
+            if line.trimmingCharacters(in: .whitespaces).hasPrefix("//") { continue }
+            let range = NSRange(line.startIndex..., in: line)
+            if bareUse.firstMatch(in: line, range: range) != nil {
+                offenders.append("line \(i + 1): \(line.trimmingCharacters(in: .whitespaces).prefix(80))")
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty,
+            "raw routedBudget consumed after the context compiler (route it through contextPlan):\n"
+            + offenders.joined(separator: "\n"))
+    }
+}

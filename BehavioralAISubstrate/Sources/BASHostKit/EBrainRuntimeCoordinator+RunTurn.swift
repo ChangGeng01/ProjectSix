@@ -95,6 +95,10 @@ extension BASEBrainRuntimeCoordinator {
                     .scheduleMaintenance(
                         deviceState: request.deviceState,
                         budget: plannedBudget))
+        // context-IR step 3 — the turn-level context compiler: ONE admission pass;
+        // everything downstream consumes the plan (raw routedBudget use below this
+        // line is linted RED — see BASTurnContextCompiler for scope + parity notes).
+        let contextPlan = BASTurnContextCompiler.compile(routedBudget: routedBudget)
 
         let hostContext = hostProfileService.resolveHost(
             hostID: request.hostID,
@@ -105,7 +109,7 @@ extension BASEBrainRuntimeCoordinator {
         let rawContextFrame = contextService.analyzeContext(
             userInput: request.userInput,
             hostContext: hostContext,
-            budget: routedBudget
+            budget: contextPlan.routedBudget
         )
 
         // M53 — L6 presence-eye main-chain wiring. Derive the
@@ -122,7 +126,7 @@ extension BASEBrainRuntimeCoordinator {
         // M954's verbatim-pin test。
         let frameContext = request.makeFrameContext(
             rawContextFrame: rawContextFrame,
-            routedBudget: routedBudget)
+            routedBudget: contextPlan.routedBudget)
         let derivedSessionID = frameContext.sessionID
         let derivedTurnID = frameContext.turnID
         let contextFrame = rawContextFrame
@@ -185,21 +189,21 @@ extension BASEBrainRuntimeCoordinator {
         let rawMemoryBundle = memoryService.retrieve(
             decomposeFrame: decomposeFrame,
             hostContext: hostContext,
-            budget: routedBudget
+            budget: contextPlan.routedBudget
         )
         let (memoryBundle, memoryFindings) = normalizeMemoryBundle(
             rawMemoryBundle,
-            budget: routedBudget
+            budget: contextPlan.routedBudget
         )
         let baseNeuralCore = neuralCoreService?.synthesize(
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             contextFrame: contextFrame,
             decomposeFrame: decomposeFrame,
             memoryBundle: memoryBundle,
             hostProfile: hostContext,
             activeKillSwitches: request.activeKillSwitches
         ) ?? defaultNeuralCoreFrame(
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             contextFrame: contextFrame,
             decomposeFrame: decomposeFrame,
             memoryBundle: memoryBundle,
@@ -219,14 +223,14 @@ extension BASEBrainRuntimeCoordinator {
             var thoughtFrame = loopService.iterate(
                 decomposeFrame: decomposeFrame,
                 memoryBundle: memoryBundle,
-                budget: routedBudget,
+                budget: contextPlan.routedBudget,
                 priorCandidateIDs: priorCandidateIDs
             )
             if thoughtFrame.candidates.isEmpty {
                 thoughtFrame.candidates = loopService.proposePaths(
                     decomposeFrame: decomposeFrame,
                     memoryBundle: memoryBundle,
-                    budget: routedBudget
+                    budget: contextPlan.routedBudget
                 )
             }
             if thoughtFrame.forecasts.isEmpty {
@@ -245,12 +249,12 @@ extension BASEBrainRuntimeCoordinator {
             }
             let (normalizedThoughtFrame, passFindings) = normalizeThoughtFrame(
                 thoughtFrame,
-                budget: routedBudget
+                budget: contextPlan.routedBudget
             )
             thoughtFrame = normalizedThoughtFrame
             thoughtFrame.organMap = baseNeuralCore.organMap
             let thoughtArtifacts = neuralCoreService?.materializeThoughtArtifacts(
-                budgetFrame: routedBudget,
+                budgetFrame: contextPlan.routedBudget,
                 contextFrame: contextFrame,
                 decomposeFrame: decomposeFrame,
                 memoryBundle: memoryBundle,
@@ -304,7 +308,7 @@ extension BASEBrainRuntimeCoordinator {
             // by deliberationLoopEnabled → flag-off is byte-equal.
             let thermallyFlooredMaxLoops =
                 BASDeliberationThermalFloor.flooredMaxLoops(
-                    routedBudget.maxLoops,
+                    contextPlan.deliberate.maxLoops,
                     thermalLevel: request.deviceState.thermalLevel)
             // OPT-IN surprise-gated EFFORT floor (mirrors the thermal floor above): a low effort tier spends
             // FEWER refinement passes (avoided compute), composing by `min` with the thermal floor — effort can
@@ -328,7 +332,7 @@ extension BASEBrainRuntimeCoordinator {
             }
         }
         let publicProjection = neuralCoreService?.materializePublicProjection(
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             contextFrame: contextFrame,
             hostProfile: hostContext,
             thoughtFrame: thoughtFrame
@@ -429,14 +433,14 @@ extension BASEBrainRuntimeCoordinator {
             contextFrame: contextFrame,
             thoughtFrame: thoughtFrame,
             triScores: triScores,
-            budget: routedBudget
+            budget: contextPlan.routedBudget
         )
         let rawRiskCard = rawRiskDecisionPackage.riskCard
         let rawActionPermit = rawRiskDecisionPackage.actionPermit
         let (riskCard, actionPermit, riskFindings) = normalizeRiskDecision(
             riskCard: rawRiskCard,
             actionPermit: rawActionPermit,
-            budget: routedBudget,
+            budget: contextPlan.routedBudget,
             activeKillSwitches: request.activeKillSwitches
         )
         var normalizedRiskDecisionPackage = projectedRiskDecisionPackage(
@@ -446,7 +450,7 @@ extension BASEBrainRuntimeCoordinator {
         )
         let resolvedRiskService = riskService
         let bindings = neuralCoreService?.materializeRiskBindings(
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             contextFrame: contextFrame,
             thoughtFrame: thoughtFrame,
             mergedChoice: mergedChoice,
@@ -636,7 +640,7 @@ extension BASEBrainRuntimeCoordinator {
                let suggestionSink = ssmCautionObservationSink {
                 let suggestionBandCeiling =
                     BASDeliberationThermalFloor.flooredMaxLoops(
-                        routedBudget.maxLoops,
+                        contextPlan.risk.maxLoops,
                         thermalLevel: request.deviceState.thermalLevel)
                 suggestionSink(ssmObservation.attaching(
                     neuromodulationSuggestion:
@@ -886,7 +890,7 @@ extension BASEBrainRuntimeCoordinator {
         let abyssalThermalTrioForAudit =
             BASTurnAuditProjectionsAbyssalThermalTrio
                 .compute(
-                    routedBudget: routedBudget,
+                    routedBudget: contextPlan.routedBudget,
                     turnID: derivedTurnID)
         // chapter 五百三十四 / M1513 — dead-code purge:
         // abyssalRunModeForAudit + abyssBudgetForAudit
@@ -911,7 +915,7 @@ extension BASEBrainRuntimeCoordinator {
         // Harness dual mode (M1290) is the regression guard。
         let kunlunTrioForAudit = BASTurnAuditProjectionsKunlunTrio
             .compute(
-                routedBudget: routedBudget,
+                routedBudget: contextPlan.routedBudget,
                 riskLevel: boundRiskCard.riskLevel,
                 permit: boundActionPermit,
                 turnID: derivedTurnID,
@@ -926,7 +930,7 @@ extension BASEBrainRuntimeCoordinator {
         // continuation。 6 declarations folded via hexa factory。
         let kunlunHexaForAudit = BASTurnAuditProjectionsKunlunHexa
             .compute(
-                runMode: routedBudget.runMode,
+                runMode: contextPlan.risk.runMode,
                 riskLevel: boundRiskCard.riskLevel,
                 permit: boundActionPermit,
                 candidates: thoughtFrame.candidates,
@@ -940,7 +944,7 @@ extension BASEBrainRuntimeCoordinator {
         // chapter 四百八十五 / M1318 — V1 fold trio #2
         let kunlunTrioTwoForAudit = BASTurnAuditProjectionsKunlunTrioTwo
             .compute(
-                runMode: routedBudget.runMode,
+                runMode: contextPlan.risk.runMode,
                 riskLevel: boundRiskCard.riskLevel,
                 candidates: thoughtFrame.candidates,
                 organRefMorph:
@@ -972,8 +976,8 @@ extension BASEBrainRuntimeCoordinator {
         // chapter 四百八十六 / M1322 — V1 cluster B start
         let cthulhuPentaForAudit =
             BASTurnAuditProjectionsCthulhuPenta.compute(
-                routedBudget: routedBudget,
-                runMode: routedBudget.runMode,
+                routedBudget: contextPlan.routedBudget,
+                runMode: contextPlan.risk.runMode,
                 hostID: hostContext.hostID,
                 riskLevel: boundRiskCard.riskLevel,
                 memoryTemperatureLayer:
@@ -1106,13 +1110,13 @@ extension BASEBrainRuntimeCoordinator {
         // (红线 7); the sink is in no canonical-bytes / seal / hash path.
         if deliberationLoopEnabled, let provisionalVerdictSink {
             let provisionalBrake = buildEmergencyBrake(
-                budgetFrame: routedBudget,
+                budgetFrame: contextPlan.routedBudget,
                 riskCard: boundRiskCard,
                 actionPermit: boundActionPermit,
                 activeKillSwitches: request.activeKillSwitches)
             let provisionalVerdict = Self.buildProvisionalVerdict(
                 policyLineagePresent: policyLineage != nil,
-                budgetFrame: routedBudget,
+                budgetFrame: contextPlan.routedBudget,
                 riskCard: boundRiskCard,
                 actionPermit: boundActionPermit,
                 emergencyBrake: provisionalBrake,
@@ -1134,7 +1138,7 @@ extension BASEBrainRuntimeCoordinator {
 
         let (finalOrganMap, neuralDegradedReasonCodes) = applySovereignNeuralContract(
             to: thoughtFrame.organMap ?? baseNeuralCore.organMap,
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             riskCard: boundRiskCard,
             actionPermit: boundActionPermit,
             activeKillSwitches: request.activeKillSwitches,
@@ -1142,7 +1146,7 @@ extension BASEBrainRuntimeCoordinator {
         )
         thoughtFrame.organMap = finalOrganMap
         thoughtFrame.toolIntentEnvelope = neuralCoreService?.materializeToolIntent(
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             thoughtFrame: thoughtFrame,
             mergedChoice: mergedChoice,
             actionPermit: boundActionPermit
@@ -1152,7 +1156,7 @@ extension BASEBrainRuntimeCoordinator {
             actionPermit: boundActionPermit
         )
         thoughtFrame.neuralLeaseReceipt = buildNeuralLeaseReceipt(
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             thoughtFrame: thoughtFrame,
             degradedReasonCodes: neuralDegradedReasonCodes
         )
@@ -1256,7 +1260,7 @@ extension BASEBrainRuntimeCoordinator {
         // turn.
         thoughtFrame = thoughtFrame
             .withDerivedLeaseLifeObservationBundle(
-                budgetFrame: routedBudget,
+                budgetFrame: contextPlan.routedBudget,
                 frameContext: frameContext)
 
         // M61 — L5 宿纹层 main-chain wiring. Derive the per-turn
@@ -1345,7 +1349,7 @@ extension BASEBrainRuntimeCoordinator {
 
         let runtimeTrace = buildRuntimeTrace(
             request: request,
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             hostContext: hostContext,
             hostConstitution: hostConstitution,
             hostConstitutionVault: hostConstitutionVault,
@@ -1384,16 +1388,16 @@ extension BASEBrainRuntimeCoordinator {
         }
         let wakeIntent = buildWakeIntent(
             request: request,
-            budgetFrame: routedBudget
+            budgetFrame: contextPlan.routedBudget
         )
         let runLease = buildRunLease(
             request: request,
             runtimeTrace: runtimeTrace,
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             actionPermit: boundActionPermit
         )
         let emergencyBrake = buildEmergencyBrake(
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             riskCard: boundRiskCard,
             actionPermit: boundActionPermit,
             activeKillSwitches: request.activeKillSwitches
@@ -1401,7 +1405,7 @@ extension BASEBrainRuntimeCoordinator {
         let sovereignVerdict = buildSovereignVerdict(
             request: request,
             runtimeTrace: runtimeTrace,
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             thoughtFold: thoughtFold,
             riskCard: boundRiskCard,
             actionPermit: boundActionPermit,
@@ -2046,14 +2050,14 @@ extension BASEBrainRuntimeCoordinator {
         }()
         let vitalState = buildVitalState(
             deviceState: request.deviceState,
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             runtimeTrace: runtimeTrace,
             emergencyBrake: emergencyBrake
         )
         let sovereignActuationCommands = buildSovereignActuationCommands(
             sovereignVerdict: finalSovereignVerdict,
             runtimeTrace: runtimeTrace,
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             riskCard: boundRiskCard,
             actionPermit: boundActionPermit
         )
@@ -2068,12 +2072,12 @@ extension BASEBrainRuntimeCoordinator {
             thoughtFrame: thoughtFrame
         )
         let recoveryDisposition = buildRecoveryDisposition(
-            budgetFrame: routedBudget,
+            budgetFrame: contextPlan.routedBudget,
             emergencyBrake: emergencyBrake,
             sovereignVerdict: finalSovereignVerdict
         )
         let finalizedBudgetFrame = buildFinalizedBudgetFrame(
-            routedBudget,
+            contextPlan.routedBudget,
             wakeIntent: wakeIntent,
             runLease: runLease,
             actionPermit: boundActionPermit
