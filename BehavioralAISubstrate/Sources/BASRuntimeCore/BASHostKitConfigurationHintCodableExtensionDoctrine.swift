@@ -24,7 +24,7 @@
 //
 //   - BASChengluPreflightHint
 //     * 3-field hint struct:route
-//       (BASChengluPreflightRoute,Codable enum),
+//       (BASChengluPreflightRoute,Codable struct — opened from a closed two-model enum, charter audit 2026-07-12; wire format unchanged),
 //       probability (Double),confidence
 //       (BASChengluHintConfidence,Codable enum)
 //

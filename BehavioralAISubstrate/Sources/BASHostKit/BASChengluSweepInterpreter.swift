@@ -101,13 +101,40 @@ public enum BASChengluHintConfidence:
     }
 }
 
-// MARK: - Preflight hint (binary AFM vs Gemma)
+// MARK: - Preflight hint (route)
 
-public enum BASChengluPreflightRoute:
-    String, Sendable, Equatable, Hashable, Codable, CaseIterable
+/// charter audit 2026-07-12 finding ④: this was a CLOSED two-model enum {afm, gemma} —
+/// a two-specific-model world model baked into the core type system; a third model
+/// family could not be expressed without changing the type. Now an OPEN
+/// RawRepresentable struct: the two shipped presets keep their exact rawValues (they
+/// are WIRE-FROZEN — they leak into sealed sovereign-ledger reason codes and pinned
+/// bench signatures; never change them), and a host can mint routes for any family
+/// (e.g. `BASChengluPreflightRoute(rawValue: "qwen-route")`). Codable is hand-written
+/// as a bare single string so the wire format is byte-identical to the old enum.
+public struct BASChengluPreflightRoute:
+    RawRepresentable, Sendable, Equatable, Hashable, Codable
 {
-    case afm = "afm-route"
-    case gemma = "gemma-route"
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+
+    /// Apple-native lane preset (wire-frozen rawValue).
+    public static let afm = BASChengluPreflightRoute(rawValue: "afm-route")
+    /// Open-model lane preset (historical name; wire-frozen rawValue).
+    public static let gemma = BASChengluPreflightRoute(rawValue: "gemma-route")
+
+    /// The shipped presets (replaces the old CaseIterable.allCases, which had zero
+    /// consumers; a host-minted route is deliberately NOT in this list).
+    public static let knownRoutes: [BASChengluPreflightRoute] = [.afm, .gemma]
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.rawValue = try container.decode(String.self)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 public struct BASChengluPreflightHint:

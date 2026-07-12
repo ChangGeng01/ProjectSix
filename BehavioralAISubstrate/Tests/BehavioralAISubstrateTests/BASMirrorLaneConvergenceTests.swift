@@ -251,3 +251,33 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
         XCTAssertEqual(outcome.reason, .badSignature)
     }
 }
+
+/// charter audit 2026-07-12 finding ④ — BASChengluPreflightRoute opened from a closed
+/// two-model enum to a RawRepresentable struct. Wire format is FROZEN (bare string).
+final class BASChengluPreflightRouteOpennessTests: XCTestCase {
+
+    func testWireFormatIsByteIdenticalToTheOldEnum() throws {
+        // The old enum encoded as a bare string; the struct must too.
+        let data = try JSONEncoder().encode(BASChengluPreflightRoute.afm)
+        XCTAssertEqual(String(decoding: data, as: UTF8.self), "\"afm-route\"")
+        let decoded = try JSONDecoder().decode(
+            BASChengluPreflightRoute.self, from: Data("\"gemma-route\"".utf8))
+        XCTAssertEqual(decoded, .gemma)
+    }
+
+    func testThirdModelFamilyIsNowExpressible() throws {
+        // The whole point of the fix: a route the shipped presets don't know.
+        let qwen = BASChengluPreflightRoute(rawValue: "qwen-route")
+        let roundTripped = try JSONDecoder().decode(
+            BASChengluPreflightRoute.self,
+            from: JSONEncoder().encode(qwen))
+        XCTAssertEqual(roundTripped, qwen)
+        XCTAssertFalse(BASChengluPreflightRoute.knownRoutes.contains(qwen),
+            "host-minted routes are deliberately not in the shipped preset list")
+    }
+
+    func testShippedPresetRawValuesAreFrozen() {
+        XCTAssertEqual(BASChengluPreflightRoute.afm.rawValue, "afm-route")
+        XCTAssertEqual(BASChengluPreflightRoute.gemma.rawValue, "gemma-route")
+    }
+}
