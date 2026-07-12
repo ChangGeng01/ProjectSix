@@ -83,13 +83,13 @@ final class LongRunningSmokeTests: XCTestCase {
             now: now,
             iterations: 50,
             afmCompleted: 50,
-            gemmaCompleted: 49,
+            openModelCompleted: 49,
             afmTimeouts: 1,
-            gemmaTimeouts: 0,
+            openModelTimeouts: 0,
             afmErrors: 0,
-            gemmaErrors: 1,
+            openModelErrors: 1,
             afmRedLineTotal: 12,
-            gemmaRedLineTotal: 8)
+            openModelRedLineTotal: 8)
         XCTAssertEqual(progress.iterationsCompleted, 50)
         XCTAssertEqual(progress.afmCallsCompleted, 50)
         XCTAssertEqual(progress.elapsedSeconds, 300, accuracy: 1)
@@ -121,17 +121,17 @@ final class LongRunningSmokeTests: XCTestCase {
             totalElapsedSeconds: 28800,
             totalIterations: 1000,
             afmCallsCompleted: 1000,
-            gemmaCallsCompleted: 980,
+            openModelCallsCompleted: 980,
             afmTimeouts: 5,
-            gemmaTimeouts: 15,
+            openModelTimeouts: 15,
             afmErrors: 2,
-            gemmaErrors: 5,
+            openModelErrors: 5,
             totalRedLineViolationsAFM: 100,
-            totalRedLineViolationsGemma: 50,
+            totalRedLineViolationsOpenModel: 50,
             avgAFMDurationSeconds: 1.5,
-            avgGemmaDurationSeconds: 2.0,
+            avgOpenModelDurationSeconds: 2.0,
             medianAFMDurationSeconds: 1.4,
-            medianGemmaDurationSeconds: 1.9,
+            medianOpenModelDurationSeconds: 1.9,
             perPersonaCounts: ["anxious": 200])
         let line = try QinaoLongRunningSmokeHelpers.jsonLine(summary)
         let data = line.data(using: .utf8)!
@@ -150,7 +150,7 @@ final class LongRunningSmokeTests: XCTestCase {
             outputDirectory: url)
         XCTAssertEqual(config.maxDurationSeconds, 8 * 3600)
         XCTAssertTrue(config.runAFM)
-        XCTAssertTrue(config.runGemma)
+        XCTAssertTrue(config.runOpenModel)
         XCTAssertFalse(config.runUserValueJudge)
         XCTAssertEqual(config.checkpointIntervalSeconds, 60)
     }
@@ -207,13 +207,13 @@ final class LongRunningSmokeTests: XCTestCase {
             elapsedSeconds: 60,
             iterationsCompleted: 5,
             afmCallsCompleted: 5,
-            gemmaCallsCompleted: 5,
+            openModelCallsCompleted: 5,
             afmTimeouts: 0,
-            gemmaTimeouts: 0,
+            openModelTimeouts: 0,
             afmErrors: 0,
-            gemmaErrors: 0,
+            openModelErrors: 0,
             totalRedLineViolationsAFM: 0,
-            totalRedLineViolationsGemma: 0)
+            totalRedLineViolationsOpenModel: 0)
         try await writer.writeProgress(progress)
 
         let url = tmpDir.appendingPathComponent("progress.json")

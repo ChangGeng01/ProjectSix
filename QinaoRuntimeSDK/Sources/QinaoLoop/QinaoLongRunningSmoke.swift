@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // M572 (chapter 一百四十七) — Long-running automation runner for
-// AFM + Gemma 4 E2B smoke benches. Designed to ship measurable
+// AFM + open-model smoke benches (the open-model lane historically ran Gemma 4 E2B;
+// charter audit 2026-07-12: the public API is now model-neutral — openModel* — the
+// endpoint injected by the host decides which family actually runs). Designed to ship measurable
 // empirical data across hours of continuous inference, with crash
 // resume + per-iteration JSONL output.
 //
@@ -70,7 +72,7 @@ public struct QinaoLongRunningSmokeConfiguration: Sendable {
     /// is nil at construction, defaults to false.
     public let runAFM: Bool
     /// Whether to run Gemma endpoint each iteration.
-    public let runGemma: Bool
+    public let runOpenModel: Bool
     /// Whether to run user-value judge each iteration. Slower
     /// (extra LLM call per iteration); default false for high
     /// iteration throughput.
@@ -84,7 +86,7 @@ public struct QinaoLongRunningSmokeConfiguration: Sendable {
         outputDirectory: URL,
         checkpointIntervalSeconds: Int = 60,
         runAFM: Bool = true,
-        runGemma: Bool = true,
+        runOpenModel: Bool = true,
         runUserValueJudge: Bool = false,
         perEndpointTimeoutSeconds: Int = 60
     ) {
@@ -92,7 +94,7 @@ public struct QinaoLongRunningSmokeConfiguration: Sendable {
         self.outputDirectory = outputDirectory
         self.checkpointIntervalSeconds = checkpointIntervalSeconds
         self.runAFM = runAFM
-        self.runGemma = runGemma
+        self.runOpenModel = runOpenModel
         self.runUserValueJudge = runUserValueJudge
         self.perEndpointTimeoutSeconds = perEndpointTimeoutSeconds
     }
@@ -153,13 +155,13 @@ public struct QinaoLongRunningSmokeProgress: Sendable, Codable {
     public let elapsedSeconds: Double
     public let iterationsCompleted: Int
     public let afmCallsCompleted: Int
-    public let gemmaCallsCompleted: Int
+    public let openModelCallsCompleted: Int
     public let afmTimeouts: Int
-    public let gemmaTimeouts: Int
+    public let openModelTimeouts: Int
     public let afmErrors: Int
-    public let gemmaErrors: Int
+    public let openModelErrors: Int
     public let totalRedLineViolationsAFM: Int
-    public let totalRedLineViolationsGemma: Int
+    public let totalRedLineViolationsOpenModel: Int
 
     public init(
         runStartTimestamp: String,
@@ -167,26 +169,26 @@ public struct QinaoLongRunningSmokeProgress: Sendable, Codable {
         elapsedSeconds: Double,
         iterationsCompleted: Int,
         afmCallsCompleted: Int,
-        gemmaCallsCompleted: Int,
+        openModelCallsCompleted: Int,
         afmTimeouts: Int,
-        gemmaTimeouts: Int,
+        openModelTimeouts: Int,
         afmErrors: Int,
-        gemmaErrors: Int,
+        openModelErrors: Int,
         totalRedLineViolationsAFM: Int,
-        totalRedLineViolationsGemma: Int
+        totalRedLineViolationsOpenModel: Int
     ) {
         self.runStartTimestamp = runStartTimestamp
         self.lastCheckpointTimestamp = lastCheckpointTimestamp
         self.elapsedSeconds = elapsedSeconds
         self.iterationsCompleted = iterationsCompleted
         self.afmCallsCompleted = afmCallsCompleted
-        self.gemmaCallsCompleted = gemmaCallsCompleted
+        self.openModelCallsCompleted = openModelCallsCompleted
         self.afmTimeouts = afmTimeouts
-        self.gemmaTimeouts = gemmaTimeouts
+        self.openModelTimeouts = openModelTimeouts
         self.afmErrors = afmErrors
-        self.gemmaErrors = gemmaErrors
+        self.openModelErrors = openModelErrors
         self.totalRedLineViolationsAFM = totalRedLineViolationsAFM
-        self.totalRedLineViolationsGemma = totalRedLineViolationsGemma
+        self.totalRedLineViolationsOpenModel = totalRedLineViolationsOpenModel
     }
 }
 
@@ -198,17 +200,17 @@ public struct QinaoLongRunningSmokeSummary: Sendable, Codable {
     public let totalElapsedSeconds: Double
     public let totalIterations: Int
     public let afmCallsCompleted: Int
-    public let gemmaCallsCompleted: Int
+    public let openModelCallsCompleted: Int
     public let afmTimeouts: Int
-    public let gemmaTimeouts: Int
+    public let openModelTimeouts: Int
     public let afmErrors: Int
-    public let gemmaErrors: Int
+    public let openModelErrors: Int
     public let totalRedLineViolationsAFM: Int
-    public let totalRedLineViolationsGemma: Int
+    public let totalRedLineViolationsOpenModel: Int
     public let avgAFMDurationSeconds: Double
-    public let avgGemmaDurationSeconds: Double
+    public let avgOpenModelDurationSeconds: Double
     public let medianAFMDurationSeconds: Double
-    public let medianGemmaDurationSeconds: Double
+    public let medianOpenModelDurationSeconds: Double
     public let perPersonaCounts: [String: Int]
 
     public init(
@@ -217,17 +219,17 @@ public struct QinaoLongRunningSmokeSummary: Sendable, Codable {
         totalElapsedSeconds: Double,
         totalIterations: Int,
         afmCallsCompleted: Int,
-        gemmaCallsCompleted: Int,
+        openModelCallsCompleted: Int,
         afmTimeouts: Int,
-        gemmaTimeouts: Int,
+        openModelTimeouts: Int,
         afmErrors: Int,
-        gemmaErrors: Int,
+        openModelErrors: Int,
         totalRedLineViolationsAFM: Int,
-        totalRedLineViolationsGemma: Int,
+        totalRedLineViolationsOpenModel: Int,
         avgAFMDurationSeconds: Double,
-        avgGemmaDurationSeconds: Double,
+        avgOpenModelDurationSeconds: Double,
         medianAFMDurationSeconds: Double,
-        medianGemmaDurationSeconds: Double,
+        medianOpenModelDurationSeconds: Double,
         perPersonaCounts: [String: Int]
     ) {
         self.runStartTimestamp = runStartTimestamp
@@ -235,17 +237,17 @@ public struct QinaoLongRunningSmokeSummary: Sendable, Codable {
         self.totalElapsedSeconds = totalElapsedSeconds
         self.totalIterations = totalIterations
         self.afmCallsCompleted = afmCallsCompleted
-        self.gemmaCallsCompleted = gemmaCallsCompleted
+        self.openModelCallsCompleted = openModelCallsCompleted
         self.afmTimeouts = afmTimeouts
-        self.gemmaTimeouts = gemmaTimeouts
+        self.openModelTimeouts = openModelTimeouts
         self.afmErrors = afmErrors
-        self.gemmaErrors = gemmaErrors
+        self.openModelErrors = openModelErrors
         self.totalRedLineViolationsAFM = totalRedLineViolationsAFM
-        self.totalRedLineViolationsGemma = totalRedLineViolationsGemma
+        self.totalRedLineViolationsOpenModel = totalRedLineViolationsOpenModel
         self.avgAFMDurationSeconds = avgAFMDurationSeconds
-        self.avgGemmaDurationSeconds = avgGemmaDurationSeconds
+        self.avgOpenModelDurationSeconds = avgOpenModelDurationSeconds
         self.medianAFMDurationSeconds = medianAFMDurationSeconds
-        self.medianGemmaDurationSeconds = medianGemmaDurationSeconds
+        self.medianOpenModelDurationSeconds = medianOpenModelDurationSeconds
         self.perPersonaCounts = perPersonaCounts
     }
 }
@@ -293,13 +295,13 @@ public enum QinaoLongRunningSmokeHelpers {
         now: Date,
         iterations: Int,
         afmCompleted: Int,
-        gemmaCompleted: Int,
+        openModelCompleted: Int,
         afmTimeouts: Int,
-        gemmaTimeouts: Int,
+        openModelTimeouts: Int,
         afmErrors: Int,
-        gemmaErrors: Int,
+        openModelErrors: Int,
         afmRedLineTotal: Int,
-        gemmaRedLineTotal: Int
+        openModelRedLineTotal: Int
     ) -> QinaoLongRunningSmokeProgress {
         QinaoLongRunningSmokeProgress(
             runStartTimestamp: iso8601(runStart),
@@ -307,13 +309,13 @@ public enum QinaoLongRunningSmokeHelpers {
             elapsedSeconds: now.timeIntervalSince(runStart),
             iterationsCompleted: iterations,
             afmCallsCompleted: afmCompleted,
-            gemmaCallsCompleted: gemmaCompleted,
+            openModelCallsCompleted: openModelCompleted,
             afmTimeouts: afmTimeouts,
-            gemmaTimeouts: gemmaTimeouts,
+            openModelTimeouts: openModelTimeouts,
             afmErrors: afmErrors,
-            gemmaErrors: gemmaErrors,
+            openModelErrors: openModelErrors,
             totalRedLineViolationsAFM: afmRedLineTotal,
-            totalRedLineViolationsGemma: gemmaRedLineTotal)
+            totalRedLineViolationsOpenModel: openModelRedLineTotal)
     }
 
     /// Build per-persona counts map from a sequence of (persona,

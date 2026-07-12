@@ -85,7 +85,7 @@ extension QinaoSampleHost {
             outputDirectory: outputURL,
             checkpointIntervalSeconds: checkpoint,
             runAFM: true,
-            runGemma: true,
+            runOpenModel: true,
             runUserValueJudge: runJudge,
             perEndpointTimeoutSeconds: timeout)
 
@@ -132,15 +132,15 @@ extension QinaoSampleHost {
         // Counters
         var iteration = 0
         var afmCompleted = 0
-        var gemmaCompleted = 0
+        var openModelCompleted = 0
         let afmTimeouts = 0
-        let gemmaTimeouts = 0
+        let openModelTimeouts = 0
         var afmErrors = 0
-        var gemmaErrors = 0
+        var openModelErrors = 0
         var afmRedLineTotal = 0
-        var gemmaRedLineTotal = 0
+        var openModelRedLineTotal = 0
         var afmDurations: [Double] = []
-        var gemmaDurations: [Double] = []
+        var openModelDurations: [Double] = []
         var perPersonaCounts: [String: Int] = [:]
 
         var lastCheckpoint = runStart
@@ -211,7 +211,7 @@ extension QinaoSampleHost {
             }
 
             // 2. Gemma call
-            if config.runGemma, let gemma = gemmaEndpoint {
+            if config.runOpenModel, let gemma = gemmaEndpoint {
                 let t0 = Date()
                 var status = "ok"
                 var errorMsg: String?
@@ -227,13 +227,13 @@ extension QinaoSampleHost {
                 } catch {
                     status = "error"
                     errorMsg = "\(error)"
-                    gemmaErrors += 1
+                    openModelErrors += 1
                 }
                 let dur = Date().timeIntervalSince(t0)
                 let redCount = countRedLineViolations(in: responseText)
-                gemmaRedLineTotal += redCount
-                gemmaCompleted += 1
-                gemmaDurations.append(dur)
+                openModelRedLineTotal += redCount
+                openModelCompleted += 1
+                openModelDurations.append(dur)
                 let row = QinaoLongRunningSmokeRow(
                     timestamp: QinaoLongRunningSmokeHelpers
                         .iso8601(Date()),
@@ -269,13 +269,13 @@ extension QinaoSampleHost {
                         now: nowAfter,
                         iterations: iteration,
                         afmCompleted: afmCompleted,
-                        gemmaCompleted: gemmaCompleted,
+                        openModelCompleted: openModelCompleted,
                         afmTimeouts: afmTimeouts,
-                        gemmaTimeouts: gemmaTimeouts,
+                        openModelTimeouts: openModelTimeouts,
                         afmErrors: afmErrors,
-                        gemmaErrors: gemmaErrors,
+                        openModelErrors: openModelErrors,
                         afmRedLineTotal: afmRedLineTotal,
-                        gemmaRedLineTotal: gemmaRedLineTotal)
+                        openModelRedLineTotal: openModelRedLineTotal)
                 do {
                     try await writer.writeProgress(progress)
                     try await writer.flush()
@@ -292,7 +292,7 @@ extension QinaoSampleHost {
                     [\(QinaoLongRunningSmokeHelpers.iso8601(nowAfter))] checkpoint:
                       iter=\(iteration) | elapsed=\(String(format: "%.2f", elapsedHrs))h / \(String(format: "%.2f", totalHrs))h (\(String(format: "%.1f", etaPct))%)
                       AFM:   completed=\(afmCompleted), timeouts=\(afmTimeouts), errors=\(afmErrors), redlines=\(afmRedLineTotal)
-                      Gemma: completed=\(gemmaCompleted), timeouts=\(gemmaTimeouts), errors=\(gemmaErrors), redlines=\(gemmaRedLineTotal)
+                      Gemma: completed=\(openModelCompleted), timeouts=\(openModelTimeouts), errors=\(openModelErrors), redlines=\(openModelRedLineTotal)
                     """)
             }
 
@@ -301,7 +301,7 @@ extension QinaoSampleHost {
             if iteration >= 10
                 && afmErrors == iteration
                 && (gemmaEndpoint == nil
-                    || gemmaErrors == iteration)
+                    || openModelErrors == iteration)
             {
                 stderr("\nABORT: both endpoints failing every call; halting at iter=\(iteration)\n")
                 break
@@ -318,21 +318,21 @@ extension QinaoSampleHost {
                 .timeIntervalSince(runStart),
             totalIterations: iteration,
             afmCallsCompleted: afmCompleted,
-            gemmaCallsCompleted: gemmaCompleted,
+            openModelCallsCompleted: openModelCompleted,
             afmTimeouts: afmTimeouts,
-            gemmaTimeouts: gemmaTimeouts,
+            openModelTimeouts: openModelTimeouts,
             afmErrors: afmErrors,
-            gemmaErrors: gemmaErrors,
+            openModelErrors: openModelErrors,
             totalRedLineViolationsAFM: afmRedLineTotal,
-            totalRedLineViolationsGemma: gemmaRedLineTotal,
+            totalRedLineViolationsOpenModel: openModelRedLineTotal,
             avgAFMDurationSeconds:
                 QinaoLongRunningSmokeHelpers.average(afmDurations),
-            avgGemmaDurationSeconds:
-                QinaoLongRunningSmokeHelpers.average(gemmaDurations),
+            avgOpenModelDurationSeconds:
+                QinaoLongRunningSmokeHelpers.average(openModelDurations),
             medianAFMDurationSeconds:
                 QinaoLongRunningSmokeHelpers.median(afmDurations),
-            medianGemmaDurationSeconds:
-                QinaoLongRunningSmokeHelpers.median(gemmaDurations),
+            medianOpenModelDurationSeconds:
+                QinaoLongRunningSmokeHelpers.median(openModelDurations),
             perPersonaCounts: perPersonaCounts)
 
         do {
@@ -352,11 +352,11 @@ extension QinaoSampleHost {
             Elapsed:   \(String(format: "%.2f", summary.totalElapsedSeconds / 3600))h
             Iterations: \(summary.totalIterations)
               AFM:   completed=\(summary.afmCallsCompleted), timeouts=\(summary.afmTimeouts), errors=\(summary.afmErrors)
-              Gemma: completed=\(summary.gemmaCallsCompleted), timeouts=\(summary.gemmaTimeouts), errors=\(summary.gemmaErrors)
+              Gemma: completed=\(summary.openModelCallsCompleted), timeouts=\(summary.openModelTimeouts), errors=\(summary.openModelErrors)
               AFM avg/median seconds:   \(String(format: "%.3f", summary.avgAFMDurationSeconds)) / \(String(format: "%.3f", summary.medianAFMDurationSeconds))
-              Gemma avg/median seconds: \(String(format: "%.3f", summary.avgGemmaDurationSeconds)) / \(String(format: "%.3f", summary.medianGemmaDurationSeconds))
+              Gemma avg/median seconds: \(String(format: "%.3f", summary.avgOpenModelDurationSeconds)) / \(String(format: "%.3f", summary.medianOpenModelDurationSeconds))
               AFM redlines:   \(summary.totalRedLineViolationsAFM)
-              Gemma redlines: \(summary.totalRedLineViolationsGemma)
+              Gemma redlines: \(summary.totalRedLineViolationsOpenModel)
             Per-persona counts:
             \(summary.perPersonaCounts.sorted { $0.key < $1.key }.map { "  \($0.key): \($0.value)" }.joined(separator: "\n"))
 
@@ -391,7 +391,7 @@ extension QinaoSampleHost {
         let nakedAFMStatus: String
         let nakedAFMError: String?
         // naked Gemma
-        let nakedGemmaResponse: String?
+        let nakedOpenModelResponse: String?
         let nakedGemmaRedlines: Int
         let nakedGemmaDurationSeconds: Double
         let nakedGemmaStatus: String
@@ -692,7 +692,7 @@ extension QinaoSampleHost {
                 nakedAFMDurationSeconds: afmDur,
                 nakedAFMStatus: afmStatus,
                 nakedAFMError: afmError,
-                nakedGemmaResponse: gemmaResp,
+                nakedOpenModelResponse: gemmaResp,
                 nakedGemmaRedlines: gemmaRedlines,
                 nakedGemmaDurationSeconds: gemmaDur,
                 nakedGemmaStatus: gemmaStatus,

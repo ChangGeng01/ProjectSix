@@ -432,12 +432,12 @@ extension QinaoSampleHost {
                 .makeComparison(
                     prompt: prompt,
                     nakedAFMResponse: afmResponse,
-                    nakedGemmaResponse: gemmaResponse,
+                    nakedOpenModelResponse: gemmaResponse,
                     substrateAuditCodeCount: substrateAuditCount,
                     substratePermitMode: substratePermitMode,
                     substrateOutputBody: substrateBody,
                     nakedAFMRedLineCount: afmViolations,
-                    nakedGemmaRedLineCount: gemmaViolations,
+                    nakedOpenModelRedLineCount: gemmaViolations,
                     substrateRedLineCount: substrateViolations)
             comparisons.append(comparison)
             print("[\(entry.persona.rawValue) / \(entry.scenario.rawValue)]")
@@ -451,7 +451,7 @@ extension QinaoSampleHost {
         print("""
             ━━━ Aggregate (\(aggregate.totalPrompts) prompts) ━━━
             Naked AFM    available: \(aggregate.nakedAFMAvailableCount) / \(aggregate.totalPrompts);  total RL violations: \(aggregate.nakedAFMTotalViolations)
-            Naked Gemma  available: \(aggregate.nakedGemmaAvailableCount) / \(aggregate.totalPrompts);  total RL violations: \(aggregate.nakedGemmaTotalViolations)
+            Naked Gemma  available: \(aggregate.nakedOpenModelAvailableCount) / \(aggregate.totalPrompts);  total RL violations: \(aggregate.nakedOpenModelTotalViolations)
             Substrate   available: \(aggregate.substrateOutputAvailableCount) / \(aggregate.totalPrompts);  total RL violations: \(aggregate.substrateTotalViolations)
             ════════════════════════════════════════════════
             """)
