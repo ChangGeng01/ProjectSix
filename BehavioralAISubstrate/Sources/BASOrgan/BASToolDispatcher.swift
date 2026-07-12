@@ -40,11 +40,18 @@
 //
 // ## Doctrine pins held
 //
-// - 不变量 #1 / #2 / #3 全保 — dispatcher is observation-class:
-//   handler results are HINTS, gate at L11 still decides what
-//   the substrate returns to the LLM
-// - 红线 7 hint-only — tool results never bypass the permit
-//   gate
+// - 不变量 #1 / #2 / #3 — dispatcher is a NEUTRAL executor: it runs whatever
+//   handler the HOST registered. charter audit 2026-07-12 HONESTY FIX: an earlier
+//   version of this header claimed "tool results never bypass the permit gate" —
+//   THERE IS NO PERMIT GATE IN THIS LANE. The only deterministic controls between an
+//   LLM-proposed invocation and the registered handler are: the planner-level
+//   restrictedToolDomains floor (F11, default nil), this dispatcher's own
+//   restrictedToolDomains filter (default nil), and the per-invocation deadline.
+//   Side-effect discipline is the HOST's: register only handlers whose effects you
+//   accept, or wire your own permit path inside the handler. The three-signature
+//   permit gate lives in QinaoRuntime.execute (SDK side) and this lane never touches
+//   it. Handler RESULTS fed back to the LLM are hints (红线 7) — that part was and
+//   remains true.
 // - 单提交口 (L11/L14) 不变 — dispatcher does NOT mutate commit
 //   token; permit synthesis is downstream
 // - chapter 二百一一 single-source-of-truth — ONE typed

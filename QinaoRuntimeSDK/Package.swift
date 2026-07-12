@@ -9,9 +9,16 @@ import PackageDescription
 ///   Human Host → Qinao SDK → Second Brain (L1–L14) → Neural Network
 ///
 /// This package is the *承载协议* (carrying protocol) between the
-/// human host and the second brain. Seven public modules, each
-/// wraps a BAS internal library; the `BAS*` symbols never leak
-/// through a Qinao public API.
+/// human host and the second brain. The Qinao facade modules each wrap a BAS
+/// substrate library. charter audit 2026-07-12 HONESTY FIX: an earlier version of
+/// this header claimed "the BAS* symbols never leak through a Qinao public API" —
+/// that is NOT true and is not the design: substrate VALUE TYPES flow through Qinao
+/// surfaces deliberately (QinaoLifecycle exposes BASThermalTwin.Reading /
+/// BASThermalGuardLevel / BASLeaseLifeCoordinator.TurnRecorded; TurnInputs carries
+/// BASContextFrame / BASDecomposeFrame / BASMemoryBundle / BASThoughtFrame /
+/// BASNeuralOrganMap; the redaction scanner bans specific internal tokens, not BAS*
+/// generally). What the facades DO hide is substrate ORCHESTRATION (runTurn,
+/// coordinators, reducers) — hosts consume typed artifacts, never drive internals.
 ///
 /// Three invariants are contracts, not advertising (§2):
 ///   1. 先醒再答 — L1 arbitrates wake/budget before generation
