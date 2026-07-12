@@ -99,7 +99,6 @@ final class BASRunTurnFrameBudgetTests: XCTestCase {
             + report.joined(separator: "\n"))
     }
 }
-#endif
 
 // MARK: - stage-contract naming lint (context-IR step 1)
 
@@ -208,3 +207,4 @@ extension BASRunTurnFrameBudgetTests {
         }
     }
 }
+#endif
