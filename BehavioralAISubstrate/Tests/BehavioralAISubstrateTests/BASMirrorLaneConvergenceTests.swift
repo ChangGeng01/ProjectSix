@@ -154,6 +154,20 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
         XCTAssertEqual(count, 1)
     }
 
+    /// The journal's production ledger sets a HARDENED schema floor (1.2.0) — the ingest
+    /// draft must clear it (caught live by the first CLI smoke: default 1.0.0 was floored).
+    func testIngestClearsHardenedSchemaFloor() async throws {
+        let ledger = BASSovereignAuditLedger(
+            signingSecret: SymmetricKey(size: .bits256),
+            minimumSchemaVersion: BASSovereignAuditEntry.hardenedSchemaVersion)
+        guard case .accepted(let env) = dispose(candidate()) else { return XCTFail() }
+        let outcome = await BASMirrorLaneIngestGate.ingest(
+            env, key: key, ledger: ledger,
+            sessionID: "sess.mirror", turnID: "turn.1", now: frozen)
+        XCTAssertTrue(outcome.appended,
+            "the mirror draft must use the hardened injective form, got \(String(describing: outcome.reason))")
+    }
+
     func testTamperedEnvelopeRejectedWithZeroWrites() async throws {
         let ledger = BASSovereignAuditLedger(
             signingSecret: SymmetricKey(size: .bits256))
@@ -197,6 +211,33 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
         XCTAssertEqual(outcome.reason, .contentDigestMismatch)
         let count = await ledger.count()
         XCTAssertEqual(count, 0)
+    }
+
+    /// Replay protection: auditID = "mirror-<envelopeID>" + the SQLite storage's
+    /// audit_id PRIMARY KEY ⇒ the SAME envelope cannot land twice. This property lives
+    /// in PERSISTENT storage (the in-memory ledger has no uniqueness index), so the
+    /// tooth uses SQLite — same as the journal's production ledger.
+    func testSameEnvelopeCannotLandTwice() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mirror-replay-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(
+            at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let storage = try BASSovereignLedgerSQLiteStorage(
+            path: dir.appendingPathComponent("ledger.sqlite").path)
+        let ledger = BASSovereignAuditLedger(
+            signingSecret: SymmetricKey(size: .bits256), storage: storage)
+        guard case .accepted(let env) = dispose(candidate()) else { return XCTFail() }
+
+        let first = await BASMirrorLaneIngestGate.ingest(
+            env, key: key, ledger: ledger,
+            sessionID: "sess.mirror", turnID: "turn.1", now: frozen)
+        XCTAssertTrue(first.appended)
+        let replay = await BASMirrorLaneIngestGate.ingest(
+            env, key: key, ledger: ledger,
+            sessionID: "sess.mirror", turnID: "turn.2", now: frozen)
+        XCTAssertFalse(replay.appended, "replaying the same envelope must be refused")
+        XCTAssertEqual(replay.reason, .appendFailed)
     }
 
     func testWrongKeyIngestRejected() async throws {

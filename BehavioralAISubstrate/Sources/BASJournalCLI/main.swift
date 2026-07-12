@@ -46,7 +46,8 @@ let journalDir: URL = {
 private let journalDBURL = journalDir.appendingPathComponent("journal.sqlite")
 let journalSessionID = "qinao-journal"
 
-private func makeStore() throws -> BASEventSourcedMemoryAtomStore {
+// (internal, not private: MirrorLane.swift shares the store/content accessors)
+func makeStore() throws -> BASEventSourcedMemoryAtomStore {
     try FileManager.default.createDirectory(
         at: journalDir, withIntermediateDirectories: true)
     let eventLog = try BASRoutedEventLogStorage(databaseURL: journalDBURL)
@@ -121,7 +122,7 @@ private func writeContent(_ id: UUID, _ text: String) throws {
     try contentStore().put(id, text)
 }
 
-private func readContent(_ id: UUID) -> String {
+func readContent(_ id: UUID) -> String {
     do {
         if let text = try contentStore().get(id) { return text }   // genuinely present
         // Genuinely ABSENT in the store → a pre-migration legacy file is the only other source.
@@ -217,7 +218,7 @@ private func seedIfEmpty(_ store: BASEventSourcedMemoryAtomStore) async throws {
 
 // MARK: - Commands
 
-private func sortedAtoms(_ store: BASEventSourcedMemoryAtomStore) async -> [BASGovernedMemory] {
+func sortedAtoms(_ store: BASEventSourcedMemoryAtomStore) async -> [BASGovernedMemory] {
     // Oldest → newest by the logged-at time (lastConfirmedAt) so the journal reads
     // chronologically; ties break on id for deterministic output.
     let atoms = await store.allAtoms()
@@ -541,6 +542,15 @@ func runJournal() async {
         case "verdict":
             guard let prefix = rest.first, !prefix.isEmpty else { print("usage: verdict <trial-id>"); return }
             try await cmdVerdict(prefix)
+        case "mirror-dispose":
+            try await cmdMirrorDispose(rest)
+        case "mirror-ingest":
+            guard let path = rest.first, !path.isEmpty else {
+                print("usage: mirror-ingest <envelope.json | ->"); return
+            }
+            try await cmdMirrorIngest(path)
+        case "mirror":
+            try await cmdMirror()
         case "--help", "-h", "help":
             printHelp()
         default:

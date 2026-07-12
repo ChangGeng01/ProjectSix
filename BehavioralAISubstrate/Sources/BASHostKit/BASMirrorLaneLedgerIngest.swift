@@ -84,6 +84,10 @@ public enum BASMirrorLaneIngestGate {
         //    annotation of the chain); signalRefs carry the full signed provenance so
         //    the landed row is attributable without the raw content.
         let draft = BASSovereignAuditEntry(
+            // Hardened injective canonical form — REQUIRED: floored ledgers (e.g. the
+            // journal's makeLedger sets minimumSchemaVersion 1.2.0) reject sub-hardened
+            // drafts, and a security lane has no business emitting the non-injective form.
+            schemaVersion: BASSovereignAuditEntry.hardenedSchemaVersion,
             auditID: "mirror-\(envelope.envelopeID)",
             sessionID: sessionID,
             turnID: turnID,
