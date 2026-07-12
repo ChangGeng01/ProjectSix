@@ -104,15 +104,28 @@ public actor QinaoLoop {
             self.candidateID = candidateID
             self.title = title
             self.actionSummary = actionSummary
-            self.expectedBenefit = expectedBenefit
-            self.expectedCost = expectedCost
-            self.reversibility = reversibility
-            self.confidence = confidence
-            self.evidenceGap = evidenceGap
-            self.manipulationRisk = manipulationRisk
-            self.emotionalBias = emotionalBias
-            self.boundaryConflict = boundaryConflict
+            // audit F8 (2026-07-12): the docstring promises "clamps on receive so a sloppy
+            // caller can't poison the frontier" — but the values were stored RAW, so +Infinity
+            // could permanently top the frontier and NaN could break the sort's strict-weak
+            // ordering. Clamp01 guards finiteness FIRST (min/max let NaN pass through), so
+            // every downstream score/sort/critique consumes a bounded [0,1] value.
+            self.expectedBenefit = Self.clamp01(expectedBenefit)
+            self.expectedCost = Self.clamp01(expectedCost)
+            self.reversibility = Self.clamp01(reversibility)
+            self.confidence = Self.clamp01(confidence)
+            self.evidenceGap = Self.clamp01(evidenceGap)
+            self.manipulationRisk = Self.clamp01(manipulationRisk)
+            self.emotionalBias = Self.clamp01(emotionalBias)
+            self.boundaryConflict = Self.clamp01(boundaryConflict)
             self.worldPriorClaim = worldPriorClaim
+        }
+
+        /// NaN-safe [0,1] clamp. Only NaN needs a guard (it is unordered by min/max, so it
+        /// would pass through) → the neutral floor 0. ±Infinity ARE ordered: min(max(+∞,0),1)=1
+        /// and min(max(-∞,0),1)=0, so they clamp to the correct bound naturally.
+        static func clamp01(_ x: Double) -> Double {
+            guard !x.isNaN else { return 0 }
+            return min(max(x, 0), 1)
         }
 
         /// Host-declared world-prior claim attached to a candidate.
@@ -749,7 +762,12 @@ public actor QinaoLoop {
         role: OrganRole = .core
     ) -> AsyncThrowingStream<OrganResponseChunk, Error> {
         AsyncThrowingStream { continuation in
-            Task { [weak self] in
+            // audit F9 (2026-07-12): capture the pump Task + cancel it on stream termination.
+            // Without onTermination, a consumer that breaks/cancels leaks this Task — the inner
+            // MLX GPU decode loop keeps running to full completion unwatched. checkCancellation
+            // stops the yield loop promptly when the consumer is gone. Mirrors the H18 pattern
+            // (BASAdjudicatingOrganAdapter.streamDraft).
+            let task = Task { [weak self] in
                 guard let self = self else {
                     continuation.finish()
                     return
@@ -764,6 +782,7 @@ public actor QinaoLoop {
                         sessionID: sessionID)
                     do {
                         for try await chunk in inner {
+                            try Task.checkCancellation()
                             continuation.yield(chunk)
                         }
                         continuation.finish()
@@ -780,6 +799,7 @@ public actor QinaoLoop {
                             reason: "no-endpoint-configured"))
                 }
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 
