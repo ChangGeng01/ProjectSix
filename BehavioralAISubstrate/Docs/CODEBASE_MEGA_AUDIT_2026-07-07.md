@@ -810,3 +810,30 @@ wonderful-goldwasser@04-17) verified before removal: 0 dirty files each, every H
 from decode-planner (zero orphan commits — nothing lost). Removed via `git worktree remove`;
 `git worktree list` now shows only the main checkout. The stale-report source class is closed:
 there is no old checkout left for tooling to wander into.
+
+## 2026-07-12 — third report iteration: 6 design asks certified against HEAD; 3 already-built, 3 kernels landed
+
+1. TurnResult structural slimming ("boxed/reference 化, builder/assembler"): ALREADY BUILT —
+   the proposal describes the shipped fix (CoW box b4c5b0cdc + flat single-hop inits +
+   stage-split runTurn); 6 teeth green live (size pin, CoW semantics, frame budget).
+2. Bench test → mock/stub: DECLINED WITH REASONING, intent declared in-code (664f5a3a0) —
+   the heavyweight path is deliberate integration teeth (it caught the SIGBUS and proved the
+   fix); a mock start/stop variant is tautology-class; runtime is ALREADY constructor-
+   injectable on SampleHostModel for hosts that want a stub.
+3. MLX touch-boundary isolation: ALREADY BUILT — BASMLXMetalAvailability probe gates the
+   ungated suites (wiring pinned by lint), MLX_METAL_PATH pinned in the headless gate;
+   three full green runs stand.
+4. Gate authority convergence: LANDED (a9d27f094) — the parent marker scan renamed to
+   check_substrate_residual_markers.sh, a delegating shim keeps the old path alive,
+   'check_substrate_residuals.sh' now unambiguously means the BAS gate. Four invocation
+   forms verified green.
+5. Qinao/MLX boundary policy: WAS ALREADY DEFINED (M222: QinaoMLX IS the bridge and may
+   import BASMLXAdapter; QinaoSampleHost is the documented executable-demo exception) —
+   the gate is clean, rule matches reality; the stale top header now states both allowances
+   (a9d27f094).
+6. logging sink: ALREADY BUILT — BASDiagnosticLog (os.Logger) took the 29 library prints
+   (9ada1c1e8); remaining print() sites are the CLI product surface and DeviceTestApp probes
+   (excluded with justification); gate clean.
+
+Premises 1/3/6 and the red numbers cited were the same stale-worktree artifacts dispositioned
+in the section above (worktrees since removed).
