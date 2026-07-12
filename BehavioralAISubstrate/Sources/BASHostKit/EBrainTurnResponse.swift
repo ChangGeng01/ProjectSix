@@ -16,10 +16,15 @@ import BASRuntimeCore
 //                     (permit, risk), SHOW (rendered output), CARRY (fold), and FILE
 //                     (tickets, audit receipt).
 //
-// ONE projection point (`record.response`) is the seam; hosts that only act/display consume
-// the response and stop coupling to the other 45 fields. Slimness is pinned by
-// BASTurnResponseTests.testResponseSurfaceStaysSlim (cap 10 — widening requires a caller
-// census first).
+// `record.response` is THE host-response projection point; hosts that only act/display
+// consume the response and stop coupling to the other 45 fields. HONEST SCOPING (audit
+// 2026-07-12): this is the single point for the HOST RESPONSE — the SDK's sovereign-
+// artifacts bridge is a separate, DECLARED audit-class projection seam, and inspection
+// surfaces (the 13-layer detail view) read the record by design. The boundary is
+// mechanically enforced: host-surface files reading the raw record must carry the
+// `BASTurnRecord-consumer: audit-class` marker (BASTurnResponseTests
+// .testHostRecordReadersDeclareAuditClass); ACT/SHOW consumers use the response. Slimness
+// pinned by testResponseSurfaceStaysSlim (cap 10 — widening requires a caller census).
 
 /// The audit/replay accretion record — the role name for what flows out of runTurn whole.
 public typealias BASTurnRecord = BASEBrainTurnResult

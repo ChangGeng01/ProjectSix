@@ -28,6 +28,8 @@
 //     stable label rendering.
 //   - 不变量 #1-#3 + Red line 7: ✓ pure UI rendering.
 
+// BASTurnRecord-consumer: audit-class — the 13-layer turn INSPECTION surface;
+// reads deep record fields (contextFrame/thoughtFrame/runtimeTrace/…) by design.
 import SwiftUI
 import BASHostKit
 

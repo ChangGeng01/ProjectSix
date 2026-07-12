@@ -106,11 +106,12 @@ extension SampleHostModel {
                             surface: .application,
                             prompt: prompt,
                             riskLevel: riskLevel))
-                    if let turn = result.eBrainTurn {
-                        if let entry = turn.sovereignAuditEntry {
+                    // context-IR: ACT/SHOW reads go through the slim response contract
+                    if let response = result.turnResponse {
+                        if let entry = response.sovereignAuditEntry {
                             auditCount = entry.signalRefs.count
                         }
-                        permitMode = turn.actionPermit.mode.rawValue
+                        permitMode = response.actionPermit.mode.rawValue
                     }
                 } catch {
                     errorMessage = "substrate: \(error)"

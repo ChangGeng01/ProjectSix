@@ -81,3 +81,59 @@ final class BASTurnResponseTests: XCTestCase {
         #endif
     }
 }
+
+// MARK: - record-adoption boundary lint (audit-confirmed HIGH: one adopter vs 14 raw reads)
+
+/// The consumer boundary, mechanically enforced: host-surface code that reads the raw
+/// 53-field record (`eBrainTurn` beyond the `turnResponse` seam) must DECLARE itself an
+/// audit-class consumer with a marker line:
+///
+///     // BASTurnRecord-consumer: audit-class — <why this file needs the record>
+///
+/// ACT/SHOW consumers (production host behavior) use `turnResponse` and need no marker.
+/// QinaoSampleHost is the documented demo-exception module (same status as in
+/// check_mlx_redaction) and is exempt wholesale.
+extension BASTurnResponseTests {
+    static let recordConsumerMarker = "BASTurnRecord-consumer: audit-class"
+
+    func testHostRecordReadersDeclareAuditClass() throws {
+        #if os(macOS)
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        var scanDirs: [URL] = [repoRoot.appendingPathComponent("SampleHost")]
+        let sdkSources = repoRoot.appendingPathComponent("QinaoRuntimeSDK/Sources")
+        if let mods = try? FileManager.default.contentsOfDirectory(atPath: sdkSources.path) {
+            for m in mods where m != "QinaoSampleHost" {
+                scanDirs.append(sdkSources.appendingPathComponent(m))
+            }
+        }
+        guard FileManager.default.fileExists(atPath: scanDirs[0].path) else {
+            throw XCTSkip("host surfaces not present at \(repoRoot.path) — host-only lint")
+        }
+        var offenders: [String] = []
+        for dir in scanDirs {
+            guard let e = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: nil)
+            else { continue }
+            for case let url as URL in e where url.pathExtension == "swift" {
+                // SampleHost's own Tests exercise both surfaces deliberately
+                if url.path.contains("/Tests/") { continue }
+                guard let src = try? String(contentsOf: url, encoding: .utf8) else { continue }
+                let rawReads = src.split(separator: "\n").contains { line in
+                    line.contains("eBrainTurn") && !line.contains("turnResponse")
+                        && !line.trimmingCharacters(in: .whitespaces).hasPrefix("//")
+                }
+                if rawReads && !src.contains(Self.recordConsumerMarker) {
+                    offenders.append(url.lastPathComponent)
+                }
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty,
+            "host-surface files read the raw record without declaring audit-class — ACT/SHOW "
+            + "consumers must use turnResponse; INSPECT/AUDIT consumers must carry the marker "
+            + "'// \(Self.recordConsumerMarker) — <why>':\n" + offenders.sorted().joined(separator: "\n"))
+        #else
+        throw XCTSkip("host-surface lint is host-only")
+        #endif
+    }
+}

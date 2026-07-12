@@ -1,3 +1,5 @@
+// BASTurnRecord-consumer: audit-class — the SDK's sovereign-artifacts projection
+// (a DECLARED audit seam distinct from the host-response projection point).
 import Foundation
 import BASRuntimeCore
 import BASPolicy
