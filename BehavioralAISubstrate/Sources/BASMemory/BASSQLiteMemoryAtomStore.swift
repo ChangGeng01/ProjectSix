@@ -348,6 +348,12 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         guard let existing else { return nil }
         do {
             try Self.deleteAtom(db: db, atomID: id)
+            // audit F6 (2026-07-12): secure_delete=ON zeroes the freed MAIN-DB page, but the
+            // atom's payload plaintext also lives as the original INSERT frame in the -wal
+            // file. remove() is the explicit forget/purge path (NOT the hot tiering-evict
+            // loop), so truncate the WAL now — a blocked checkpoint that leaves frames THROWS
+            // rather than reporting a clean forget while plaintext lingers.
+            try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
             return existing
         } catch {
             onSilentFailure?(error)

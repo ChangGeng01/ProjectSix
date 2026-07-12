@@ -28,6 +28,33 @@ public enum BASSQLiteSecureDelete {
         isEnabled ? "PRAGMA secure_delete=ON;" : nil
     }
 
+    // MARK: - F6 (2026-07-12): verified WAL truncate after a secure delete
+
+    public enum SecureDeleteError: Error, Equatable, Sendable {
+        /// The post-delete checkpoint could not truncate the WAL — the original INSERT frame
+        /// (plaintext) may still live in the -wal file. Fail LOUD, not silently "deleted".
+        case walNotTruncated(rc: Int32, framesLeft: Int32)
+    }
+
+    /// `secure_delete=ON` only zeroes the freed cell in the MAIN-DB page. Under WAL the
+    /// sensitive plaintext ALSO lives as the original INSERT frame in the -wal file, which
+    /// secure_delete never touches. A `wal_checkpoint(TRUNCATE)` flushes the zeroed page into
+    /// the main DB and truncates the WAL to zero bytes; we inspect the result so a
+    /// BUSY/blocked checkpoint that leaves frames THROWS rather than reporting a clean delete
+    /// while plaintext lingers. Mirrors the proven ContentStore.delete() discipline.
+    ///
+    /// Skipped (no-op, returns) when the secure-delete kill-switch is engaged — the operator
+    /// opted back into pre-fix write cost. Call AFTER the DELETE, on a NON-hot path (or batched
+    /// — checkpointing per-delete on a hot eviction loop amplifies writes; see caller notes).
+    public static func checkpointTruncateAfterSecureDelete(db: OpaquePointer?) throws {
+        guard let db, isEnabled else { return }
+        var pnLog: Int32 = -1, pnCkpt: Int32 = -1
+        let rc = sqlite3_wal_checkpoint_v2(db, nil, SQLITE_CHECKPOINT_TRUNCATE, &pnLog, &pnCkpt)
+        guard rc == SQLITE_OK, pnLog == 0 else {
+            throw SecureDeleteError.walNotTruncated(rc: rc, framesLeft: pnLog)
+        }
+    }
+
     // MARK: - memory-a F4 residual (2026-07-11): one-time legacy freelist purge
 
     /// `secure_delete=ON` only zeroes NEW deletions. Rows deleted BEFORE the #16 fix still sit
