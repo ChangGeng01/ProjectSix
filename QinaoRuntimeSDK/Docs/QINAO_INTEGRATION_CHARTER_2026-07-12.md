@@ -69,6 +69,12 @@ A + K + T + M on one spine; L stays outside the boundary as data, by directive. 
 capability the map showed as "composed nowhere" (T) or "default-off everywhere" (K) is
 now live-by-default on this path. Full SDK regression 1479/0.
 
+- **Permit-signing** ✅ (`1ccc2b8fd`) the gate's LAST field-binding lane closed: ActionPermit
+  HMAC-signed at mint (domain-labelled "qinao.permit.v1", reason-code arity bound), verified
+  signature-first; QinaoRiskGate stays sovereign-free via an injected plain-CryptoKit
+  permitTagKey (assembly derives it from the host secret). Cross-process proof: shared-key
+  gate-A→gate-B verification passes, different-key gate refuses. **F2 fully discharged —
+  all three tokens signed; cross-process adoption needs only key sharing.** SDK 1488/0.
 - **Sample-upgrade** ✅ (`cd9d8e71c`) QinaoSample — the SDK's reference consumer — now
   TEACHES this posture instead of path B: endpoint stays on the sample's side, every
   finished exchange crosses as data (`SampleSession.recordTurn` → memory admission +
