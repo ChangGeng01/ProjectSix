@@ -1823,10 +1823,14 @@ final class SampleHostTests: XCTestCase {
         XCTAssertFalse(m.hybridBenchIsRunning)
     }
 
-    /// M737 — bench-loop integration smoke test: start with
-    /// 0.001h (3.6s) duration, verify it starts + can be stopped
-    /// without crash. Doesn't rely on LLM availability — substrate
-    /// routing always works in test sim.
+    /// M737 — bench-loop INTEGRATION teeth (deliberately heavyweight, NOT a unit smoke):
+    /// drives the REAL BASHostRuntime.startSession through the full EBrain turn pipeline on
+    /// the cooperative pool — exactly the path that SIGBUSed pre-CoW-box (2026-07-11) and
+    /// proved the fix. A mock-runtime start/stop variant would only exercise timer/flag
+    /// mechanics (tautology-class); this test's weight IS its value. Runtime remains
+    /// constructor-injectable on SampleHostModel for hosts that want a stub.
+    /// Start with 0.001h (3.6s) duration, verify it starts + can be stopped without crash.
+    /// Doesn't rely on LLM availability — substrate routing always works in test sim.
     @MainActor
     func testBenchLoopStartsAndStopsWithoutCrash() async throws {
         let m = SampleHostModel()
