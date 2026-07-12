@@ -21,8 +21,9 @@ final class BASEBrainTurnResultBoxingTests: XCTestCase {
     /// of to the Storage box) reds this immediately.
     func testTurnResultValueIsPointerSized() {
         let size = MemoryLayout<BASEBrainTurnResult>.size
-        XCTAssertLessThanOrEqual(size, 16,
-            "BASEBrainTurnResult must stay a CoW box (pointer-sized value); actual inline size \(size) bytes")
+        // EXACTLY one pointer (audit: `<= 16` left room to smuggle one 8-byte inline field)
+        XCTAssertEqual(size, MemoryLayout<UnsafeRawPointer>.size,
+            "BASEBrainTurnResult must stay EXACTLY a CoW box reference; actual inline size \(size) bytes")
     }
 
     // MARK: - value semantics through the box
@@ -180,11 +181,17 @@ extension BASEBrainTurnResultBoxingTests {
         guard FileManager.default.fileExists(atPath: dir.path) else {
             throw XCTSkip("source tree not present (built bundle) — host-only lint")
         }
+        // scan EVERY BASHostKit file that touches the type (audit: a revived convenience
+        // init in a sibling `extension BASEBrainTurnResult` file escaped the old
+        // prefix-only scan). Cap saturation is deliberate: a nested public type's init in
+        // these files reds and forces a conscious look — that is the ratchet working.
         var initCount = 0
         for file in try FileManager.default.contentsOfDirectory(atPath: dir.path)
-        where file.hasPrefix("EBrainTurnResult") && file.hasSuffix(".swift") {
+        where file.hasSuffix(".swift") {
             let src = try String(
                 contentsOf: dir.appendingPathComponent(file), encoding: .utf8)
+            guard file.hasPrefix("EBrainTurnResult")
+                || src.contains("extension BASEBrainTurnResult") else { continue }
             initCount += src.components(separatedBy: "public init(").count - 1
         }
         XCTAssertLessThanOrEqual(initCount, 3,

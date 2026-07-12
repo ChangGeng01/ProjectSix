@@ -57,13 +57,25 @@ final class BASTurnResponseTests: XCTestCase {
                 .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
                 .appendingPathComponent("Sources/BASHostKit/EBrainTurnResponse.swift"),
             encoding: .utf8)
-        let stored = src.split(separator: "\n").filter {
-            $0.trimmingCharacters(in: .whitespaces).hasPrefix("public let ")
-        }.count
-        XCTAssertLessThanOrEqual(stored, 10,
-            "BASTurnResponse grew to \(stored) stored fields (cap 10) — census the host callers "
-            + "before widening the host contract")
-        XCTAssertGreaterThan(stored, 0, "expected the response fields in EBrainTurnResponse.swift")
+        let storedLines = src.split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            // stored bindings only — computed properties carry `{` on the declaration line
+            .filter { ($0.hasPrefix("public let ") || $0.hasPrefix("public var "))
+                && !$0.contains("{") }
+        // audit hardening: (1) the contract is immutable — no public var stored props;
+        // (2) no one-line multi-bindings or tuple types (commas forbidden in a binding);
+        // (3) no aggregate smuggling of the record back through one fat field.
+        XCTAssertTrue(storedLines.allSatisfy { $0.hasPrefix("public let ") },
+            "BASTurnResponse must be immutable — public var stored property found")
+        XCTAssertTrue(storedLines.allSatisfy { !$0.contains(",") },
+            "multi-binding / tuple-typed response field found — one named field per line")
+        XCTAssertFalse(src.contains(": BASEBrainTurnResult") || src.contains(": BASTurnRecord"),
+            "the response must not carry the RECORD as a field — that recreates the coupling")
+        XCTAssertLessThanOrEqual(storedLines.count, 10,
+            "BASTurnResponse grew to \(storedLines.count) stored fields (cap 10) — census the "
+            + "host callers before widening the host contract")
+        XCTAssertGreaterThan(storedLines.count, 0,
+            "expected the response fields in EBrainTurnResponse.swift")
         #else
         throw XCTSkip("source lint is host-only")
         #endif

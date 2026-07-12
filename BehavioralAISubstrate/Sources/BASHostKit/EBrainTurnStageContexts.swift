@@ -61,7 +61,10 @@ struct BASRiskEscalateStageContext {
 /// L12 first half output: rendered output + runtime trace + sovereign verdict + quarantine
 /// + evolution governance artifacts.
 struct BASRenderVerdictStageContext {
-    /// The thought frame with lease refs attached — DECLARED write-back.
+    /// The thought frame after renderStageA's continuation rebinds (observation bundles
+    /// attached; the sovereign LEASE refs are attached later, in renderStageB) — DECLARED
+    /// write-back. thoughtFrame is relay-mutated by FOUR stages: riskA → riskB → renderA →
+    /// renderB; each hop is a declared output field.
     let thoughtFrame: BASThoughtFrame
     let abyssalPressureForAudit: BASAbyssalPressure
     let humanAnchorSignalForAudit: BASHumanAnchorSignal
