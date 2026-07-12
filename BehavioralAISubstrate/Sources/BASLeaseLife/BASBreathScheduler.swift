@@ -92,6 +92,13 @@ public actor BASBreathScheduler {
     private let clock: @Sendable () -> Date
     private var scheduled: [String: ScheduledBreath] = [:]
 
+    /// audit F10 (2026-07-12): the last guard level reconcile() saw. schedule() re-reads this
+    /// AFTER its `await bridge.register` suspension so a request that passed the pre-await
+    /// validation cannot land a LIVE OS registration when an emergency/throttle reconcile ran
+    /// during the suspension (the reconcile's cancelAll couldn't see the in-flight request).
+    /// Defaults to .nominal (no restriction) until the thermal twin first reconciles.
+    private var currentGuardLevel: BASThermalGuardLevel = .nominal
+
     public init(
         bridge: any PlatformBridge = NoOpBridge(),
         clock: @escaping @Sendable () -> Date = { Date() }
@@ -120,6 +127,16 @@ public actor BASBreathScheduler {
         if scheduled[request.id] != nil {
             await bridge.cancel(id: request.id)
             throw ScheduleError.duplicateRequest(id: request.id)
+        }
+        // audit F10: re-validate against the guard level that may have changed DURING the
+        // register suspension. If a reconcile escalated to emergency/throttle while we were
+        // parked, this request must not survive — cancel our own now-illegal OS registration
+        // and fail closed (mirrors the reconcile that couldn't see us).
+        do {
+            try Self.validate(class: request.maintenanceClass, at: currentGuardLevel)
+        } catch {
+            await bridge.cancel(id: request.id)
+            throw error
         }
         let breath = ScheduledBreath(
             request: request,
@@ -169,6 +186,9 @@ public actor BASBreathScheduler {
     public func reconcile(
         with guardLevel: BASThermalGuardLevel
     ) async {
+        // audit F10: record the level FIRST so any schedule() suspended at bridge.register
+        // observes it on wake and fails closed (see schedule()'s post-await re-validation).
+        currentGuardLevel = guardLevel
         switch guardLevel {
         case .emergency:
             await cancelAll()
