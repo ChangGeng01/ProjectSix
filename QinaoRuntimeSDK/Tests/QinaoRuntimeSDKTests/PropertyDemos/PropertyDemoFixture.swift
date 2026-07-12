@@ -184,18 +184,20 @@ enum PropertyDemoFixture {
             summary: "demo intent")
     }
 
+    /// integration S3: proofs are minted by the control plane (HMAC-signed) — hand-built
+    /// proofs now fail the gate by design.
     static func validProof(
         for intent: QinaoRiskGate.ActionIntent,
-        at now: Date = frozenNow(),
+        sovereign: QinaoSovereignControlPlane,
         ttl: TimeInterval = 30
-    ) -> QinaoRuntime.SnapshotContinuityProof {
-        QinaoRuntime.SnapshotContinuityProof(
-            proofID: "proof-\(UUID().uuidString)",
-            sessionID: intent.sessionID,
+    ) async -> QinaoRuntime.SnapshotContinuityProof {
+        await sovereign.issueSnapshotContinuityProof(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: intent.digest,
+                sessionID: intent.sessionID,
+                hostVersionID: intent.hostVersionID),
             anchorID: "anchor-host.v1",
-            intentDigest: intent.digest,
-            issuedAt: now,
-            expiresAt: now.addingTimeInterval(ttl))
+            ttlSeconds: ttl)
     }
 
     /// Build a fully-signed bundle — used by demos that need to
@@ -210,7 +212,7 @@ enum PropertyDemoFixture {
                 digest: intent.digest,
                 sessionID: intent.sessionID,
                 hostVersionID: intent.hostVersionID))
-        let proof = validProof(for: intent)
+        let proof = await validProof(for: intent, sovereign: fx.sovereign)
         return QinaoRuntime.Signatures(
             permit: permit,
             warrant: warrant,

@@ -29,14 +29,14 @@ import QinaoLoop
 /// permits and warrants; the runtime is the only surface that
 /// actually calls the world.
 ///
-/// ⚠️ HONEST SECURITY SCOPE (audit F2, 2026-07-12): the gate binds the three tokens to a
-/// shared `intentDigest` and enforces TTLs, but the tokens are NOT yet cryptographically
-/// signed — `isPermitValid` / `isWarrantValid` / the proof check are field-binding + expiry
-/// comparisons, and the token types have public inits (constructible by any caller). This is
-/// sound TODAY because `execute()` has no production caller and no untrusted IPC/deserialization
-/// boundary (operator decision B), and the adversary emits intent DATA, not a Signatures
-/// bundle. Before any untrusted-boundary adoption, sign the tokens (see the `Warrant`
-/// docstring in QinaoSovereign for the concrete recipe).
+/// SECURITY SCOPE (integration S3, 2026-07-12 — audit F2 largely discharged): the WARRANT
+/// and the SNAPSHOT PROOF are now HMAC-SHA256 signed at mint (`issueWarrant` /
+/// `issueSnapshotContinuityProof`) and verified signature-first (`isWarrantValid` /
+/// `isSnapshotProofValid` — the latter also closes the pre-S3 gap where proof expiry and
+/// sessionID were unchecked). Forging either now requires the control plane's
+/// `tokenTagKey`, not just the type. Documented residual: the RISK permit remains
+/// field-binding + TTL (QinaoRisk deliberately holds no signing key to stay decoupled
+/// from the sovereign module); sign the permit lane before any cross-process adoption.
 public actor QinaoRuntime {
 
     public enum RuntimeError: Error, Equatable, Sendable {
@@ -70,8 +70,14 @@ public actor QinaoRuntime {
         }
     }
 
-    /// Opaque proof that the current session's snapshot chain is
-    /// intact. Produced by the control plane, consumed by the gate.
+    /// Proof that the current session's snapshot chain is intact.
+    ///
+    /// integration S3 (2026-07-12, audit F2 discharge): the proof now has a REAL issuance
+    /// path — `QinaoSovereignControlPlane.issueSnapshotContinuityProof` HMAC-signs all six
+    /// identity fields; `isSnapshotProofValid` verifies signature + session binding +
+    /// expiry (the pre-S3 gate checked only `intentDigest` — expiry and sessionID were
+    /// silently unvalidated). The public init remains for Codable/testing, but an
+    /// unsigned or hand-built proof fails verification: forgery needs the key.
     public struct SnapshotContinuityProof: Sendable, Equatable, Codable {
         public let proofID: String
         public let sessionID: String
@@ -79,13 +85,17 @@ public actor QinaoRuntime {
         public let intentDigest: String
         public let issuedAt: Date
         public let expiresAt: Date
+        /// HMAC-SHA256 tag over the six fields (hex). Minted only by
+        /// `issueSnapshotContinuityProof`.
+        public let signature: String
         public init(
             proofID: String,
             sessionID: String,
             anchorID: String,
             intentDigest: String,
             issuedAt: Date,
-            expiresAt: Date
+            expiresAt: Date,
+            signature: String
         ) {
             self.proofID = proofID
             self.sessionID = sessionID
@@ -93,6 +103,7 @@ public actor QinaoRuntime {
             self.intentDigest = intentDigest
             self.issuedAt = issuedAt
             self.expiresAt = expiresAt
+            self.signature = signature
         }
     }
 
@@ -204,6 +215,13 @@ public actor QinaoRuntime {
         let warrantOK = await sovereign.isWarrantValid(
             signatures.warrant, for: sovereignIntent)
         guard warrantOK else { throw RuntimeError.missingWarrant }
+
+        // integration S3 (audit F2 discharge): FULL proof verification — signature +
+        // session binding + expiry. The pre-S3 gate compared only intentDigest, so an
+        // expired or cross-session or hand-built proof passed silently.
+        let proofOK = await sovereign.isSnapshotProofValid(
+            signatures.snapshotProof, for: sovereignIntent)
+        guard proofOK else { throw RuntimeError.missingSnapshotProof }
 
         do {
             return try await toolExecutor(toolName, payload)

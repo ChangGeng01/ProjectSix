@@ -144,18 +144,19 @@ final class QinaoRuntimeGateTests: XCTestCase {
             .joined()
     }
 
+    /// integration S3: proofs are minted by the control plane (HMAC-signed).
     private func validProof(
         for intent: QinaoRiskGate.ActionIntent,
-        at now: Date = Date(),
+        sovereign: QinaoSovereignControlPlane,
         ttl: TimeInterval = 10
-    ) -> QinaoRuntime.SnapshotContinuityProof {
-        QinaoRuntime.SnapshotContinuityProof(
-            proofID: "proof-\(UUID().uuidString)",
-            sessionID: intent.sessionID,
+    ) async -> QinaoRuntime.SnapshotContinuityProof {
+        await sovereign.issueSnapshotContinuityProof(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: intent.digest,
+                sessionID: intent.sessionID,
+                hostVersionID: intent.hostVersionID),
             anchorID: "anchor-host.v1",
-            intentDigest: intent.digest,
-            issuedAt: now,
-            expiresAt: now.addingTimeInterval(ttl))
+            ttlSeconds: ttl)
     }
 
     // MARK: - Happy path
@@ -173,7 +174,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
                 digest: it.digest,
                 sessionID: it.sessionID,
                 hostVersionID: it.hostVersionID))
-        let proof = validProof(for: it)
+        let proof = await validProof(for: it, sovereign: sovereign)
         let sigs = QinaoRuntime.Signatures(
             permit: permit, warrant: warrant, snapshotProof: proof)
 
@@ -205,7 +206,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
         let warrant = try await sovereign.issueWarrant(
             for: QinaoSovereignControlPlane.Intent(
                 digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID))
-        let proof = validProof(for: it)
+        let proof = await validProof(for: it, sovereign: sovereign)
         let sigs = QinaoRuntime.Signatures(
             permit: permit, warrant: warrant, snapshotProof: proof)
 
@@ -241,7 +242,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
                 digest: it.digest,
                 sessionID: it.sessionID,
                 hostVersionID: it.hostVersionID))
-        let proof = validProof(for: it)
+        let proof = await validProof(for: it, sovereign: sovereign)
 
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
@@ -278,7 +279,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
                 digest: "intent.other",
                 sessionID: it.sessionID,
                 hostVersionID: it.hostVersionID))
-        let proof = validProof(for: it)
+        let proof = await validProof(for: it, sovereign: sovereign)
 
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
@@ -310,8 +311,8 @@ final class QinaoRuntimeGateTests: XCTestCase {
                 digest: it.digest,
                 sessionID: it.sessionID,
                 hostVersionID: it.hostVersionID))
-        let wrongProof = validProof(
-            for: intent(digest: "intent.other"))
+        let wrongProof = await validProof(
+            for: intent(digest: "intent.other"), sovereign: sovereign)
 
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
@@ -357,7 +358,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
         // Advance past permit TTL (10s); warrant TTL is also 10s —
         // the runtime checks permit first, so that's what we observe.
         clock.t = frozen.addingTimeInterval(11)
-        let proof = validProof(for: it, at: clock.t, ttl: 60)
+        let proof = await validProof(for: it, sovereign: sovereign, ttl: 60)
 
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
@@ -408,7 +409,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
                 digest: it.digest,
                 sessionID: it.sessionID,
                 hostVersionID: it.hostVersionID))
-        let proof = validProof(for: it)
+        let proof = await validProof(for: it, sovereign: fx.sovereign)
 
         _ = try await fx.sovereign.haltSession(
             sessionID: sessionID,

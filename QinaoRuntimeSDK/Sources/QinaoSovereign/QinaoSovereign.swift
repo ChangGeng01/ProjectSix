@@ -92,26 +92,24 @@ public actor QinaoSovereignControlPlane {
 
     /// Warrant token the runtime attaches to side-effect calls.
     ///
-    /// ⚠️ HONEST SECURITY SCOPE (audit F2, 2026-07-12): this warrant is NOT cryptographically
-    /// unforgeable at present. It is a plaintext value type bound to an intent by `intentDigest`
-    /// + a short TTL (`expiresAt`); `isWarrantValid` verifies ONLY those fields and does NOT
-    /// call `BASSovereignTokenAuthority` — the configured `tokenSigningKey`/`tokenAuthority`
-    /// exist but are not yet wired into this issue/verify chain. Because the struct has a public
-    /// memberwise init, any caller can construct a Warrant. This is acceptable TODAY because
-    /// `QinaoRuntime.execute()` has no production caller and no IPC/deserialization boundary
-    /// (operator decision B: the SDK is adoption-ready scaffold, not live), and the intended
-    /// adversary — the neural layer — emits INTENT data, not a Signatures bundle.
-    ///
-    /// BEFORE wiring `execute()` to any untrusted boundary, the warrant (and the permit +
-    /// snapshot proof) MUST be signed: mint an HMAC/Ed25519 tag over
-    /// (warrantID, sessionID, intentDigest, issuedAt, expiresAt) via `tokenAuthority` in
-    /// `issueWarrant`, verify it in `isWarrantValid`, and drop the public init.
+    /// SECURITY SCOPE (integration S3, 2026-07-12 — discharges audit F2 for the warrant):
+    /// the warrant is now HMAC-SHA256 signed at mint. `issueWarrant` computes `signature`
+    /// over an injective length-prefixed encoding of (warrantID, sessionID, intentDigest,
+    /// issuedAt, expiresAt) with the control plane's `tokenTagKey` (wired from
+    /// `Configuration.tokenSigningKey`, falling back to `ledgerSigningSecret`);
+    /// `isWarrantValid` recomputes and compares before the field-binding + TTL checks.
+    /// A warrant constructed or decoded outside the control plane fails verification —
+    /// forgery requires the key, not just the type. Residual (documented): the RISK
+    /// permit remains field-binding-only (QinaoRisk deliberately holds no signing key);
+    /// sign it before any cross-process adoption of the permit lane.
     public struct Warrant: Sendable, Equatable, Codable {
         public let warrantID: String
         public let sessionID: String
         public let intentDigest: String
         public let issuedAt: Date
         public let expiresAt: Date
+        /// HMAC-SHA256 tag binding all five fields (hex). Minted only by `issueWarrant`.
+        public let signature: String
     }
 
     /// Intent the runtime wants the control plane to authorize.
@@ -495,6 +493,29 @@ public actor QinaoSovereignControlPlane {
     /// reaching back through intermediates.
     package let auditLedger: BASSovereignAuditLedger
     package let warrantTTL: TimeInterval
+
+    /// integration S3 — HMAC-SHA256 key for warrant + snapshot-proof tags. `package` so
+    /// the QinaoRuntime module's snapshot-proof issuance extension can reach it; never
+    /// exposed publicly.
+    package let tokenTagKey: SymmetricKey
+
+    /// integration S3 — injective token tag: each field is length-prefixed
+    /// (`<utf8len>:<field>`) then concatenated, so no field content can masquerade as a
+    /// boundary; the HMAC of the canonical string is hex-encoded. Dates enter via the
+    /// bit pattern of `timeIntervalSince1970` (lossless, locale-free).
+    package static func tokenTag(
+        key: SymmetricKey, fields: [String]
+    ) -> String {
+        let canonical = fields.map { "\($0.utf8.count):\($0)" }.joined()
+        return Data(HMAC<SHA256>.authenticationCode(
+            for: Data(canonical.utf8), using: key))
+            .map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Canonical lossless textual form of a Date for token tags.
+    package static func tagDate(_ d: Date) -> String {
+        "t\(String(d.timeIntervalSince1970.bitPattern, radix: 16))"
+    }
     package let now: @Sendable () -> Date
     package var haltedSessions: Set<String> = []
     package var haltReasons: [String: String] = [:]
@@ -556,13 +577,18 @@ public actor QinaoSovereignControlPlane {
                 .defaultRenderFrameCapacity,
         processedTurnCapacity: Int =
             QinaoSovereignControlPlane
-                .defaultProcessedTurnCapacity
+                .defaultProcessedTurnCapacity,
+        // integration S3: HMAC key for warrant / snapshot-proof tags. Random default is
+        // sound for direct (test) construction — mint and verify happen on the same
+        // instance; bootstrap passes a host-stable key so tokens survive re-bootstrap.
+        tokenTagKey: SymmetricKey = SymmetricKey(size: .bits256)
     ) {
         self.coordinator = coordinator
         self.tokenAuthority = tokenAuthority
         self.turnVerifier = turnVerifier
         self.auditLedger = auditLedger
         self.warrantTTL = warrantTTLSeconds
+        self.tokenTagKey = tokenTagKey
         self.now = now
         // Clamp to ≥ 1; a zero/negative cap would make the
         // storage write-only.
@@ -689,7 +715,13 @@ public actor QinaoSovereignControlPlane {
             turnVerifier: verifier,
             auditLedger: ledger,
             warrantTTLSeconds: configuration.warrantTTLSeconds,
-            now: configuration.now)
+            now: configuration.now,
+            // integration S3: the previously-dead tokenSigningKey now keys the
+            // warrant/snapshot-proof HMAC tags; ledgerSigningSecret is the fallback so a
+            // single-secret host still gets signed tokens.
+            tokenTagKey: SymmetricKey(
+                data: configuration.tokenSigningKey
+                    ?? configuration.ledgerSigningSecret))
         let handle = SubstrateHandle(
             snapshotManager: snapshotManager,
             hostVersionTree: versionTree)
@@ -1029,22 +1061,39 @@ public actor QinaoSovereignControlPlane {
                 sessionID: intent.sessionID)
         }
         let issuedAt = now()
+        let warrantID = "wa-\(UUID().uuidString)"
+        let expiresAt = issuedAt.addingTimeInterval(warrantTTL)
+        // integration S3 (audit F2 discharge): HMAC-sign the five fields at mint.
+        let signature = Self.tokenTag(
+            key: tokenTagKey,
+            fields: [
+                warrantID, intent.sessionID, intent.digest,
+                Self.tagDate(issuedAt), Self.tagDate(expiresAt),
+            ])
         return Warrant(
-            warrantID: "wa-\(UUID().uuidString)",
+            warrantID: warrantID,
             sessionID: intent.sessionID,
             intentDigest: intent.digest,
             issuedAt: issuedAt,
-            expiresAt: issuedAt.addingTimeInterval(warrantTTL))
+            expiresAt: expiresAt,
+            signature: signature)
     }
 
-    /// Verify a warrant is live for a given intent. audit F2: this is a FIELD-BINDING +
-    /// TTL check only (sessionID + intentDigest + expiry) — NOT a cryptographic signature
-    /// verification. See the `Warrant` docstring for the honest scope and the pre-adoption
-    /// signing requirement.
+    /// Verify a warrant is live for a given intent. integration S3 (audit F2 discharge):
+    /// the HMAC signature is verified FIRST — a warrant not minted by this control
+    /// plane's key fails closed regardless of its field values — then the field binding
+    /// (sessionID + intentDigest) and TTL.
     public func isWarrantValid(
         _ warrant: Warrant,
         for intent: Intent
     ) -> Bool {
+        let expected = Self.tokenTag(
+            key: tokenTagKey,
+            fields: [
+                warrant.warrantID, warrant.sessionID, warrant.intentDigest,
+                Self.tagDate(warrant.issuedAt), Self.tagDate(warrant.expiresAt),
+            ])
+        guard warrant.signature == expected else { return false }
         guard warrant.sessionID == intent.sessionID else { return false }
         guard warrant.intentDigest == intent.digest else { return false }
         guard warrant.expiresAt > now() else { return false }

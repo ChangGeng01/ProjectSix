@@ -105,7 +105,7 @@ final class ProtectNotTakeOverDemo: XCTestCase {
                 digest: intent.digest,
                 sessionID: intent.sessionID,
                 hostVersionID: intent.hostVersionID))
-        let proof = PropertyDemoFixture.validProof(for: intent)
+        let proof = await PropertyDemoFixture.validProof(for: intent, sovereign: fx.sovereign)
 
         do {
             _ = try await fx.runtime.execute(

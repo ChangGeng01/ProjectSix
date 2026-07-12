@@ -151,18 +151,19 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
 
     /// Construct a SnapshotContinuityProof bound to a specific
     /// intent digest. Same shape used by `QinaoRuntimeGateTests`.
+    /// integration S3: proofs are minted by the control plane (HMAC-signed).
     private func proof(
         for intent: QinaoRiskGate.ActionIntent,
-        now: Date,
+        sovereign: QinaoSovereignControlPlane,
         ttl: TimeInterval = 30
-    ) -> QinaoRuntime.SnapshotContinuityProof {
-        QinaoRuntime.SnapshotContinuityProof(
-            proofID: "proof-\(UUID().uuidString)",
-            sessionID: intent.sessionID,
+    ) async -> QinaoRuntime.SnapshotContinuityProof {
+        await sovereign.issueSnapshotContinuityProof(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: intent.digest,
+                sessionID: intent.sessionID,
+                hostVersionID: intent.hostVersionID),
             anchorID: "anchor-host.v1",
-            intentDigest: intent.digest,
-            issuedAt: now,
-            expiresAt: now.addingTimeInterval(ttl))
+            ttlSeconds: ttl)
     }
 
     // MARK: - Happy path: real LLM body → intent → all 3 sigs → execute
@@ -239,7 +240,7 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
                 digest: intent.digest,
                 sessionID: intent.sessionID,
                 hostVersionID: intent.hostVersionID))
-        let snapshotProof = proof(for: intent, now: nowDate)
+        let snapshotProof = await proof(for: intent, sovereign: fx.sovereign)
 
         XCTAssertEqual(permit.digest, intent.digest)
         XCTAssertEqual(warrant.intentDigest, intent.digest)
@@ -332,7 +333,7 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
                 digest: Self.sha256Hex(of: "different-intent"),
                 sessionID: intent.sessionID,
                 hostVersionID: intent.hostVersionID))
-        let snapshotProof = proof(for: intent, now: nowDate)
+        let snapshotProof = await proof(for: intent, sovereign: fx.sovereign)
 
         do {
             _ = try await fx.runtime.execute(

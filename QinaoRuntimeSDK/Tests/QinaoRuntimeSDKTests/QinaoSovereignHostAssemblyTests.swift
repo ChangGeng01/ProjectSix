@@ -133,11 +133,12 @@ final class QinaoSovereignHostAssemblyTests: XCTestCase {
                 digest: intent.digest,
                 sessionID: intent.sessionID,
                 hostVersionID: intent.hostVersionID))
-        let proof = QinaoRuntime.SnapshotContinuityProof(
-            proofID: "proof.assembly", sessionID: intent.sessionID,
-            anchorID: "anchor.host.v1", intentDigest: intent.digest,
-            issuedAt: Date(timeIntervalSince1970: 1_700_000_000),
-            expiresAt: Date(timeIntervalSince1970: 1_700_000_010))
+        let proof = await host.sovereign.issueSnapshotContinuityProof(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: intent.digest,
+                sessionID: intent.sessionID,
+                hostVersionID: intent.hostVersionID),
+            anchorID: "anchor.host.v1")
 
         let result = try await host.runtime.execute(
             toolName: "journal.append",

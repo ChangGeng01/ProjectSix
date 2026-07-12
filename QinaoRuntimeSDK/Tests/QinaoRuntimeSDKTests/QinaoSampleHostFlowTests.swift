@@ -208,13 +208,12 @@ final class QinaoSampleHostFlowTests: XCTestCase {
                 digest: intent.digest,
                 sessionID: intent.sessionID,
                 hostVersionID: intent.hostVersionID))
-        let snapshotProof = QinaoRuntime.SnapshotContinuityProof(
-            proofID: "proof.demo",
-            sessionID: intent.sessionID,
-            anchorID: "anchor.demo",
-            intentDigest: intent.digest,
-            issuedAt: now(),
-            expiresAt: now().addingTimeInterval(30))
+        let snapshotProof = await sovereign.issueSnapshotContinuityProof(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: intent.digest,
+                sessionID: intent.sessionID,
+                hostVersionID: intent.hostVersionID),
+            anchorID: "anchor.demo")
 
         let execResult = try await runtime.execute(
             toolName: toolName,
