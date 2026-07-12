@@ -257,7 +257,18 @@ let package = Package(
                 "QinaoLoopSeats",
                 "QinaoSeats",
                 "QinaoWorldPrior",
-                "QinaoUI"
+                "QinaoUI",
+                // integration S2 (2026-07-12) — the LLM-free sovereign host assembly
+                // (QinaoSovereignHostAssembly.swift) composes the full stack. BOUNDARY:
+                // QinaoAppleFoundation / QinaoMLX must NEVER appear here (pinned by
+                // QinaoBoundaryPinTests).
+                "QinaoHost",
+                "QinaoMemory",
+                "QinaoRisk",
+                "QinaoSovereign",
+                "QinaoRuntime",
+                .product(name: "BASRuntimeCore", package: "BehavioralAISubstrate"),
+                .product(name: "BASMemory", package: "BehavioralAISubstrate")
             ]),
         // M180 — public factory wiring Apple FoundationModels
         // behind QinaoOrganEndpoint. Optional library: hosts that
