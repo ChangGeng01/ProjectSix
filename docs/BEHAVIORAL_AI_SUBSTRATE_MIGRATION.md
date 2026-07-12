@@ -151,7 +151,7 @@ This keeps substrate execution generic while moving workflow strategy DNA back i
 
 Substrate residual enforcement is now split across two gates:
 
-- `./scripts/check_substrate_residuals.sh`
+- `./scripts/check_substrate_residual_markers.sh`
 - `./scripts/check_sdk_import_boundaries.sh`
 
 The residual scan now covers:

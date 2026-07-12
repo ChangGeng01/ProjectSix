@@ -20,8 +20,9 @@
 #      `ModelConfiguration`, `LanguageModelSession`,
 #      `MLXLLMConfiguration`, etc.
 #
-# Allowed: QinaoMLX (the bridge). Tested: every other Qinao module
-# under QinaoRuntimeSDK/Sources/.
+# Allowed: QinaoMLX (the bridge — it MAY import BASMLXAdapter and name MLX/HF
+# types; that is its job) and QinaoSampleHost (executable DEMO exception, rationale
+# below at the allowlist). Tested: every other Qinao module under QinaoRuntimeSDK/Sources/.
 
 set -euo pipefail
 
