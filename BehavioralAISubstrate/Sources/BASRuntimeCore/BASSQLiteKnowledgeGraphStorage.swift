@@ -680,15 +680,13 @@ public actor BASSQLiteKnowledgeGraphStorage {
         }
         defer { sqlite3_finalize(stmt) }
         var out: [BASKnowledgeNode] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            // M891 fix (post-deep-audit):per-row corruption
-            // tolerance — pre-M891 a single bad node row threw
-            // out of fetchAllNodes,then `try?` in `allNodes()`
-            // swallowed the throw + returned `[]` → preload
-            // silently lost ALL nodes,not just the corrupt one。
-            // Post-M891 the bad row is skipped + good rows
-            // are preserved per chapter 一百九十一 row-by-row
-            // integrity doctrine。
+        // audit F4 (2026-07-12): distinguish a per-row DATA corruption (skip the row, keep
+        // the rest — M891 doctrine) from a STEP error (BUSY/IOERR/CORRUPT at the SQLite
+        // layer). The former is tolerated; the latter must NOT be read as end-of-data —
+        // throw so allNodes()/onSilentFailure surfaces it instead of silently returning a
+        // truncated graph.
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             do {
                 out.append(try buildNode(stmt: stmt))
             } catch {
@@ -696,6 +694,11 @@ public actor BASSQLiteKnowledgeGraphStorage {
                 // Caller can detect via storage.nodeCount vs
                 // returned-array count if needed。
             }
+            rc = sqlite3_step(stmt)
+        }
+        guard rc == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return out
     }
@@ -840,7 +843,9 @@ public actor BASSQLiteKnowledgeGraphStorage {
         }
         defer { sqlite3_finalize(stmt) }
         var out: [BASKnowledgeEdge] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        // audit F4: STEP-error fail-closed (see fetchAllNodes).
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             // M891 fix:per-row corruption tolerance (same as
             // fetchAllNodes — see that comment for rationale)。
             do {
@@ -848,6 +853,11 @@ public actor BASSQLiteKnowledgeGraphStorage {
             } catch {
                 // Skip corrupt row;continue with remaining。
             }
+            rc = sqlite3_step(stmt)
+        }
+        guard rc == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return out
     }

@@ -88,6 +88,32 @@ public protocol BASSovereignLedgerStorage {
     /// Called from inside the actor on rotation or when segments
     /// change state.
     func persistSegment(_ segment: BASSovereignLedgerSegment) throws
+
+    /// audit F3 (2026-07-12): persist a freshly-appended entry AND its owning segment
+    /// ATOMICALLY — either both rows commit or neither does. `append()` mutates memory then
+    /// mirrors to disk; before this, the two writes were independent autocommits, so a
+    /// transient failure on the segment write after the entry committed left a DURABLE orphan
+    /// entry whose segment count is under-recorded, and the next cold-start
+    /// `segmentTotal != entries.count` cross-check permanently quarantines the whole ledger.
+    /// The default is the legacy two-call sequence (byte-equal for null/segment-less
+    /// storages); the SQLite storage overrides it with a real transaction.
+    func persistAppendedEntryAndSegment(
+        _ appended: BASSovereignAuditLedger.AppendedEntry,
+        _ segment: BASSovereignLedgerSegment
+    ) throws
+}
+
+public extension BASSovereignLedgerStorage {
+    /// Default: preserve the historical two-write sequence (no atomicity guarantee) for
+    /// storages that don't override — the null storage and any host storage that keeps its
+    /// own transaction discipline stay byte-equal.
+    func persistAppendedEntryAndSegment(
+        _ appended: BASSovereignAuditLedger.AppendedEntry,
+        _ segment: BASSovereignLedgerSegment
+    ) throws {
+        try persistAppended(appended)
+        try persistSegment(segment)
+    }
 }
 
 // MARK: - Default null storage (pre-M91 in-memory-only behaviour)
@@ -425,6 +451,34 @@ public final class BASSovereignLedgerSQLiteStorage:
         }
     }
 
+    /// audit F3 (2026-07-12): the ATOMIC entry+segment write. Both INSERTs run inside one
+    /// `BEGIN IMMEDIATE … COMMIT`; any failure ROLLBACKs so disk never holds an orphan entry
+    /// without its segment count. Reuses the exact BEGIN/COMMIT/ROLLBACK discipline the
+    /// migration path already proved. persistAppended/persistSegment remain for rotation and
+    /// other single-row writes.
+    public func persistAppendedEntryAndSegment(
+        _ appended: BASSovereignAuditLedger.AppendedEntry,
+        _ segment: BASSovereignLedgerSegment
+    ) throws {
+        guard db != nil else { return }
+        try Self.runExec(db: db!, sql: "BEGIN IMMEDIATE;")
+        do {
+            try persistAppended(appended)
+            try persistSegment(segment)
+            try Self.runExec(db: db!, sql: "COMMIT;")
+        } catch {
+            do {
+                try Self.runExec(db: db!, sql: "ROLLBACK;")
+            } catch let rollbackError {
+                FileHandle.standardError.write(Data(
+                    ("[BASSovereignLedgerSQLiteStorage] audit F3: ROLLBACK after atomic "
+                     + "append failed itself: \(rollbackError) (original: \(error)); DB may "
+                     + "be in an indeterminate state\n").utf8))
+            }
+            throw error
+        }
+    }
+
     public func persistSegment(
         _ segment: BASSovereignLedgerSegment
     ) throws {
@@ -524,7 +578,12 @@ public final class BASSovereignLedgerSQLiteStorage:
         defer { sqlite3_finalize(stmt) }
 
         var entries: [BASSovereignAuditLedger.AppendedEntry] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        // audit F4 (2026-07-12): capture the step rc so a BUSY/IOERR/CORRUPT is NOT read as
+        // end-of-data. A truncated/errored read that returns a short-or-empty entry list would
+        // otherwise slip past the reload cross-check and fork the audit chain (fail-open) —
+        // integrity > availability: throw, so loadState() throws and rehydrate() fails closed.
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             let auditID = Self.readText(stmt, 0)
             let sessionID = Self.readText(stmt, 1)
             let turnID = Self.readText(stmt, 2)
@@ -568,6 +627,11 @@ public final class BASSovereignLedgerSQLiteStorage:
                 entry: entry,
                 priorHash: priorHash,
                 selfHash: selfHash))
+            rc = sqlite3_step(stmt)
+        }
+        guard rc == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return entries
     }
@@ -595,7 +659,9 @@ public final class BASSovereignLedgerSQLiteStorage:
         defer { sqlite3_finalize(stmt) }
 
         var segments: [BASSovereignLedgerSegment] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        // audit F4: fail-closed on read errors (see loadEntries).
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             let segID = Self.readText(stmt, 0)
             let segIdx = Int(sqlite3_column_int64(stmt, 1))
             let sessionID = Self.readText(stmt, 2)
@@ -636,6 +702,11 @@ public final class BASSovereignLedgerSQLiteStorage:
                 closedAt: closedAt,
                 closedBy: closedBy,
                 closingRotationID: closingRotationID))
+            rc = sqlite3_step(stmt)
+        }
+        guard rc == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return segments
     }

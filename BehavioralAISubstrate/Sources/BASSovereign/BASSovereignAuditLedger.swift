@@ -369,7 +369,6 @@ public actor BASSovereignAuditLedger {
     private func ensureReloadVerified() {
         guard !reloadVerified else { return }
         reloadVerified = true
-        guard !entries.isEmpty else { return }
         // H14 (mega-audit 2026-07-07): tail truncation leaves an internally-consistent
         // prefix that auditChainFull() cannot detect (all priorHash links + signatures
         // still verify). Cross-check the loaded entry count against the persisted
@@ -377,6 +376,12 @@ public actor BASSovereignAuditLedger {
         // consulted. entries < Σ entryCount ⇒ audit_entries rows were deleted; any
         // mismatch ⇒ tamper ⇒ quarantine. Scoped to segment-persisting storages
         // (segments non-empty); a segment-less storage stays byte-equal.
+        //
+        // audit F4 (2026-07-12): this cross-check now runs BEFORE the empty-entries early
+        // return — an errored/truncated read that yields ZERO entries while segments record
+        // a positive count is exactly the tamper signal (was fail-open: the old
+        // `guard !entries.isEmpty` returned first and skipped this). A genuinely fresh store
+        // has empty entries AND empty segments, so it still passes byte-equal.
         if !segments.isEmpty {
             let segmentTotal = segments.reduce(0) { $0 + $1.entryCount }
             if segmentTotal != entries.count {
@@ -388,6 +393,7 @@ public actor BASSovereignAuditLedger {
                 return
             }
         }
+        guard !entries.isEmpty else { return }
         let report = auditChainFull()
         guard !report.corruptions.isEmpty else { return }
         integrityQuarantined = true
@@ -569,10 +575,12 @@ public actor BASSovereignAuditLedger {
             openedAt: sealed.appendedAt)
         segments[segIndex].entryCount += 1
 
-        // M91 — mirror to persistent storage; H13 — atomic across memory+disk.
+        // M91 — mirror to persistent storage; H13 — atomic across memory; audit F3 — atomic
+        // across DISK too: the entry + its segment commit together or not at all, so a
+        // transient failure on the segment write can no longer leave a durable orphan entry
+        // that self-quarantines the ledger on the next cold start.
         do {
-            try storage.persistAppended(appended)
-            try storage.persistSegment(segments[segIndex])
+            try storage.persistAppendedEntryAndSegment(appended, segments[segIndex])
         } catch {
             // H13 rollback — undo every mutation in reverse so memory == disk.
             segments[segIndex].entryCount -= 1
