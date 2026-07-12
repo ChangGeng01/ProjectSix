@@ -20,6 +20,13 @@ final class BASSessionPersistProtectionTests: XCTestCase {
     override func setUpWithError() throws {
         try BASScreenLockSkip.skipIfScreenLocked()
     }
+
+    // The console can LOCK MID-RUN (idle timeout during long suites) — protection flips
+    // silently no-op in the lock transition window. Re-check before asserting so a mid-run
+    // lock reads as the environmental skip it is, not a red (observed 2026-07-12 11:39).
+    override func tearDownWithError() throws {
+        try BASScreenLockSkip.skipIfScreenLocked()
+    }
 #if canImport(MLXLLM)
 
     private func tempURL() -> URL {
