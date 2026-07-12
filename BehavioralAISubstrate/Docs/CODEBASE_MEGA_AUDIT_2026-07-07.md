@@ -854,3 +854,18 @@ QinaoMLX, so output-greppers misread the innocence statement as a violation list
 mechanism behind the recurring "redaction flags QinaoMLX itself" claim (allowlist correct
 since at least 06-29). Clean output now names NO modules. Gate-authoring law: a clean verdict
 must not contain the names it exonerates.
+
+## 2026-07-12 — context-IR step 1: the stage contracts have names (9e854fb76)
+
+The operator's architectural verdict ("distributed context engineering, not a unified context
+compiler") was certified TRUE with measured evidence — 16 carrier types in runTurn, five ad-hoc
+tuple contracts (9/4/10/16/12 anonymous values) left by the stage split, a 53-field result
+serving four consumers (host UI reads ~8 fields, SDK bridge projects 18, audit consumes nearly
+all, replay needs all) — and step 1 of the compatible unification path was ordered and shipped:
+the five tuples are now NAMED output contracts (BASMemoryDeliberateStageContext /
+BASRiskBindStageContext / BASRiskEscalateStageContext / BASRenderVerdictStageContext /
+BASAuditProjectionStageContext), immutable-field structs whose docs name their layer. Honest
+boundary: step 1 declares each stage's WRITES; reads remain lexical captures. Teeth:
+testStageContractsAreNamedTypesNotTuples (RED listed all five pre-conversion) + frame budget
+re-verified (named structs cost what tuples cost). Steps 2 (TurnRecord/TurnResponse split) and
+3 (turn-level context-budget pass) remain OPEN, operator-gated.
