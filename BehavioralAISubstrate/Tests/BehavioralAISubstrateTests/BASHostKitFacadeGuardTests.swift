@@ -141,9 +141,12 @@ final class BASHostKitFacadeGuardTests: XCTestCase {
         // 2026-07-12 deliberate raise 288→292: context-IR arc (operator-ordered) — StageContexts +
         // TurnResponse + TurnContextCompiler + 3 stage-method files (verbatim-moved runTurn bodies),
         // minus the deleted BundleInitsLegacy. Structural extractions, zero new business logic.
+        // 2026-07-12 deliberate raise 292→294: mirror-lane charter M1-M3 (operator ruling ① —
+        // "汇合管线落 BASHostKit": convergence is EXPLICITLY HostKit property) — Convergence
+        // (envelope + deterministic disposer) + LedgerIngest (verify-then-append gate).
         let count = Self.swiftFiles().count
-        XCTAssertLessThanOrEqual(count, 292,
-            "BASHostKit grew to \(count) files (band 292). New files likely belong in a lower module "
+        XCTAssertLessThanOrEqual(count, 294,
+            "BASHostKit grew to \(count) files (band 294). New files likely belong in a lower module "
             + "(composition stays small) — or raise the band deliberately.")
         XCTAssertGreaterThan(count, 100, "sanity: expected to find the HostKit sources; found \(count)")
     }
