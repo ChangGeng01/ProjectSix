@@ -21,9 +21,10 @@ final class BASChapter527FourBundleInitTests: XCTestCase {
     // MARK: - 1) 4-bundle init constructs successfully
 
     func testFourBundleInitConstructsResult() {
-        // Just verifying compile-time signature works.
-        // Real V1 integration is exercised by stress-
-        // sweep tests.
+        // NOTE 2026-07-12: the 4-bundle turn-result INIT was deleted as a zero-caller
+        // ladder rung (git anchor 83c499f45); the bundle TYPES below remain live
+        // (the 9-bundle production init + cluster Codable roundtrips use them), so
+        // this suite now pins the bundle types' field-count/Sendable contracts only.
         let evo = BASEBrainTurnResultEvolutionBundle()
         let sov = BASEBrainTurnResultSovereignBundle()
         let host = BASEBrainTurnResultHostBundle(

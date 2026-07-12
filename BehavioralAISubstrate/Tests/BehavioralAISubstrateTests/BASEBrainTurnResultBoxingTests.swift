@@ -163,3 +163,35 @@ final class BASEBrainTurnResultBoxingTests: XCTestCase {
             runtimeTrace: runtimeTrace)
     }
 }
+
+// MARK: - init-surface pin (hallway-furniture guard)
+
+/// 2026-07-12 operator order: 9 of the 11 public inits (the M1474→M1502 bundle-ladder
+/// rungs) had ZERO callers repo-wide — pure historical-compat weight in a private library.
+/// Deleted (recoverable at git anchor 83c499f45). This pin holds the surface at exactly:
+/// the all-fields designated init + the production 9-bundle init + Codable's init(from:).
+/// A red here means dead convenience inits are accumulating again — census callers first.
+extension BASEBrainTurnResultBoxingTests {
+    func testInitSurfaceStaysMinimal() throws {
+        #if os(macOS)
+        let dir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/BASHostKit")
+        guard FileManager.default.fileExists(atPath: dir.path) else {
+            throw XCTSkip("source tree not present (built bundle) — host-only lint")
+        }
+        var initCount = 0
+        for file in try FileManager.default.contentsOfDirectory(atPath: dir.path)
+        where file.hasPrefix("EBrainTurnResult") && file.hasSuffix(".swift") {
+            let src = try String(
+                contentsOf: dir.appendingPathComponent(file), encoding: .utf8)
+            initCount += src.components(separatedBy: "public init(").count - 1
+        }
+        XCTAssertLessThanOrEqual(initCount, 3,
+            "EBrainTurnResult public-init surface grew to \(initCount) (pin 3: all-fields + "
+            + "9-bundle + init(from:)) — dead ladder rungs accumulating again?")
+        #else
+        throw XCTSkip("source-tree lint is host-only")
+        #endif
+    }
+}
