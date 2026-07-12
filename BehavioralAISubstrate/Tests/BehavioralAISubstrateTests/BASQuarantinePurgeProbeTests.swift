@@ -13,6 +13,22 @@ import BASRuntimeCore
 /// builds the purge, the "expected failure never occurred" flip forces this file to be updated
 /// consciously (never silently). Do NOT "fix" this test with a partial purge that cannot reach
 /// the KV files — the red legs ARE the honest finding about the forgetting story.
+///
+/// audit F5 ADJUDICATION (2026-07-12, runtime-security report): these red legs are a DESIGN
+/// BOUNDARY, not a live leak — deliberately kept loud, deliberately NOT "fixed" with a scrub:
+///   • Quarantine is a REVERSIBLE retrieval-suppression flag; the recall gate
+///     (frontstageEligibleMemories .governed) already blocks quarantined atoms from ever
+///     reaching L2, so nothing quarantined is served — the leg (a) usage record is a trail,
+///     not a serving surface.
+///   • The KV-spill / cross-turn-corpus legs (b,c) are ordinary session-lifecycle state purged
+///     by clearSession/clearAllSessions (not quarantine's job); the probe fabricates them with
+///     unrelated data.
+///   • The COMPLETE-purge operation is forget/remove + secure-delete, and that path was
+///     hardened the SAME DAY (F6: verified wal_checkpoint(TRUNCATE) so a removed atom's
+///     plaintext no longer lingers in -wal). Adding a scrub-on-quarantine here would also
+///     contradict the substrate doctrine (the substrate stores a digest, the host owns content).
+/// So this file stays as the honest gap-marker; the actual forgetting guarantee lives in
+/// remove()+secure-delete (F6-hardened) and clearSession, not in quarantine.
 final class BASQuarantinePurgeProbeTests: XCTestCase {
 
     func testQuarantineChainAdmitUseQuarantinePurge() async throws {
