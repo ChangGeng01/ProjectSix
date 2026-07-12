@@ -181,7 +181,7 @@ extension BASEBrainRuntimeCoordinator {
 
         markStage("l2_7_decompose")
         // stage-frame isolation (see renderStage note below)
-        func memoryDeliberateStage() -> (BASNeuralCoreFrame, [BASRuntimeAuditFinding], BASMemoryBundle, [BASRuntimeAuditFinding], BASMergedChoice, Int, BASNeuralThoughtMaterialization, BASThoughtFrame, [BASTriSelfScore]) {
+        func memoryDeliberateStage() -> BASMemoryDeliberateStageContext {
         let rawMemoryBundle = memoryService.retrieve(
             decomposeFrame: decomposeFrame,
             hostContext: hostContext,
@@ -401,13 +401,30 @@ extension BASEBrainRuntimeCoordinator {
                 frameContext: frameContext)
 
         let riskService = self.riskService
-            return (baseNeuralCore, loopFindings, memoryBundle, memoryFindings, mergedChoice, ssmActualTargetPasses, thoughtArtifacts, thoughtFrame, triScores)
+            return BASMemoryDeliberateStageContext(
+                baseNeuralCore: baseNeuralCore,
+                loopFindings: loopFindings,
+                memoryBundle: memoryBundle,
+                memoryFindings: memoryFindings,
+                mergedChoice: mergedChoice,
+                ssmActualTargetPasses: ssmActualTargetPasses,
+                thoughtArtifacts: thoughtArtifacts,
+                thoughtFrame: thoughtFrame,
+                triScores: triScores)
         }
-        var (baseNeuralCore, loopFindings, memoryBundle, memoryFindings, mergedChoice, ssmActualTargetPasses, thoughtArtifacts, thoughtFrame, triScores)
-            = memoryDeliberateStage()
+        let memoryDeliberateCtx = memoryDeliberateStage()
+        let baseNeuralCore = memoryDeliberateCtx.baseNeuralCore
+        let loopFindings = memoryDeliberateCtx.loopFindings
+        let memoryBundle = memoryDeliberateCtx.memoryBundle
+        let memoryFindings = memoryDeliberateCtx.memoryFindings
+        let mergedChoice = memoryDeliberateCtx.mergedChoice
+        let ssmActualTargetPasses = memoryDeliberateCtx.ssmActualTargetPasses
+        let thoughtArtifacts = memoryDeliberateCtx.thoughtArtifacts
+        var thoughtFrame = memoryDeliberateCtx.thoughtFrame
+        let triScores = memoryDeliberateCtx.triScores
         markStage("l8_to_l10")
         // stage-frame isolation (see renderStage note below)
-        func riskStageA() -> (BASActionPermit, BASRiskCard, BASRiskDecisionPackage, [BASRuntimeAuditFinding]) {
+        func riskStageA() -> BASRiskBindStageContext {
         let rawRiskDecisionPackage = riskService.buildRiskDecisionPackage(
             contextFrame: contextFrame,
             thoughtFrame: thoughtFrame,
@@ -687,11 +704,18 @@ extension BASEBrainRuntimeCoordinator {
         thoughtFrame.actionPermit = boundActionPermit
         thoughtFrame.riskDecisionPackage = normalizedRiskDecisionPackage
 
-            return (boundActionPermit, boundRiskCard, normalizedRiskDecisionPackage, riskFindings)
+            return BASRiskBindStageContext(
+                boundActionPermit: boundActionPermit,
+                boundRiskCard: boundRiskCard,
+                normalizedRiskDecisionPackage: normalizedRiskDecisionPackage,
+                riskFindings: riskFindings)
         }
-        var (boundActionPermit, boundRiskCard, normalizedRiskDecisionPackage, riskFindings)
-            = riskStageA()
-        func riskStageB() -> (BASTurnAuditProjectionsAbyssalThermalTrio, BASCthulhuAssertionCeilingDecision, BASCthulhuPermitEscalationDecision, BASTurnAuditProjectionsCthulhuPenta, [String], Double, BASTurnAuditProjectionsKunlunHexa, BASTurnAuditProjectionsKunlunHexaTwo, BASTurnAuditProjectionsKunlunTrio, BASTurnAuditProjectionsKunlunTrioTwo) {
+        let riskBindCtx = riskStageA()
+        var boundActionPermit = riskBindCtx.boundActionPermit
+        var boundRiskCard = riskBindCtx.boundRiskCard
+        let normalizedRiskDecisionPackage = riskBindCtx.normalizedRiskDecisionPackage
+        let riskFindings = riskBindCtx.riskFindings
+        func riskStageB() -> BASRiskEscalateStageContext {
         // M392 — Cthulhu doctrine pressure / anchor / unknown-reserve
         // derives + permit gating wires moved UP to here (was at the
         // audit-projection seam, line 681+). The wires now fire
@@ -1133,15 +1157,34 @@ extension BASEBrainRuntimeCoordinator {
             degradedReasonCodes: neuralDegradedReasonCodes
         )
 
-            return (abyssalThermalTrioForAudit, cthulhuAssertionDecision, cthulhuEscalation, cthulhuPentaForAudit, escalationSuppressionCodes, hostGateValue, kunlunHexaForAudit, kunlunHexaTwoForAudit, kunlunTrioForAudit, kunlunTrioTwoForAudit)
+            return BASRiskEscalateStageContext(
+                abyssalThermalTrioForAudit: abyssalThermalTrioForAudit,
+                cthulhuAssertionDecision: cthulhuAssertionDecision,
+                cthulhuEscalation: cthulhuEscalation,
+                cthulhuPentaForAudit: cthulhuPentaForAudit,
+                escalationSuppressionCodes: escalationSuppressionCodes,
+                hostGateValue: hostGateValue,
+                kunlunHexaForAudit: kunlunHexaForAudit,
+                kunlunHexaTwoForAudit: kunlunHexaTwoForAudit,
+                kunlunTrioForAudit: kunlunTrioForAudit,
+                kunlunTrioTwoForAudit: kunlunTrioTwoForAudit)
         }
-        let (abyssalThermalTrioForAudit, cthulhuAssertionDecision, cthulhuEscalation, cthulhuPentaForAudit, escalationSuppressionCodes, hostGateValue, kunlunHexaForAudit, kunlunHexaTwoForAudit, kunlunTrioForAudit, kunlunTrioTwoForAudit)
-            = riskStageB()
+        let riskEscalateCtx = riskStageB()
+        let abyssalThermalTrioForAudit = riskEscalateCtx.abyssalThermalTrioForAudit
+        let cthulhuAssertionDecision = riskEscalateCtx.cthulhuAssertionDecision
+        let cthulhuEscalation = riskEscalateCtx.cthulhuEscalation
+        let cthulhuPentaForAudit = riskEscalateCtx.cthulhuPentaForAudit
+        let escalationSuppressionCodes = riskEscalateCtx.escalationSuppressionCodes
+        let hostGateValue = riskEscalateCtx.hostGateValue
+        let kunlunHexaForAudit = riskEscalateCtx.kunlunHexaForAudit
+        let kunlunHexaTwoForAudit = riskEscalateCtx.kunlunHexaTwoForAudit
+        let kunlunTrioForAudit = riskEscalateCtx.kunlunTrioForAudit
+        let kunlunTrioTwoForAudit = riskEscalateCtx.kunlunTrioTwoForAudit
         markStage("l11_risk")
         // stage-frame isolation (frame lint): render-stage locals+temps die with this closure frame
         // stage-frame isolation: a NAMED local function is a real separate frame at -Onone
         // (an immediately-applied closure literal gets SILGen-inlined — measured, no win).
-        func renderStageA() -> (BASAbyssalPressure, BASHumanAnchorSignal, BASTurnAuditProjectionsLateClusterB, BASRuntimeTrace, BASSovereignVerdict, BASEmergencyBrake, BASEBrainRuntimeCoordinator.BASEvolutionGovernanceArtifacts, [BASQuarantineRecord], BASRenderedOutput, BASRunLease?, [BASSovereignCommitToken], BASSovereignLock?, [BASSovereignWarrant], BASThoughtFold, [BASUpdateTicket], BASWakeIntent) {
+        func renderStageA() -> BASRenderVerdictStageContext {
         let baseRenderedOutput = actionService.render(
             choice: mergedChoice,
             riskCard: boundRiskCard,
@@ -1413,11 +1456,42 @@ extension BASEBrainRuntimeCoordinator {
         // 7: hint, not verdict.
         let humanAnchorSignalForAudit = lateClusterBForAudit
             .humanAnchorSignal
-            return (abyssalPressureForAudit, humanAnchorSignalForAudit, lateClusterBForAudit, runtimeTrace, sovereignVerdict, emergencyBrake, evolutionGovernance, quarantineRecords, renderedOutput, runLease, sovereignCommitTokens, sovereignLock, sovereignWarrants, thoughtFold, updateTickets, wakeIntent)
+            return BASRenderVerdictStageContext(
+                abyssalPressureForAudit: abyssalPressureForAudit,
+                humanAnchorSignalForAudit: humanAnchorSignalForAudit,
+                lateClusterBForAudit: lateClusterBForAudit,
+                runtimeTrace: runtimeTrace,
+                sovereignVerdict: sovereignVerdict,
+                emergencyBrake: emergencyBrake,
+                evolutionGovernance: evolutionGovernance,
+                quarantineRecords: quarantineRecords,
+                renderedOutput: renderedOutput,
+                runLease: runLease,
+                sovereignCommitTokens: sovereignCommitTokens,
+                sovereignLock: sovereignLock,
+                sovereignWarrants: sovereignWarrants,
+                thoughtFold: thoughtFold,
+                updateTickets: updateTickets,
+                wakeIntent: wakeIntent)
         }
-        let (abyssalPressureForAudit, humanAnchorSignalForAudit, lateClusterBForAudit, runtimeTrace, sovereignVerdict, emergencyBrake, evolutionGovernance, quarantineRecords, renderedOutput, runLease, sovereignCommitTokens, sovereignLock, sovereignWarrants, thoughtFold, updateTickets, wakeIntent)
-            = renderStageA()
-        func renderStageB() -> (BASSovereignVerdict?, BASBudgetFrame, BASRuntimeTrace, BASHeavenGatePermit, BASRiverOriginTrace, BASYaochiSanctumEntry, BASAuditObservationProjections, BASRecoveryDisposition?, [BASSovereignActuationCommand], BASSovereignAuditEntry, [BASSovereignExecutionReceipt], BASVitalState) {
+        let renderVerdictCtx = renderStageA()
+        let abyssalPressureForAudit = renderVerdictCtx.abyssalPressureForAudit
+        let humanAnchorSignalForAudit = renderVerdictCtx.humanAnchorSignalForAudit
+        let lateClusterBForAudit = renderVerdictCtx.lateClusterBForAudit
+        let runtimeTrace = renderVerdictCtx.runtimeTrace
+        let sovereignVerdict = renderVerdictCtx.sovereignVerdict
+        let emergencyBrake = renderVerdictCtx.emergencyBrake
+        let evolutionGovernance = renderVerdictCtx.evolutionGovernance
+        let quarantineRecords = renderVerdictCtx.quarantineRecords
+        let renderedOutput = renderVerdictCtx.renderedOutput
+        let runLease = renderVerdictCtx.runLease
+        let sovereignCommitTokens = renderVerdictCtx.sovereignCommitTokens
+        let sovereignLock = renderVerdictCtx.sovereignLock
+        let sovereignWarrants = renderVerdictCtx.sovereignWarrants
+        let thoughtFold = renderVerdictCtx.thoughtFold
+        let updateTickets = renderVerdictCtx.updateTickets
+        let wakeIntent = renderVerdictCtx.wakeIntent
+        func renderStageB() -> BASAuditProjectionStageContext {
         // M384 escalation now fires upstream (M392 — see the
         // gating block right after `thoughtFrame.actionPermit =
         // boundActionPermit` at line ~380). The audit emission
@@ -2010,10 +2084,33 @@ extension BASEBrainRuntimeCoordinator {
             thoughtFrame.neuralLeaseReceipt?.leaseID = runLease.leaseID
         }
 
-            return (finalSovereignVerdict, finalizedBudgetFrame, finalizedRuntimeTrace, kunlunHeavenGateForAudit, kunlunRiverTraceForAudit, kunlunYaochiSanctumForAudit, projections, recoveryDisposition, sovereignActuationCommands, sovereignAuditEntry, sovereignExecutionReceipts, vitalState)
+            return BASAuditProjectionStageContext(
+                finalSovereignVerdict: finalSovereignVerdict,
+                finalizedBudgetFrame: finalizedBudgetFrame,
+                finalizedRuntimeTrace: finalizedRuntimeTrace,
+                kunlunHeavenGateForAudit: kunlunHeavenGateForAudit,
+                kunlunRiverTraceForAudit: kunlunRiverTraceForAudit,
+                kunlunYaochiSanctumForAudit: kunlunYaochiSanctumForAudit,
+                projections: projections,
+                recoveryDisposition: recoveryDisposition,
+                sovereignActuationCommands: sovereignActuationCommands,
+                sovereignAuditEntry: sovereignAuditEntry,
+                sovereignExecutionReceipts: sovereignExecutionReceipts,
+                vitalState: vitalState)
         }
-        let (finalSovereignVerdict, finalizedBudgetFrame, finalizedRuntimeTrace, kunlunHeavenGateForAudit, kunlunRiverTraceForAudit, kunlunYaochiSanctumForAudit, projections, recoveryDisposition, sovereignActuationCommands, sovereignAuditEntry, sovereignExecutionReceipts, vitalState)
-            = renderStageB()
+        let auditProjectionCtx = renderStageB()
+        let finalSovereignVerdict = auditProjectionCtx.finalSovereignVerdict
+        let finalizedBudgetFrame = auditProjectionCtx.finalizedBudgetFrame
+        let finalizedRuntimeTrace = auditProjectionCtx.finalizedRuntimeTrace
+        let kunlunHeavenGateForAudit = auditProjectionCtx.kunlunHeavenGateForAudit
+        let kunlunRiverTraceForAudit = auditProjectionCtx.kunlunRiverTraceForAudit
+        let kunlunYaochiSanctumForAudit = auditProjectionCtx.kunlunYaochiSanctumForAudit
+        let projections = auditProjectionCtx.projections
+        let recoveryDisposition = auditProjectionCtx.recoveryDisposition
+        let sovereignActuationCommands = auditProjectionCtx.sovereignActuationCommands
+        let sovereignAuditEntry = auditProjectionCtx.sovereignAuditEntry
+        let sovereignExecutionReceipts = auditProjectionCtx.sovereignExecutionReceipts
+        let vitalState = auditProjectionCtx.vitalState
         markStage("l12_render")   // covers render → verdict/audit/trace assembly up to here
         // stage-frame isolation: the 9-bundle assembly temporaries die with this frame
         func assembleStage() -> BASEBrainTurnResult {

@@ -82,3 +82,31 @@ final class BASRunTurnFrameBudgetTests: XCTestCase {
     }
 }
 #endif
+
+// MARK: - stage-contract naming lint (context-IR step 1)
+
+/// 2026-07-12 operator order ("阶段合同具名化"): runTurn's stage functions must return NAMED
+/// context types (BAS*StageContext), not ad-hoc tuples — the tuple contracts were the measured
+/// signature of distributed context engineering (9/4/10/16/12 anonymous values). A red here
+/// means someone added a stage returning a bare tuple: name its contract instead.
+extension BASRunTurnFrameBudgetTests {
+    func testStageContractsAreNamedTypesNotTuples() throws {
+        let src = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("Sources/BASHostKit/EBrainRuntimeCoordinator+RunTurn.swift"),
+            encoding: .utf8)
+        let offenders = src.split(separator: "\n").enumerated().filter { _, line in
+            line.contains("Stage") && line.contains("func ") && line.contains("-> (")
+        }
+        XCTAssertTrue(offenders.isEmpty,
+            "stage functions returning anonymous tuples (name the contract as a BAS*StageContext):\n"
+            + offenders.map { "line \($0.0 + 1): \($0.1.trimmingCharacters(in: .whitespaces).prefix(90))" }
+                .joined(separator: "\n"))
+        for ty in ["BASMemoryDeliberateStageContext", "BASRiskBindStageContext",
+                   "BASRiskEscalateStageContext", "BASRenderVerdictStageContext",
+                   "BASAuditProjectionStageContext"] {
+            XCTAssertTrue(src.contains(ty), "stage contract type \(ty) not wired into runTurn")
+        }
+    }
+}
