@@ -954,3 +954,16 @@ no-op, call sites can never recreate the break. Then:
 
 Law banked: platform-gated TEST HELPERS must be cross-platform no-ops (gate INSIDE the type),
 never whole-file gated — two instances of the call-site compile-break class in 24h.
+
+### 2026-07-12 addendum — the TurnResponse adoption boundary is REAL now (08c4983d1)
+
+The audit's remaining architecture HIGH is closed. Consumer classes are explicit and
+mechanically enforced: ACT/SHOW host code consumes the response (all three remaining SampleHost
+bench paths migrated — their reads were response fields all along); INSPECT/AUDIT consumers
+carry the `BASTurnRecord-consumer: audit-class` marker (the 13-layer inspection view + its
+handoff, and the SDK artifacts bridge — now a DECLARED second seam instead of a narrative
+contradiction). testHostRecordReadersDeclareAuditClass reds any unmarked raw-record read on the
+host surfaces (RED proven: named all four offenders pre-migration); QinaoSampleHost keeps its
+documented demo exemption. The response header's 'ONE projection point' claim is re-scoped
+honestly to the host response. Verified: SampleHost sim suite SUCCEEDED, SDK 1,449/0, response
+teeth 5/5.
