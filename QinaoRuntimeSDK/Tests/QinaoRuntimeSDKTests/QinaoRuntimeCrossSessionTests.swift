@@ -455,4 +455,22 @@ final class QinaoRuntimeCrossSessionTests: XCTestCase {
         XCTAssertNil(reasonA)
         XCTAssertNil(reasonB)
     }
+
+    /// audit F14 (2026-07-12): clearHalt must ALSO drop the reason so haltReason's documented
+    /// "nil when not halted" contract holds and a later halt cannot inherit a stale reason.
+    func testClearHaltDropsTheReason() async {
+        let fx = await makeRuntime()
+        await fx.sovereign.markSessionHalted(sessionID: "sess.F14", reason: "first-reason")
+        let before = await fx.sovereign.haltReason(sessionID: "sess.F14")
+        XCTAssertEqual(before, "first-reason")
+
+        await fx.sovereign.clearHalt(sessionID: "sess.F14")
+        let after = await fx.sovereign.haltReason(sessionID: "sess.F14")
+        XCTAssertNil(after, "clearHalt must drop the reason (was: stale reason lingered)")
+
+        // a subsequent halt attributes correctly, not to the stale reason
+        await fx.sovereign.markSessionHalted(sessionID: "sess.F14", reason: "second-reason")
+        let again = await fx.sovereign.haltReason(sessionID: "sess.F14")
+        XCTAssertEqual(again, "second-reason")
+    }
 }

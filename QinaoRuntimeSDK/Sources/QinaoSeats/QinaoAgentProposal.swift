@@ -127,6 +127,14 @@ public enum QinaoAgentProposalIssue:
     case leaseInvalid(
         agent: QinaoSeat,
         reasons: [QinaoAgentLeaseInvalidReason])
+
+    /// audit F12 (2026-07-12): the proposal's self-reported `agent` does not match the seat
+    /// that actually emitted it — a seat impersonating another's identity/capability.
+    case seatIdentityMismatch(claimed: QinaoSeat, actual: QinaoSeat)
+
+    /// audit F12: the proposal carries a `leaseRef` but no lease enforcer is wired, so the
+    /// lease cannot be verified — fail closed rather than trust an unverifiable lease claim.
+    case leaseUnverifiable(agent: QinaoSeat)
 }
 
 public enum QinaoAgentProposalGate {

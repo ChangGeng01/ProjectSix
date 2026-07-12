@@ -824,6 +824,11 @@ public actor QinaoSovereignControlPlane {
 
     public func clearHalt(sessionID: String) {
         haltedSessions.remove(sessionID)
+        // audit F14 (2026-07-12): also drop the reason so haltReason's documented "nil when
+        // not halted" contract holds and a later halt in the same session can't inherit a
+        // stale attribution. (Production halts route through markSessionHalted which overwrites
+        // the reason, so this is contract/state hygiene, not a live-attribution bug.)
+        haltReasons.removeValue(forKey: sessionID)
     }
 
     /// Lightweight "mark this session halted" that does NOT produce
