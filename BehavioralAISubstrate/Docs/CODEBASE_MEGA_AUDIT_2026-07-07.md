@@ -925,3 +925,32 @@ SDK 1,449/0 · SampleHost SUCCEEDED. The context-IR arc is now FULLY closed: nam
 reads with declared write-backs (step 4). No open residuals except the documented
 transitionals (whole-frame service passes ride plan.routedBudget; the 53-field record remains
 the audit surface by design).
+
+## 2026-07-12 — teeth-hardening batch + two-phone device re-certification (operator-ordered)
+
+TEETH BATCH (a8ed6e0e7): all 7 confirmed audit evasions closed with negative-control fixtures —
+fossil guard (layout detection via the test's OWN bundle path; mtime rejected: SPM content-hash
+recompile skipping false-trips it, measured live), rename/new-file blindness (family-prefix
+glob), frame model (single-frame → main + worst object top-2 chain bound; budget tightened in
+real terms 80K→64K, measured 48,240), multi-line signature spans, nesting/closure/whitelist
+holes, sibling-file init revival, response var/multi-binding/aggregate-smuggle guards,
+10×10 identity property sweep, exact-pointer pin. Narrative corrections: thoughtFrame is a
+FOUR-stage relay (riskA→riskB→renderA→renderB); lease-ref attribution fixed.
+
+DEVICE RE-CERT (both iPhone Air, iOS 27): the arc had ZERO device coverage — and the first
+build attempt proved why that matters twice over: a SECOND instance of the os(macOS)-guard
+compile-break class (BASScreenLockSkip whole-file gated, call sites not) redded the device
+build; structurally closed (02118b1ff) by moving the #if INSIDE the type — cross-platform
+no-op, call sites can never recreate the break. Then:
+- 9E9E: 16,283 executed / 50 failures (12 unexpected-class)
+- 5E5C: 16,283 executed / 49 failures (same taxonomy; one thermal-bench flake delta)
+- EVERY arc suite PASSED on BOTH phones: BoxingTests (CoW box), Chapter527 bundle contracts,
+  KVStore ModelID/Quantize, MTPSamplingLossless, file/session protection suites (REAL iOS
+  protection enforcement), TurnContextCompiler, TurnResponse.
+- All 49/50 failures classify into the KNOWN device-legit taxonomy (07-11 baseline): host-only
+  source-tree lints (~36, incl. the ch981.9 count pin which counts via #filePath → 0 on
+  device), model-asset-gated (~9, Gemma not installed), device-conditional bench/endurance
+  (~4). ZERO failures attributable to the arc.
+
+Law banked: platform-gated TEST HELPERS must be cross-platform no-ops (gate INSIDE the type),
+never whole-file gated — two instances of the call-site compile-break class in 24h.
