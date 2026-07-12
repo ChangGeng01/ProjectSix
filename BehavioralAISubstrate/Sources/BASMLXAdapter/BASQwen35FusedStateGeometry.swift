@@ -1,3 +1,6 @@
+// Moved from BASRuntimeCore (charter audit 2026-07-12 finding ④): model-family-specific
+// geometry constants belong in the adapter ring, beside the Qwen3.5 MTP decoder they
+// describe — not in the deterministic core.
 import Foundation
 
 /// audit devicetestapp MED-5 — the single source of truth for the Qwen3.5 FUSED-asset

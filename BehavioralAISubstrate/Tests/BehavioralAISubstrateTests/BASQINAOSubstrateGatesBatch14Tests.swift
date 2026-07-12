@@ -6,6 +6,7 @@ import XCTest
 import CryptoKit
 import Foundation
 import SQLite3
+import BASAppleAdapters
 
 /// QINAO Substrate-100 gates — Phase-2 batch 14 (6 MEDIUM + 2 HIGH rework). Completes the host-authorable Substrate-100.
 final class BASQINAOSubstrateGatesBatch14Tests: XCTestCase {

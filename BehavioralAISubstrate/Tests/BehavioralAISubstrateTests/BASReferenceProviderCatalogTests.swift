@@ -1,5 +1,6 @@
 import Testing
 @testable import BASRuntimeCore
+import BASAppleAdapters
 
 struct BASReferenceProviderCatalogTests {
     @Test

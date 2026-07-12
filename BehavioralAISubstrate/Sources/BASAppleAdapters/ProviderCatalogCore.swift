@@ -1,4 +1,13 @@
+// MARK: - BASReferenceProviderCatalog — moved from BASRuntimeCore (charter audit 2026-07-12)
+//
+// Charter finding ④: the deterministic core shipped a hardcoded Gemma-4-E4B descriptor +
+// per-model task-affinity routing scores as DEFAULT DATA. The catalog is reference wiring
+// for a concrete model lineup — adapter-ring property. Zero live production consumers
+// (tests + dormant Archive/Legacy only, the latter compiling via BASHostKit's re-export).
+// The model-neutral descriptor TYPES and provider-ID constants stay in BASRuntimeCore.
+
 import Foundation
+import BASRuntimeCore
 
 public enum BASReferenceProviderCatalog {
     public static let gemmaOpenModelDescriptor = BASOpenModelDescriptor(

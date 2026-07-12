@@ -1,5 +1,5 @@
 import XCTest
-@testable import BASRuntimeCore
+import BASMLXAdapter
 
 /// audit devicetestapp MED-5 — the fused-asset state-row width, now Mac-pinned.
 /// The M3 chain-fidelity probe reused the M1 toy-probe width (524_288 = GDN state

@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import BASRuntimeCore
+import BASAppleAdapters
 
 @Suite("BASRuntimeCore")
 struct BASRuntimeCoreTests {
