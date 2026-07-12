@@ -1,6 +1,7 @@
 import XCTest
 import CryptoKit
 @testable import BASHostKit
+import BASOrgan
 @testable import BASSovereign
 @testable import BASRuntimeCore
 
@@ -21,12 +22,14 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
         kind: BASMirrorLaneKind = .proposal,
         content: String = "the operator tends to over-commit on Fridays",
         evidence: [String] = ["atom:1234", "atom:5678"],
+        evidenceDigests: [String]? = nil,
         modelID: String = "qwen3.5-2b-v12",
         promptDigest: String = "pd-abc123",
         claimedPolicy: String = "policy.trusted.v1"
     ) -> BASMirrorLaneCandidate {
         BASMirrorLaneCandidate(
             claimedKind: kind, content: content, evidenceIDs: evidence,
+            evidenceDigests: evidenceDigests ?? evidence.map { "digest-\($0)" },
             modelID: modelID, promptDigest: promptDigest,
             claimedPolicyHash: claimedPolicy, provenance: "mirror-lane-test")
     }
@@ -113,9 +116,12 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
         let tampered = BASConvergedProposalEnvelope(
             envelopeID: env.envelopeID, kind: env.kind, content: env.content,
             contentDigest: env.contentDigest, evidenceIDs: env.evidenceIDs,
+            evidenceDigests: env.evidenceDigests,
             modelID: "SWAPPED-MODEL", promptDigest: env.promptDigest,
-            policyHash: env.policyHash, producedAtMs: env.producedAtMs,
-            provenance: env.provenance, signature: env.signature)
+            policyHash: env.policyHash, reducerVersion: env.reducerVersion,
+            producedAtMs: env.producedAtMs,
+            provenance: env.provenance, signerKeyID: env.signerKeyID,
+            signature: env.signature)
         XCTAssertFalse(tampered.verifySignature(with: key))
     }
 
@@ -123,9 +129,12 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
         func env(_ evidence: [String]) -> BASConvergedProposalEnvelope {
             BASConvergedProposalEnvelope(
                 envelopeID: "e", kind: .proposal, content: "c",
-                contentDigest: "d", evidenceIDs: evidence, modelID: "m",
-                promptDigest: "p", policyHash: "ph", producedAtMs: 0,
-                provenance: "prov", signature: "").signed(with: key)
+                contentDigest: "d", evidenceIDs: evidence,
+                evidenceDigests: evidence.map { _ in "x" }, modelID: "m",
+                promptDigest: "p", policyHash: "ph",
+                reducerVersion: "r1", producedAtMs: 0,
+                provenance: "prov", signerKeyID: "k1",
+                signature: "").signed(with: key)
         }
         XCTAssertNotEqual(env(["ab"]).signature, env(["a", "b"]).signature,
             "evidence arity must be part of the canonical payload")
@@ -175,9 +184,12 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
         let tampered = BASConvergedProposalEnvelope(
             envelopeID: env.envelopeID, kind: env.kind, content: env.content,
             contentDigest: env.contentDigest, evidenceIDs: env.evidenceIDs,
+            evidenceDigests: env.evidenceDigests,
             modelID: "SWAPPED", promptDigest: env.promptDigest,
-            policyHash: env.policyHash, producedAtMs: env.producedAtMs,
-            provenance: env.provenance, signature: env.signature)
+            policyHash: env.policyHash, reducerVersion: env.reducerVersion,
+            producedAtMs: env.producedAtMs,
+            provenance: env.provenance, signerKeyID: env.signerKeyID,
+            signature: env.signature)
 
         let outcome = await BASMirrorLaneIngestGate.ingest(
             tampered, key: key, ledger: ledger,
@@ -198,9 +210,12 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
             envelopeID: env.envelopeID, kind: env.kind,
             content: "totally different text",
             contentDigest: env.contentDigest, evidenceIDs: env.evidenceIDs,
+            evidenceDigests: env.evidenceDigests,
             modelID: env.modelID, promptDigest: env.promptDigest,
-            policyHash: env.policyHash, producedAtMs: env.producedAtMs,
-            provenance: env.provenance, signature: env.signature)
+            policyHash: env.policyHash, reducerVersion: env.reducerVersion,
+            producedAtMs: env.producedAtMs,
+            provenance: env.provenance, signerKeyID: env.signerKeyID,
+            signature: env.signature)
         XCTAssertTrue(swapped.verifySignature(with: key),
             "signature legitimately survives (digest is what is signed) — the gate must catch it")
 
@@ -237,7 +252,7 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
             env, key: key, ledger: ledger,
             sessionID: "sess.mirror", turnID: "turn.2", now: frozen)
         XCTAssertFalse(replay.appended, "replaying the same envelope must be refused")
-        XCTAssertEqual(replay.reason, .appendFailed)
+        XCTAssertEqual(replay.reason, .replayed, "ruling ③: replay is a TYPED reject now")
     }
 
     func testWrongKeyIngestRejected() async throws {
@@ -251,6 +266,127 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
         XCTAssertEqual(outcome.reason, .badSignature)
     }
 }
+
+/// ruling ③ hardening (2026-07-12) — envelope v2: evidence CONTENT binding, reducer
+/// version, signer key ID, and TYPED replay rejection on ANY storage.
+final class BASMirrorLaneEnvelopeV2Tests: XCTestCase {
+
+    private let key = SymmetricKey(data: Data("mirror-v2-key".utf8))
+    private let policy = BASMirrorLanePolicy(trustedPolicyHash: "policy.trusted.v1")
+    private let frozen = Date(timeIntervalSince1970: 1_700_000_000)
+
+    private func cand(
+        evidence: [String] = ["atom:1"], digests: [String] = ["d1"]
+    ) -> BASMirrorLaneCandidate {
+        BASMirrorLaneCandidate(
+            claimedKind: .proposal, content: "observation",
+            evidenceIDs: evidence, evidenceDigests: digests,
+            modelID: "m1", promptDigest: "p1",
+            claimedPolicyHash: "policy.trusted.v1", provenance: "t")
+    }
+
+    private func dispose(_ c: BASMirrorLaneCandidate) -> BASMirrorLaneDisposer.Disposition {
+        BASMirrorLaneDisposer.dispose(
+            c, policy: policy, key: key, envelopeID: "env-v2", now: frozen)
+    }
+
+    func testUnpairedEvidenceIsRejected() {
+        guard case .rejected(.evidenceDigestMismatch) =
+            dispose(cand(evidence: ["a", "b"], digests: ["only-one"])) else {
+            return XCTFail("evidence without a paired content digest must be rejected")
+        }
+    }
+
+    func testEvidenceContentDigestIsSigned() throws {
+        guard case .accepted(let a) = dispose(cand(digests: ["d1"])),
+              case .accepted(let b) = dispose(cand(digests: ["DIFFERENT"])) else {
+            return XCTFail()
+        }
+        XCTAssertNotEqual(a.signature, b.signature,
+            "swapping the referenced evidence CONTENT must change the signature")
+    }
+
+    func testReducerVersionAndSignerKeyIDAreStampedAndSigned() throws {
+        guard case .accepted(let env) = dispose(cand()) else { return XCTFail() }
+        XCTAssertEqual(env.reducerVersion, BASMirrorLaneDisposer.reducerVersion)
+        XCTAssertEqual(env.signerKeyID, BASConvergedProposalEnvelope.keyID(of: key))
+        XCTAssertEqual(env.signerKeyID.count, 16)
+
+        // tampering the signed keyID breaks the tag
+        let forged = BASConvergedProposalEnvelope(
+            envelopeID: env.envelopeID, kind: env.kind, content: env.content,
+            contentDigest: env.contentDigest, evidenceIDs: env.evidenceIDs,
+            evidenceDigests: env.evidenceDigests,
+            modelID: env.modelID, promptDigest: env.promptDigest,
+            policyHash: env.policyHash, reducerVersion: env.reducerVersion,
+            producedAtMs: env.producedAtMs,
+            provenance: env.provenance, signerKeyID: "0000000000000000",
+            signature: env.signature)
+        XCTAssertFalse(forged.verifySignature(with: key))
+    }
+
+    /// The pre-v2 gap: replay was only caught by SQLite's PRIMARY KEY (untyped) — the
+    /// in-memory ledger accepted the same envelope twice. Now: typed, any storage.
+    func testReplayIsTypedOnInMemoryLedger() async throws {
+        let ledger = BASSovereignAuditLedger(
+            signingSecret: SymmetricKey(size: .bits256))
+        guard case .accepted(let env) = dispose(cand()) else { return XCTFail() }
+        let first = await BASMirrorLaneIngestGate.ingest(
+            env, key: key, ledger: ledger,
+            sessionID: "s", turnID: "t1", now: frozen)
+        XCTAssertTrue(first.appended)
+        let replay = await BASMirrorLaneIngestGate.ingest(
+            env, key: key, ledger: ledger,
+            sessionID: "s", turnID: "t2", now: frozen)
+        XCTAssertFalse(replay.appended)
+        XCTAssertEqual(replay.reason, .replayed)
+        let count = await ledger.count()
+        XCTAssertEqual(count, 1, "replay must leave the chain untouched")
+    }
+}
+
+/// ruling ① completion (2026-07-12) — producer orchestration lives in BASHostKit;
+/// the adapter is injected through the protocol seam.
+final class BASMirrorLaneProducerTests: XCTestCase {
+
+    private struct ScriptedAdapter: BASOrganAdapter {
+        let descriptor = BASOrganDescriptor(
+            providerID: "scripted.mirror", providerName: "Scripted",
+            supportsStreaming: false, maxInputTokens: 1_000, maxOutputTokens: 1_000,
+            runsOnDevice: true, supportedRoles: [.scout])
+        func draft(_ request: BASOrganRequest) async throws -> BASOrganDraft {
+            BASOrganDraft(
+                requestID: request.requestID, providerID: descriptor.providerID,
+                role: request.role, body: "a mirror observation",
+                inputTokensEstimated: 1, outputTokensEstimated: 1,
+                producedAt: Date(timeIntervalSince1970: 0), traceID: "t")
+        }
+        func currentCapacity() async -> BASOrganCapacity { .unlimited }
+    }
+
+    func testProducerBindsEvidenceDigestsAndProvenance() async throws {
+        let sources = [
+            BASMirrorLaneProducer.Source(id: "atom:a", content: "entry A"),
+            BASMirrorLaneProducer.Source(id: "atom:b", content: "entry B"),
+        ]
+        let candidate = try await BASMirrorLaneProducer.produceCandidate(
+            adapter: ScriptedAdapter(),
+            sources: sources,
+            trustedPolicyHash: "ph",
+            provenance: "producer-test",
+            requestID: "req-1")
+        XCTAssertEqual(candidate.claimedKind, .annotation)
+        XCTAssertEqual(candidate.content, "a mirror observation")
+        XCTAssertEqual(candidate.evidenceIDs, ["atom:a", "atom:b"])
+        XCTAssertEqual(candidate.evidenceDigests, [
+            BASMirrorLaneProducer.sha256Hex("entry A"),
+            BASMirrorLaneProducer.sha256Hex("entry B"),
+        ])
+        XCTAssertEqual(candidate.modelID, "scripted.mirror")
+        XCTAssertFalse(candidate.promptDigest.isEmpty)
+    }
+}
+
 
 /// charter audit 2026-07-12 finding ④ — BASChengluPreflightRoute opened from a closed
 /// two-model enum to a RawRepresentable struct. Wire format is FROZEN (bare string).

@@ -85,6 +85,7 @@ func cmdMirrorDispose(_ rest: [String]) async throws {
     var kind = BASMirrorLaneKind.annotation
     var model = "operator.manual"
     var evidence: [String] = []
+    var evidenceDigests: [String] = []
     var i = 0
     loop: while i < rest.count {
         switch rest[i] {
@@ -102,6 +103,9 @@ func cmdMirrorDispose(_ rest: [String]) async throws {
         case "--evidence":
             guard i + 1 < rest.count else { exit(1) }
             evidence = rest[i + 1].split(separator: ",").map(String.init); i += 2
+        case "--evidence-digests":
+            guard i + 1 < rest.count else { exit(1) }
+            evidenceDigests = rest[i + 1].split(separator: ",").map(String.init); i += 2
         case "--": i += 1; break loop
         default: break loop
         }
@@ -113,6 +117,9 @@ func cmdMirrorDispose(_ rest: [String]) async throws {
         claimedKind: kind,
         content: text,
         evidenceIDs: evidence,
+        // ruling ③ hardening: paired content digests (unpaired evidence is rejected by
+        // the disposer — the CLI does not guess digests it did not read).
+        evidenceDigests: evidenceDigests,
         modelID: model,
         promptDigest: BASConvergedProposalEnvelope.sha256Hex(text),
         claimedPolicyHash: BASSovereignTrustConstants.builtInPolicyHash,
@@ -199,41 +206,29 @@ func cmdMirror(recentCount: Int = 5) async throws {
         return
     }
     let recent = atoms.suffix(recentCount)
-    let entries = recent.map { "- \(readContent($0.id))" }.joined(separator: "\n")
-    let instruction = """
-        You are a MIRROR for a private decision journal — never an oracle. In at most \
-        three sentences, reflect one honest observation about the recent entries below: \
-        a pattern, a tension, or a question worth sitting with. Do not advise, do not \
-        flatter, do not invent facts.
-        """
-
-    let adapter = AppleFoundationOrganAdapter()
-    let draft: BASOrganDraft
+    // ruling ① (2026-07-12): orchestration (prompt, model call through the protocol
+    // seam, evidence binding with content digests, candidate assembly) lives in
+    // BASHostKit's BASMirrorLaneProducer — the CLI only constructs the CONCRETE
+    // adapter (edge business) and hands it in.
+    let sources = recent.map {
+        BASMirrorLaneProducer.Source(
+            id: "atom:\($0.id.uuidString.lowercased())",
+            content: readContent($0.id))
+    }
+    let candidate: BASMirrorLaneCandidate
     do {
-        draft = try await adapter.draft(BASOrganRequest(
-            requestID: "mirror-\(UUID().uuidString.prefix(8))",
-            role: .scout,
-            preset: .scout,
-            instruction: instruction,
-            context: [entries],
-            maxOutputTokens: 220,
-            stopSequences: []))
+        candidate = try await BASMirrorLaneProducer.produceCandidate(
+            adapter: AppleFoundationOrganAdapter(),
+            sources: sources,
+            trustedPolicyHash: BASSovereignTrustConstants.builtInPolicyHash,
+            provenance: "qinao-journal-mirror",
+            requestID: "mirror-\(UUID().uuidString.prefix(8))")
     } catch {
         let note = "mirror: model unavailable — the lane stays honest, no fake mirror. "
             + "(\(error))\n"
         FileHandle.standardError.write(Data(note.utf8))
         exit(2)
     }
-
-    let candidate = BASMirrorLaneCandidate(
-        claimedKind: .annotation,
-        content: draft.body,
-        evidenceIDs: recent.map { "atom:\($0.id.uuidString.lowercased())" },
-        modelID: adapter.descriptor.providerID,
-        promptDigest: BASConvergedProposalEnvelope.sha256Hex(
-            instruction + "\n" + entries),
-        claimedPolicyHash: BASSovereignTrustConstants.builtInPolicyHash,
-        provenance: "qinao-journal-mirror")
     let key = try loadOrCreateMirrorTagKey()
     let disposition = BASMirrorLaneDisposer.dispose(
         candidate,
@@ -263,7 +258,7 @@ func cmdMirror(recentCount: Int = 5) async throws {
             Data("mirror: ingest REJECTED (\(outcome.reason?.rawValue ?? "unknown"))\n".utf8))
         exit(1)
     }
-    print("🪞 \(draft.body)")
+    print("🪞 \(candidate.content)")
     print("sealed \(String((outcome.auditID ?? "").prefix(24)))  "
         + "annotation over \(recent.count) entries  (mirror lane, Ed25519 chain)")
 }

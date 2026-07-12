@@ -29,6 +29,11 @@ public enum BASMirrorLaneIngestGate {
         case emptyModelID = "empty-model-id"
         case emptyPromptDigest = "empty-prompt-digest"
         case emptyPolicyHash = "empty-policy-hash"
+        /// ruling ③ hardening: same envelope presented twice — typed, on ANY storage
+        /// (was an untyped append failure, and only SQLite's PRIMARY KEY caught it).
+        case replayed = "replayed"
+        /// ruling ③ hardening: evidence IDs/digests unpaired at the gate.
+        case evidenceDigestMismatch = "evidence-digest-mismatch"
         case appendFailed = "append-failed"
     }
 
@@ -78,6 +83,18 @@ public enum BASMirrorLaneIngestGate {
         guard !envelope.policyHash.isEmpty else {
             return IngestOutcome(appended: false, auditID: nil, reason: .emptyPolicyHash)
         }
+        guard envelope.evidenceIDs.count == envelope.evidenceDigests.count else {
+            return IngestOutcome(
+                appended: false, auditID: nil, reason: .evidenceDigestMismatch)
+        }
+
+        // 2b. Replay: the envelopeID is the signed nonce; its derived auditID must be
+        //     NEW on this chain. Typed reject, zero writes — and it now holds on the
+        //     in-memory ledger too, not just via SQLite's PRIMARY KEY side effect.
+        let auditID = "mirror-\(envelope.envelopeID)"
+        if await ledger.hasEntry(auditID: auditID) {
+            return IngestOutcome(appended: false, auditID: nil, reason: .replayed)
+        }
 
         // 3. Append a digest-bearing audit entry. verdictRef encodes the lane + kind
         //    (mirror lane never mutates existing entries — this is an append-only
@@ -88,7 +105,7 @@ public enum BASMirrorLaneIngestGate {
             // journal's makeLedger sets minimumSchemaVersion 1.2.0) reject sub-hardened
             // drafts, and a security lane has no business emitting the non-injective form.
             schemaVersion: BASSovereignAuditEntry.hardenedSchemaVersion,
-            auditID: "mirror-\(envelope.envelopeID)",
+            auditID: auditID,
             sessionID: sessionID,
             turnID: turnID,
             verdictRef: "mirror.ingest|kind:\(envelope.kind.rawValue)",
@@ -97,10 +114,13 @@ public enum BASMirrorLaneIngestGate {
                 "model:\(envelope.modelID)",
                 "prompt:\(envelope.promptDigest)",
                 "policy:\(envelope.policyHash)",
+                "reducer:\(envelope.reducerVersion)",
                 "producedAtMs:\(envelope.producedAtMs)",
                 "provenance:\(envelope.provenance)",
+                "signerKey:\(envelope.signerKeyID)",
                 "envelopeTag:\(envelope.signature)",
-            ] + envelope.evidenceIDs.map { "evidence:\($0)" },
+            ] + zip(envelope.evidenceIDs, envelope.evidenceDigests)
+                .map { "evidence:\($0.0)#\($0.1)" },
             actionRefs: [],
             snapshotRef: envelope.contentDigest,
             actor: .system,

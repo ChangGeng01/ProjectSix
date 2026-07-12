@@ -24,11 +24,14 @@ explicit provider injection.
 
 ## Honest residuals (documented, not hidden)
 
-1. **BASRuntimeCore's CoreML context classifier** (18K-param MLP + shipped weights in the
-   deepest core target): a real neural runtime inside the deterministic core. NOT an LLM
-   (charter's letter survives), but "model-invoking code lives in the adapter ring" is not
-   fully true until it moves. Deliberately deferred — resource+target surgery with its own
-   blast radius.
+1. **BASRuntimeCore's CoreML context classifier** — ADJUDICATED (2026-07-12 continuation,
+   operator may overrule): stays in core BY DESIGN. It is the brain's own deterministic
+   neural micro-head (18K params, version-pinned weights shipped with the substrate, no
+   generation, no provider routing) constructed inside `BASCognitiveBrain.makeWithDefaults`
+   — moving it behind injection would break the "brain boots complete" property and force
+   every construction site to supply a classifier. The charter's LLM clause is untouched;
+   the honest statement is: the substrate OWNS one microscopic neural organ the way it
+   owns its redline lattice. Boundary note added at the class declaration.
 2. **Reading A vs B of "统一进入 Qinao SDK"** remains the operator's call: under Reading A
    (SDK = the two-package stack) unification holds today; under Reading B (QinaoRuntimeSDK
    package only) the runTurn cascade / mirror lane / tool lane / The Ledger have no SDK

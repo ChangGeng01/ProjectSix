@@ -41,6 +41,10 @@ public struct BASMirrorLaneCandidate: Sendable, Equatable, Codable {
     public let claimedKind: BASMirrorLaneKind
     public let content: String
     public let evidenceIDs: [String]
+    /// ruling ③ hardening (2026-07-12): the CONTENT hash of each evidence item, paired
+    /// 1:1 with `evidenceIDs`. Binding IDs alone let the referenced content be swapped
+    /// after signing; the disposer rejects a count mismatch and the digests are signed.
+    public let evidenceDigests: [String]
     public let modelID: String
     public let promptDigest: String
     /// The policy the producer CLAIMS it ran under — checked against the gate's
@@ -52,6 +56,7 @@ public struct BASMirrorLaneCandidate: Sendable, Equatable, Codable {
         claimedKind: BASMirrorLaneKind,
         content: String,
         evidenceIDs: [String],
+        evidenceDigests: [String] = [],
         modelID: String,
         promptDigest: String,
         claimedPolicyHash: String,
@@ -60,6 +65,9 @@ public struct BASMirrorLaneCandidate: Sendable, Equatable, Codable {
         self.claimedKind = claimedKind
         self.content = content
         self.evidenceIDs = evidenceIDs.map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }.filter { !$0.isEmpty }
+        self.evidenceDigests = evidenceDigests.map {
             $0.trimmingCharacters(in: .whitespacesAndNewlines)
         }.filter { !$0.isEmpty }
         self.modelID = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -75,19 +83,31 @@ public struct BASMirrorLaneCandidate: Sendable, Equatable, Codable {
 /// is bound via `contentDigest` (digest-not-content doctrine — the Ledger never needs
 /// the raw text to verify the envelope).
 public struct BASConvergedProposalEnvelope: Sendable, Equatable, Codable {
-    public static let signingNamespace = "qinao.mirror.envelope.v1"
+    /// ruling ③ hardening (2026-07-12): v2 — the canonical payload gained
+    /// evidenceDigests (content binding, not just IDs), reducerVersion (which
+    /// accept/reject/reduce semantics produced this), and signerKeyID (which key signed
+    /// it — rotation-attributable). v1 envelopes fail verification BY DESIGN: schema
+    /// evolution of a signed format is explicit, never silent.
+    public static let signingNamespace = "qinao.mirror.envelope.v2"
 
     public let envelopeID: String
     public let kind: BASMirrorLaneKind
     public let content: String
     public let contentDigest: String
     public let evidenceIDs: [String]
+    /// Content hash per evidence item, index-paired with `evidenceIDs` (signed).
+    public let evidenceDigests: [String]
     public let modelID: String
     public let promptDigest: String
     /// TRUSTED policy hash stamped by the disposer — never the candidate's claim.
     public let policyHash: String
+    /// Version of the disposer semantics that produced this envelope (signed).
+    public let reducerVersion: String
     public let producedAtMs: Int64
     public let provenance: String
+    /// Fingerprint of the signing key (first 16 hex of SHA-256 over the key bytes) —
+    /// signed, so a landed envelope is attributable to a key generation.
+    public let signerKeyID: String
     /// HMAC-SHA256 (hex) over `canonicalBytes()`. Empty until `signed(with:)`.
     public let signature: String
 
@@ -97,11 +117,14 @@ public struct BASConvergedProposalEnvelope: Sendable, Equatable, Codable {
         content: String,
         contentDigest: String,
         evidenceIDs: [String],
+        evidenceDigests: [String],
         modelID: String,
         promptDigest: String,
         policyHash: String,
+        reducerVersion: String,
         producedAtMs: Int64,
         provenance: String,
+        signerKeyID: String,
         signature: String
     ) {
         self.envelopeID = envelopeID
@@ -109,11 +132,14 @@ public struct BASConvergedProposalEnvelope: Sendable, Equatable, Codable {
         self.content = content
         self.contentDigest = contentDigest
         self.evidenceIDs = evidenceIDs
+        self.evidenceDigests = evidenceDigests
         self.modelID = modelID
         self.promptDigest = promptDigest
         self.policyHash = policyHash
+        self.reducerVersion = reducerVersion
         self.producedAtMs = producedAtMs
         self.provenance = provenance
+        self.signerKeyID = signerKeyID
         self.signature = signature
     }
 
@@ -123,12 +149,19 @@ public struct BASConvergedProposalEnvelope: Sendable, Equatable, Codable {
     public func canonicalBytes() -> Data {
         var fields = [envelopeID, kind.rawValue, contentDigest]
         fields.append(contentsOf: BASSovereignCanonicalBytes.list(evidenceIDs))
+        fields.append(contentsOf: BASSovereignCanonicalBytes.list(evidenceDigests))
         fields.append(contentsOf: [
-            modelID, promptDigest, policyHash,
-            String(producedAtMs), provenance,
+            modelID, promptDigest, policyHash, reducerVersion,
+            String(producedAtMs), provenance, signerKeyID,
             Self.signingNamespace,
         ])
         return BASSovereignCanonicalBytes.lengthPrefixed(fields)
+    }
+
+    /// Fingerprint of an HMAC key: first 16 hex chars of SHA-256 over the raw key bytes.
+    public static func keyID(of key: SymmetricKey) -> String {
+        let digest = key.withUnsafeBytes { SHA256.hash(data: Data($0)) }
+        return String(digest.map { String(format: "%02x", $0) }.joined().prefix(16))
     }
 
     /// Immutable-update: a copy carrying the HMAC tag over the canonical bytes.
@@ -138,9 +171,11 @@ public struct BASConvergedProposalEnvelope: Sendable, Equatable, Codable {
         return BASConvergedProposalEnvelope(
             envelopeID: envelopeID, kind: kind, content: content,
             contentDigest: contentDigest, evidenceIDs: evidenceIDs,
+            evidenceDigests: evidenceDigests,
             modelID: modelID, promptDigest: promptDigest,
-            policyHash: policyHash, producedAtMs: producedAtMs,
-            provenance: provenance,
+            policyHash: policyHash, reducerVersion: reducerVersion,
+            producedAtMs: producedAtMs,
+            provenance: provenance, signerKeyID: signerKeyID,
             signature: Data(tag).map { String(format: "%02x", $0) }.joined())
     }
 
@@ -193,6 +228,11 @@ public struct BASMirrorLanePolicy: Sendable, Equatable {
 /// (candidate, policy, clock, key) — no LLM, no I/O, no hidden state.
 public enum BASMirrorLaneDisposer {
 
+    /// Version of THIS disposer's accept/reject/reduce semantics — stamped and SIGNED
+    /// into every envelope so downstream can tell which rules produced it. Bump when
+    /// the demotion/validation rules change meaning.
+    public static let reducerVersion = "mirror-disposer.v1"
+
     public enum RejectReason: String, Sendable, Equatable, Codable {
         case emptyContent = "empty-content"
         case contentTooLong = "content-too-long"
@@ -200,6 +240,9 @@ public enum BASMirrorLaneDisposer {
         case missingPromptDigest = "missing-prompt-digest"
         case policyHashMismatch = "policy-hash-mismatch"
         case kindNotAllowed = "kind-not-allowed"
+        /// ruling ③ hardening: evidenceDigests must pair 1:1 with evidenceIDs —
+        /// unpair-able evidence is unverifiable evidence.
+        case evidenceDigestMismatch = "evidence-digest-mismatch"
     }
 
     public enum Disposition: Sendable, Equatable {
@@ -240,6 +283,11 @@ public enum BASMirrorLaneDisposer {
         guard policy.allowedKinds.contains(candidate.claimedKind) else {
             return .rejected(.kindNotAllowed)
         }
+        // ruling ③ hardening: every evidence ID must carry its content digest (1:1) —
+        // ID-only evidence lets the referenced content be swapped after signing.
+        guard candidate.evidenceIDs.count == candidate.evidenceDigests.count else {
+            return .rejected(.evidenceDigestMismatch)
+        }
 
         // Evidence rule: a proposal or warrant-request with NO evidence is an opinion —
         // it may annotate, it may not propose. Deterministic demotion, explicit in the
@@ -260,11 +308,14 @@ public enum BASMirrorLaneDisposer {
             content: content,
             contentDigest: BASConvergedProposalEnvelope.sha256Hex(content),
             evidenceIDs: candidate.evidenceIDs,
+            evidenceDigests: candidate.evidenceDigests,
             modelID: candidate.modelID,
             promptDigest: candidate.promptDigest,
             policyHash: policy.trustedPolicyHash,
+            reducerVersion: Self.reducerVersion,
             producedAtMs: Int64(now.timeIntervalSince1970 * 1000),
             provenance: candidate.provenance,
+            signerKeyID: BASConvergedProposalEnvelope.keyID(of: key),
             signature: "")
             .signed(with: key)
 

@@ -190,6 +190,12 @@ public enum BASContextClassifierMLAdapterError:
 /// the same user input multiple times (replay,A/B test,
 /// retry) benefit measurably。 Cache size is bounded to
 /// avoid unbounded memory growth on adversarial inputs。
+// charter adjudication (2026-07-12): this CoreML micro-head (18K params, pinned weights)
+// deliberately lives in the deterministic core — it is substrate-owned cognition machinery
+// (no generation, no provider routing, boots with the brain), NOT an LLM and NOT part of
+// the model-adapter ring. The model-agnostic charter's LLM-outside rule is enforced at
+// BASAppleAdapters/FoundationModels/MLX level (BASModelBoundaryPinTests); this file is the
+// documented, operator-overrulable exception for in-core neural code.
 public final class BASContextClassifierMLAdapter: @unchecked Sendable {
 
     /// 7 labels in the same order as Python label_index.json

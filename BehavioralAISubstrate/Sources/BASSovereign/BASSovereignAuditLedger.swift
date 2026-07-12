@@ -152,6 +152,15 @@ public actor BASSovereignAuditLedger {
     /// The chain itself. Ordered; appending is the only mutator.
     private var entries: [AppendedEntry] = []
 
+    /// mirror-lane charter ③ (2026-07-12): auditID existence probe — lets ingest gates
+    /// reject a REPLAYED envelope with a typed reason BEFORE append, on ANY storage
+    /// (the in-memory ledger has no uniqueness index; SQLite's audit_id PRIMARY KEY was
+    /// the only backstop and surfaced as an untyped append failure).
+    public func hasEntry(auditID: String) -> Bool {
+        ensureReloadVerified()
+        return entries.contains { $0.entry.auditID == auditID }
+    }
+
     /// Index for O(1) `query(byAuditRef:)`. Kept in sync with `entries`.
     private var auditRefIndex: [String: Int] = [:]
 
