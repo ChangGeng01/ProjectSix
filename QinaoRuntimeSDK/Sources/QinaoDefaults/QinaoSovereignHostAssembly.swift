@@ -19,6 +19,7 @@
 // (TurnInputs observations / CandidateInput / memory admissions).
 
 import Foundation
+import CryptoKit
 import BASRuntimeCore
 import BASMemory
 import QinaoHost
@@ -82,12 +83,19 @@ extension QinaoDefaults {
                 now: now))
 
         // Risk gate with the M103 wire: every issued permit lands in the sovereign audit
-        // trail (fail-closed — a permit whose recording throws never escapes).
+        // trail (fail-closed — a permit whose recording throws never escapes). Permit
+        // signing (integration permit-signing): the gate gets a STABLE key derived from
+        // the same host secret as the warrant/proof tags — domain separation comes from
+        // the "qinao.permit.v1" label inside the tag, so a permit tag can never collide
+        // with a warrant/proof tag. Cross-process hosts re-derive the same key on both
+        // sides and a permit minted on one gate verifies on the other.
         let risk = QinaoRiskGate(
             permitTTLSeconds: permitTTLSeconds,
             permitEventRecorder: QinaoRuntime
                 .makeSovereignPermitEventRecorder(sovereign: sovereign),
-            now: now)
+            now: now,
+            permitTagKey: SymmetricKey(
+                data: tokenSigningKey ?? ledgerSigningSecret))
 
         let constitution = BASHostConstitution(
             hostID: hostID, activeVersion: activeVersion)

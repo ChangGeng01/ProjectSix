@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import BASRuntimeCore
 import BASPolicy
 
@@ -139,6 +140,11 @@ public actor QinaoRiskGate {
         }
     }
 
+    /// integration permit-signing (2026-07-12): permits are HMAC-SHA256 signed at mint
+    /// (`signature` binds ALL fields incl. `mode` — a forged block→allow flip breaks the
+    /// tag) and verified signature-first in `isPermitValid`. This closes the last
+    /// field-binding-only lane of the three-signature gate; the permit is now safe to
+    /// carry across a process boundary when both sides share the gate's `permitTagKey`.
     public struct ActionPermit: Sendable, Equatable, Codable {
         public let permitID: String
         public let digest: String
@@ -147,6 +153,8 @@ public actor QinaoRiskGate {
         public let reasonCodes: [String]
         public let issuedAt: Date
         public let expiresAt: Date
+        /// HMAC-SHA256 tag over all seven fields (hex). Minted only by the risk gate.
+        public let signature: String
 
         public init(
             permitID: String,
@@ -155,7 +163,8 @@ public actor QinaoRiskGate {
             mode: Mode,
             reasonCodes: [String],
             issuedAt: Date,
-            expiresAt: Date
+            expiresAt: Date,
+            signature: String
         ) {
             self.permitID = permitID
             self.digest = digest
@@ -164,6 +173,7 @@ public actor QinaoRiskGate {
             self.reasonCodes = reasonCodes
             self.issuedAt = issuedAt
             self.expiresAt = expiresAt
+            self.signature = signature
         }
     }
 
@@ -171,6 +181,13 @@ public actor QinaoRiskGate {
     private let defaultDelaySeconds: TimeInterval
     private let now: @Sendable () -> Date
     private let permitEventRecorder: PermitEventRecorder?
+
+    /// integration permit-signing: HMAC key for permit tags. QinaoRisk deliberately
+    /// imports no sovereign module — the key is plain CryptoKit, injected by the
+    /// composition layer. Random default = mint/verify on the same instance works with
+    /// zero config (and forged permits still fail); cross-process hosts inject a shared
+    /// stable key on BOTH gates so a permit minted on one verifies on the other.
+    private let permitTagKey: SymmetricKey
 
     /// M99 — callback fired AFTER a permit is successfully issued
     /// but BEFORE it is returned to the caller. Designed to let the
@@ -202,12 +219,36 @@ public actor QinaoRiskGate {
         permitTTLSeconds: TimeInterval = 30,
         defaultDelaySeconds: TimeInterval = 60,
         permitEventRecorder: PermitEventRecorder? = nil,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        permitTagKey: SymmetricKey = SymmetricKey(size: .bits256)
     ) {
         self.permitTTL = permitTTLSeconds
         self.defaultDelaySeconds = defaultDelaySeconds
         self.permitEventRecorder = permitEventRecorder
         self.now = now
+        self.permitTagKey = permitTagKey
+    }
+
+    /// integration permit-signing — injective permit tag. Mirrors the sovereign
+    /// module's token-tag scheme (length-prefixed fields, dates via bitPattern) with a
+    /// domain label so a permit tag can never collide with a warrant/proof tag under a
+    /// shared key, and the reason-code COUNT is folded in so variable-arity reason
+    /// lists cannot alias adjacent fields.
+    static func permitTag(
+        key: SymmetricKey, _ permit: ActionPermit
+    ) -> String {
+        var fields = [
+            "qinao.permit.v1",
+            permit.permitID, permit.digest, permit.sessionID,
+            permit.mode.rawValue, String(permit.reasonCodes.count),
+        ]
+        fields.append(contentsOf: permit.reasonCodes)
+        fields.append("t\(String(permit.issuedAt.timeIntervalSince1970.bitPattern, radix: 16))")
+        fields.append("t\(String(permit.expiresAt.timeIntervalSince1970.bitPattern, radix: 16))")
+        let canonical = fields.map { "\($0.utf8.count):\($0)" }.joined()
+        return Data(HMAC<SHA256>.authenticationCode(
+            for: Data(canonical.utf8), using: key))
+            .map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: - Permit issuance
@@ -273,6 +314,13 @@ public actor QinaoRiskGate {
         _ permit: ActionPermit,
         for intent: ActionIntent
     ) -> Bool {
+        // integration permit-signing: signature FIRST — a permit not minted with this
+        // gate's key (or tampered after mint, incl. a block→allow mode flip) fails
+        // closed regardless of its field values. permitTag reads only the seven
+        // identity fields, never .signature, so the permit passes through directly.
+        guard permit.signature == Self.permitTag(key: permitTagKey, permit) else {
+            return false
+        }
         guard permit.digest == intent.digest else { return false }
         guard permit.sessionID == intent.sessionID else { return false }
         guard permit.mode == .allow else { return false }
@@ -450,14 +498,26 @@ public actor QinaoRiskGate {
         switch assessment.mode {
         case .allow:
             let issuedAt = now()
-            let permit = ActionPermit(
+            // integration permit-signing: sign at mint, BEFORE the M99 recorder fires,
+            // so the audited permit is byte-identical to the returned one.
+            let unsigned = ActionPermit(
                 permitID: "permit-\(UUID().uuidString)",
                 digest: intent.digest,
                 sessionID: intent.sessionID,
                 mode: .allow,
                 reasonCodes: assessment.reasonCodes,
                 issuedAt: issuedAt,
-                expiresAt: issuedAt.addingTimeInterval(permitTTL))
+                expiresAt: issuedAt.addingTimeInterval(permitTTL),
+                signature: "")
+            let permit = ActionPermit(
+                permitID: unsigned.permitID,
+                digest: unsigned.digest,
+                sessionID: unsigned.sessionID,
+                mode: unsigned.mode,
+                reasonCodes: unsigned.reasonCodes,
+                issuedAt: unsigned.issuedAt,
+                expiresAt: unsigned.expiresAt,
+                signature: Self.permitTag(key: permitTagKey, unsigned))
             // M99 — fail-closed audit recording. If a recorder is
             // wired, it MUST succeed before the permit reaches the
             // caller. Any recorder error propagates out so the

@@ -231,7 +231,9 @@ final class QinaoRiskTests: XCTestCase {
             mode: .block,
             reasonCodes: livePermit.reasonCodes,
             issuedAt: livePermit.issuedAt,
-            expiresAt: livePermit.expiresAt)
+            expiresAt: livePermit.expiresAt,
+            // permit-signing: reuse the REAL signature — the mode flip breaks the tag.
+            signature: livePermit.signature)
         let ok = await gate.isPermitValid(forged, for: intent)
         XCTAssertFalse(ok)
     }

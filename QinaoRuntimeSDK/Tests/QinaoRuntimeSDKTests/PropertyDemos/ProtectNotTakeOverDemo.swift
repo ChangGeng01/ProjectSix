@@ -98,7 +98,10 @@ final class ProtectNotTakeOverDemo: XCTestCase {
             mode: .block,
             reasonCodes: realPermit.reasonCodes,
             issuedAt: realPermit.issuedAt,
-            expiresAt: realPermit.expiresAt)
+            expiresAt: realPermit.expiresAt,
+            // permit-signing: the forger keeps the REAL signature — the mode flip alone
+            // must break the tag (and the mode check would catch it regardless).
+            signature: realPermit.signature)
 
         let warrant = try await fx.sovereign.issueWarrant(
             for: .init(

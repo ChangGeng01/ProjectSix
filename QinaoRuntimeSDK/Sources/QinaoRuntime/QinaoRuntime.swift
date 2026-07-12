@@ -29,14 +29,16 @@ import QinaoLoop
 /// permits and warrants; the runtime is the only surface that
 /// actually calls the world.
 ///
-/// SECURITY SCOPE (integration S3, 2026-07-12 — audit F2 largely discharged): the WARRANT
-/// and the SNAPSHOT PROOF are now HMAC-SHA256 signed at mint (`issueWarrant` /
-/// `issueSnapshotContinuityProof`) and verified signature-first (`isWarrantValid` /
-/// `isSnapshotProofValid` — the latter also closes the pre-S3 gap where proof expiry and
-/// sessionID were unchecked). Forging either now requires the control plane's
-/// `tokenTagKey`, not just the type. Documented residual: the RISK permit remains
-/// field-binding + TTL (QinaoRisk deliberately holds no signing key to stay decoupled
-/// from the sovereign module); sign the permit lane before any cross-process adoption.
+/// SECURITY SCOPE (integration S3 + permit-signing, 2026-07-12 — audit F2 DISCHARGED):
+/// all three tokens are now HMAC-SHA256 signed at mint and verified signature-first —
+/// warrant (`issueWarrant`/`isWarrantValid`), snapshot proof
+/// (`issueSnapshotContinuityProof`/`isSnapshotProofValid`, which also closed the pre-S3
+/// gap where proof expiry and sessionID were unchecked), and the risk permit
+/// (`requestActionPermit`/`isPermitValid`; QinaoRisk stays sovereign-free — its
+/// `permitTagKey` is plain CryptoKit injected by the composition layer, with a
+/// "qinao.permit.v1" domain label so tags never collide across token kinds under a
+/// shared key). Forging any token now requires the corresponding key, not just the
+/// type. Cross-process adoption requires only sharing the keys across the boundary.
 public actor QinaoRuntime {
 
     public enum RuntimeError: Error, Equatable, Sendable {

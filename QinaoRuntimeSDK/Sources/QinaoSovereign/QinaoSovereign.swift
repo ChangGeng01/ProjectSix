@@ -99,9 +99,10 @@ public actor QinaoSovereignControlPlane {
     /// `Configuration.tokenSigningKey`, falling back to `ledgerSigningSecret`);
     /// `isWarrantValid` recomputes and compares before the field-binding + TTL checks.
     /// A warrant constructed or decoded outside the control plane fails verification —
-    /// forgery requires the key, not just the type. Residual (documented): the RISK
-    /// permit remains field-binding-only (QinaoRisk deliberately holds no signing key);
-    /// sign it before any cross-process adoption of the permit lane.
+    /// forgery requires the key, not just the type. The RISK permit lane is likewise
+    /// signed as of integration permit-signing (same day): QinaoRiskGate holds its own
+    /// injected `permitTagKey` (no sovereign import), domain-labelled so permit tags
+    /// never collide with warrant/proof tags under a shared key.
     public struct Warrant: Sendable, Equatable, Codable {
         public let warrantID: String
         public let sessionID: String
