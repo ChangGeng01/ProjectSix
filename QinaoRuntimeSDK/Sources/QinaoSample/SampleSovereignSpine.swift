@@ -15,6 +15,7 @@
 // BOTH sides while the assembly itself stays LLM-free.
 
 import Foundation
+import CryptoKit
 import QinaoDefaults
 import QinaoRuntime
 import QinaoSovereign
@@ -93,12 +94,25 @@ extension SampleSession {
                 memoryLine = "memory REFUSED (\(error))"
             }
 
+            // deep-audit P1-12 (2026-07-13): BIND the audited turn to THIS exact exchange.
+            // Previously snapshotRef/policyHash were fixed placeholders ("snap.sample"/
+            // "policy.sample"), so the signed, persisted BASSovereignAuditEntry committed to
+            // nothing about the prompt/response — two different exchanges produced
+            // byte-identical audit content (modulo turnID). We derive snapshotRef from the
+            // SHA-256 digests of prompt AND response, so the entry the verdict engine signs
+            // and the keyed ledger persists is cryptographically content-bound to the
+            // exchange; policyHash carries the host's REAL active constitution version.
+            let promptDigest = Self.sha256Hex(prompt)
+            let responseDigest = Self.sha256Hex(responseBody)
+            let boundSnapshotRef =
+                "snap.sample.\(promptDigest.prefix(8)).\(responseDigest.prefix(8))"
+
             var inputs = QinaoRuntime.TurnInputs(
                 observations: QinaoSovereignControlPlane.TurnObservations(
                     sessionID: sessionID,
                     turnID: "turn-\(UUID().uuidString.prefix(8))",
-                    snapshotRef: "snap.sample",
-                    policyHash: "policy.sample"),
+                    snapshotRef: boundSnapshotRef,
+                    policyHash: "policy.\(constitution.activeVersion)"),
                 coordinatorSeverity: nil)
             inputs.expectedCoverageLayerIDs = ["L8", "L14"]
 
@@ -110,6 +124,16 @@ extension SampleSession {
         } catch {
             return "sovereign: turn REFUSED — \(error)"
         }
+    }
+
+    // MARK: - Content binding (deep-audit P1-12)
+
+    /// Lowercase hex SHA-256 of a UTF-8 string — used to content-bind the audited turn's
+    /// snapshotRef to the exact prompt/response exchange.
+    static func sha256Hex(_ s: String) -> String {
+        SHA256.hash(data: Data(s.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 
     // MARK: - Ledger location + local secret

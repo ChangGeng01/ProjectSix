@@ -87,6 +87,50 @@ final class QinaoSampleSovereignSpineTests: XCTestCase {
         XCTAssertEqual(memCount, 2)
     }
 
+    /// deep-audit P1-12 (2026-07-13): the SIGNED, PERSISTED audit entry is content-bound to
+    /// the exchange. Before the fix, snapshotRef was the fixed placeholder "snap.sample", so
+    /// two different prompts/responses produced byte-identical audit content. Now snapshotRef
+    /// is derived from the SHA-256 digests of prompt AND response — reverting the derivation
+    /// (back to "snap.sample") reds this tooth.
+    func testPersistedAuditEntryIsContentBoundToTheExchange() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let session = SampleSession(ledgerDirectory: dir)
+
+        let prompt = "what is the capital of France?"
+        let response = "Paris."
+        _ = await session.recordTurn(
+            sessionID: "sess.bind", prompt: prompt,
+            responseBody: response, providerID: "mock.provider")
+
+        let promptDigest = SampleSession.sha256Hex(prompt)
+        let responseDigest = SampleSession.sha256Hex(response)
+        let expectedRef = "snap.sample.\(promptDigest.prefix(8)).\(responseDigest.prefix(8))"
+
+        // Reopen COLD with the stored secret; the chain must verify AND a persisted entry's
+        // signed snapshotRef must commit to THIS exchange.
+        let secret = try SampleSession.loadOrCreateLedgerSecret(in: dir)
+        let storage = try BASSovereignLedgerSQLiteStorage(
+            path: dir.appendingPathComponent("sovereign-ledger.sqlite").path)
+        let reopened = BASSovereignAuditLedger(
+            signingSecret: SymmetricKey(data: secret), storage: storage)
+        let quarantined = await reopened.isIntegrityQuarantined
+        XCTAssertFalse(quarantined, "reloaded sample ledger must verify its chain")
+
+        let entries = await reopened.snapshot()
+        XCTAssertTrue(entries.contains { $0.entry.snapshotRef == expectedRef },
+            "a persisted audit entry must be content-bound to the exchange "
+            + "(snapshotRef=\(expectedRef)); got \(entries.map { $0.entry.snapshotRef })")
+        // The bound ref depends on BOTH digests: a different response changes the expected ref.
+        let wrongResponseRef =
+            "snap.sample.\(promptDigest.prefix(8)).\(SampleSession.sha256Hex("different").prefix(8))"
+        XCTAssertFalse(entries.contains { $0.entry.snapshotRef == wrongResponseRef },
+            "the ref must bind the actual response, not just the prompt")
+        // Reversal witness: the fixed placeholder must be gone.
+        XCTAssertFalse(entries.contains { $0.entry.snapshotRef == "snap.sample" },
+            "the fixed placeholder snapshotRef must no longer be persisted")
+    }
+
     /// The local HMAC secret is generated once and reused — the chain stays verifiable
     /// across restarts (a regenerated secret would quarantine the prior chain).
     func testLedgerSecretIsStableAcrossLoads() throws {
