@@ -63,6 +63,9 @@ enum BASPromptLookupProbe {
             switch plookupSel {
             case "llama", "llama_3b": plookupModel = MLXModelCatalog.speculativeOptimalTarget
             case "qwen", "qwen_3b": plookupModel = MLXModelCatalog.qwen2_5_3B_4bit
+            // P1-b cert (2026-07-13): the production quality default — GDN cache shape routes to
+            // the new carry-forward lane, so this selection IS the on-device P1-b certification.
+            case "qwen35", "qwen3_5", "qwen35_4b": plookupModel = MLXModelCatalog.qwen3_5_4B_4bit
             case "e4b_local", "gemma_e4b_local": plookupModel = MLXModelCatalog.gemma4_E4B_4bit_local
             case "gemma_e4b", "gemma4_e4b", "e4b": plookupModel = MLXModelCatalog.gemma4_E4B_4bit
             default: plookupModel = MLXModelCatalog.gemma4_E2B_4bit

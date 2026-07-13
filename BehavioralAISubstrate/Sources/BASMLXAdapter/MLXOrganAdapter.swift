@@ -160,7 +160,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     nonisolated func _resolveMTPWeightsURL() -> URL? {
         guard mtpSpecEnabled else { return nil }
         if let explicit = mtpDrafterWeightsURL { return explicit }
-        guard model.id.lowercased().contains("qwen3.5") else { return nil }
+        // Orchestrator Phase 1 (2026-07-13): the typed manifest is now the authority for "this model
+        // carries an MTP head". For a manifested model we trust `carriesMTPHead` (data, not a string
+        // check); an un-manifested model falls back to the legacy `id.contains("qwen3.5")` probe so
+        // a Qwen3.5 variant not yet in the registry is never silently denied its head.
+        let manifestSaysMTP = BASModelManifestRegistry.manifest(forModelID: model.id)?.carriesMTPHead
+        guard manifestSaysMTP ?? model.id.lowercased().contains("qwen3.5") else { return nil }
         let fm = FileManager.default
         // operator decision 6A / audit mlx-decode LOW-1: the world-writable /tmp candidate is a
         // Mac-DEV convenience only — gate it behind an explicit opt-in env so a stray or
