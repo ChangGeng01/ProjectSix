@@ -1,6 +1,7 @@
 #if canImport(MLXLLM)
 import Foundation
 import MLX
+import MLXLLM
 import MLXLMCommon
 
 /// BAS-owned greedy speculative decode loop with a PROMPT-LOOKUP (n-gram) drafter — universal (any LLM, no
@@ -65,11 +66,18 @@ public struct BASPromptLookupDecoder {
         guard canTrimPromptCache(cache) else {
             let gdnCarryForwardEnabled =
                 ProcessInfo.processInfo.environment["BAS_GDN_CARRYFORWARD"] == "1"
-            guard gdnCarryForwardEnabled, BASTrunkCheckpoint.compositionSupported(cache) else {
+            // The carry-forward lane routes ONLY Qwen35's GDN composition, and it must drive the
+            // trunk through the SAME concrete forward the byte-identical MTP lane uses
+            // (`hiddenStatesWithCache` → the inner Qwen35TextModelInner), NOT the protocol
+            // `callAsFunction(_:cache:state:)` whose LMOutput.State handling is what made the
+            // generic loop diverge from sequential plain on device. Any non-Qwen35 or state-
+            // carrying model fails closed.
+            guard gdnCarryForwardEnabled, BASTrunkCheckpoint.compositionSupported(cache),
+                  let qwen = model as? Qwen35Model else {
                 throw DecodeError.nonTrimmableCache
             }
             return try generateCarryForward(
-                input: input, model: model, parameters: parameters, drafter: drafter,
+                input: input, model: qwen, parameters: parameters, drafter: drafter,
                 eosTokenIds: eosTokenIds, adaptiveK: adaptiveK, cache: cache)
         }
         let sampler = parameters.sampler()
@@ -172,7 +180,7 @@ public struct BASPromptLookupDecoder {
     /// (it runs draft-free, which commits the pending feed and warms the slots).
     private static func generateCarryForward(
         input: LMInput,
-        model: any LanguageModel,
+        model: Qwen35Model,
         parameters: GenerateParameters,
         drafter: any BASUniversalDraftSource,
         eosTokenIds: Set<Int>,
@@ -189,46 +197,40 @@ public struct BASPromptLookupDecoder {
         var rounds = 0, proposed = 0, accepted = 0
         var emaAccept = Double(K)
 
-        // ---- Prefill. `pendingFeed` = tokens NOT yet committed to the cache (fed next forward). ----
-        var pendingFeed: [Int]
-        switch try model.prepare(input, cache: cache, windowSize: parameters.prefillStepSize) {
-        case .tokens(let toks):
-            // Prompt tail left unfed — it becomes the first round's feed (never emitted).
-            pendingFeed = toks.tokens.asArray(Int.self)
-        case .logits(let result):
-            guard result.state == nil else { throw DecodeError.nonTrimmableCache }
-            let logits = result.logits[0..., -1, 0...]
-            let token = sampler.sample(logits: logits)
-            eval(token)
-            let t = token.item(Int.self)
-            if eosTokenIds.contains(t) { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0) }
-            rolling.append(t)
-            out.append(t)
-            pendingFeed = [t]
-        }
+        // ---- Prefill: whole prompt in ONE `hiddenStatesWithCache` call — byte-for-byte the same
+        // primer the certified generatePlain/MTP lanes use (NOT model.prepare's chunked windows).
+        // `pendingFeed` = the emitted-but-not-yet-fed token that seeds the next verify forward. ----
+        let promptIDs = input.text.tokens
+        let h0 = model.hiddenStatesWithCache(
+            promptIDs.expandedDimensions(axis: 0), cache: cache)
+        let firstToken = sampler.sample(logits: model.logits(fromHidden: h0)[0, h0.dim(1) - 1])
+        eval(firstToken)
+        let firstT = firstToken.item(Int.self)
+        if eosTokenIds.contains(firstT) { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0) }
+        rolling.append(firstT)
+        out.append(firstT)
+        var pendingFeed: [Int] = [firstT]
 
         // ---- Speculative rounds (carry-forward). ----
         while maxTokens.map({ out.count < $0 }) ?? true {
             let remaining = maxTokens.map { $0 - out.count } ?? K
             guard remaining > 0 else { break }
             let effK = adaptiveK ? Swift.max(1, Swift.min(K, Int(emaAccept.rounded()) + 1)) : K
-            // A COLD ArraysCache (possible only on the first round of the `.tokens` prefill path)
-            // cannot be snapshotted — run that round draft-free: it commits pendingFeed + warms the slots.
-            let cold = cache.contains { ($0 as? ArraysCache).map { $0.state.isEmpty } ?? false }
-            let rawDraft = cold ? [] : drafter.propose(over: rolling)
+            let rawDraft = drafter.propose(over: rolling)
             let numDraft = Swift.min(rawDraft.count, Swift.min(effK, Swift.max(0, remaining - 1)))
             let draft = Array(rawDraft.prefix(numDraft))
             rounds += 1
             proposed += numDraft
 
-            // Snapshot ONLY when there is something to reject (numDraft > 0 ⇒ cache is warm here).
+            // Snapshot ONLY when there is something to reject (numDraft > 0).
             let checkpoint: BASTrunkCheckpoint? = numDraft > 0 ? BASTrunkCheckpoint(cache: cache) : nil
             let feed = pendingFeed + draft
-            let verifyInput = LMInput.Text(tokens: MLXArray(feed.map { Int32($0) }))
             let verifyStart = feed.count - (numDraft + 1)
-            let result = model(verifyInput[text: .newAxis], cache: cache, state: nil)
-            guard result.state == nil else { throw DecodeError.nonTrimmableCache }
-            let verifyLogits = result.logits[0..., verifyStart..., 0...].squeezed(axis: 0)
+            // THE fix: the concrete inner-model forward (hiddenStatesWithCache), NOT the protocol
+            // callAsFunction — the state-free forward the byte-identical MTP lane is built on.
+            let h = model.hiddenStatesWithCache(
+                MLXArray(feed.map { Int32($0) }).expandedDimensions(axis: 0), cache: cache)
+            let verifyLogits = model.logits(fromHidden: h)[0, verifyStart...]
             let mainTokens = sampler.sample(logits: verifyLogits)
             eval(mainTokens)
             let mainList = mainTokens.asArray(Int.self)
