@@ -180,4 +180,32 @@ final class BASImprovementCandidateTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(found.count, 11,
                                     "默认开签名自证(≥11:7 解码 + 4 数据安全): \(found.sorted())")
     }
+
+    /// deep-audit tests-arch ① (2026-07-13): every REGISTERED opt-in/knob gate variable must have
+    /// a live reader in source. A registered var whose reader was renamed/removed (or a typo in the
+    /// registry) becomes a phantom knob — the exact "a mistyped/renamed gate variable silently
+    /// disables a probe / drifts from source" risk. One-way + bounded to the REGISTERED subset, so
+    /// no false-positive on the many unregistered opt-in reads. (The default-on class is covered
+    /// two-way above; this extends the drift guard to the opt-in/knob class.) Scans Sources/ AND
+    /// DeviceTestApp/ (some knobs, e.g. BAS_KV_BITS, are read only by the device endurance runner).
+    func testRegisteredOptInSwitchesHaveALiveReader() throws {
+        let testsDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let repoRoot = testsDir.deletingLastPathComponent().deletingLastPathComponent()
+        var blob = ""
+        for dir in ["Sources", "DeviceTestApp"] {
+            let root = repoRoot.appendingPathComponent(dir)
+            guard let en = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil) else { continue }
+            for case let url as URL in en
+            where url.pathExtension == "swift"
+                && url.lastPathComponent != "BASConfigRegistry.swift" {   // exclude the registry itself
+                blob += (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+            }
+        }
+        XCTAssertFalse(blob.isEmpty, "scanner must read source (path drift guard)")
+        let optIns = BASConfigRegistry.switches.filter { $0.polarity != .defaultOnKill }
+        XCTAssertGreaterThan(optIns.count, 8, "sanity: opt-in/knob switches are registered")
+        let orphans = optIns.map(\.envName).filter { !blob.contains($0) }
+        XCTAssertTrue(orphans.isEmpty,
+            "注册的 opt-in/knob 开关无源读者(改名/删读/typo 幻影): \(orphans.sorted())")
+    }
 }

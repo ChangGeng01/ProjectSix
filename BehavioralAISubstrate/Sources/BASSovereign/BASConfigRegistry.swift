@@ -131,8 +131,10 @@ public enum BASConfigRegistry {
               what: "B3 熵阈(默认 300 millinats;+MIN/WINDOW/RESERVE 族)",
               adrRef: "FRONTIER B3"),
         .init(envName: "BAS_KV_BITS", polarity: .constantKnob,
-              owner: "MLXOrganAdapter (KV 量化)",
-              what: "KV cache 量化位宽", adrRef: nil),
+              // deep-audit tests-arch ① (2026-07-13): owner anchor was stale — it read
+              // "MLXOrganAdapter" but the actual reader is the DeviceTestApp endurance runner.
+              owner: "DeviceTestApp/BASEnduranceAppRunner.swift:1482 (KV 量化 A/B)",
+              what: "KV cache 量化位宽（4|8;unset=vendor default）", adrRef: nil),
     ]
 
     public static func entry(_ envName: String) -> BASProductionSwitch? {
