@@ -15,6 +15,17 @@ import BASMemory
 /// deterministic witness for whether memory reached the turn.
 final class QinaoRuntimeMemorySeamTests: XCTestCase {
 
+    /// deep-audit P1-7 (2026-07-13): the L8 auto-feed carries GOVERNED memory. Blind
+    /// `admit(_:)` now holds as `.candidate` (no constitution → no promotion authority), so
+    /// these seam probes admit through a permissive constitution — the real path a host with
+    /// promotion authority uses to put frontstage-eligible memory in front of L8.
+    private static let permissive: BASHostConstitution = {
+        var c = BASHostConstitution(hostID: "seam-host", activeVersion: "v1")
+        c.consentLattice.memoryWriteScope = "all"
+        c.consentLattice.memoryPromotionScope = "auto"
+        return c
+    }()
+
     private func inputs(
         fx: QinaoTestFixture, turnID: String
     ) -> QinaoRuntime.TurnInputs {
@@ -36,7 +47,8 @@ final class QinaoRuntimeMemorySeamTests: XCTestCase {
         let fx = await QinaoTestFixture.make()
         _ = try await fx.memory.admit(QinaoMemory.AdmitRequest(
             kind: .semantic, content: "operator prefers tea over coffee",
-            scope: .session, sensitivity: .low, confidence: 0.9))
+            scope: .session, sensitivity: .low, confidence: 0.9),
+            under: Self.permissive)
 
         let outcome = try await fx.runtime.sendSession(inputs(fx: fx, turnID: "turn.mem1"))
         XCTAssertFalse(hasMissingL8(outcome),
@@ -81,7 +93,8 @@ final class QinaoRuntimeMemorySeamTests: XCTestCase {
         let admitted = try await memory.admit(QinaoMemory.AdmitRequest(
             kind: .profile, content: "prefers dark mode",
             scope: .user, sensitivity: .high, confidence: 0.83,
-            preferredTier: .hot, sourceType: "host-settings"))
+            preferredTier: .hot, sourceType: "host-settings"),
+            under: Self.permissive)
 
         let bundle = await memory.frontstageBundle(activeHostVersion: "host.v9")
         let atom = try XCTUnwrap(bundle?.atoms.first)

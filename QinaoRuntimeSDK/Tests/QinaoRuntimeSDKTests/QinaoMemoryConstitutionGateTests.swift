@@ -117,4 +117,51 @@ final class QinaoMemoryConstitutionGateTests: XCTestCase {
             XCTAssertEqual(reason, "confidence-below-floor")
         } catch { XCTFail("unexpected: \(error)") }
     }
+
+    // MARK: - deep-audit P1-7 (2026-07-13): the CONSTITUTION-LESS overload must HOLD, not govern.
+
+    /// The blind `admit(_:)` (no constitution) must land content as `.candidate` — HELD, not
+    /// `.governed`. Without a constitution there is no authority to certify promotion, so
+    /// blind-admitted content must be invisible to the governed-only recall surfaces and must
+    /// never reach an L8 `frontstageBundle`. Pre-P1-7 the blind overload stamped `.governed`
+    /// at `preferredTier`, silently bypassing the whole constitution (the SDK API-surface
+    /// footgun). Reverting the fix flips this from `.candidate` back to `.governed` → RED.
+    func testBlindAdmitHoldsAsCandidateOutOfFrontstageAndL8() async throws {
+        let memory = QinaoMemory(now: { Date(timeIntervalSince1970: 1_700_000_000) })
+        let m = try await memory.admit(QinaoMemory.AdmitRequest(
+            kind: .episodic, content: "ungoverned llm text",
+            scope: .session, sensitivity: .low, confidence: 0.9,
+            preferredTier: .hot, sourceType: "third-party.llm"))
+
+        XCTAssertEqual(m.governanceStatus, .candidate,
+            "blind admit (no constitution) must HOLD as candidate, never auto-govern")
+        let frontstage = await memory.recallFrontstage()
+        XCTAssertTrue(frontstage.isEmpty,
+            "a held candidate must not be frontstage-eligible")
+        let recalled = await memory.recall()
+        XCTAssertTrue(recalled.isEmpty,
+            "recall() is governed-only, so a blind-admitted candidate is absent")
+        let bundle = await memory.frontstageBundle()
+        XCTAssertNil(bundle,
+            "the runtime L8 auto-feed derives from frontstageBundle() — a blind candidate must not reach L8")
+        let stored = await memory.count()
+        XCTAssertEqual(stored, 1,
+            "the candidate IS stored (held for later governed review), not silently dropped")
+    }
+
+    /// Contrast control: the SAME content admitted `under:` a permissive constitution DOES
+    /// become governed + frontstage-eligible — proving the hold is the missing-authority
+    /// consequence, not a blanket refusal.
+    func testSameContentUnderPermissiveConstitutionGovernsAndReachesFrontstage() async throws {
+        let memory = QinaoMemory(now: { Date(timeIntervalSince1970: 1_700_000_000) })
+        let m = try await memory.admit(QinaoMemory.AdmitRequest(
+            kind: .episodic, content: "ungoverned llm text",
+            scope: .session, sensitivity: .low, confidence: 0.9,
+            preferredTier: .hot, sourceType: "third-party.llm"),
+            under: constitution(scope: "all", promotion: "auto"))
+        XCTAssertEqual(m.governanceStatus, .governed)
+        let bundle = await memory.frontstageBundle()
+        XCTAssertEqual(bundle?.atoms.count, 1,
+            "governed memory reaches the L8 frontstage bundle")
+    }
 }

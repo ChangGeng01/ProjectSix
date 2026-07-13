@@ -90,7 +90,8 @@ final class QinaoAppleFoundationMemoryChainTests: XCTestCase {
                 confidence: 0.85,
                 preferredTier: .warm,
                 sourceType: "qinao.test.m194",
-                tags: ["m194", "real-llm"]))
+                tags: ["m194", "real-llm"]),
+            under: p1_7PermissiveConstitution())  // P1-7: governed path for recallability
 
         // Recall — body must come back byte-equal.
         let recalled = await memory.recall(

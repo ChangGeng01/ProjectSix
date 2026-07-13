@@ -243,7 +243,8 @@ final class QinaoSampleHostFlowTests: XCTestCase {
                 confidence: 0.85,
                 preferredTier: .warm,
                 sourceType: "qinao.demo.m201",
-                tags: ["m201", "demo"]))
+                tags: ["m201", "demo"]),
+            under: p1_7PermissiveConstitution())  // P1-7: governed path for recallability
         let recalled = await memory.recall(
             scope: .session, sensitivity: .low)
         XCTAssertTrue(

@@ -79,9 +79,13 @@ final class QinaoSovereignHostAssemblyTests: XCTestCase {
         let host = try await makeHost(ledgerPath: ledgerPath)
 
         // M — admit a memory; S1 wiring must carry it into the turn's L8 layer.
+        // deep-audit P1-7: blind admit now holds as .candidate; a governed, frontstage-eligible
+        // memory (which reaches L8) requires promotion authority — admit through a permissive
+        // constitution, the real path a host with that authority uses.
         _ = try await host.memory.admit(QinaoMemory.AdmitRequest(
             kind: .semantic, content: "assembly adoption memory",
-            scope: .session, sensitivity: .low, confidence: 0.9))
+            scope: .session, sensitivity: .low, confidence: 0.9),
+            under: p1_7PermissiveConstitution())
 
         var inputs = QinaoRuntime.TurnInputs(
             observations: QinaoSovereignControlPlane.TurnObservations(

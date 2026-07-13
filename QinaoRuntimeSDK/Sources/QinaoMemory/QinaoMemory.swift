@@ -12,9 +12,18 @@ import BASMemory
 ///
 /// The façade exposes:
 ///
-/// - `admit(_:)` — submit a candidate; runs the substrate's governance
-///   gate (confidence floor + `BASMemoryGovernance.shouldAdmit`) and
-///   promotes the candidate to a governed memory if it survives.
+/// - `admit(_:)` — submit a candidate WITHOUT a constitution. This runs
+///   ONLY the confidence floor (`BASMemoryGovernance.shouldAdmit`), then
+///   holds the survivor as a `.candidate` (un-promoted). A constitution-less
+///   host has no governance authority to certify promotion, so blind-admitted
+///   content is NOT frontstage-eligible and never auto-feeds L8 — it is stored,
+///   held for review, and absent from `recall`/`recallFrontstage`. Deep-audit
+///   P1-7 (2026-07-13): this closed a fail-open where the blind overload used to
+///   stamp `.governed` at `preferredTier`, silently bypassing the constitution's
+///   consent-lattice / promotion-scope / tier-cap / sensitive-domain governance.
+/// - `admit(_:under:)` — the GOVERNED path: a host holding a constitution admits
+///   through the consent-lattice + promotion-scope gate; survivors that the
+///   constitution permits land `.governed` (frontstage-eligible).
 /// - `recall(scope:sensitivity:tiers:)` — scope-filtered, tier-filtered
 ///   read. Uses `BASMemoryTierFilter.filter` so the ordering is exactly
 ///   the substrate's canonical policy (tier descending, confidence
@@ -102,9 +111,20 @@ public actor QinaoMemory {
 
     // MARK: - Admit
 
-    /// Run a candidate through the substrate's governance gate. On
-    /// success the returned `BASGovernedMemory` is stored; on
-    /// failure no state changes and a typed error is thrown.
+    /// Constitution-LESS admission. Runs ONLY the confidence floor, then HOLDS
+    /// the survivor as a `.candidate` — never `.governed`.
+    ///
+    /// deep-audit P1-7 (2026-07-13): this overload used to blind-`promote(candidate:)`,
+    /// which defaults `governanceStatus` to `.governed` at `candidate.preferredTier`.
+    /// That was a fail-open: a host (or third-party SDK consumer) calling the simple,
+    /// default-looking `admit(_:)` silently bypassed the ENTIRE constitution
+    /// (consent-lattice write-scope, promotion-scope review holds, warm/cold tier caps,
+    /// restricted/sensitive-domain holds) and landed content directly frontstage-eligible,
+    /// where `QinaoRuntime.sendSession` auto-feeds `frontstageBundle()` into L8. Without a
+    /// constitution there is no authority to certify promotion, so the honest posture is to
+    /// HOLD: the memory is stored (for later review) but stays `.candidate` — invisible to
+    /// `recall`/`recallFrontstage` (both governed-only) and absent from any L8 bundle.
+    /// Hosts that want governed, frontstage-eligible memory must use `admit(_:under:)`.
     @discardableResult
     public func admit(
         _ request: AdmitRequest
@@ -128,7 +148,9 @@ public actor QinaoMemory {
             throw MemoryError.rejectedByGovernance(
                 reason: "confidence-below-floor")
         }
-        let governed = BASMemoryGovernance.promote(candidate: candidate)
+        // P1-7: HELD, not governed — no constitution → no promotion authority.
+        let governed = BASMemoryGovernance.promote(
+            candidate: candidate, governanceStatus: .candidate)
         store[governed.id] = governed
         return governed
     }
