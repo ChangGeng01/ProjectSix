@@ -1694,6 +1694,14 @@ public actor QinaoSovereignControlPlane {
     /// implicated by a break at a given ID. In practice hosts
     /// will pass the currently-live sessions or the complete
     /// session set known to their scheduler.
+    ///
+    /// deep-audit sweep 2026-07-13: HOST-SITUATIONAL capability — no in-repo caller. This
+    /// chain-break recovery surface (with `ChainBreakRecoveryPolicy`) is offered to hosts that
+    /// run a scheduler which knows its live session set; the SDK's own runtime never invokes it
+    /// (the live integrity path is fail-closed reads + `isIntegrityQuarantined`). The
+    /// forward-conditional "In practice hosts will pass…" doc above describes that host
+    /// integration point, not a live SDK path. Legitimately host-situational (not the dormant
+    /// loaded-gun anti-pattern); flagged here so the absence of an in-repo caller is explicit.
     public func autoHealChainIntegrity(
         policy: ChainBreakRecoveryPolicy,
         affectedSessionIDs: [String]
