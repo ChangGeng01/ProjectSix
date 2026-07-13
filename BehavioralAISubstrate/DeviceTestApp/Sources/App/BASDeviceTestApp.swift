@@ -161,8 +161,12 @@ struct ContentView: View {
                     // on the 8GB A19. Result reuses `mambaVerify` so no new @State is needed.
                     Task { mambaVerify = await BASV12HonestyProbe.run() }
                 } else {
-                    // MPSGraph:async(kernel evaluate)。 Serial,never
-                    // concurrent with MLX(no GPU contention)。
+                    // MPSGraph:async(kernel evaluate)。 deep-audit devicetestapp LOW-5: this Task
+                    // is serial w.r.t. the Mamba SSM below (same Task), BUT it is NOT guaranteed
+                    // free of GPU contention overall — when the v12 probe is OFF and
+                    // BAS_ENDURANCE_AUTOSTART=1, the endurance loop's MLX load kicks off in the SAME
+                    // onAppear (see the autostart gate below), so the cold-start GPU probe can
+                    // contend with MLX. The "no contention" property holds only when autostart is off.
                     Task {
                         // MPSGraph cannot initialize a device on the iOS Simulator —
                         // `MPSGraphDeviceDescriptor initWithMPSGraphDevice:` throws an uncaught

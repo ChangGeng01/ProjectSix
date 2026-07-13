@@ -46,12 +46,19 @@ final class ProbeFileLog: @unchecked Sendable {
         let stamp = f.string(from: Date())
         guard let docs = FileManager.default.urls(
             for: .documentDirectory, in: .userDomainMask).first else {
+            // deep-audit devicetestapp LOW-3: don't silently degrade — no Documents dir means no
+            // on-device probe log survives to `devicectl log collect`; surface it to the unified log.
+            logger.notice("ProbeFileLog[\(filePrefix, privacy: .public)]: no Documents dir — file logging disabled")
             handle = nil
             return
         }
         let url = docs.appendingPathComponent("\(filePrefix)-\(stamp).log")
         FileManager.default.createFile(atPath: url.path, contents: nil)
-        handle = try? FileHandle(forWritingTo: url)
+        let opened = try? FileHandle(forWritingTo: url)
+        if opened == nil {
+            logger.notice("ProbeFileLog[\(filePrefix, privacy: .public)]: FileHandle open failed at \(url.path, privacy: .public) — file logging disabled")
+        }
+        handle = opened
     }
 
     func emit(_ line: String) {
@@ -64,7 +71,10 @@ final class ProbeFileLog: @unchecked Sendable {
         guard let data = (line + "\n").data(using: .utf8) else { return }
         lock.lock()
         defer { lock.unlock() }
-        try? handle?.write(contentsOf: data)
+        // deep-audit devicetestapp LOW-3: log a dropped write (disk-full / handle death) instead of
+        // silently swallowing it — the os_log line above still lands, so diagnostics aren't lost.
+        do { try handle?.write(contentsOf: data) }
+        catch { logger.notice("ProbeFileLog: file write dropped — \(error.localizedDescription, privacy: .public)") }
     }
 
     func close() {
