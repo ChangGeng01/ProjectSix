@@ -292,8 +292,11 @@ let package = Package(
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate"),
                 // observe→DISPOSE: route the registered organ through the default-OFF factual-belief
-                // adjudicator wrap (BASLLMNeuralCoreService.adjudicating). BASHostKit @_exported-imports
-                // BASAppleAdapters, so this adds no new transitive surface for this target.
+                // adjudicator wrap (BASLLMNeuralCoreService.adjudicating). deep-audit P2-20
+                // (2026-07-14): comment corrected — BASHostKit does NOT link BASAppleAdapters
+                // (charter-T4 repointed it to BASAppleLifecycleKit). Adding BASHostKit still brings
+                // no NEW FoundationModels surface to THIS target, but only because
+                // QinaoAppleFoundation already depends on BASAppleAdapters directly (line above).
                 .product(name: "BASHostKit", package: "BehavioralAISubstrate")
             ]),
         // M222 — public factory wiring downloaded MLX Gemma weights
