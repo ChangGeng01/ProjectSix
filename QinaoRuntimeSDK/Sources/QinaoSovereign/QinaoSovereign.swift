@@ -423,12 +423,18 @@ public actor QinaoSovereignControlPlane {
             self.hostRemovalBypassed = hostRemovalBypassed
             self.unauthorizedSelfMutation = unauthorizedSelfMutation
             self.memoryOrHostWriteBypass = memoryOrHostWriteBypass
-            func clamp(_ v: Double) -> Double { min(max(v, 0), 1) }
-            self.irreversibilityScore = clamp(irreversibilityScore)
-            self.manipulationStrength = clamp(manipulationStrength)
-            self.uncertaintyScore = clamp(uncertaintyScore)
-            self.gsiScore = clamp(gsiScore)
-            self.hostGateValue = clamp(hostGateValue)
+            // deep-audit P0-5 (2026-07-13): NaN fails closed per field (see QinaoRisk). Risk
+            // scores (higher=more dangerous) → 1.0; hostGateValue (default 1 = authorized) →
+            // 0.0 so an unknown gate reads as NOT authorized.
+            func clamp(_ v: Double, nan: Double) -> Double {
+                guard !v.isNaN else { return nan }
+                return min(max(v, 0), 1)
+            }
+            self.irreversibilityScore = clamp(irreversibilityScore, nan: 1)
+            self.manipulationStrength = clamp(manipulationStrength, nan: 1)
+            self.uncertaintyScore = clamp(uncertaintyScore, nan: 1)
+            self.gsiScore = clamp(gsiScore, nan: 1)
+            self.hostGateValue = clamp(hostGateValue, nan: 0)
             self.quarantineCount = max(0, quarantineCount)
             self.mode = mode
             self.brake = brake

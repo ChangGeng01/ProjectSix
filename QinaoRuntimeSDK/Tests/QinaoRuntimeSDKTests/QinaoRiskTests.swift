@@ -70,6 +70,41 @@ final class QinaoRiskTests: XCTestCase {
         XCTAssertTrue(r.reasonCodes.contains("irreversibility-ceiling"))
     }
 
+    // deep-audit P0-5 (2026-07-13): a NaN in ANY risk signal must FAIL CLOSED, not fall
+    // through every `>= threshold` comparison (NaN >= x is false) into a baseline .allow.
+    // Each harm-direction field clamps NaN → 1.0 (max risk); pressureAuthenticity is
+    // inverse (`<= 0.3` blocks) so it clamps NaN → 0.0 (least authentic).
+    func testNaNHarmSeverityFailsClosed() {
+        let r = QinaoRiskGate.assess(
+            QinaoRiskGate.RiskSignals(harmSeverity: .nan))
+        XCTAssertEqual(r.mode, .block, "NaN harm must not silently allow")
+    }
+
+    func testNaNInEachGatingFieldNeverAllows() {
+        // Only the fields assess() actually gates on: a NaN here could otherwise skip its
+        // `>= threshold` (or `<= 0.3`) block-check and slip to .allow.
+        let mk: [(String, QinaoRiskGate.RiskSignals)] = [
+            ("harmSeverity", .init(harmSeverity: .nan)),
+            ("irreversibility", .init(irreversibility: .nan)),
+            ("uncertainty", .init(uncertainty: .nan)),
+            ("evidenceDebt", .init(evidenceDebt: .nan)),
+            ("manipulationIntensity", .init(manipulationIntensity: .nan)),
+            ("pressureAuthenticity", .init(pressureAuthenticity: .nan)),
+            ("gsiScore", .init(gsiScore: .nan)),
+        ]
+        for (name, sig) in mk {
+            let r = QinaoRiskGate.assess(sig)
+            XCTAssertNotEqual(r.mode, .allow,
+                "NaN \(name) must fail closed, not resolve to .allow")
+        }
+    }
+
+    /// harmScope is stored but not currently a gating field; the NaN clamp is still applied
+    /// (defense-in-depth) so it can never re-introduce fail-open if it later becomes one.
+    func testNaNNonGatingFieldStillClampsToFailClosedPole() {
+        XCTAssertEqual(QinaoRiskGate.RiskSignals(harmScope: .nan).harmScope, 1.0)
+    }
+
     func testAssessBlockBeatsReplaceAndDelay() {
         // All three stages cross thresholds simultaneously —
         // block (stage 1) must win.

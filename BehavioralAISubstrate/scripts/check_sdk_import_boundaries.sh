@@ -40,6 +40,7 @@ declare -a SDK_CONSUMERS=(
     "BASMPSGraphExecutableCacheCxx"
     "BASAdminUI"      # audit x-architecture LOW-7: SwiftUI host UI (M-o MED-2 split)
     "BASJournalCLI"   # audit x-architecture LOW-7: CLI host
+    "BASAppleEdgeWiring"  # deep-audit P2-21(b): T4 edge ring that wires adapters at the boundary
 )
 
 # Substrate core modules — these are checked for forbidden imports
@@ -59,6 +60,7 @@ declare -a SUBSTRATE_CORE=(
     "BASSQLSchemaGenTool"
     "BASRustCoreBridge"
     "BASAdmin"
+    "BASAppleLifecycleKit"  # deep-audit P2-21(b): T4 pure, model-free lifecycle kit BASHostKit rides
 )
 
 # audit x-architecture LOW-7 — completeness gate: every Sources/ module must be classified as either

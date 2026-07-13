@@ -85,6 +85,27 @@ final class BASSovereignLedgerHostSinkTests: XCTestCase {
             "each turn must derive a unique auditID (turn-unique, not session+verdict only)")
     }
 
+    /// deep-audit P2-17 (2026-07-13): auditID must carry a clock-independent uniqueness
+    /// component that distinguishes DISTINCT turns even under a frozen host clock — while
+    /// staying a PURE function of the turn (the replay-determinism harness requires the same
+    /// turn to re-derive the same entry, so the component is a deterministic content digest,
+    /// NOT a UUID). Pre-fix the ID ended in the verdict rawValue (no digest) — the distinct-
+    /// turn assertion below reds.
+    func testAuditIDCarriesDeterministicContentDigest() async throws {
+        let t1 = try await MainActor.run { try Self.drivenTurn(prompt: "One.") }
+        let t2 = try await MainActor.run { try Self.drivenTurn(prompt: "Two.") }
+        let id1 = try XCTUnwrap(t1.sovereignAuditEntry?.auditID)
+        let id2 = try XCTUnwrap(t2.sovereignAuditEntry?.auditID)
+        // Trailing component is a lowercase-hex digest (16 chars = 8 bytes), not a UUID.
+        let last1 = try XCTUnwrap(id1.split(separator: ".").last.map(String.init))
+        XCTAssertEqual(last1.count, 16, "auditID must end in a 16-hex-char content digest")
+        XCTAssertTrue(last1.allSatisfy { $0.isHexDigit && !$0.isUppercase },
+            "the digest must be lowercase hex, got '\(last1)'")
+        XCTAssertNotEqual(id1, id2, "distinct turns get distinct auditIDs")
+        XCTAssertNotEqual(id1.split(separator: ".").last, id2.split(separator: ".").last,
+            "the digest component must differ for distinct turns (clock-independent)")
+    }
+
     // MARK: - 1. Real turn → signed + chained
 
     func testRecordsSignedChainedEntryFromRealTurn() async throws {

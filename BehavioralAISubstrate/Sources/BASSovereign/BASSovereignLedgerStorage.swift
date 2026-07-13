@@ -389,9 +389,28 @@ public final class BASSovereignLedgerSQLiteStorage:
         entries: [BASSovereignAuditLedger.AppendedEntry],
         segments: [BASSovereignLedgerSegment]
     ) {
-        let entries = try loadEntries()
-        let segments = try loadSegments()
-        return (entries, segments)
+        // deep-audit P2-16 (2026-07-13): entries and segments must be read as ONE consistent
+        // snapshot. Read separately (no enclosing transaction), a concurrent writer in another
+        // process could land a new entry+segment BETWEEN the two queries, so rehydrate would see
+        // entries.count and segments that disagree and wrongly quarantine. WAL mode (set at open)
+        // makes a plain `BEGIN` a repeatable-read snapshot for the transaction's lifetime; wrap
+        // both reads in it. On any failure the read txn is ended before rethrowing.
+        guard let db else {
+            let entries = try loadEntries()
+            let segments = try loadSegments()
+            return (entries, segments)
+        }
+        try Self.runExec(db: db, sql: "BEGIN;")
+        do {
+            let entries = try loadEntries()
+            let segments = try loadSegments()
+            try Self.runExec(db: db, sql: "COMMIT;")
+            return (entries, segments)
+        } catch {
+            // End the read transaction; a failed ROLLBACK must not mask the original error.
+            try? Self.runExec(db: db, sql: "ROLLBACK;")
+            throw error
+        }
     }
 
     public func persistAppended(

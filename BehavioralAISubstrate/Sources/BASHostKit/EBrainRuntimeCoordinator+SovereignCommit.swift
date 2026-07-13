@@ -683,18 +683,31 @@ extension BASEBrainRuntimeCoordinator {
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
-        // deep-audit L-3 follow-on (2026-07-13): auditID must be TURN-UNIQUE. It was
-        // `audit.<sessionID>.<verdictLevel>` — so two turns of the same session+verdict
-        // collided on the same auditID, which the SQLite ledger's `audit_id PRIMARY KEY`
-        // rejects on the second append (the ledger-host-sink was broken on SQLite for
-        // multi-turn; only the uniqueness-free in-memory backend hid it). turnID already
-        // carries sessionID + a per-turn timestamp, so folding it in makes the auditID
-        // unique per turn while keeping sessionID grep-able as the prefix.
-        let auditID = "audit.\(turnID).\(sovereignVerdict.verdictLevel.rawValue)"
         let actionRefs =
             sovereignCommitTokens.map(\.tokenID)
             + sovereignWarrants.map(\.warrantID)
             + quarantineRecords.map(\.quarantineID)
+        // deep-audit L-3 follow-on + P2-17 (2026-07-13): auditID must be unique per DISTINCT
+        // turn — but it must ALSO be a pure function of the turn, because the replay-
+        // determinism harness (BASCoordinatorTurnDeterminismTests /
+        // BASEBrainTurnResultReplayHarnessTests) requires the same turn to re-derive a
+        // byte-identical entry. A UUID/nonce would satisfy uniqueness but BREAK determinism
+        // (it did — 173 replay tests reddened). So the uniqueness component is a DETERMINISTIC
+        // SHA256 over the turn's identifying fields: turnID (session + recordedAt), verdictID,
+        // level, the commit/warrant/quarantine action refs, and the snapshot ref. Distinct
+        // turns differ in at least one → distinct digest, even under a host-frozen clock where
+        // turnID alone collided; identical inputs mean the SAME turn, which correctly maps to
+        // the same auditID (idempotent). turnID stays the grep-able prefix.
+        let auditDiscriminator = [
+            turnID,
+            sovereignVerdict.verdictID,
+            sovereignVerdict.verdictLevel.rawValue,
+            snapshotRef,
+            actionRefs.joined(separator: ","),
+        ].joined(separator: "\u{1F}")
+        let auditDigest = SHA256.hash(data: Data(auditDiscriminator.utf8))
+            .prefix(8).map { String(format: "%02x", $0) }.joined()
+        let auditID = "audit.\(turnID).\(sovereignVerdict.verdictLevel.rawValue).\(auditDigest)"
         // M299 — derive frontier summary from the candidate
         // observation bundle. `summarize()` is a pure value-type
         // transform; emits at most three status codes per turn

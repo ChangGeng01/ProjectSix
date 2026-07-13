@@ -15,8 +15,20 @@ cd "$ROOT"
 # constrains the substrate's evolving import surface。
 TARGETS=(
   "SampleHost"
-  "SampleHostTests"
 )
+
+# deep-audit P2-21(a) (2026-07-13): "SampleHostTests" was relocated to
+# SampleHost/Tests/SampleHostTests on 2026-05-21 and no longer exists at root — the
+# recursive "SampleHost" entry already covers it. Left in TARGETS, the missing dir made
+# `rg` exit 2 (error), which the `if searcher …; then` truthiness read as "no violations",
+# so a REAL forbidden import in SampleHost would still pass. Pre-flight every target dir so
+# a vanished path fails loudly instead of silently greening the gate.
+for _t in "${TARGETS[@]}"; do
+  if [[ ! -d "$_t" ]]; then
+    echo "check_sdk_import_boundaries: target dir '$_t' missing — cannot verify gate." >&2
+    exit 2
+  fi
+done
 
 FORBIDDEN_REGEX='^import BAS(RuntimeCore|Memory|Policy|Orchestration|Observability|Evaluation|AppleAdapters)$'
 ADMIN_REGEX='^import BASAdmin$'
@@ -47,13 +59,27 @@ else
   exit 2
 fi
 
-if searcher "$FORBIDDEN_REGEX" "${TARGETS[@]}" /tmp/bas_host_import_violations.txt; then
+# deep-audit P2-21(a): discriminate searcher exit codes — 0 = match (violation), 1 = clean
+# (pass), ≥2 = searcher ERROR (must fail, never be read as "clean"). The old
+# `if searcher …; then` collapsed 1 and ≥2 into the same "no violations" branch.
+_rc=0
+searcher "$FORBIDDEN_REGEX" "${TARGETS[@]}" /tmp/bas_host_import_violations.txt || _rc=$?
+if [[ $_rc -eq 0 ]]; then
   echo "Direct low-level BAS imports are forbidden in host sources. Use BASHostKit instead." >&2
   cat /tmp/bas_host_import_violations.txt >&2
   exit 1
+elif [[ $_rc -ge 2 ]]; then
+  echo "check_sdk_import_boundaries: searcher errored (rc=$_rc) scanning FORBIDDEN imports." >&2
+  exit 2
 fi
 
-if searcher "$ADMIN_REGEX" "${TARGETS[@]}" /tmp/bas_admin_imports.txt; then
+_rc=0
+searcher "$ADMIN_REGEX" "${TARGETS[@]}" /tmp/bas_admin_imports.txt || _rc=$?
+if [[ $_rc -ge 2 ]]; then
+  echo "check_sdk_import_boundaries: searcher errored (rc=$_rc) scanning ADMIN imports." >&2
+  exit 2
+fi
+if [[ $_rc -eq 0 ]]; then
   grep -Ev "$ADMIN_ALLOWED_PATH_REGEX" /tmp/bas_admin_imports.txt >/tmp/bas_admin_import_violations.txt || true
   if [[ -s /tmp/bas_admin_import_violations.txt ]]; then
     echo "Direct BASAdmin imports are only allowed in debug or inspection surfaces. Use BASHostKit elsewhere." >&2

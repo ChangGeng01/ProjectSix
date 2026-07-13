@@ -7,7 +7,9 @@ name: Test + boundary checks
 
 on:
   push:
-    branches: [ main, "m605-chapter-*" ]
+    # deep-audit P2-23 (2026-07-13): the active dev branch (decode-planner) was NOT covered,
+    # so every push to it silently skipped CI. `decode-*` covers it + future decode branches.
+    branches: [ main, "m605-chapter-*", "decode-*" ]
   pull_request:
     branches: [ main ]
 

@@ -44,14 +44,41 @@ final class QinaoBoundaryPinTests: XCTestCase {
             let context = manifest[contextStart..<nameRange.lowerBound]
             if context.contains(".target(") || context.contains(".executableTarget(") {
                 let tail = manifest[nameRange.upperBound...]
-                guard let end = tail.range(of: "]),") ?? tail.range(of: "])") else {
-                    return String(tail.prefix(2_000))
+                // deep-audit P2-21(d) (2026-07-13): the old `tail.range(of: "]),") ?? "])"`
+                // cut at the FIRST bracket-close, which for a target whose dependencies
+                // contain a nested array (e.g. `.product(... , condition: .when(platforms: [.iOS]))`
+                // or a trailing `swiftSettings: [...]`) closes the WRONG bracket and silently
+                // truncates the scanned block — the same green-by-luck defect fixed in
+                // BASModelBoundaryPinTests. Anchor on `dependencies: [` and balance-match.
+                guard let depsOpen = tail.range(of: "dependencies: [") else {
+                    searchStart = nameRange.upperBound
+                    continue
                 }
-                return String(tail[..<end.lowerBound])
+                var depth = 1
+                var i = depsOpen.upperBound
+                let bodyStart = i
+                while i < tail.endIndex {
+                    let c = tail[i]
+                    if c == "[" { depth += 1 }
+                    else if c == "]" {
+                        depth -= 1
+                        if depth == 0 { return String(tail[bodyStart..<i]) }
+                    }
+                    i = tail.index(after: i)
+                }
+                return String(tail[bodyStart...])
             }
             searchStart = nameRange.upperBound
         }
-        throw XCTSkip("target \(target) not found in Package.swift")
+        // deep-audit P2-21(c): a required target the manifest no longer matches must FAIL,
+        // not XCTSkip into a false green.
+        struct RequiredTargetNotFound: Error, CustomStringConvertible {
+            let target: String
+            var description: String {
+                "boundary-pin target '\(target)' not found in Package.swift — manifest drift"
+            }
+        }
+        throw RequiredTargetNotFound(target: target)
     }
 
     func testInBoundaryTargetsNeverDependOnLLMModules() throws {

@@ -220,8 +220,10 @@ extension QinaoRuntime {
                 = .pureInference,
             evidenceSufficient: Bool = true
         ) {
-            func clamp(_ v: Double) -> Double {
-                Swift.min(Swift.max(v, 0), 1)
+            // deep-audit P0-5 (2026-07-13): NaN fails closed per field (see QinaoRisk).
+            func clamp(_ v: Double, nan: Double) -> Double {
+                guard !v.isNaN else { return nan }
+                return Swift.min(Swift.max(v, 0), 1)
             }
             self.sessionID = sessionID
             self.turnID = turnID
@@ -236,11 +238,11 @@ extension QinaoRuntime {
             self.hostRemovalBypassed = hostRemovalBypassed
             self.unauthorizedSelfMutation = unauthorizedSelfMutation
             self.memoryOrHostWriteBypass = memoryOrHostWriteBypass
-            self.irreversibilityScore = clamp(irreversibilityScore)
-            self.manipulationStrength = clamp(manipulationStrength)
-            self.uncertaintyScore = clamp(uncertaintyScore)
-            self.gsiScore = clamp(gsiScore)
-            self.hostGateValue = clamp(hostGateValue)
+            self.irreversibilityScore = clamp(irreversibilityScore, nan: 1)
+            self.manipulationStrength = clamp(manipulationStrength, nan: 1)
+            self.uncertaintyScore = clamp(uncertaintyScore, nan: 1)
+            self.gsiScore = clamp(gsiScore, nan: 1)
+            self.hostGateValue = clamp(hostGateValue, nan: 0)
             self.quarantineCount = Swift.max(0, quarantineCount)
             self.mode = mode
             self.brake = brake

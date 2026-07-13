@@ -102,15 +102,23 @@ public actor QinaoRiskGate {
             pressureAuthenticity: Double = 1,
             gsiScore: Double = 0
         ) {
-            func clamp(_ v: Double) -> Double { min(max(v, 0), 1) }
-            self.harmSeverity = clamp(harmSeverity)
-            self.harmScope = clamp(harmScope)
-            self.irreversibility = clamp(irreversibility)
-            self.uncertainty = clamp(uncertainty)
-            self.evidenceDebt = clamp(evidenceDebt)
-            self.manipulationIntensity = clamp(manipulationIntensity)
-            self.pressureAuthenticity = clamp(pressureAuthenticity)
-            self.gsiScore = clamp(gsiScore)
+            // deep-audit P0-5 (2026-07-13): NaN must FAIL CLOSED per field, not pass through
+            // `min(max(NaN,0),1)=NaN` and then slip every `>= threshold` block-check
+            // (NaN >= x is false) into a baseline .allow. `nan` is the field's fail-closed pole:
+            // harm-direction fields (blocked on HIGH) → 1.0; pressureAuthenticity is inverse
+            // (blocked on `<= 0.3`) → 0.0 so a NaN still trips its block.
+            func clamp(_ v: Double, nan: Double) -> Double {
+                guard !v.isNaN else { return nan }
+                return min(max(v, 0), 1)
+            }
+            self.harmSeverity = clamp(harmSeverity, nan: 1)
+            self.harmScope = clamp(harmScope, nan: 1)
+            self.irreversibility = clamp(irreversibility, nan: 1)
+            self.uncertainty = clamp(uncertainty, nan: 1)
+            self.evidenceDebt = clamp(evidenceDebt, nan: 1)
+            self.manipulationIntensity = clamp(manipulationIntensity, nan: 1)
+            self.pressureAuthenticity = clamp(pressureAuthenticity, nan: 0)
+            self.gsiScore = clamp(gsiScore, nan: 1)
         }
 
         /// Default "no risk raised" signals — used when the caller

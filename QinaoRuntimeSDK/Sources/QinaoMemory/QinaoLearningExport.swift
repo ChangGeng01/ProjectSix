@@ -113,7 +113,9 @@ extension QinaoMemory {
             self.sourceMemoryID = sourceMemoryID
             self.generalizedSkeleton = generalizedSkeleton
             self.domain = domain
-            self.confidence = min(max(confidence, 0), 1)
+            // deep-audit P0-5 (2026-07-13): a NaN confidence must fail closed to 0.0 (least
+            // trusted) rather than pass through as NaN and defeat every downstream floor check.
+            self.confidence = confidence.isNaN ? 0 : min(max(confidence, 0), 1)
             self.sensitivity = sensitivity
         }
     }

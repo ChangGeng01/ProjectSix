@@ -70,7 +70,17 @@ final class BASModelBoundaryPinTests: XCTestCase {
             }
             searchStart = nameRange.upperBound
         }
-        throw XCTSkip("target \(target) not found")
+        // deep-audit P2-21(c) (2026-07-13): a required target that the manifest anchor no
+        // longer matches (rename / `.target(` spelling drift) must FAIL the boundary pin,
+        // not XCTSkip it into a false green — every caller passes a target that MUST exist.
+        struct RequiredTargetNotFound: Error, CustomStringConvertible {
+            let target: String
+            var description: String {
+                "boundary-pin target '\(target)' not found in Package.swift — "
+                + "manifest drift disables the check; fix the manifest or the anchor"
+            }
+        }
+        throw RequiredTargetNotFound(target: target)
     }
 
     func testHostKitManifestExcludesModelAdapterModules() throws {
