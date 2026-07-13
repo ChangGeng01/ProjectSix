@@ -1,0 +1,16 @@
+QINAO substrate-gate suite re-verification — 2026-07-13 (deep-audit incomplete-work sweep, item #8)
+
+Context: the "98/0 green" QINAO gate claim was a weeks-old push-time verdict; ~333 Sources
+files churned since. This run re-confirms it at HEAD (branch decode-planner) after the
+2026-07-13 external-audit remediation (P0/P1/P2, 19 tranches) + the incomplete-work sweep.
+
+Command: swift test --skip-build --filter QINAO   (from BehavioralAISubstrate/)
+
+Result: Executed 99 tests, with 0 failures (0 unexpected).
+
+Named drift-risk gate (the one flagged as static-refuted-but-unrun):
+  QINAOSchemaGovernanceParityGateTests.test_qinao_schema_governance_parity — PASS
+  "276 governed schemas, registry↔conformer parity exact (tolerance 0), unique keys, full
+   metadata, per-entry concrete-type version parity verified, mutation-immutability held."
+
+Verdict: QINAO substrate gates GREEN at HEAD. No positive regression signal; hygiene only.
