@@ -125,7 +125,10 @@ for t in "${TARGETS[@]}"; do
   echo "==> cargo build --release --target ${t}"
   (
     cd "${CARGO_ROOT}"
+    # deep-audit P2-23 (2026-07-13): --locked pins to the committed Cargo.lock so the reproducible
+    # XCFramework build never silently resolves a newer dependency (byte-reproducibility invariant).
     cargo build \
+      --locked \
       --release \
       --target "${t}" \
       --manifest-path bas-memory-usage-tracker/Cargo.toml

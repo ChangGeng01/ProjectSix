@@ -98,3 +98,19 @@ jobs:
         run: |
           pip install pytest
           python3 -m pytest scripts/test_chenglu_feature_schema.py -v
+
+  # deep-audit P2-23 (2026-07-13): the 26 Rust crates had ZERO CI coverage, so a broken /
+  # non-reproducible Rust change (the source of the shipped XCFramework) could land unnoticed.
+  # This builds + tests the workspace --locked against the pinned toolchain (rust-toolchain.toml
+  # → 1.96.0), enforcing the same Cargo.lock the reproducible XCFramework build uses.
+  rust-tests:
+    name: Rust cargo build + test (--locked)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: cargo build + test (locked, pinned toolchain)
+        working-directory: BehavioralAISubstrate/Cargo
+        run: |
+          cargo build --locked --release
+          cargo test --locked
