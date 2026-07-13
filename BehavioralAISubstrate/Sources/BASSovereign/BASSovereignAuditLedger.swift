@@ -158,7 +158,12 @@ public actor BASSovereignAuditLedger {
     /// the only backstop and surfaced as an untyped append failure).
     public func hasEntry(auditID: String) -> Bool {
         ensureReloadVerified()
-        return entries.contains { $0.entry.auditID == auditID }
+        // deep-audit P2-14(a) (2026-07-13): O(1) via the existing auditRefIndex instead of an
+        // O(N) linear scan (an ingest gate calls this per envelope → O(N^2) over a growing
+        // chain). Semantics-identical: the index is keyed by auditID and rebuilt in full from
+        // `entries` on load (see the reload path) and kept in sync on every append, so
+        // presence-in-index ⇔ presence-in-entries.
+        return auditRefIndex[auditID] != nil
     }
 
     /// Index for O(1) `query(byAuditRef:)`. Kept in sync with `entries`.

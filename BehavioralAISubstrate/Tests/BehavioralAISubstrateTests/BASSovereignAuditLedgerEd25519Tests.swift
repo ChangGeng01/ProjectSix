@@ -324,4 +324,45 @@ final class BASSovereignAuditLedgerEd25519Tests: XCTestCase {
                 "entry \(idx) (audit \(appended.entry.auditID)) should verify")
         }
     }
+
+    // MARK: - deep-audit P2-14(a) (2026-07-13): hasEntry is index-backed (O(1)) and reload-safe.
+
+    /// `hasEntry` now consults `auditRefIndex` instead of an O(N) linear scan. The one place
+    /// index-based existence could DIVERGE from the scan is a cold reopen: if the index weren't
+    /// rebuilt from persisted entries on load, the reopened ledger would report a persisted
+    /// auditID as absent. This pins that it is rebuilt — so index-backed hasEntry stays
+    /// semantics-identical to the scan, in-process AND after cold reopen.
+    func testHasEntryIsIndexBackedAndSurvivesColdReopen() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bas-hasentry-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let path = dir.appendingPathComponent("ledger.sqlite").path
+        let secret = SymmetricKey(data: Data("hasentry-secret".utf8))
+
+        let ledger = BASSovereignAuditLedger(
+            signingSecret: secret,
+            storage: try BASSovereignLedgerSQLiteStorage(path: path))
+        _ = try await ledger.append(makeEntry(auditID: "he-1"))
+        _ = try await ledger.append(makeEntry(auditID: "he-2", turn: "turn-2"))
+
+        // In-process: present auditIDs found, an unknown one absent.
+        let has1 = await ledger.hasEntry(auditID: "he-1")
+        let has2 = await ledger.hasEntry(auditID: "he-2")
+        let hasGhost = await ledger.hasEntry(auditID: "ghost")
+        XCTAssertTrue(has1); XCTAssertTrue(has2)
+        XCTAssertFalse(hasGhost, "an auditID never appended must be absent")
+
+        // Cold reopen over the same SQLite file: the index is rebuilt from persisted entries,
+        // so index-backed hasEntry still finds them (this is what keeps it scan-equivalent).
+        let reopened = BASSovereignAuditLedger(
+            signingSecret: secret,
+            storage: try BASSovereignLedgerSQLiteStorage(path: path))
+        let reHas1 = await reopened.hasEntry(auditID: "he-1")
+        let reHas2 = await reopened.hasEntry(auditID: "he-2")
+        let reGhost = await reopened.hasEntry(auditID: "ghost")
+        XCTAssertTrue(reHas1, "index-backed hasEntry must find persisted 'he-1' after cold reopen")
+        XCTAssertTrue(reHas2, "index-backed hasEntry must find persisted 'he-2' after cold reopen")
+        XCTAssertFalse(reGhost)
+    }
 }
