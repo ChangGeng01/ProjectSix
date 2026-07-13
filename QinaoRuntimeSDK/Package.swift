@@ -328,11 +328,14 @@ let package = Package(
                 // so the redaction seam (check_mlx_redaction.sh) stays clean — the wrap is body-only, the
                 // public factory signature is unchanged (still `async throws -> any QinaoOrganEndpoint`).
                 // TRADE-OFF (audit INFO): BASHostKit widens this target's transitive link closure by the
-                // host-kit modules NOT already pulled via QinaoLoop→BASOrchestration→BASMemory — notably
-                // BASAppleAdapters (→ FoundationModels), BASMetalSubstrate, BASEvaluation, BASAdmin. Accepted
-                // because every standalone QinaoMLX consumer (QinaoSample / QinaoSampleHost) already links
-                // QinaoAppleFoundation → BASAppleAdapters → FoundationModels, so NO module newly gains it; the
-                // alternative (relocating `adjudicating` out of BASHostKit) is net-new code for no real win.
+                // host-kit modules NOT already pulled via QinaoLoop→BASOrchestration→BASMemory —
+                // BASMetalSubstrate, BASEvaluation, BASAdmin.
+                //   deep-audit P2-20 (2026-07-14) — comment corrected: BASHostKit does NOT pull
+                //   BASAppleAdapters/FoundationModels. charter-T4 cut that edge (BASHostKit now links
+                //   BASAppleLifecycleKit, which is pinned to zero model-runtime imports — verified in
+                //   BASModelBoundaryPinTests). So the ONLY FoundationModels path into QinaoMLX is the
+                //   DIRECT `.product(name: "BASAppleAdapters")` dependency above (line ~325) — the single
+                //   edge the named-deferral extraction (BASEmbeddingKit) would remove.
                 .product(name: "BASHostKit", package: "BehavioralAISubstrate")
             ]),
         // M228 — testable SwiftUI library backing QinaoSampleApp.
