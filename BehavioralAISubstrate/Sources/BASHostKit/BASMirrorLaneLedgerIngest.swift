@@ -34,6 +34,9 @@ public enum BASMirrorLaneIngestGate {
         case replayed = "replayed"
         /// ruling ③ hardening: evidence IDs/digests unpaired at the gate.
         case evidenceDigestMismatch = "evidence-digest-mismatch"
+        /// deep-audit P1-11 (2026-07-13): provenance is a signed-as-claimed field; the gate
+        /// enforces at least its PRESENCE so no unattributed envelope reaches the ledger.
+        case emptyProvenance = "empty-provenance"
         case appendFailed = "append-failed"
     }
 
@@ -82,6 +85,12 @@ public enum BASMirrorLaneIngestGate {
         }
         guard !envelope.policyHash.isEmpty else {
             return IngestOutcome(appended: false, auditID: nil, reason: .emptyPolicyHash)
+        }
+        // deep-audit P1-11 (2026-07-13): provenance must be PRESENT at the gate too — an
+        // unattributed (empty-provenance) envelope must never reach the ledger, mirroring the
+        // disposer's own presence check.
+        guard !envelope.provenance.isEmpty else {
+            return IngestOutcome(appended: false, auditID: nil, reason: .emptyProvenance)
         }
         guard envelope.evidenceIDs.count == envelope.evidenceDigests.count else {
             return IngestOutcome(

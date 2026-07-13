@@ -177,6 +177,34 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
             "the mirror draft must use the hardened injective form, got \(String(describing: outcome.reason))")
     }
 
+    /// deep-audit P1-11 (2026-07-13): the ingest gate is defense-in-depth for provenance,
+    /// INDEPENDENT of the disposer. A validly-SIGNED envelope with empty provenance (built
+    /// directly, bypassing the disposer) must still be refused at the gate with ZERO writes.
+    /// Reversal: removing the gate's provenance check appends this unattributed envelope.
+    func testEmptyProvenanceEnvelopeIsRejectedAtIngestGate() async throws {
+        let ledger = BASSovereignAuditLedger(signingSecret: SymmetricKey(size: .bits256))
+        let content = "observation"
+        let env = BASConvergedProposalEnvelope(
+            envelopeID: "mirror-noprov", kind: .annotation, content: content,
+            contentDigest: BASConvergedProposalEnvelope.sha256Hex(content),
+            evidenceIDs: [], evidenceDigests: [],
+            modelID: "m1", promptDigest: "p1", policyHash: "policy.trusted.v1",
+            reducerVersion: BASMirrorLaneDisposer.reducerVersion,
+            producedAtMs: 1_700_000_000_000, provenance: "",
+            signerKeyID: BASConvergedProposalEnvelope.keyID(of: key), signature: "")
+            .signed(with: key)
+        // The reject must be the provenance check, NOT a signature failure.
+        XCTAssertTrue(env.verifySignature(with: key), "the empty-provenance envelope IS validly signed")
+
+        let outcome = await BASMirrorLaneIngestGate.ingest(
+            env, key: key, ledger: ledger,
+            sessionID: "sess.mirror", turnID: "turn.1", now: frozen)
+        XCTAssertFalse(outcome.appended)
+        XCTAssertEqual(outcome.reason, .emptyProvenance)
+        let count = await ledger.count()
+        XCTAssertEqual(count, 0, "an unattributed envelope must leave ZERO writes")
+    }
+
     func testTamperedEnvelopeRejectedWithZeroWrites() async throws {
         let ledger = BASSovereignAuditLedger(
             signingSecret: SymmetricKey(size: .bits256))
@@ -338,6 +366,22 @@ final class BASMirrorLaneEnvelopeV2Tests: XCTestCase {
             "decode must not have run the custom init's normalization")
         guard case .rejected(.evidenceEntryEmpty) = dispose(decoded) else {
             return XCTFail("the disposer must reject a decoded candidate's blank evidence entry")
+        }
+    }
+
+    // MARK: - deep-audit P1-11 (2026-07-13): provenance must at least be PRESENT.
+
+    /// provenance is signed as-CLAIMED (never recomputed). The disposer must at minimum enforce
+    /// its presence — an envelope that attributes itself to nothing is unattributable. Reversal:
+    /// dropping the disposer's presence check signs an empty-provenance envelope.
+    func testEmptyProvenanceIsRejectedAtDisposer() {
+        let c = BASMirrorLaneCandidate(
+            claimedKind: .proposal, content: "observation",
+            evidenceIDs: ["atom:1"], evidenceDigests: ["d1"],
+            modelID: "m1", promptDigest: "p1",
+            claimedPolicyHash: "policy.trusted.v1", provenance: "")
+        guard case .rejected(.missingProvenance) = dispose(c) else {
+            return XCTFail("an unattributed candidate must be rejected at mint")
         }
     }
 

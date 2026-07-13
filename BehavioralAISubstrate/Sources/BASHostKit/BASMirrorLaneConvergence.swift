@@ -10,10 +10,32 @@
 //
 // Untrusted-ness is STRUCTURAL, not a Bool flag (house pattern — 红线 7 hint-only):
 // `BASMirrorLaneCandidate` is a value type with zero authority. Only the disposer can
-// turn one into a `BASConvergedProposalEnvelope`, and only by stamping TRUSTED values
-// (policy hash from the gate's policy, timestamp from the gate's clock) — claimed
-// values are checked, never copied through on trust (mirrors BASSovereignGatedTurn's
-// recompute-don't-trust posture).
+// turn one into a `BASConvergedProposalEnvelope`.
+//
+// deep-audit P1-11 (2026-07-13) — doc honesty. The prior header claimed "claimed values
+// are checked, never copied through on trust". That overstated: the disposer treats the
+// envelope's fields in TWO distinct ways, and most producer-supplied fields are bound
+// AS CLAIMED (signed as-is), not recomputed:
+//
+//   STAMPED / recomputed (gate-authoritative, the producer cannot influence):
+//     • policyHash     — recompute-checked: MUST equal the gate's trustedPolicyHash, then
+//                        the TRUSTED hash is stamped (the claim is never copied through)
+//     • producedAtMs   — from the gate's injected clock
+//     • contentDigest  — recomputed here over the trimmed content
+//     • kind           — the EFFECTIVE (post-demotion) kind, re-checked against policy
+//     • reducerVersion, signerKeyID — stamped by the gate
+//
+//   BOUND AS CLAIMED (producer-supplied, signed as-is; only PRESENCE / PAIRING checked,
+//   NOT validated against a source of truth):
+//     • modelID, promptDigest — non-empty checked
+//     • provenance            — non-empty checked (P1-11); still producer-attributed
+//     • evidenceIDs / evidenceDigests — pairing + non-blank checked (P1-10); the referenced
+//                        content is NOT re-hashed against a store at the dispose site
+//
+// This is safe at HEAD because the only untrusted producer (the LLM) controls just the
+// `content` field (digest-bound at dispose AND ingest); the claimed-metadata fields come
+// from trusted HostKit producer code. Hardening those to store-verified values is deferred
+// to the future M4 / IPC seam (see P1-11), when an untrusted party could mint candidates.
 //
 // Signing (ruling ③): AFTER canonicalization, BEFORE ledger ingest. Canonical bytes
 // via BASSovereignCanonicalBytes (injective netstrings + arity marker — never
@@ -253,6 +275,10 @@ public enum BASMirrorLaneDisposer {
         /// A blank ID or digest makes the index-pairing ambiguous — fail closed rather than
         /// drop-and-shift (which silently re-pairs surviving entries across the gap).
         case evidenceEntryEmpty = "evidence-entry-empty"
+        /// deep-audit P1-11 (2026-07-13): provenance is a producer-CLAIMED field bound (signed)
+        /// as-is — it is not recomputed against any source of truth. At minimum it must be
+        /// PRESENT: an envelope that attributes itself to nothing is unattributable. Fail closed.
+        case missingProvenance = "missing-provenance"
     }
 
     public enum Disposition: Sendable, Equatable {
@@ -284,6 +310,11 @@ public enum BASMirrorLaneDisposer {
         guard !candidate.modelID.isEmpty else { return .rejected(.missingModelID) }
         guard !candidate.promptDigest.isEmpty else {
             return .rejected(.missingPromptDigest)
+        }
+        // deep-audit P1-11 (2026-07-13): provenance is signed as-CLAIMED (never recomputed) —
+        // enforce at least its PRESENCE so no signed envelope attributes itself to nothing.
+        guard !candidate.provenance.isEmpty else {
+            return .rejected(.missingProvenance)
         }
         // Recompute-don't-trust: the claim must MATCH the trusted hash; empty or
         // divergent claims fail closed. The envelope carries the TRUSTED hash.
