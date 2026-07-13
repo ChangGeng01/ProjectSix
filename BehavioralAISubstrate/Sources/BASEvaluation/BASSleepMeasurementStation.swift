@@ -188,6 +188,10 @@ public enum BASSleepMeasurementStation {
         let ownPgid = getpgrp()   // audit H20: the station's own process group — never SIGKILL it
         for (suiteIndex, filter) in manifest.suiteFilters.enumerated() {
             let t0 = Date()
+            // deep-audit organ-eval LOW-3 (2026-07-13): stamp each record with THIS suite's start,
+            // not the single entry-time `nowMs` — sequentially-run suites are minutes apart, so a
+            // shared timestamp distorts ledger sort/staleness across the run.
+            let t0Ms = Int64(t0.timeIntervalSince1970 * 1000)
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
             proc.arguments = ["test", "--filter", filter]
@@ -199,7 +203,7 @@ public enum BASSleepMeasurementStation {
                 try proc.run()
             } catch {
                 records.append(BASStationRunRecord(
-                    startedAtMs: nowMs, suiteFilter: filter, exitCode: -1,
+                    startedAtMs: t0Ms, suiteFilter: filter, exitCode: -1,
                     executedTests: 0, failures: 0, durationS: 0,
                     verdictCandidate: "LAUNCH-FAIL: \(error)"))
                 continue
@@ -269,7 +273,7 @@ public enum BASSleepMeasurementStation {
                 verdict = "NO-AGGREGATE — inspect raw log (never trust exit code alone)"
             }
             records.append(BASStationRunRecord(
-                startedAtMs: nowMs, suiteFilter: filter, exitCode: proc.terminationStatus,
+                startedAtMs: t0Ms, suiteFilter: filter, exitCode: proc.terminationStatus,
                 executedTests: agg?.tests ?? 0, failures: agg?.failures ?? 0,
                 durationS: dt, verdictCandidate: verdict))
             BASDiagnosticLog.emit("📊 station suite=\(filter) \(verdict) t=\(String(format: "%.1f", dt))s")
@@ -281,7 +285,7 @@ public enum BASSleepMeasurementStation {
                 for skipped in Self.suitesToSkipAfterHalt(
                     all: manifest.suiteFilters, haltedIndex: suiteIndex) {
                     records.append(BASStationRunRecord(
-                        startedAtMs: nowMs, suiteFilter: skipped, exitCode: -1,
+                        startedAtMs: t0Ms, suiteFilter: skipped, exitCode: -1,
                         executedTests: 0, failures: 0, durationS: 0,
                         verdictCandidate:
                             "SKIPPED — station halted after prior timeout (one-heavy-task invariant)"))
