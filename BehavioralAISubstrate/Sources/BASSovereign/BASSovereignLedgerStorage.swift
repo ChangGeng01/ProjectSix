@@ -95,25 +95,19 @@ public protocol BASSovereignLedgerStorage {
     /// transient failure on the segment write after the entry committed left a DURABLE orphan
     /// entry whose segment count is under-recorded, and the next cold-start
     /// `segmentTotal != entries.count` cross-check permanently quarantines the whole ledger.
-    /// The default is the legacy two-call sequence (byte-equal for null/segment-less
-    /// storages); the SQLite storage overrides it with a real transaction.
+    ///
+    /// deep-audit P2-15 (2026-07-13): this is a REQUIRED method with NO protocol-extension
+    /// default — atomicity is a forcing function, not an opt-in. Previously a default provided
+    /// the legacy non-atomic two-write sequence, so a host storage that simply forgot to
+    /// override it silently inherited the orphan-quarantine hazard the F3 method exists to
+    /// close. Every conformer must now CONSCIOUSLY decide: a store with real durability MUST
+    /// wrap both writes in one transaction (see `BASSovereignLedgerSQLiteStorage`); a store
+    /// that persists nothing (null) implements a no-op; a store that legitimately keeps the
+    /// two-write sequence must write it out explicitly, acknowledging the non-atomicity.
     func persistAppendedEntryAndSegment(
         _ appended: BASSovereignAuditLedger.AppendedEntry,
         _ segment: BASSovereignLedgerSegment
     ) throws
-}
-
-public extension BASSovereignLedgerStorage {
-    /// Default: preserve the historical two-write sequence (no atomicity guarantee) for
-    /// storages that don't override — the null storage and any host storage that keeps its
-    /// own transaction discipline stay byte-equal.
-    func persistAppendedEntryAndSegment(
-        _ appended: BASSovereignAuditLedger.AppendedEntry,
-        _ segment: BASSovereignLedgerSegment
-    ) throws {
-        try persistAppended(appended)
-        try persistSegment(segment)
-    }
 }
 
 // MARK: - Default null storage (pre-M91 in-memory-only behaviour)
@@ -137,6 +131,14 @@ public struct BASSovereignLedgerNullStorage: BASSovereignLedgerStorage {
     ) throws {}
 
     public func persistSegment(
+        _ segment: BASSovereignLedgerSegment
+    ) throws {}
+
+    /// deep-audit P2-15 (2026-07-13): null storage persists nothing, so the F3 atomic
+    /// entry+segment write is trivially satisfied by a no-op — there is no disk state that
+    /// could be left half-written. Written out explicitly now that there is no protocol default.
+    public func persistAppendedEntryAndSegment(
+        _ appended: BASSovereignAuditLedger.AppendedEntry,
         _ segment: BASSovereignLedgerSegment
     ) throws {}
 }

@@ -90,6 +90,15 @@ private final class FlakyOnceStorage: BASSovereignLedgerStorage, @unchecked Send
     func persistSegment(_ segment: BASSovereignLedgerSegment) throws {
         try inner.persistSegment(segment)
     }
+    // deep-audit P2-15: no protocol default anymore. Keep the legacy two-write sequence THROUGH
+    // this stub's OWN persistAppended so the once-failing injection still fires (the whole point
+    // of this fixture: the entry write fails, the ledger must roll back and re-chain cleanly).
+    func persistAppendedEntryAndSegment(
+        _ appended: BASSovereignAuditLedger.AppendedEntry,
+        _ segment: BASSovereignLedgerSegment) throws {
+        try persistAppended(appended)
+        try persistSegment(segment)
+    }
 }
 
 /// H14:loadState 返回被截尾的 entries 但 segments entryCount 保持满 → reload 必 quarantine。
@@ -107,6 +116,13 @@ private struct TailTruncatingStorage: BASSovereignLedgerStorage {
     }
     func persistSegment(_ segment: BASSovereignLedgerSegment) throws {
         try inner.persistSegment(segment)
+    }
+    // deep-audit P2-15: forward to the inner SQLite storage's ATOMIC impl (this fixture only
+    // exercises loadState truncation, not append atomicity).
+    func persistAppendedEntryAndSegment(
+        _ appended: BASSovereignAuditLedger.AppendedEntry,
+        _ segment: BASSovereignLedgerSegment) throws {
+        try inner.persistAppendedEntryAndSegment(appended, segment)
     }
 }
 

@@ -121,5 +121,9 @@ final class BASSovereignLedgerAtomicityTests: XCTestCase {
                 segments: [BASSovereignLedgerSegment]) { (entries, segments) }
         func persistAppended(_ entry: BASSovereignAuditLedger.AppendedEntry) throws {}
         func persistSegment(_ segment: BASSovereignLedgerSegment) throws {}
+        // deep-audit P2-15: no protocol default anymore — a persist-nothing stub is a no-op.
+        func persistAppendedEntryAndSegment(
+            _ appended: BASSovereignAuditLedger.AppendedEntry,
+            _ segment: BASSovereignLedgerSegment) throws {}
     }
 }
