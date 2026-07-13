@@ -305,6 +305,19 @@ let package = Package(
                 // charter audit 2026-07-12 T4: BASMiniLMEmbeddingProvider is edge-injected
                 // by this LLM-side factory (BASHostKit no longer links the adapter module);
                 // explicit dep so the import is manifest-honest, not transitively lucky.
+                //
+                // deep-audit P2-20 (2026-07-13) — NAMED DEFERRAL, not an oversight. This pulls
+                // BASAppleAdapters → FoundationModels into QinaoMLX, so an "open-weights only"
+                // host still transitively links Apple's FoundationModels. Benign today: every
+                // in-repo QinaoMLX consumer (QinaoSample / QinaoSampleHost) already links
+                // QinaoAppleFoundation → BASAppleAdapters → FoundationModels, so no module newly
+                // gains it, and nothing is shipped as an FM-free binary.
+                //   TRIGGER to decouple: the first external / binary distribution that must host
+                //   open weights WITHOUT linking FoundationModels. FIX at that point: extract
+                //   BASMiniLMEmbeddingProvider + its MiniLM.mlmodelc / vocab.txt resources out of
+                //   BASAppleAdapters into a CoreML-only module (natural home: a small
+                //   BASEmbeddingKit beside BASAppleLifecycleKit, which is pinned to zero
+                //   model-runtime imports), and depend on THAT here instead of BASAppleAdapters.
                 .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate"),
                 // observe→DISPOSE: route the registered MLX organ through the default-OFF factual-belief
                 // adjudicator wrap (BASLLMNeuralCoreService.adjudicating). BASHostKit is NOT an MLX/HF type,
