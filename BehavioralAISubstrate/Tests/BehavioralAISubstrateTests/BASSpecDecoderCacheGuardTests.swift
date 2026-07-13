@@ -1,5 +1,6 @@
 #if canImport(MLXLLM)
 import XCTest
+import MLX
 import MLXLMCommon
 @testable import BASMLXAdapter
 
@@ -25,6 +26,30 @@ final class BASSpecDecoderCacheGuardTests: XCTestCase {
             "a KVCacheSimple must pass the RotatingKVCache check")
         XCTAssertTrue(canTrimPromptCache(simple),
             "KVCacheSimple is unconditionally trimmable (the happy path the guard preserves)")
+    }
+
+    /// P1-b (2026-07-13): the GDN/hybrid composition (ArraysCache linear layers + trimmable
+    /// attention — Qwen3.5's cache shape) fails `canTrimPromptCache` (which used to throw the
+    /// whole model-free family off the production quality default) but passes
+    /// `BASTrunkCheckpoint.compositionSupported` — the predicate pair that now routes it to the
+    /// snapshot-restore carry-forward lane instead of `DecodeError.nonTrimmableCache`.
+    /// Reversal: restoring the old single-guard (`canTrimPromptCache` ⇒ throw) turns this
+    /// composition back into a hard refusal — the routing asserts below red.
+    func testGDNCompositionRoutesToCarryForwardNotRefusal() {
+        let gdn = MambaCache()
+        gdn[0] = MLXArray([Float]([1, 2, 3]))
+        gdn[1] = MLXArray([Float]([4, 5, 6]))
+        let hybrid: [KVCache] = [gdn, KVCacheSimple()]
+        XCTAssertFalse(canTrimPromptCache(hybrid),
+            "the hybrid composition is NOT trim-rewindable (ArraysCache) — pre-P1-b this threw")
+        XCTAssertTrue(BASTrunkCheckpoint.compositionSupported(hybrid),
+            "every layer is ArraysCache-or-trimmable — the carry-forward lane must accept it")
+        XCTAssertTrue(hybrid.allSatisfy { !($0 is RotatingKVCache) },
+            "the rotating exclusion still guards BOTH lanes")
+        // An alien non-trimmable, non-Arrays layer stays refused (fail-closed) in both lanes.
+        let alien: [KVCache] = [gdn, RotatingKVCache(maxSize: 8, keep: 4)]
+        XCTAssertFalse(alien.allSatisfy { !($0 is RotatingKVCache) },
+            "a rotating layer inside a hybrid composition must still be rejected up front")
     }
 }
 #endif

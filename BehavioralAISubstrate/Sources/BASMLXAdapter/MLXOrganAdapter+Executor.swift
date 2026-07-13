@@ -115,10 +115,12 @@ extension MLXOrganAdapter {
             }
 
         case .promptLookup(let k):
-            // audit H1: FAIL-CLOSED like .mtpSpec — `_generateModelFree` throws `nonTrimmableCache`
-            // on a GDN/Qwen3.5 (non-trimmable Mamba/Arrays cache), and this arm had NO catch, so a
-            // Qwen3.5 + serious/critical-thermal turn (which drops .mtpSpec then elects model-free)
-            // threw uncaught EVERY turn instead of degrading. `_plainDraft` is the certified GDN path.
+            // audit H1: FAIL-CLOSED like .mtpSpec — this arm had NO catch, so a decode error threw
+            // uncaught EVERY turn instead of degrading; `_plainDraft` is the certified landing.
+            // P1-b (2026-07-13): GDN/Qwen3.5 no longer throws nonTrimmableCache here — the decoder
+            // routes ArraysCache compositions to the BASTrunkCheckpoint carry-forward lane
+            // (BASPromptLookupCarryForwardTests); the catch now guards alien cache compositions
+            // and genuine decode failures only.
             do {
                 let g = try await _generateModelFree(
                     for: request, drafter: BASPromptLookupDrafter(numDraftTokens: k))
@@ -138,9 +140,9 @@ extension MLXOrganAdapter {
             // T3: seed from the session corpus when present; nil session → empty store = byte-identical to
             // prompt-lookup (the BASCrossTurnDrafter empty-store parity anchor).
             let prior = sessionID.map { crossTurnStore.tokens(session: $0) } ?? []
-            // audit H1: FAIL-CLOSED (same GDN nonTrimmableCache throw as .promptLookup). The corpus
-            // append + telemetry only run on a successful generate, so a throw degrades to plain with
-            // no partial cross-turn mutation.
+            // audit H1: FAIL-CLOSED (same decode-error class as .promptLookup; GDN now routes to the
+            // P1-b carry-forward lane instead of throwing). The corpus append + telemetry only run on
+            // a successful generate, so a throw degrades to plain with no partial cross-turn mutation.
             do {
                 let g = try await _generateModelFree(
                     for: request, drafter: BASCrossTurnDrafter(priorTokens: prior, numDraftTokens: k))

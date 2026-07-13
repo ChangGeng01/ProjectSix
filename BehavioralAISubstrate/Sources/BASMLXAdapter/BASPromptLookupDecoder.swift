@@ -50,8 +50,24 @@ public struct BASPromptLookupDecoder {
         // caches are left untouched, so Llama/Qwen stay byte-unchanged. The guard below now PASSES for swapped Gemma
         // (no RotatingKVCache remains) and still fail-closes on any non-trimmable cache we couldn't swap.
         let cache = BASWindowMaskedCache.verifyCache(for: model, parameters: parameters)
-        guard cache.allSatisfy({ !($0 is RotatingKVCache) }), canTrimPromptCache(cache) else {
+        guard cache.allSatisfy({ !($0 is RotatingKVCache) }) else {
             throw DecodeError.nonTrimmableCache
+        }
+        // P1-b (2026-07-13): GDN/hybrid targets (Qwen3.5 — ArraysCache linear layers) are NOT
+        // trim-rewindable, which until now fail-closed the whole model-free family off the
+        // production quality default. But the MTP lane already proved the alternative rollback
+        // on these exact models: BASTrunkCheckpoint snapshot-restore (retaining the GDN slot
+        // references is FREE) + carry-forward reject (uncommitted tokens ride into the next
+        // verify forward — the T-cost curve is flat, so no separate re-feed pass). Route those
+        // compositions to the carry-forward loop; the certified trimmable loop below is
+        // byte-for-byte untouched for Llama/Gemma-class caches.
+        guard canTrimPromptCache(cache) else {
+            guard BASTrunkCheckpoint.compositionSupported(cache) else {
+                throw DecodeError.nonTrimmableCache
+            }
+            return try generateCarryForward(
+                input: input, model: model, parameters: parameters, drafter: drafter,
+                eosTokenIds: eosTokenIds, adaptiveK: adaptiveK, cache: cache)
         }
         let sampler = parameters.sampler()
         let maxTokens = parameters.maxTokens
@@ -132,6 +148,120 @@ public struct BASPromptLookupDecoder {
             _ = trimPromptCache(cache, numTokens: numDraft - acc)
             // Next round seeds from the last emitted token.
             y = .init(tokens: MLXArray([Int32(out.last ?? 0)]))
+            if stop { break }
+        }
+        return Result(tokens: out, rounds: rounds, proposed: proposed, accepted: accepted)
+    }
+
+    /// P1-b (2026-07-13) — the GDN/hybrid (ArraysCache) lane: prompt-lookup speculation for targets whose
+    /// recurrent state cannot be trim-rewound (Qwen3.5's Gated-DeltaNet layers). Numerics:
+    /// - Rollback = `BASTrunkCheckpoint` (the 案1 mechanism the MTP/fused lanes device-certified on this
+    ///   exact model): capture retains the GDN slot references pre-round (FREE), restore reassigns them and
+    ///   trims the attention layers by the full fed width.
+    /// - Reject economics = CARRY-FORWARD (the MTP K=1 lesson): tokens that are emitted-but-uncommitted
+    ///   after a restore ride a pending queue into the NEXT verify forward instead of paying a re-feed
+    ///   pass — the verify T-cost curve is flat (T=1 14.9ms vs T=4 16.6ms), so a reject costs ~nothing.
+    /// - Byte-identity: causal forward ⇒ logits at position i depend only on fed prefix ≤ i, so every
+    ///   emission is the trunk's own argmax exactly as in the trimmable loop; the rejected suffix can
+    ///   never contaminate an emitted position.
+    /// Fail-closed: a model whose `prepare`/forward carries `LMOutput.State` is REFUSED (unknown state
+    /// lives outside the cache and would not be restored); a cold-ArraysCache round never snapshots
+    /// (it runs draft-free, which commits the pending feed and warms the slots).
+    private static func generateCarryForward(
+        input: LMInput,
+        model: any LanguageModel,
+        parameters: GenerateParameters,
+        drafter: any BASUniversalDraftSource,
+        eosTokenIds: Set<Int>,
+        adaptiveK: Bool,
+        cache: [KVCache]
+    ) throws -> Result {
+        var drafter = drafter
+        let sampler = parameters.sampler()
+        let maxTokens = parameters.maxTokens
+        let K = drafter.numDraftTokens
+
+        var rolling = input.text.tokens.asArray(Int.self)
+        var out = [Int]()
+        var rounds = 0, proposed = 0, accepted = 0
+        var emaAccept = Double(K)
+
+        // ---- Prefill. `pendingFeed` = tokens NOT yet committed to the cache (fed next forward). ----
+        var pendingFeed: [Int]
+        switch try model.prepare(input, cache: cache, windowSize: parameters.prefillStepSize) {
+        case .tokens(let toks):
+            // Prompt tail left unfed — it becomes the first round's feed (never emitted).
+            pendingFeed = toks.tokens.asArray(Int.self)
+        case .logits(let result):
+            guard result.state == nil else { throw DecodeError.nonTrimmableCache }
+            let logits = result.logits[0..., -1, 0...]
+            let token = sampler.sample(logits: logits)
+            eval(token)
+            let t = token.item(Int.self)
+            if eosTokenIds.contains(t) { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0) }
+            rolling.append(t)
+            out.append(t)
+            pendingFeed = [t]
+        }
+
+        // ---- Speculative rounds (carry-forward). ----
+        while maxTokens.map({ out.count < $0 }) ?? true {
+            let remaining = maxTokens.map { $0 - out.count } ?? K
+            guard remaining > 0 else { break }
+            let effK = adaptiveK ? Swift.max(1, Swift.min(K, Int(emaAccept.rounded()) + 1)) : K
+            // A COLD ArraysCache (possible only on the first round of the `.tokens` prefill path)
+            // cannot be snapshotted — run that round draft-free: it commits pendingFeed + warms the slots.
+            let cold = cache.contains { ($0 as? ArraysCache).map { $0.state.isEmpty } ?? false }
+            let rawDraft = cold ? [] : drafter.propose(over: rolling)
+            let numDraft = Swift.min(rawDraft.count, Swift.min(effK, Swift.max(0, remaining - 1)))
+            let draft = Array(rawDraft.prefix(numDraft))
+            rounds += 1
+            proposed += numDraft
+
+            // Snapshot ONLY when there is something to reject (numDraft > 0 ⇒ cache is warm here).
+            let checkpoint: BASTrunkCheckpoint? = numDraft > 0 ? BASTrunkCheckpoint(cache: cache) : nil
+            let feed = pendingFeed + draft
+            let verifyInput = LMInput.Text(tokens: MLXArray(feed.map { Int32($0) }))
+            let verifyStart = feed.count - (numDraft + 1)
+            let result = model(verifyInput[text: .newAxis], cache: cache, state: nil)
+            guard result.state == nil else { throw DecodeError.nonTrimmableCache }
+            let verifyLogits = result.logits[0..., verifyStart..., 0...].squeezed(axis: 0)
+            let mainTokens = sampler.sample(logits: verifyLogits)
+            eval(mainTokens)
+            let mainList = mainTokens.asArray(Int.self)
+
+            var acc = 0
+            while acc < numDraft && mainList[acc] == draft[acc] { acc += 1 }
+            accepted += acc
+            emaAccept = 0.6 * emaAccept + 0.4 * Double(acc)
+
+            var emittedThisRound: [Int] = []
+            var stop = false
+            for i in 0...acc {
+                let t = mainList[i]
+                if eosTokenIds.contains(t) { stop = true; break }
+                out.append(t)
+                rolling.append(t)
+                emittedThisRound.append(t)
+                if let m = maxTokens, out.count >= m { stop = true; break }
+            }
+
+            if acc == numDraft {
+                // Full accept: the cache committed pendingFeed + every draft token; the only
+                // uncommitted token is the correction/bonus (if emitted) — it seeds the next feed.
+                pendingFeed = emittedThisRound.suffix(1).map { $0 }
+            } else if let checkpoint {
+                // Partial reject: the rejected suffix poisoned the recurrent state → restore the
+                // GDN slots to pre-round and trim the attention layers by the FULL fed width.
+                guard checkpoint.restore(cache: cache, trimming: feed.count) else {
+                    // Fail-close (trim under-returned): everything emitted is a trunk argmax, so
+                    // stopping early is safe; continuing on inconsistent state is not.
+                    return Result(tokens: out, rounds: rounds, proposed: proposed, accepted: accepted)
+                }
+                // Everything fed this round is uncommitted again; the accepted prefix + correction
+                // (== emittedThisRound) carries forward on top of the old pending feed.
+                pendingFeed += emittedThisRound
+            }
             if stop { break }
         }
         return Result(tokens: out, rounds: rounds, proposed: proposed, accepted: accepted)
