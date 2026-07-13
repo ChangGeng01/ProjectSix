@@ -56,23 +56,38 @@ public struct BASPromptLookupDecoder {
         }
         // P1-b (2026-07-13): GDN/hybrid targets (Qwen3.5 — ArraysCache linear layers) are NOT
         // trim-rewindable. A carry-forward lane (BASTrunkCheckpoint snapshot-restore + carry-forward
-        // reject) was written to route them — and PASSED a Mac stub byte-identity test — but ON-
-        // DEVICE CERTIFICATION FAILED it: real Qwen3.5, prompt-lookup-20260713-162414.log, byte-
-        // identical 1/5 workloads (rag-quote YES; json/code/verify/control NO). The stub did not
-        // replicate the real GDN state update on variable-width feeds, so the reject/restore path
-        // diverges from plain greedy — an ADR-039 byte-identity VIOLATION. Until root-caused, the
-        // lane is GATED OFF (fail-closed to plain, exactly the pre-P1-b behavior); the code + teeth
-        // remain for the fix. Opt-in BAS_GDN_CARRYFORWARD=1 re-enables it for investigation only.
+        // reject) routes them. Its first device cert was byte-identical only 1/5
+        // (prompt-lookup-20260713-162414.log) — an ADR-039 violation that gated it OFF.
+        //
+        // ROOT-CAUSED + FIXED (commit 0187edada, cert-logs/gdn-fp32-state-ON-5of5-20260713.log):
+        // the divergence was the GDN RECURRENT STATE being cast back to bf16 (7-mantissa) between
+        // tokens, so a chunked multi-token verify rounded differently than sequential decode.
+        // Keeping the state in float32 (GatedDelta.swift:296-300, BAS_GDN_FP32_STATE=1 — the
+        // kernel supports it natively) makes chunked == sequential EXACTLY → byte-identical 5/5 on
+        // device. So the lane is CORRECT under fp32 state; it stays opt-in only because its
+        // end-to-end win is ~1.03x (low n-gram acceptance on Qwen3.5), not because it is broken.
+        //
+        // FOOTGUN CLOSED: the two flags are separate (fp32 state is read deep in GatedDelta, carry-
+        // forward here). Setting ONLY BAS_GDN_CARRYFORWARD=1 would route the carry-forward lane over
+        // the still-bf16 state = the broken 1/5 control. So carry-forward now REQUIRES fp32 state
+        // too: BAS_GDN_CARRYFORWARD=1 without BAS_GDN_FP32_STATE=1 fails closed to plain (an
+        // investigator gets the correct 5/5 path or nothing, never the misleading broken one).
         guard canTrimPromptCache(cache) else {
             let gdnCarryForwardEnabled =
                 ProcessInfo.processInfo.environment["BAS_GDN_CARRYFORWARD"] == "1"
+            let gdnFP32StateEnabled =
+                ProcessInfo.processInfo.environment["BAS_GDN_FP32_STATE"] == "1"
             // The carry-forward lane routes ONLY Qwen35's GDN composition, and it must drive the
             // trunk through the SAME concrete forward the byte-identical MTP lane uses
             // (`hiddenStatesWithCache` → the inner Qwen35TextModelInner), NOT the protocol
             // `callAsFunction(_:cache:state:)` whose LMOutput.State handling is what made the
             // generic loop diverge from sequential plain on device. Any non-Qwen35 or state-
             // carrying model fails closed.
-            guard gdnCarryForwardEnabled, BASTrunkCheckpoint.compositionSupported(cache),
+            // P2-sweep footgun close: carry-forward is byte-correct ONLY with fp32 recurrent
+            // state (see the block above). Require BOTH flags — carry-forward without fp32 is the
+            // broken bf16 control, so fail closed to plain rather than route it.
+            guard gdnCarryForwardEnabled, gdnFP32StateEnabled,
+                  BASTrunkCheckpoint.compositionSupported(cache),
                   let qwen = model as? Qwen35Model else {
                 throw DecodeError.nonTrimmableCache
             }
