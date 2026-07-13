@@ -152,25 +152,25 @@ final class BASExperiencePersistenceTests: XCTestCase {
         XCTAssertNil(loaded)
     }
 
-    /// deep-audit organ-eval LOW-1 (2026-07-13): the COMPLEMENT of the above. A live
-    /// `observing()` fold where accepted > proposed (off-by-one / anomalous count) must NOT push
-    /// emaHitRate above the [0,1] sanity band — otherwise ONE such fold silently cold-starts the
-    /// whole persisted acceptance profile (lost EMA warm-state). `observing` now clamps hit to
-    /// [0,1]. Reversal: removing the clamp makes emaHitRate = 5/3 > 1 → isSane false → load nil.
-    func testAcceptedExceedingProposedKeepsSnapshotSane() async throws {
+    /// deep-audit organ-eval LOW-1 (2026-07-13): the >1 hit rate is a DELIBERATE diagnostic, NOT a
+    /// bug to clamp. A legitimate fold always has accepted<=proposed; accepted>proposed means a
+    /// mis-folding lane, and the resulting emaHitRate>1 SHOULD make the store fail-safely refuse to
+    /// warm-start (a corrupt profile must not seed the 0.05 cross-lane floor). This pins that
+    /// contract: an accepted>proposed fold produces emaHitRate>1 and the snapshot is (correctly)
+    /// discarded. (Mirrors BASProfilerCurrencyTests' "the >1 signature is detectable" pin.)
+    func testAcceptedExceedingProposedKeepsTheBugSignalAndFailsSafe() async throws {
         let prof = BASAcceptanceProfiler()
             .observing(sourceID: "mtpSpec", purpose: .factual, accepted: 5, proposed: 3, rounds: 2)
-        for cell in prof.exportCells() {
-            XCTAssertLessThanOrEqual(cell.stat.emaHitRate, 1.0,
-                "hit rate must be clamped to [0,1] even when accepted > proposed")
-        }
+        let cell = try XCTUnwrap(prof.exportCells().first)
+        XCTAssertGreaterThan(cell.stat.emaHitRate, 1.0,
+            "the >1 diagnostic must survive — accepted>proposed signals a mis-folding lane")
         let snap = BASDecodeExperienceSnapshot(
             modelID: "m1", savedAtMs: 1_000, cells: prof.exportCells(), chainEmaL: nil)
-        XCTAssertTrue(snap.isSane, "a clamped snapshot must stay sane, not be discarded")
+        XCTAssertFalse(snap.isSane, "a >1 (corrupt) profile must be refused, not warm-started")
         let store = BASAcceptanceProfilerStore(url: fileURL, policy: .init(debounceMs: 0))
         await store.save(snap, nowMs: 1_000)
         let loaded = await store.load(expectedModelID: "m1", nowMs: 2_000)
-        XCTAssertNotNil(loaded, "an accepted>proposed fold must NOT cold-start-discard the profile")
+        XCTAssertNil(loaded, "the corrupt snapshot is fail-safely discarded (cold start)")
     }
 
     func testSchemaVersionGate() async throws {

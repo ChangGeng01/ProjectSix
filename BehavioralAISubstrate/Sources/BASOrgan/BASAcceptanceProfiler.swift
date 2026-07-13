@@ -59,12 +59,13 @@ public struct BASAcceptanceProfiler: Sendable, Equatable {
     ) -> BASAcceptanceProfiler {
         guard rounds > 0 else { return self }
         let acceptedPerRound = Double(accepted) / Double(rounds)
-        // deep-audit organ-eval LOW-1 (2026-07-13): CLAMP the hit rate to [0,1]. A single fold
-        // where accepted > proposed (off-by-one / anomalous count) would push emaHitRate above
-        // 1.0, which the store's `isSane` band [0,1] then rejects — silently discarding the
-        // ENTIRE persisted acceptance snapshot (cold start, lost EMA warm-state). A hit rate
-        // cannot exceed 1; treat the anomaly as full acceptance, not as a corrupt snapshot.
-        let hit = proposed > 0 ? min(1.0, Double(accepted) / Double(proposed)) : 0
+        // deep-audit organ-eval LOW-1 (2026-07-13, REVERTED): do NOT clamp. emaHitRate>1 is a
+        // DELIBERATE diagnostic — a legitimate fold always has accepted<=proposed, so >1 signals a
+        // mis-folding lane (rounds used as the denominator, the ch725 bug), which the store's
+        // isSane [0,1] band then fail-safely refuses to warm-start from (BASProfilerCurrencyTests
+        // pins exactly this "the >1 signature is detectable" contract). Clamping masked that bug
+        // signal. The snapshot discard is fail-safe by design, not a loss.
+        let hit = proposed > 0 ? Double(accepted) / Double(proposed) : 0
         let k = Self.key(sourceID, purpose)
         let updated: Stat
         if let s = stats[k] {
