@@ -302,6 +302,10 @@ public actor BASSQLiteKnowledgeGraphStorage {
             try Self.deleteIncidentEdges(db: db, nodeID: nodeID)
             let removed = try Self.deleteNode(db: db, nodeID: nodeID)
             try Self.runExec(db: db, sql: "COMMIT;")
+            // deep-audit P2-18 (2026-07-13): the node's (and incident edges') plaintext content
+            // lingers as INSERT frames in the -wal until truncated. removeNode is the explicit
+            // forget path — truncate AFTER the commit (a checkpoint can't run mid-transaction).
+            try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
             return removed
         } catch {
             try? Self.runExec(db: db, sql: "ROLLBACK;")
@@ -416,7 +420,11 @@ public actor BASSQLiteKnowledgeGraphStorage {
         _ edgeID: String
     ) async throws -> Bool {
         guard let db else { return false }
-        return try Self.deleteEdge(db: db, edgeID: edgeID)
+        let removed = try Self.deleteEdge(db: db, edgeID: edgeID)
+        // deep-audit P2-18 (2026-07-13): the edge's plaintext lingers as its INSERT frame in
+        // the -wal until truncated. removeEdge is the explicit forget path — truncate now.
+        try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
+        return removed
     }
 
     public var edgeCount: Int {

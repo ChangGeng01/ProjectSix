@@ -170,6 +170,11 @@ public actor BASSharedStateGraphSQLiteStorage:
     public func deleteObject(ref: String) async throws {
         guard let db else { return }
         try Self.deleteObjectRow(db: db, ref: ref)
+        // deep-audit P2-18 (2026-07-13): the object's payload_json plaintext lingers as the
+        // original INSERT frame in the -wal until truncated. deleteObject is the explicit
+        // forget path — truncate now, throwing (not reporting a clean delete while plaintext
+        // survives in the WAL sidecar).
+        try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
     }
 
     // MARK: - Writer registry persistence

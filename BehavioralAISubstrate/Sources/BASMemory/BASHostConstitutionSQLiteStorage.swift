@@ -234,6 +234,11 @@ public actor BASHostConstitutionSQLiteStorage {
             db: db, vaultID: vaultID) else { return nil }
         do {
             try Self.deleteVault(db: db, vaultID: vaultID)
+            // deep-audit P2-18 (2026-07-13): the vault's full payload_json plaintext also lives
+            // as the original INSERT frame in the -wal file, which secure_delete=ON never
+            // touches. remove() is the explicit forget path (not a hot loop) — truncate the WAL
+            // now so a purged constitution vault is actually gone from disk.
+            try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
             return existing
         } catch {
             return nil

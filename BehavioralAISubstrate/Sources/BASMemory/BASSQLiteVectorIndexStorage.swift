@@ -241,6 +241,11 @@ public actor BASSQLiteVectorIndexStorage {
             db: db, atomID: atomID)
         guard existed else { return false }
         try Self.delete(db: db, atomID: atomID)
+        // deep-audit P2-18 (2026-07-13): a forgotten atom's embedding still lives as the
+        // original INSERT frame in the -wal (secure_delete=ON only zeroes the main-DB page).
+        // remove(atomID:) is the explicit forget path — truncate the WAL so the vector of a
+        // forgotten memory is gone from disk too.
+        try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
         return true
     }
 
