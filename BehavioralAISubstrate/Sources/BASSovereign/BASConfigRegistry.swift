@@ -22,9 +22,13 @@ public struct BASProductionSwitch: Sendable, Equatable {
 
 public enum BASConfigRegistry {
 
-    /// The production decode-stack switch census (2026-07-07). Append-only by convention:
-    /// a NEW production switch must land here in the same commit (CI-asserted for the
-    /// default-on class by BASConfigRegistryTests).
+    /// The production switch census (2026-07-07; widened repo-wide 2026-07-13). Append-only by
+    /// convention: a NEW production default-on switch must land here in the same commit. The
+    /// completeness of the default-on class is CI-asserted (both directions) by
+    /// `BASImprovementCandidateTests.testRegistryCoversDefaultOnSwitchesInSource`, which greps
+    /// all of Sources for the three default-on signatures (`!= "0"`, `_OFF ==/!= "1"`, and the
+    /// skip-style `BAS_SKIP_* != "1"`). (The earlier comment named a `BASConfigRegistryTests`
+    /// file that never existed.)
     public static let switches: [BASProductionSwitch] = [
         // ── 默认开 + kill-switch(ADR-014 毕业态)──────────────────────────────
         .init(envName: "BAS_SESSION_CAPPED_FUSED", polarity: .defaultOnKill,
@@ -55,6 +59,28 @@ public enum BASConfigRegistry {
               owner: "BASTurnRuntimeEngine.swift (turnSerializer)",
               what: "M-k F1 引擎整轮串行化(一turn一engine不变量;共享 last*/seq 不跨turn串扰;SERIAL=0 杀)",
               adrRef: "MEGA_AUDIT §9 M-k F1 整轮串行化 07-09"),
+        // ── 默认开 + kill-switch:数据安全 / 删除教义(BASRuntimeCore 存储层)──────
+        // deep-audit sweep 2026-07-13: these 4 default-on DATA-SAFETY kill-switches were live in
+        // Sources/BASRuntimeCore but ABSENT from this registry, and the CI drift-detector scanned
+        // only the decode stack (BASMLXAdapter/BASHostKit) — so the "every production default-on
+        // switch is enumerable + registered" invariant passed green while blind to the storage
+        // layer. Registered now; the detector is widened repo-wide + gains the skip-style signature.
+        .init(envName: "BAS_SECURE_DELETE", polarity: .defaultOnKill,
+              owner: "BASSQLiteSecureDelete.swift:21",
+              what: "secure_delete=ON pragma(删除时零填释放页,#16 删除教义;=0 复原 pre-fix 写成本)",
+              adrRef: "ADR-014 + MEGA_AUDIT #16 删除教义 + RUNTIME_SECURITY_REPORT F6"),
+        .init(envName: "BAS_SECURE_DELETE_VACUUM", polarity: .defaultOnKill,
+              owner: "BASSQLiteSecureDelete.swift:79",
+              what: "一次性遗留空闲页 VACUUM(重写库文件,清 pre-#16 明文空闲页;=0 关)",
+              adrRef: "MEGA_AUDIT memory-a F4 残余"),
+        .init(envName: "BAS_FILE_PROTECTION", polarity: .defaultOnKill,
+              owner: "BASSQLiteFileProtection.swift:27",
+              what: "SQLite 存储文件 NSFileProtection.complete(静态加密;=0 关)",
+              adrRef: "ADR-014 + x-sov#5 at-rest 加密"),
+        .init(envName: "BAS_SKIP_STORE_INTEGRITY_CHECK", polarity: .defaultOnKill,
+              owner: "BASSQLiteIntegrity.swift:32",
+              what: "每次开库 PRAGMA integrity_check(损坏=空 防御,fail-closed;SKIP=1 杀跳过)",
+              adrRef: "MEGA_AUDIT M-c(损坏=空)"),
         // ── opt-in ───────────────────────────────────────────────────────────
         .init(envName: "BAS_THERMAL_PREDICT", polarity: .optIn,
               owner: "BASEnduranceAppRunner.swift:1545 (app host)",

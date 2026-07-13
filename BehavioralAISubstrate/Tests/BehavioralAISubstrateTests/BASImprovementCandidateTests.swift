@@ -114,16 +114,22 @@ final class BASImprovementCandidateTests: XCTestCase {
     /// 必须 100% 在注册表——新增生产开关不入册即此测试红。
     func testRegistryCoversDefaultOnSwitchesInSource() throws {
         let testsDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-        // 2026-07-11 reconciliation: the scan was BASMLXAdapter-only, so BAS_TURN_SERIAL
-        // (BASHostKit, registered 07-09) read as a registry phantom. Scan BOTH dirs — the two
-        // homes of default-on switches — keeping the two-way assertion honest in each.
+        // 2026-07-11: scan was BASMLXAdapter-only → BAS_TURN_SERIAL (BASHostKit) read as a
+        // phantom; widened to two dirs. deep-audit 2026-07-13: even two dirs left the whole
+        // BASRuntimeCore storage layer UNSCANNED, so 4 default-on DATA-SAFETY switches
+        // (BAS_SECURE_DELETE / _VACUUM / BAS_FILE_PROTECTION / BAS_SKIP_STORE_INTEGRITY_CHECK)
+        // were invisible to this completeness assertion — it passed green while blind. Scan ALL
+        // of Sources recursively so the invariant is repo-wide, not decode-stack-only.
         let srcRoot = testsDir.deletingLastPathComponent().deletingLastPathComponent()
-        let files = try ["Sources/BASMLXAdapter", "Sources/BASHostKit"].flatMap { dir in
-            try FileManager.default.contentsOfDirectory(
-                at: srcRoot.appendingPathComponent(dir), includingPropertiesForKeys: nil)
-                .filter { $0.pathExtension == "swift" }
+        let sourcesRoot = srcRoot.appendingPathComponent("Sources")
+        var files: [URL] = []
+        if let en = FileManager.default.enumerator(
+            at: sourcesRoot, includingPropertiesForKeys: nil) {
+            for case let url as URL in en where url.pathExtension == "swift" {
+                files.append(url)
+            }
         }
-        XCTAssertFalse(files.isEmpty)
+        XCTAssertFalse(files.isEmpty, "the repo-wide Sources scan must see files (path drift guard)")
         // 复审修10:v1 正则是纸糊的——真实代码写法是 `env["BAS_X_OFF"] != "1"`(变量名
         // env、运算符 != "1"),v1 的 `environment[...] == "1"` 两处全 miss(4 个默认开
         // 只抓到 2 个),且无反向断言 ⇒ 幻影条目/断言失牙都不红。v2:①去变量名前缀
@@ -149,6 +155,16 @@ final class BASImprovementCandidateTests: XCTestCase {
                         found.insert(String(m[name]))
                     }
                 }
+                // 默认开签名 C(deep-audit 2026-07-13):skip 形 ["BAS_SKIP_X"] != "1" —— 默认跑,
+                // =1 跳过(= kill)。BAS_SKIP_STORE_INTEGRITY_CHECK 用此写法,既非 != "0" 也非
+                // _OFF,故逃过签名 A/B。限定 BAS_SKIP_ 前缀以精确匹配"默认开-可跳过"语义,不误抓无关 != "1"。
+                if let r = line.range(of: #"\["(BAS_SKIP_[A-Z0-9_]+)"\]\s*!=\s*"1""#,
+                                      options: .regularExpression) {
+                    let m = String(line[r])
+                    if let name = m.range(of: #"BAS_SKIP_[A-Z0-9_]+"#, options: .regularExpression) {
+                        found.insert(String(m[name]))
+                    }
+                }
             }
         }
         let registered = Set(BASConfigRegistry.defaultOnKillSwitches.map(\.envName))
@@ -158,7 +174,10 @@ final class BASImprovementCandidateTests: XCTestCase {
         let phantom = registered.subtracting(found)
         XCTAssertTrue(phantom.isEmpty,
                       "注册表幻影/改名条目(或断言失牙——源里找不到): \(phantom.sorted())")
-        XCTAssertGreaterThanOrEqual(found.count, 4,
-                                    "已知 4 个默认开必须全被抓到(断言有牙的自证): \(found.sorted())")
+        // Anti-vacuous floor: 11 default-on switches at HEAD (7 decode-stack + 4 data-safety).
+        // A drop below this means the detector regex regressed or a census switch was silently
+        // dropped — either way the two-way assertion above could go falsely-empty-equal.
+        XCTAssertGreaterThanOrEqual(found.count, 11,
+                                    "默认开签名自证(≥11:7 解码 + 4 数据安全): \(found.sorted())")
     }
 }
