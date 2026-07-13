@@ -157,4 +157,49 @@ final class QinaoAgentLeaseEnforcerTests: XCTestCase {
             from: data)
         XCTAssertEqual(decoded, report)
     }
+
+    // MARK: - deep-audit P1-8 (2026-07-13): lease is bound to its issued agent.
+
+    /// A lease issued to `.planner`, presented by `.risk`, must fail closed with
+    /// `.leaseAgentMismatch` — a seat cannot spend another agent's lease budget/scope even
+    /// when every other invariant (unexpired, budget, scope) holds. Dropping the
+    /// `entry.lease.agent != agent` compare (the pre-P1-8 state) flips this GREEN → the tooth.
+    func test_leasePresentedByWrongAgentFailsClosed() async {
+        let clock = Clock()
+        let enf = makeEnforcer(clock: clock)
+        let ref = await enf.issue(makeLease(agent: .planner))
+
+        // Same lease, presented by the ISSUED agent → valid.
+        let ownReport = await enf.validity(leaseRef: ref, agent: .planner)
+        XCTAssertTrue(ownReport.isValid,
+            "the lease's own agent must pass every invariant")
+
+        // Presented by a DIFFERENT seat → mismatch, fail closed.
+        let report = await enf.validity(leaseRef: ref, agent: .risk)
+        XCTAssertFalse(report.isValid,
+            "a seat presenting another agent's lease must fail closed")
+        let mismatched = report.reasons.contains {
+            if case .leaseAgentMismatch(let issuedTo, let presentedBy) = $0 {
+                return issuedTo == .planner && presentedBy == .risk
+            }
+            return false
+        }
+        XCTAssertTrue(mismatched,
+            "the typed reason must name both the issued and presenting seats")
+    }
+
+    /// Back-compat: the agent-less validity() call keeps its exact pre-P1-8 semantics — no
+    /// mismatch reason can appear when no presenting agent is supplied.
+    func test_agentlessValidityUnchanged() async {
+        let clock = Clock()
+        let enf = makeEnforcer(clock: clock)
+        let ref = await enf.issue(makeLease(agent: .planner))
+        let report = await enf.validity(leaseRef: ref)  // no agent
+        XCTAssertTrue(report.isValid)
+        let anyMismatch = report.reasons.contains {
+            if case .leaseAgentMismatch = $0 { return true }
+            return false
+        }
+        XCTAssertFalse(anyMismatch, "no agent supplied → no mismatch check")
+    }
 }

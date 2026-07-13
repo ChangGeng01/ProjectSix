@@ -187,9 +187,13 @@ public actor QinaoAgentProposalRegistry {
             // enforcer, forward the typed reasons (expired / writesExhausted / … ).
             if let leaseRef = proposal.leaseRef {
                 if let enforcer = leaseEnforcer {
+                    // deep-audit P1-8: bind the lease to the seat that ACTUALLY emitted the
+                    // proposal (not the self-reported proposal.agent) — a seat cannot present
+                    // another agent's leaseRef to spend its budget/scope. Fail closed on mismatch.
                     let report =
                         await enforcer.validity(
                             leaseRef: leaseRef,
+                            agent: emitter,
                             target: proposal.delta.target)
                     if !report.isValid {
                         issues.append(
