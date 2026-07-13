@@ -186,6 +186,20 @@ public actor QinaoRuntime {
             throw RuntimeError.toolMismatch(
                 expected: intent.toolName, got: toolName)
         }
+        // deep-audit P0-1: bind the PERMIT to the presented tool AND payload. The permit signs only
+        // `intent.digest`, and toolName/payload were never in that signed material — so a holder of
+        // valid signatures for one action's digest could pass a different tool or payload. Recompute
+        // the SDK-canonical digest from the PRESENTED (toolName, payload, session, host) and require
+        // the signed permit.digest to equal it: any tool/payload swap changes the recomputed digest
+        // and fails here. (F1's `toolName == intent.toolName` compared against the caller-supplied,
+        // UNSIGNED intent — this closes that confused-deputy gap against signed material.)
+        let boundDigest = QinaoRiskGate.ActionIntent.canonicalDigest(
+            toolName: toolName, payload: payload,
+            sessionID: intent.sessionID, hostVersionID: intent.hostVersionID)
+        guard signatures.permit.digest == boundDigest else {
+            throw RuntimeError.digestMismatch(
+                expected: boundDigest, got: signatures.permit.digest)
+        }
         guard signatures.permit.digest == intent.digest else {
             throw RuntimeError.digestMismatch(
                 expected: intent.digest,

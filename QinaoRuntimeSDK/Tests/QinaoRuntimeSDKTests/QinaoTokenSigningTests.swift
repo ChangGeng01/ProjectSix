@@ -55,9 +55,11 @@ final class QinaoTokenSigningTests: XCTestCase {
 
     // MARK: - Snapshot proof (the pre-S3 gate checked ONLY intentDigest)
 
+    // deep-audit P0-1: the intent's digest canonically binds the presented tool+payload — the gate
+    // tests below execute with an empty payload, so bind that.
     private func makeIntent(session: String = "sess.p") -> QinaoRiskGate.ActionIntent {
         QinaoRiskGate.ActionIntent(
-            digest: "intent.proof", toolName: "calendar.add_event",
+            toolName: "calendar.add_event", payload: Data(),
             sessionID: session, hostVersionID: "host.v1", summary: "s")
     }
 
@@ -153,8 +155,8 @@ final class QinaoTokenSigningTests: XCTestCase {
         // gate PASSED (no throw) with minted tokens — the negative tests above prove the
         // same gate refuses forged/expired/cross-session tokens.
         _ = try await fx.runtime.execute(
-            toolName: intent.toolName, payload: Data("x".utf8),
-            intent: intent, signatures: sigs)
+            toolName: intent.toolName, payload: Data(),
+            intent: intent, signatures: sigs)  // P0-1: match makeIntent binding
     }
 }
 

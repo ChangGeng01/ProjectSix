@@ -43,7 +43,6 @@ final class WakeAndSleepDemo: XCTestCase {
             sealedPayload: Data("anchor-host.v1".utf8))
 
         let intent = PropertyDemoFixture.intent(
-            digest: "intent.wake-sleep",
             sessionID: "sess.wake-sleep")
         let signatures = try await PropertyDemoFixture.signBundle(
             for: intent, runtime: fx)

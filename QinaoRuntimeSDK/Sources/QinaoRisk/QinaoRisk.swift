@@ -77,6 +77,40 @@ public actor QinaoRiskGate {
             self.hostVersionID = hostVersionID
             self.summary = summary
         }
+
+        /// deep-audit P0-1 (2026-07-13): the SDK-owned canonical action digest. It BINDS the tool,
+        /// the payload, the session and the host version, so a permit signed over `digest` cannot be
+        /// reused for a different tool or payload — `QinaoRuntime.execute()` recomputes this from the
+        /// PRESENTED toolName+payload and requires it to equal the signed `permit.digest`. Fields are
+        /// length-prefixed (`<len>:<field>`) so the join is injective (no delimiter ambiguity).
+        public static func canonicalDigest(
+            toolName: String, payload: Data, sessionID: String, hostVersionID: String
+        ) -> String {
+            let payloadHash = SHA256.hash(data: payload)
+                .map { String(format: "%02x", $0) }.joined()
+            func lp(_ s: String) -> Data {
+                let b = Data(s.utf8)
+                return Data("\(b.count):".utf8) + b
+            }
+            var canonical = Data()
+            for field in [toolName, payloadHash, sessionID, hostVersionID] { canonical += lp(field) }
+            return SHA256.hash(data: canonical)
+                .map { String(format: "%02x", $0) }.joined()
+        }
+
+        /// Build an intent whose `digest` IS the canonical tool+payload+session+host binding — the
+        /// form `execute()` enforces. Hosts should construct action intents this way.
+        public init(
+            toolName: String, payload: Data, sessionID: String,
+            hostVersionID: String, summary: String = ""
+        ) {
+            self.init(
+                digest: Self.canonicalDigest(
+                    toolName: toolName, payload: payload,
+                    sessionID: sessionID, hostVersionID: hostVersionID),
+                toolName: toolName, sessionID: sessionID,
+                hostVersionID: hostVersionID, summary: summary)
+        }
     }
 
     /// Normalised [0,1] risk input vector. Every field has a

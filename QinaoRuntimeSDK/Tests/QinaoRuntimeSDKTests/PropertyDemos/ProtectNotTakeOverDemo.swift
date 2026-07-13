@@ -18,7 +18,6 @@ import XCTest
 final class ProtectNotTakeOverDemo: XCTestCase {
 
     private let intent = PropertyDemoFixture.intent(
-        digest: "intent.protect",
         sessionID: "sess.protect")
 
     // MARK: - Four-way assessment, stable reason codes

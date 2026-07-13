@@ -135,12 +135,21 @@ final class QinaoRuntimeGateTests: XCTestCase {
             versionTree: versionTree)
     }
 
+    // deep-audit P0-1: the standard payload the canonical-digest intents bind (execute() now
+    // recomputes the digest from the presented tool+payload, so intent and execute must agree).
+    private static let gatePayload = Data("meet".utf8)
+
     private func intent(
-        digest: String = "intent.abc",
+        digest: String? = nil,
         sessionID: String = "sess.1"
     ) -> QinaoRiskGate.ActionIntent {
-        QinaoRiskGate.ActionIntent(
-            digest: digest,
+        // Default: a canonical digest binding tool+payload+session+host (the form execute enforces).
+        // An explicit `digest:` (mismatch tests) overrides it to exercise the rejection path.
+        let d = digest ?? QinaoRiskGate.ActionIntent.canonicalDigest(
+            toolName: "calendar.add_event", payload: Self.gatePayload,
+            sessionID: sessionID, hostVersionID: "host.v1")
+        return QinaoRiskGate.ActionIntent(
+            digest: d,
             toolName: "calendar.add_event",
             sessionID: sessionID,
             hostVersionID: "host.v1",
@@ -189,13 +198,43 @@ final class QinaoRuntimeGateTests: XCTestCase {
 
         let result = try await runtime.execute(
             toolName: "calendar.add_event",
-            payload: Data("meet".utf8),
+            payload: Self.gatePayload,
             intent: it,
             signatures: sigs)
 
         XCTAssertEqual(String(data: result, encoding: .utf8), "ok")
         let count = await recorder.callCount
         XCTAssertEqual(count, 1)
+    }
+
+    // MARK: - deep-audit P0-1: permit binds tool AND payload
+
+    /// A fully-valid bundle minted for payload A cannot be reused to execute a DIFFERENT payload B.
+    /// The permit signs the canonical digest of (tool, payload, session, host); presenting payload B
+    /// recomputes a different digest and fails the gate. Pre-fix the payload was never in the signed
+    /// material, so B would have executed under A's approval.
+    func testPermitCannotBeReusedForADifferentPayload() async throws {
+        let fx = await makeRuntime()
+        let it = intent()   // binds Self.gatePayload
+        let permit = try await fx.risk.requestActionPermit(for: it)
+        let warrant = try await fx.sovereign.issueWarrant(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID))
+        let proof = await validProof(for: it, sovereign: fx.sovereign)
+        let sigs = QinaoRuntime.Signatures(permit: permit, warrant: warrant, snapshotProof: proof)
+
+        await XCTAssertThrowsErrorAsync(
+            try await fx.runtime.execute(
+                toolName: "calendar.add_event",
+                payload: Data("A DIFFERENT PAYLOAD".utf8),   // ≠ the bound gatePayload
+                intent: it, signatures: sigs)
+        ) { error in
+            guard case QinaoRuntime.RuntimeError.digestMismatch = error else {
+                return XCTFail("a swapped payload must be refused at the canonical binding, got \(error)")
+            }
+        }
+        let count = await fx.recorder.callCount
+        XCTAssertEqual(count, 0, "the tool must not run with a payload the permit never bound")
     }
 
     // MARK: - deep-audit P0-2: single-use bundle (no replay within TTL)
@@ -218,11 +257,11 @@ final class QinaoRuntimeGateTests: XCTestCase {
             permit: permit, warrant: warrant, snapshotProof: proof)
 
         _ = try await runtime.execute(
-            toolName: "calendar.add_event", payload: Data("meet".utf8), intent: it, signatures: sigs)
+            toolName: "calendar.add_event", payload: Self.gatePayload, intent: it, signatures: sigs)
 
         do {
             _ = try await runtime.execute(
-                toolName: "calendar.add_event", payload: Data("meet".utf8),
+                toolName: "calendar.add_event", payload: Self.gatePayload,
                 intent: it, signatures: sigs)
             XCTFail("a consumed bundle must not execute again")
         } catch QinaoRuntime.RuntimeError.tokenAlreadyConsumed {
@@ -258,7 +297,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
 
         await XCTAssertThrowsErrorAsync(
             try await fx.runtime.execute(
-                toolName: "calendar.add_event", payload: Data(), intent: it,
+                toolName: "calendar.add_event", payload: Self.gatePayload, intent: it,
                 signatures: .init(permit: permit, warrant: warrant, snapshotProof: orphanProof))
         ) { error in
             guard case QinaoRuntime.RuntimeError.missingSnapshotProof = error else {
@@ -291,7 +330,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
                 toolName: "mail.send_all",  // ← swapped tool, same (valid) signatures
-                payload: Data(),
+                payload: Self.gatePayload,
                 intent: it,
                 signatures: sigs)
         ) { error in
@@ -325,7 +364,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
                 toolName: "calendar.add_event",
-                payload: Data(),
+                payload: Self.gatePayload,
                 intent: it,
                 signatures: .init(
                     permit: wrongPermit,
@@ -337,8 +376,13 @@ final class QinaoRuntimeGateTests: XCTestCase {
             else {
                 return XCTFail("expected digestMismatch, got \(error)")
             }
-            XCTAssertEqual(expected, "intent.real")
+            // deep-audit P0-1: the wrong permit is now rejected at the canonical tool+payload
+            // binding check (which fires first). `got` is the wrong permit's digest; `expected` is
+            // the SDK-canonical bound digest for the presented tool+payload.
             XCTAssertEqual(got, "intent.other")
+            XCTAssertEqual(expected, QinaoRiskGate.ActionIntent.canonicalDigest(
+                toolName: "calendar.add_event", payload: Self.gatePayload,
+                sessionID: it.sessionID, hostVersionID: "host.v1"))
         }
         let count = await recorder.callCount
         XCTAssertEqual(count, 0)
@@ -362,7 +406,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
                 toolName: "calendar.add_event",
-                payload: Data(),
+                payload: Self.gatePayload,
                 intent: it,
                 signatures: .init(
                     permit: permit,
@@ -395,7 +439,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
                 toolName: "calendar.add_event",
-                payload: Data(),
+                payload: Self.gatePayload,
                 intent: it,
                 signatures: .init(
                     permit: permit,
@@ -441,7 +485,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
                 toolName: "calendar.add_event",
-                payload: Data(),
+                payload: Self.gatePayload,
                 intent: it,
                 signatures: .init(
                     permit: permit,
@@ -496,7 +540,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
         await XCTAssertThrowsErrorAsync(
             try await fx.runtime.execute(
                 toolName: "calendar.add_event",
-                payload: Data(),
+                payload: Self.gatePayload,
                 intent: it,
                 signatures: .init(
                     permit: permit,

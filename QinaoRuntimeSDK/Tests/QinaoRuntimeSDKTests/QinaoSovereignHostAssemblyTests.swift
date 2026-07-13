@@ -129,9 +129,10 @@ final class QinaoSovereignHostAssemblyTests: XCTestCase {
                 integrityHash: SHA256.hash(data: Data("host.v1".utf8)).map { String(format: "%02x", $0) }.joined()),
             sealedPayload: Data("host.v1".utf8))
 
+        // deep-audit P0-1: the intent digest must canonically bind the presented tool+payload.
         let intent = QinaoRiskGate.ActionIntent(
-            digest: "intent.assembly.tool",
             toolName: "journal.append",
+            payload: Data("entry".utf8),
             sessionID: "sess.assembly",
             hostVersionID: "host.v1",
             summary: "append a journal entry")

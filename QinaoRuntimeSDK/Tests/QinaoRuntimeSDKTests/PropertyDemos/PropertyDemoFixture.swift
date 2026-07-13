@@ -171,13 +171,20 @@ enum PropertyDemoFixture {
 
     // MARK: - Intent + proof helpers
 
+    // deep-audit P0-1: the payload the demos' canonical-digest intents bind (demos execute with it).
+    static let demoPayload = Data("{}".utf8)
+
     static func intent(
-        digest: String = "intent.demo",
+        digest: String? = nil,
         sessionID: String = "sess.demo",
         toolName: String = "calendar.add_event"
     ) -> QinaoRiskGate.ActionIntent {
-        QinaoRiskGate.ActionIntent(
-            digest: digest,
+        // Default: canonical digest binding tool+payload+session+host (the form execute enforces).
+        let d = digest ?? QinaoRiskGate.ActionIntent.canonicalDigest(
+            toolName: toolName, payload: demoPayload,
+            sessionID: sessionID, hostVersionID: "host.v1")
+        return QinaoRiskGate.ActionIntent(
+            digest: d,
             toolName: toolName,
             sessionID: sessionID,
             hostVersionID: "host.v1",
