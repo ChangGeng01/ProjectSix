@@ -52,6 +52,39 @@ final class BASSovereignLedgerHostSinkTests: XCTestCase {
         return BASSovereignLedgerHostSink(ledger: ledger)
     }
 
+    /// deep-audit L-3 follow-on (2026-07-13): a SQLite-backed sink — the coverage GAP that
+    /// hid the non-unique-auditID bug. The `audit_id TEXT PRIMARY KEY` constraint rejects a
+    /// duplicate auditID on the SECOND append, so two distinct turns chaining to count==2
+    /// PROVES each turn now gets a unique auditID (pre-fix this failed here while the
+    /// in-memory backend, having no uniqueness check, stayed green).
+    func testChainsAcrossTurnsOnSQLiteBackend() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bas-sink-sqlite-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let storage = try BASSovereignLedgerSQLiteStorage(
+            path: dir.appendingPathComponent("ledger.sqlite").path)
+        let ledger = BASSovereignAuditLedger(
+            ed25519KeyPair: BASSovereignEd25519KeyPair.generate(), storage: storage)
+        let sink = BASSovereignLedgerHostSink(ledger: ledger)
+
+        let t1 = try await MainActor.run {
+            try Self.drivenTurn(prompt: "First distinct turn.") }
+        let t2 = try await MainActor.run {
+            try Self.drivenTurn(prompt: "Second, distinct turn.") }
+        let o1 = await sink.recordTurn(t1)
+        let o2 = await sink.recordTurn(t2)
+        XCTAssertTrue(o1.appended, "first turn must append")
+        XCTAssertTrue(o2.appended,
+            "second turn must append on SQLite — a shared auditID would be rejected by "
+            + "the audit_id PRIMARY KEY (reason: \(o2.reason ?? "nil"))")
+        let count = await sink.appendedCount()
+        XCTAssertEqual(count, 2, "two distinct turns chain to two persisted entries")
+        // distinct auditIDs is the underlying invariant
+        XCTAssertNotEqual(t1.sovereignAuditEntry?.auditID, t2.sovereignAuditEntry?.auditID,
+            "each turn must derive a unique auditID (turn-unique, not session+verdict only)")
+    }
+
     // MARK: - 1. Real turn → signed + chained
 
     func testRecordsSignedChainedEntryFromRealTurn() async throws {

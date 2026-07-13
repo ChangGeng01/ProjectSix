@@ -683,7 +683,14 @@ extension BASEBrainRuntimeCoordinator {
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
-        let auditID = "audit.\(runtimeTrace.sessionID).\(sovereignVerdict.verdictLevel.rawValue)"
+        // deep-audit L-3 follow-on (2026-07-13): auditID must be TURN-UNIQUE. It was
+        // `audit.<sessionID>.<verdictLevel>` — so two turns of the same session+verdict
+        // collided on the same auditID, which the SQLite ledger's `audit_id PRIMARY KEY`
+        // rejects on the second append (the ledger-host-sink was broken on SQLite for
+        // multi-turn; only the uniqueness-free in-memory backend hid it). turnID already
+        // carries sessionID + a per-turn timestamp, so folding it in makes the auditID
+        // unique per turn while keeping sessionID grep-able as the prefix.
+        let auditID = "audit.\(turnID).\(sovereignVerdict.verdictLevel.rawValue)"
         let actionRefs =
             sovereignCommitTokens.map(\.tokenID)
             + sovereignWarrants.map(\.warrantID)
