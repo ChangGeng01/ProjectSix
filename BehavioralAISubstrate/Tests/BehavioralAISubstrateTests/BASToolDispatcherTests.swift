@@ -182,6 +182,47 @@ final class BASToolDispatcherTests: XCTestCase {
             "Deadline must fire within 500ms,not 1000ms+")
     }
 
+    /// deep-audit P2-19 (2026-07-13): the deadline is a COOPERATIVE bound, not a hard kill.
+    /// The existing slow-handler test uses Task.sleep (cancellation-AWARE) so it returns at the
+    /// deadline. This contrasts it: an UNCOOPERATIVE handler that busy-loops without checking
+    /// Task.isCancelled still gets `.timeoutExceeded` reported, but structured concurrency awaits
+    /// it at scope exit — so dispatch() does NOT return until the handler finishes. This pins the
+    /// honest contract the docstring now states (and would flag a future switch to a true detach).
+    private struct UncooperativeHandler: BASToolHandler {
+        let toolName: String
+        let busyMs: Int
+        func handle(invocation: BASToolInvocation) async throws -> BASToolResult {
+            // CPU busy-loop — never checks Task.isCancelled, never awaits a cancellation point.
+            let end = Date().addingTimeInterval(Double(busyMs) / 1000.0)
+            var spins = 0
+            while Date() < end { spins &+= 1 }
+            _ = spins
+            return BASToolResult(
+                invocationID: invocation.invocationID,
+                success: true, payload: "uncooperative-finished")
+        }
+    }
+
+    func testDeadlineIsCooperativeUncooperativeHandlerBlocksPastDeadline() async throws {
+        let dispatcher = BASToolDispatcher(deadlineMs: 50)
+        try await dispatcher.register(
+            handler: UncooperativeHandler(toolName: "busy", busyMs: 300))
+
+        let started = Date()
+        let result = await dispatcher.dispatch(
+            invocation: makeInvocation(toolName: "busy"))
+        let elapsed = Date().timeIntervalSince(started)
+
+        // The timeout IS reported (the deadline fired)…
+        XCTAssertFalse(result.success)
+        XCTAssertTrue(result.errorMessage.contains("exceeded deadline"),
+            "the deadline breach must be reported even for an uncooperative handler")
+        // …but dispatch did NOT return at the 50ms deadline — it waited for the ~300ms busy
+        // handler, because cancellation is cooperative and the group awaits its children.
+        XCTAssertGreaterThan(elapsed, 0.2,
+            "an uncooperative handler is NOT force-killed at the deadline (cooperative bound)")
+    }
+
     // MARK: - Domain restriction (chapter 三百五六 composition)
 
     func testRestrictedToolDomainBlocksDispatch() async throws

@@ -134,8 +134,22 @@ public actor BASToolDispatcher {
     /// without a constitution see no behavior change)。
     private let restrictedToolDomains: Set<String>?
 
-    /// Per-invocation deadline。Handlers exceeding this are
-    /// cancelled + reported as `.timeoutExceeded`。
+    /// Per-invocation deadline。When it elapses the dispatcher reports
+    /// `.timeoutExceeded` and requests cancellation of the handler task。
+    ///
+    /// deep-audit P2-19 (2026-07-13): this is a COOPERATIVE bound, not a
+    /// hard kill。Swift structured concurrency cannot force-stop a task —
+    /// `cancelAll()` only sets the cancellation flag。A handler that checks
+    /// `Task.isCancelled` (or awaits cancellation-aware APIs) returns
+    /// promptly at the deadline;a CPU-bound or cancellation-ignoring
+    /// handler keeps running, and because the task group awaits its
+    /// children at scope exit, `dispatch()` does not actually return until
+    /// that handler finishes。The deadline therefore bounds well-behaved
+    /// handlers, and reports the breach for the rest — it does not
+    /// guarantee wall-clock return against an uncooperative handler。(The
+    /// dispatcher/planner lane is not yet wired into a live turn; hardening
+    /// this to an unstructured-Task detach + orphan-audit signal is
+    /// deferred to when that lane goes live.)
     private let deadlineMs: Int64
 
     /// Counter of successful dispatches (for observability)。
@@ -288,7 +302,14 @@ public actor BASToolDispatcher {
 
     /// TaskGroup-based deadline helper。Spawns the handler in
     /// one task and a sleep in another;whichever returns first
-    /// wins。Cancels the loser。
+    /// wins, then `cancelAll()` REQUESTS cancellation of the loser。
+    ///
+    /// deep-audit P2-19 (2026-07-13): cancellation is COOPERATIVE。When the
+    /// sleep wins (timeout), the group rethrows `.timeoutExceeded`, but
+    /// structured concurrency awaits the handler task at scope exit — so an
+    /// uncooperative handler that ignores `Task.isCancelled` blocks this
+    /// call past the deadline rather than being killed. See the
+    /// `defaultDeadlineMs` doc for the full cooperative-bound contract。
     private func withDeadline<T: Sendable>(
         deadlineMs: Int64,
         toolName: String,
