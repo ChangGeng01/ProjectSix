@@ -51,5 +51,16 @@ final class BASSpecDecoderCacheGuardTests: XCTestCase {
         XCTAssertFalse(alien.allSatisfy { !($0 is RotatingKVCache) },
             "a rotating layer inside a hybrid composition must still be rejected up front")
     }
+
+    /// P1-b GATE (2026-07-13): the carry-forward lane is OFF by default after on-device
+    /// byte-identity FAILED on real Qwen3.5 (1/5 workloads identical). The routing guard now
+    /// requires BAS_GDN_CARRYFORWARD=1; absent it, a GDN composition must throw nonTrimmableCache
+    /// (fail-closed to plain — the pre-P1-b behavior) so no non-byte-identical output ever ships.
+    func testGDNCarryForwardIsGatedOffByDefault() {
+        // Env unset (this test does NOT opt in) ⇒ the predicate the router consults is false.
+        let enabled = ProcessInfo.processInfo.environment["BAS_GDN_CARRYFORWARD"] == "1"
+        XCTAssertFalse(enabled,
+            "the carry-forward lane must be opt-in only until the byte-identity bug is fixed")
+    }
 }
 #endif

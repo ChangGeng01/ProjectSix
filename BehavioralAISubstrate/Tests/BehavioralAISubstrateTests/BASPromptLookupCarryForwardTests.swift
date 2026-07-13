@@ -73,6 +73,19 @@ final class BASPromptLookupCarryForwardTests: XCTestCase {
     private let prompt = [1, 3, 1, 3, 1, 3]   // repetitive → the n-gram drafter proposes
     private let maxTokens = 24
 
+    // The carry-forward lane is GATED OFF by default (on-device byte-identity FAILED on real
+    // Qwen3.5 — see BASPromptLookupDecoder). These stub tests exercise the MECHANISM for the
+    // eventual fix, so they must opt in; they do NOT certify real-model correctness (the stub
+    // does not replicate the real GDN state update — that is exactly the gap that shipped a bug).
+    override func setUp() {
+        super.setUp()
+        setenv("BAS_GDN_CARRYFORWARD", "1", 1)
+    }
+    override func tearDown() {
+        unsetenv("BAS_GDN_CARRYFORWARD")
+        super.tearDown()
+    }
+
     /// Plain-greedy gold: same stub arithmetic, one token per forward, no speculation.
     private func plainGold() -> [Int] {
         let model = StubHybridModel()

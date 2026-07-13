@@ -54,15 +54,18 @@ public struct BASPromptLookupDecoder {
             throw DecodeError.nonTrimmableCache
         }
         // P1-b (2026-07-13): GDN/hybrid targets (Qwen3.5 — ArraysCache linear layers) are NOT
-        // trim-rewindable, which until now fail-closed the whole model-free family off the
-        // production quality default. But the MTP lane already proved the alternative rollback
-        // on these exact models: BASTrunkCheckpoint snapshot-restore (retaining the GDN slot
-        // references is FREE) + carry-forward reject (uncommitted tokens ride into the next
-        // verify forward — the T-cost curve is flat, so no separate re-feed pass). Route those
-        // compositions to the carry-forward loop; the certified trimmable loop below is
-        // byte-for-byte untouched for Llama/Gemma-class caches.
+        // trim-rewindable. A carry-forward lane (BASTrunkCheckpoint snapshot-restore + carry-forward
+        // reject) was written to route them — and PASSED a Mac stub byte-identity test — but ON-
+        // DEVICE CERTIFICATION FAILED it: real Qwen3.5, prompt-lookup-20260713-162414.log, byte-
+        // identical 1/5 workloads (rag-quote YES; json/code/verify/control NO). The stub did not
+        // replicate the real GDN state update on variable-width feeds, so the reject/restore path
+        // diverges from plain greedy — an ADR-039 byte-identity VIOLATION. Until root-caused, the
+        // lane is GATED OFF (fail-closed to plain, exactly the pre-P1-b behavior); the code + teeth
+        // remain for the fix. Opt-in BAS_GDN_CARRYFORWARD=1 re-enables it for investigation only.
         guard canTrimPromptCache(cache) else {
-            guard BASTrunkCheckpoint.compositionSupported(cache) else {
+            let gdnCarryForwardEnabled =
+                ProcessInfo.processInfo.environment["BAS_GDN_CARRYFORWARD"] == "1"
+            guard gdnCarryForwardEnabled, BASTrunkCheckpoint.compositionSupported(cache) else {
                 throw DecodeError.nonTrimmableCache
             }
             return try generateCarryForward(
