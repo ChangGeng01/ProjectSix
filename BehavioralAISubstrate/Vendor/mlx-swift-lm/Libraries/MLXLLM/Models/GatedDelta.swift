@@ -86,7 +86,7 @@ private func makeGatedDeltaKernel(hasMask: Bool) -> MLXFast.MLXFastKernel? {
             }
             for (int i = 0; i < n_per_t; ++i) {
               auto s_idx = n_per_t * dk_idx + i;
-              o_state[s_idx] = static_cast<InT>(state[i]);
+              o_state[s_idx] = static_cast<StateT>(state[i]);
             }
         """
 
@@ -149,10 +149,16 @@ func gatedDeltaKernel(
         fatalError("Gated delta kernel not available")
     }
 
+    // BAS lossless-GDN-speculation lever (2026-07-13): the recurrent state carries its OWN dtype
+    // (StateT) so it can stay float32 across tokens (kills the per-token bf16 round that makes a
+    // chunked multi-token verify diverge from sequential decode). Default StateT == InT keeps every
+    // existing caller byte-identical; only a caller that passes a float32 `state` gets full precision.
+    let stateType = state.dtype
     let outputs = kernel(
         inputs,
         template: [
             ("InT", inputType),
+            ("StateT", stateType),
             ("Dk", Dk),
             ("Dv", Dv),
             ("Hk", Hk),
@@ -161,7 +167,7 @@ func gatedDeltaKernel(
         grid: (32, Dv, B * Hv),
         threadGroup: (32, 4, 1),
         outputShapes: [[B, T, Hv, Dv], state.shape],
-        outputDTypes: [inputType, inputType]
+        outputDTypes: [inputType, stateType]
     )
 
     return (outputs[0], outputs[1])
@@ -287,7 +293,12 @@ func gatedDeltaUpdate(
     let Hv = v.dim(2)
     let Dv = v.dim(3)
 
-    let state = state ?? MLXArray.zeros([B, Hv, Dv, Dk], dtype: q.dtype)
+    // BAS lossless-GDN-speculation lever (2026-07-13): opt-in float32 recurrent state. Default
+    // (flag unset) allocates in q.dtype — byte-identical to stock. BAS_GDN_FP32_STATE=1 keeps the
+    // state in float32 so a chunked multi-token verify matches sequential decode (no per-token round).
+    let stateDtype: DType =
+        ProcessInfo.processInfo.environment["BAS_GDN_FP32_STATE"] == "1" ? .float32 : q.dtype
+    let state = state ?? MLXArray.zeros([B, Hv, Dv, Dk], dtype: stateDtype)
 
     if GatedDeltaKernelManager.shared.kernel != nil {
         return gatedDeltaKernel(q: q, k: k, v: v, g: g, beta: beta, state: state, mask: mask)
