@@ -21,11 +21,15 @@ import Foundation
 //   propose write to a domain outside its capability.
 // - **Lease requirement enforced.** If capability requires
 //   lease, proposal without lease ref rejected.
-// - **directCommit cannot bypass sovereignWarrant.** Even
-//   if some capability has directCommit=true (none do per
-//   doctrine), commit still requires warrant — typed-pinned.
-// - **Commit gate is single.** All commit paths flow through
-//   `QinaoAgentCommitGate.canCommit`.
+// - **`QinaoAgentCommitGate.canCommit` is a DECLARATIVE shape-pin, NOT the commit authority.**
+//   deep-audit P1-9 (2026-07-13): the earlier doctrine here ("directCommit cannot bypass
+//   sovereignWarrant" / "Commit gate is single. All commit paths flow through canCommit") was a
+//   doc-lie — canCommit only checks that three refs are present (ref-presence), verifies no
+//   signature, and binds no digest, and the agent-fabric propose→commit lane it belongs to has
+//   NO production caller (it is test-only scaffolding; see the DORMANT note in
+//   QinaoSeatProposingProtocol and QinaoSeatFabricDormancyBoundaryTests). The REAL commit
+//   authority for tool side effects is `QinaoRuntime.execute` (HMAC-signed permit/warrant/proof
+//   + digest mutual binding). See the full contract on `canCommit`'s own doc comment below.
 
 // MARK: - Lease
 
