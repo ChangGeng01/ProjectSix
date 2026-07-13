@@ -194,15 +194,30 @@ public enum QinaoAgentProposalGate {
 // MARK: - Single Commit Gate
 
 public enum QinaoAgentCommitGate {
-    /// **THE single commit mouth.** A commit is only legal
-    /// when ALL three are present:
+    /// **DECLARATIVE SHAPE-PIN — not a cryptographic authority.**
     ///
-    /// 1. ≥ 1 valid proposal ref
-    /// 2. ActionPermit ref (from L11 / Risk seat)
-    /// 3. SovereignWarrant ref (from L14 / Sovereign Sentinel)
+    /// deep-audit P1-9 (2026-07-13): this checks only that the three refs are *present*
+    /// (≥1 proposal ref, a non-empty permit ref string, a non-empty warrant ref string). It
+    /// does NOT verify any signature, does NOT bind the permit's digest to the warrant's
+    /// intent, and does NOT confirm the refs name real, valid, unexpired tokens. Any caller
+    /// that can produce three non-empty strings passes. The prior doc ("THE single commit
+    /// mouth", "a commit is only legal when ALL three are present", "directCommit cannot
+    /// bypass") overstated this to sound like the doctrine-A invariant — a doc-lie the repo
+    /// treats as a first-class defect.
     ///
-    /// directCommit cannot bypass. This is the doctrine A
-    /// invariant from manifesto v4 八.5.
+    /// The REAL commit authority for tool side effects is `QinaoRuntime.execute`, which
+    /// verifies HMAC-signed permit/warrant/snapshot-proof and enforces
+    /// `permit.digest == warrant.intentDigest` mutual binding (QinaoRuntime.swift). The
+    /// agent-fabric propose→commit lane that would consume THIS gate is dormant, test-only
+    /// scaffolding — see `QinaoAgentCommitGateBoundaryTests`, which fails closed if any
+    /// production (non-test) module starts calling `canCommit`.
+    ///
+    /// TRIGGER to build the real gate: when a production path wires the seat-fabric commit
+    /// lane into the sovereign spine, retype `canCommit` to accept the *validated, signed*
+    /// tokens (QinaoAgentProposalBoard + QinaoRiskGate.ActionPermit +
+    /// QinaoSovereignControlPlane.Warrant) plus the intent and delegate to the hardened
+    /// verifiers (risk.isPermitValid / sovereign.isWarrantValid + digest binding), or route
+    /// the lane through `QinaoRuntime.execute` itself so there is genuinely one mouth.
     public static func canCommit(
         proposalRefs: [String],
         actionPermitRef: String?,
