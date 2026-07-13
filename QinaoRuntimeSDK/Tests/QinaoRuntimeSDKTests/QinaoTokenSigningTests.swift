@@ -23,6 +23,7 @@ final class QinaoTokenSigningTests: XCTestCase {
             warrantID: "wa-forged",
             sessionID: intent.sessionID,
             intentDigest: intent.digest,
+            hostVersionID: intent.hostVersionID,
             issuedAt: Date(timeIntervalSince1970: 1_700_000_000),
             expiresAt: Date(timeIntervalSince1970: 1_700_000_030),
             signature: "deadbeef")
@@ -44,6 +45,7 @@ final class QinaoTokenSigningTests: XCTestCase {
             warrantID: real.warrantID,
             sessionID: real.sessionID,
             intentDigest: "intent.SWAPPED",
+            hostVersionID: real.hostVersionID,
             issuedAt: real.issuedAt,
             expiresAt: real.expiresAt,
             signature: real.signature)
@@ -51,6 +53,45 @@ final class QinaoTokenSigningTests: XCTestCase {
             digest: "intent.SWAPPED", sessionID: "sess.t", hostVersionID: "host.v1")
         let valid = await fx.sovereign.isWarrantValid(redirected, for: swappedIntent)
         XCTAssertFalse(valid, "redirecting a signed warrant to another digest must fail")
+    }
+
+    // MARK: - P1-6(b): host-version binding (rollback / cross-host replay)
+
+    /// A warrant minted under host version N must NOT be accepted for the same session+digest
+    /// under host version N+1 within the TTL. Pre-P1-6(b) hostVersionID was carried on Intent but
+    /// never signed/checked, so a rollback (or a sibling host on a different version) replayed the
+    /// warrant. Reversal: dropping hostVersionID from the signed fields + the explicit guard reds
+    /// the second assertion (the tag matches and the binding no longer discriminates).
+    func testWarrantMintedUnderOneHostVersionFailsUnderAnother() async throws {
+        let fx = await QinaoTestFixture.make()
+        let intentN = QinaoSovereignControlPlane.Intent(
+            digest: "intent.same", sessionID: "sess.hv", hostVersionID: "host.vN")
+        let warrant = try await fx.sovereign.issueWarrant(for: intentN)
+        let ownVersion = await fx.sovereign.isWarrantValid(warrant, for: intentN)
+        XCTAssertTrue(ownVersion, "a warrant must verify under its own host version")
+
+        let intentNext = QinaoSovereignControlPlane.Intent(
+            digest: "intent.same", sessionID: "sess.hv", hostVersionID: "host.vN+1")
+        let replayed = await fx.sovereign.isWarrantValid(warrant, for: intentNext)
+        XCTAssertFalse(replayed,
+            "a warrant minted under host N must NOT be accepted under host N+1 (rollback replay)")
+    }
+
+    /// The snapshot-continuity proof carries the identical host-version binding.
+    func testSnapshotProofMintedUnderOneHostVersionFailsUnderAnother() async throws {
+        let fx = await QinaoTestFixture.make()
+        let intentN = QinaoSovereignControlPlane.Intent(
+            digest: "intent.same", sessionID: "sess.hv", hostVersionID: "host.vN")
+        let proof = await fx.sovereign.issueSnapshotContinuityProof(
+            for: intentN, anchorID: "anchor")
+        let ownVersion = await fx.sovereign.isSnapshotProofValid(proof, for: intentN)
+        XCTAssertTrue(ownVersion, "proof must verify under its own host version + registered anchor")
+
+        let intentNext = QinaoSovereignControlPlane.Intent(
+            digest: "intent.same", sessionID: "sess.hv", hostVersionID: "host.vN+1")
+        let replayed = await fx.sovereign.isSnapshotProofValid(proof, for: intentNext)
+        XCTAssertFalse(replayed,
+            "a proof minted under host N must NOT be accepted under host N+1 (rollback replay)")
     }
 
     // MARK: - Snapshot proof (the pre-S3 gate checked ONLY intentDigest)
@@ -83,6 +124,7 @@ final class QinaoTokenSigningTests: XCTestCase {
         let handBuilt = QinaoRuntime.SnapshotContinuityProof(
             proofID: "proof-hand", sessionID: intent.sessionID,
             anchorID: "anchor", intentDigest: intent.digest,
+            hostVersionID: intent.hostVersionID,
             issuedAt: Date(timeIntervalSince1970: 1_700_000_000),
             expiresAt: Date(timeIntervalSince1970: 1_700_000_030),
             signature: "")

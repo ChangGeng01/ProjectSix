@@ -88,9 +88,12 @@ public actor QinaoRuntime {
         public let sessionID: String
         public let anchorID: String
         public let intentDigest: String
+        /// deep-audit P1-6(b) (2026-07-13): host-version binding — see Warrant.hostVersionID.
+        /// A proof minted under host N cannot be replayed under host N+1 within the TTL.
+        public let hostVersionID: String
         public let issuedAt: Date
         public let expiresAt: Date
-        /// HMAC-SHA256 tag over the six fields (hex). Minted only by
+        /// HMAC-SHA256 tag over the seven fields (hex). Minted only by
         /// `issueSnapshotContinuityProof`.
         public let signature: String
         public init(
@@ -98,6 +101,7 @@ public actor QinaoRuntime {
             sessionID: String,
             anchorID: String,
             intentDigest: String,
+            hostVersionID: String,
             issuedAt: Date,
             expiresAt: Date,
             signature: String
@@ -106,6 +110,7 @@ public actor QinaoRuntime {
             self.sessionID = sessionID
             self.anchorID = anchorID
             self.intentDigest = intentDigest
+            self.hostVersionID = hostVersionID
             self.issuedAt = issuedAt
             self.expiresAt = expiresAt
             self.signature = signature

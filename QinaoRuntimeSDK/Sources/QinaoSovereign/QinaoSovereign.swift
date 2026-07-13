@@ -129,10 +129,28 @@ public actor QinaoSovereignControlPlane {
         public let warrantID: String
         public let sessionID: String
         public let intentDigest: String
+        /// deep-audit P1-6(b) (2026-07-13): the host version the warrant was minted under.
+        /// Bound into the signature and re-checked at verify, so a warrant minted for host N
+        /// cannot be replayed for the same session+digest under host N+1 within the TTL
+        /// (rollback / cross-host replay).
+        public let hostVersionID: String
         public let issuedAt: Date
         public let expiresAt: Date
-        /// HMAC-SHA256 tag binding all five fields (hex). Minted only by `issueWarrant`.
+        /// HMAC-SHA256 tag binding all six fields (hex). Minted only by `issueWarrant`.
         public let signature: String
+
+        public init(
+            warrantID: String, sessionID: String, intentDigest: String,
+            hostVersionID: String, issuedAt: Date, expiresAt: Date, signature: String
+        ) {
+            self.warrantID = warrantID
+            self.sessionID = sessionID
+            self.intentDigest = intentDigest
+            self.hostVersionID = hostVersionID
+            self.issuedAt = issuedAt
+            self.expiresAt = expiresAt
+            self.signature = signature
+        }
     }
 
     /// Intent the runtime wants the control plane to authorize.
@@ -1124,17 +1142,19 @@ public actor QinaoSovereignControlPlane {
         let issuedAt = now()
         let warrantID = "wa-\(UUID().uuidString)"
         let expiresAt = issuedAt.addingTimeInterval(warrantTTL)
-        // integration S3 (audit F2 discharge): HMAC-sign the five fields at mint.
+        // integration S3 (audit F2 discharge): HMAC-sign the fields at mint.
+        // P1-6(b): hostVersionID is now part of the signed material (host-version binding).
         let signature = Self.tokenTag(
             key: tokenTagKey,
             fields: [
-                warrantID, intent.sessionID, intent.digest,
+                warrantID, intent.sessionID, intent.digest, intent.hostVersionID,
                 Self.tagDate(issuedAt), Self.tagDate(expiresAt),
             ])
         return Warrant(
             warrantID: warrantID,
             sessionID: intent.sessionID,
             intentDigest: intent.digest,
+            hostVersionID: intent.hostVersionID,
             issuedAt: issuedAt,
             expiresAt: expiresAt,
             signature: signature)
@@ -1149,16 +1169,20 @@ public actor QinaoSovereignControlPlane {
         for intent: Intent
     ) -> Bool {
         // deep-audit MEDIUM-1: constant-time MAC verify (was hex String ==).
+        // P1-6(b): hostVersionID is part of the verified material AND re-checked against the
+        // presented intent — a warrant minted under another host version fails both the MAC
+        // (its tag was over a different hostVersionID) and the explicit binding below.
         guard Self.tokenTagValid(
             key: tokenTagKey,
             fields: [
-                warrant.warrantID, warrant.sessionID, warrant.intentDigest,
+                warrant.warrantID, warrant.sessionID, warrant.intentDigest, warrant.hostVersionID,
                 Self.tagDate(warrant.issuedAt), Self.tagDate(warrant.expiresAt),
             ],
             hexTag: warrant.signature)
         else { return false }
         guard warrant.sessionID == intent.sessionID else { return false }
         guard warrant.intentDigest == intent.digest else { return false }
+        guard warrant.hostVersionID == intent.hostVersionID else { return false }
         guard warrant.expiresAt > now() else { return false }
         return true
     }

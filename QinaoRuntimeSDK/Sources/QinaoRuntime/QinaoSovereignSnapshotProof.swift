@@ -23,10 +23,11 @@ extension QinaoSovereignControlPlane {
         let issuedAt = now()
         let proofID = "proof-\(UUID().uuidString)"
         let expiresAt = issuedAt.addingTimeInterval(ttlSeconds)
+        // P1-6(b): hostVersionID is part of the signed material (host-version binding).
         let signature = Self.tokenTag(
             key: tokenTagKey,
             fields: [
-                proofID, intent.sessionID, anchorID, intent.digest,
+                proofID, intent.sessionID, anchorID, intent.digest, intent.hostVersionID,
                 Self.tagDate(issuedAt), Self.tagDate(expiresAt),
             ])
         return QinaoRuntime.SnapshotContinuityProof(
@@ -34,6 +35,7 @@ extension QinaoSovereignControlPlane {
             sessionID: intent.sessionID,
             anchorID: anchorID,
             intentDigest: intent.digest,
+            hostVersionID: intent.hostVersionID,
             issuedAt: issuedAt,
             expiresAt: expiresAt,
             signature: signature)
@@ -50,12 +52,15 @@ extension QinaoSovereignControlPlane {
             key: tokenTagKey,
             fields: [
                 proof.proofID, proof.sessionID, proof.anchorID, proof.intentDigest,
+                proof.hostVersionID,
                 Self.tagDate(proof.issuedAt), Self.tagDate(proof.expiresAt),
             ],
             hexTag: proof.signature)
         else { return false }
         guard proof.sessionID == intent.sessionID else { return false }
         guard proof.intentDigest == intent.digest else { return false }
+        // P1-6(b): host-version binding re-checked against the presented intent.
+        guard proof.hostVersionID == intent.hostVersionID else { return false }
         guard proof.expiresAt > now() else { return false }
         // deep-audit P0-4: the proof's anchor must be REGISTERED with the snapshot manager right
         // now. Signing an arbitrary anchorID (never registered, or deregistered/rotated within the
