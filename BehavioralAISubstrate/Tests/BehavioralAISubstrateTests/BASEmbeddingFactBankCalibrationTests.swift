@@ -83,10 +83,14 @@ final class BASEmbeddingFactBankCalibrationTests: XCTestCase {
     func testWikidataCoverageWithRealMiniLM() async throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["BAS_ADJ_CALIBRATE"] == "1",
                           "host calibration — set BAS_ADJ_CALIBRATE=1")
-        let path = ProcessInfo.processInfo.environment["BAS_WIKIDATA_FACTS"]
-            ?? "/Users/changgeng/qwen_honesty_finetune/wikidata_facts.json"
+        // deep-audit tests-arch ⑤ (2026-07-13): require the path via env — no machine-specific
+        // hardcoded fallback (the old `?? "/Users/changgeng/…"` rots silently on any other machine
+        // / CI, and is already opt-in behind BAS_ADJ_CALIBRATE above).
+        guard let path = ProcessInfo.processInfo.environment["BAS_WIKIDATA_FACTS"] else {
+            throw XCTSkip("set BAS_WIKIDATA_FACTS to the wikidata_facts.json path (build_wikidata_facts.py)")
+        }
         guard let data = FileManager.default.contents(atPath: path) else {
-            throw XCTSkip("wikidata_facts.json not found — run build_wikidata_facts.py")
+            throw XCTSkip("wikidata_facts.json not found at \(path) — run build_wikidata_facts.py")
         }
         let wiki = try BASFactBank.load(verifiedFactsJSON: data)
         XCTAssertGreaterThan(wiki.count, 500, "expected the Wikidata coverage pull")

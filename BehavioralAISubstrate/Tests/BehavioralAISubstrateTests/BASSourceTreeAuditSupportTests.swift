@@ -43,4 +43,35 @@ final class BASSourceTreeAuditSupportTests: XCTestCase {
         XCTAssertTrue(fm.fileExists(atPath: root + "/Sources"))
         XCTAssertTrue(fm.fileExists(atPath: root + "/Tests"))
     }
+
+    /// deep-audit tests-arch ⑤ (2026-07-13): NO test may hardcode a "/Users/…" absolute machine
+    /// path literal — such paths rot silently on any other machine / CI (the exact defect this
+    /// resolver replaced, most recently BASEmbeddingFactBankCalibrationTests' wikidata fallback).
+    /// Two files are allowlisted: this resolver's deliberate last-resort fallback, and this test
+    /// (which names the substring to guard against it). Reversal: restoring any `?? "/Users/…"`
+    /// fallback reds this.
+    func testNoTestHardcodesAMachinePath() throws {
+        let testsDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let allowlist: Set<String> = [
+            "BASSourceTreeAuditSupport.swift",       // the deliberate repo-root fallback
+            "BASSourceTreeAuditSupportTests.swift",  // this file — names the substring to guard
+        ]
+        var offenders: [String] = []
+        let en = FileManager.default.enumerator(at: testsDir, includingPropertiesForKeys: nil)
+        while let url = en?.nextObject() as? URL {
+            guard url.pathExtension == "swift",
+                  !allowlist.contains(url.lastPathComponent) else { continue }
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for (idx, rawLine) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+                let line = String(rawLine)
+                if line.trimmingCharacters(in: .whitespaces).hasPrefix("//") { continue }
+                let code = line.components(separatedBy: "//").first ?? line
+                if code.contains("\"/Users/") {
+                    offenders.append("\(url.lastPathComponent):\(idx + 1)  \(line.trimmingCharacters(in: .whitespaces))")
+                }
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty,
+            "hardcoded machine-path literal(s) in tests — resolve via env / repoRoot instead: \(offenders)")
+    }
 }
