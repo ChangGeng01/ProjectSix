@@ -43,6 +43,20 @@ import BASOrchestration
 /// `execute(intent:)` call that arrives without all three.
 public actor QinaoSovereignControlPlane {
 
+    /// deep-audit P1-6 (2026-07-13): HKDF-SHA256 domain-separated key derivation. The token HMAC
+    /// keys (permit / warrant / proof) MUST NOT equal the raw ledger secret — the single-secret
+    /// fallback (`tokenSigningKey ?? ledgerSigningSecret`) otherwise shares ONE key across the
+    /// ledger and every token kind, so a tag minted in one domain could be replayed in another.
+    /// The ledger key stays the raw secret (unchanged ⇒ persisted ledgers still verify); each token
+    /// domain gets a cryptographically separated key derived from the same secret with a distinct
+    /// `info` label. Deterministic ⇒ cross-process gates that share the secret derive the same key.
+    public static func deriveDomainKey(_ secret: Data, domain: String) -> SymmetricKey {
+        HKDF<SHA256>.deriveKey(
+            inputKeyMaterial: SymmetricKey(data: secret),
+            info: Data(domain.utf8),
+            outputByteCount: 32)
+    }
+
     // MARK: - Errors
 
     public enum SovereignError: Error, Equatable, Sendable {
@@ -753,9 +767,12 @@ public actor QinaoSovereignControlPlane {
             // integration S3: the previously-dead tokenSigningKey now keys the
             // warrant/snapshot-proof HMAC tags; ledgerSigningSecret is the fallback so a
             // single-secret host still gets signed tokens.
-            tokenTagKey: SymmetricKey(
-                data: configuration.tokenSigningKey
-                    ?? configuration.ledgerSigningSecret))
+            // deep-audit P1-6: HKDF-derive the warrant/proof key with its own domain label so it
+            // is cryptographically separated from the ledger key AND the permit key, even when a
+            // single-secret host falls back to the ledger secret.
+            tokenTagKey: QinaoSovereignControlPlane.deriveDomainKey(
+                configuration.tokenSigningKey ?? configuration.ledgerSigningSecret,
+                domain: "qinao.token.v1"))
         let handle = SubstrateHandle(
             snapshotManager: snapshotManager,
             hostVersionTree: versionTree)

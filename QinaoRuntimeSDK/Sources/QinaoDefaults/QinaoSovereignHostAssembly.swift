@@ -94,8 +94,11 @@ extension QinaoDefaults {
             permitEventRecorder: QinaoRuntime
                 .makeSovereignPermitEventRecorder(sovereign: sovereign),
             now: now,
-            permitTagKey: SymmetricKey(
-                data: tokenSigningKey ?? ledgerSigningSecret))
+            // deep-audit P1-6: HKDF-derive the permit key with its own domain label ("qinao.permit.v1")
+            // so it is cryptographically separated from the ledger key AND the warrant/proof key —
+            // the single-secret fallback no longer shares the raw ledger secret across domains.
+            permitTagKey: QinaoSovereignControlPlane.deriveDomainKey(
+                tokenSigningKey ?? ledgerSigningSecret, domain: "qinao.permit.v1"))
 
         let constitution = BASHostConstitution(
             hostID: hostID, activeVersion: activeVersion)
