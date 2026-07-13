@@ -2,6 +2,12 @@ import Foundation
 
 // 六十五.3 — typed hot/cold seat residency runtime.
 //
+// deep-audit DORMANT (2026-07-13): test-only scaffolding — NO production consumer. Live hosts
+// register the full 9-seat council via `standardLoopSeats` (all hot); nothing drives this
+// residency actor's wake/sleep in a live path. Honestly marked dormant per
+// pin-boundary-defer-interface; TRIGGER = the first host adopting the propose/dispose seat
+// fabric onto the sovereign spine. See QinaoSeatFabricDormancyBoundaryTests.
+//
 // ## Why this exists
 //
 // 六十四.2 typed-pinned each seat's `residency` (.hot or

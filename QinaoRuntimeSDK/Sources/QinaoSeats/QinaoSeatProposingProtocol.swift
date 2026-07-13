@@ -3,6 +3,17 @@ import Foundation
 // 六十五.4 — opt-in proposing protocol bridging seat verdicts
 // to v4 typed proposals.
 //
+// deep-audit DORMANT (2026-07-13): this is the HEART of the dormant seat-fabric lane. The
+// registry's `dispatchProposals` (proposeDelta → validate → lease-check → collect) has NO
+// production caller — the sovereign spine (QinaoDefaults.makeSovereignHost / QinaoRuntime)
+// never invokes it; live seats still emit `SeatVerdict` via `contribute`. The lease-agent
+// binding (P1-8) and the declarative commit gate (P1-9) are the already-hardened pieces of
+// this SAME lane. Per pin-boundary-defer-interface the lane stays dormant, honestly marked,
+// NOT wired speculatively; TRIGGER to go live = a host that adopts propose/dispose seats onto
+// the sovereign spine, at which point the commit path must be retyped to the signed-token gate
+// (see P1-9). QinaoSeatFabricDormancyBoundaryTests fails closed if any production module starts
+// calling `dispatchProposals`.
+//
 // ## Why this exists
 //
 // Existing `QinaoSeatProtocol.contribute(snapshotID:)`

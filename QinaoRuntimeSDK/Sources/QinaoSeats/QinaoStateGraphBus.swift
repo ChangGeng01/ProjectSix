@@ -2,6 +2,15 @@ import Foundation
 
 // 六十五.2 — typed state graph pub/sub bus.
 //
+// deep-audit DORMANT (2026-07-13): test-only scaffolding — NO production consumer. The 9
+// default seats pull `QinaoLoop` directly; nothing subscribes/publishes on this bus in a live
+// path (only tests construct it). Per pin-boundary-defer-interface it stays dormant, honestly
+// marked, NOT wired speculatively (a reader-less bus is the repo's "上膛未击发" loaded-gun
+// anti-pattern). TRIGGER to activate = the first host that adopts the propose/dispose seat
+// fabric onto the sovereign spine. The whole seat-fabric propose→commit lane shares this
+// dormancy — see QinaoSeatFabricDormancyBoundaryTests, which fails closed if a production
+// module starts wiring `dispatchProposals`.
+//
 // ## Why this exists
 //
 // Manifesto v4 八.2 says "agent 不是彼此聊天，而是一起看
