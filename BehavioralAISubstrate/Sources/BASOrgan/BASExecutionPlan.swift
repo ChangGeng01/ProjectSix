@@ -92,15 +92,20 @@ public struct BASExecutionPlan: Sendable, Equatable, Codable {
         /// True when the elector kept `maxKVSize == nil` because the decode axis wants speculation
         /// (the RotatingKVCache-vs-spec hazard was actively honored, not incidentally satisfied).
         public let specCachePreserved: Bool
+        /// Whether a DRAFT-MODEL spec lane (target + draft sibling co-resident) fits the jetsam
+        /// budget. False for Gemma-4 E4B+E2B on the Air (7428 MB > cap) — the machine-readable reason
+        /// E4B runs single-model at its plain ceiling instead of the ~50 the draft would deliver.
+        public let draftSpeculationViable: Bool
         /// Honest: energy has no runtime data on this stack (3 of 4 Pareto axes have evidence).
         public let energyModeled: Bool
         public init(
             deviceLabel: String, residentAdmitted: Bool,
-            specCachePreserved: Bool, energyModeled: Bool
+            specCachePreserved: Bool, draftSpeculationViable: Bool, energyModeled: Bool
         ) {
             self.deviceLabel = deviceLabel
             self.residentAdmitted = residentAdmitted
             self.specCachePreserved = specCachePreserved
+            self.draftSpeculationViable = draftSpeculationViable
             self.energyModeled = energyModeled
         }
     }

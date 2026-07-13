@@ -29,11 +29,40 @@ final class BASExecutionPlanElectorTests: XCTestCase {
     }
 
     func testAirProfileAdmitsQwen35UnderJetsam() {
-        XCTAssertTrue(air.admitsResident(bytes: qwen.residentBytesEstimate),
-            "3.1 GB resident fits under the 6.29 GB jetsam cap with headroom")
+        XCTAssertTrue(air.admitsResident(bytes: qwen.peakBytesEstimate),
+            "3.1 GB peak fits under the 6.29 GB jetsam cap with headroom")
         // A 9B-class ~8.2 GB dual-residency must be refused (M5 deferral evidence).
         XCTAssertFalse(air.admitsResident(bytes: 8_200 * 1_048_576),
             "a footprint over the jetsam budget must be refused")
+    }
+
+    // MARK: draft-sibling dual-residency (why Gemma-E4B does NOT reach ~50 on the Air)
+
+    func testGemmaE4BDraftSpeculationRefusedByJetsamOnAir() {
+        let e4b = BASModelManifestRegistry.gemma4_E4B_4bit
+        XCTAssertEqual(e4b.draftSiblingID, "mlx-community/gemma-4-e2b-it-4bit",
+            "E4B's draft sibling is the nested MatFormer E2B (manifest correctness fix)")
+        // E4B alone admits...
+        XCTAssertTrue(air.admitsResident(bytes: e4b.peakBytesEstimate),
+            "E4B alone (4314 MB) fits under the cap")
+        // ...but E4B + E2B co-resident does NOT (4314 + 3114 = 7428 > 6290).
+        let e2b = BASModelManifestRegistry.gemma4_E2B_4bit
+        XCTAssertFalse(
+            air.admitsResident(bytes: e4b.peakBytesEstimate + e2b.peakBytesEstimate),
+            "the dual-residency draft plan must be refused — the memory reason E4B stays single-model")
+        let plan = BASExecutionPlanElector.elect(
+            modelID: e4b.modelID, manifest: e4b, device: air, state: state(temp: 0))
+        XCTAssertFalse(plan.attestation.draftSpeculationViable,
+            "the elector must attest the draft-spec lane is NOT viable on the Air (why not ~50)")
+    }
+
+    func testLlama3BDraftSpeculationViableUnderJetsam() {
+        // Llama-3.2-3B (2542) + 1B draft (~800) DOES co-reside under the cap → draft plan viable.
+        let llama = BASModelManifestRegistry.llama32_3B_4bit
+        let plan = BASExecutionPlanElector.elect(
+            modelID: llama.modelID, manifest: llama, device: air, state: state(temp: 0))
+        XCTAssertTrue(plan.attestation.draftSpeculationViable,
+            "Llama-3B + 1B draft co-reside under the cap ⇒ draft-spec lane is memory-viable")
     }
 
     // MARK: election rules
@@ -81,7 +110,7 @@ final class BASExecutionPlanElectorTests: XCTestCase {
         // A model too big for the jetsam budget: manifest present but not admitted.
         let big = BASModelCapabilityManifest(
             modelID: "big/9b-4bit", architecture: .trimmableAttention, draft: .none,
-            quantBits: 4, residentBytesEstimate: 8_200 * 1_048_576, contextCapTokens: 131_072)
+            quantBits: 4, peakBytesEstimate: 8_200 * 1_048_576, contextCapTokens: 131_072)
         let plan = BASExecutionPlanElector.elect(
             modelID: big.modelID, manifest: big, device: air, state: state(temp: 0))
         XCTAssertFalse(plan.load.residentAdmitted)

@@ -59,12 +59,25 @@ public enum BASExecutionPlanElector {
         let admitted: Bool
         let residentBytes: Int
         if let m = manifest {
-            residentBytes = m.residentBytesEstimate
-            admitted = device.admitsResident(bytes: m.residentBytesEstimate)
+            residentBytes = m.peakBytesEstimate
+            admitted = device.admitsResident(bytes: m.peakBytesEstimate)
         } else {
             residentBytes = 0
             admitted = false
         }
+
+        // Rule 1b — DRAFT-SIBLING dual-residency admission. A draft-model spec lane needs BOTH the
+        // target AND the draft resident at once; it is elected only if their combined peak admits
+        // under the jetsam budget. This is why Gemma-4 E4B (4314 MB) + E2B (3114 MB) = 7428 MB is
+        // refused on the 6.29 GB Air and E4B runs single-model at its plain ceiling — the memory
+        // reason it does not reach ~50, modeled as data instead of a hardcoded willEngageSpeculation.
+        let draftSiblingAdmitted: Bool = {
+            guard admitted, let siblingID = manifest?.draftSiblingID,
+                  let sibling = BASModelManifestRegistry.manifest(forModelID: siblingID)
+            else { return false }
+            return device.admitsResident(
+                bytes: residentBytes + sibling.peakBytesEstimate)
+        }()
 
         // Rule 5 — purpose: greedy request unlocks speculative lanes; sampling stays the default.
         // Rule 4 — a device already throttled forces the plain-leaning default regardless of temp.
@@ -115,6 +128,7 @@ public enum BASExecutionPlanElector {
             deviceLabel: device.label,
             residentAdmitted: admitted,
             specCachePreserved: specCachePreserved,
+            draftSpeculationViable: draftSiblingAdmitted,
             energyModeled: false)
 
         return BASExecutionPlan(

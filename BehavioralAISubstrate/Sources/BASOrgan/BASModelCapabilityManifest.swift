@@ -42,9 +42,11 @@ public struct BASModelCapabilityManifest: Sendable, Equatable, Hashable, Codable
     public let draft: DraftMechanism
     /// Quantization width of the resident weights (4 / 3 / 8 / 16).
     public let quantBits: Int
-    /// Measured/estimated resident footprint of the loaded model, in bytes. Load-plan admission and
-    /// dual-residency election read this against the device jetsam budget.
-    public let residentBytesEstimate: Int
+    /// PEAK footprint of the loaded model in bytes — the load-time high-water mark the OS jetsam
+    /// SIGKILL check applies (NOT the resting weight size; e.g. Gemma-4 E4B's 2700 MB weights peak
+    /// at 4314 MB under the MatFormer runtime, and E4B was jetsam-killed twice at load). Admission
+    /// and dual-residency election MUST use this, not the weights estimate.
+    public let peakBytesEstimate: Int
     /// Maximum context the model was converted for (tokens); prefill/cache election reads it.
     public let contextCapTokens: Int
 
@@ -53,15 +55,21 @@ public struct BASModelCapabilityManifest: Sendable, Equatable, Hashable, Codable
         architecture: Architecture,
         draft: DraftMechanism,
         quantBits: Int,
-        residentBytesEstimate: Int,
+        peakBytesEstimate: Int,
         contextCapTokens: Int
     ) {
         self.modelID = modelID
         self.architecture = architecture
         self.draft = draft
         self.quantBits = quantBits
-        self.residentBytesEstimate = residentBytesEstimate
+        self.peakBytesEstimate = peakBytesEstimate
         self.contextCapTokens = contextCapTokens
+    }
+
+    /// The draft sibling's model id, if this model's acceleration is a separate draft model.
+    public var draftSiblingID: String? {
+        if case .draftSibling(let id) = draft { return id }
+        return nil
     }
 
     /// Whether the model carries a folded MTP head — the typed replacement for the
@@ -82,14 +90,14 @@ public struct BASModelCapabilityManifest: Sendable, Equatable, Hashable, Codable
 public enum BASModelManifestRegistry {
 
     /// Qwen3.5-4B-4bit — the chartered production default. GDN hybrid (linear DeltaNet + full-attn
-    /// interval-4), carries the folded MTP head, ~3114 MB resident (device-measured phys_footprint,
+    /// interval-4), carries the folded MTP head, ~3114 MB peak (device-measured phys_footprint,
     /// BASQwen35MTPProbe SUSTAIN 2026-07-13), 256k context.
     public static let qwen35_4B_4bit = BASModelCapabilityManifest(
         modelID: "mlx-community/Qwen3.5-4B-4bit",
         architecture: .gdnHybrid,
         draft: .mtpHead(weightsBasename: "qwen35_mtp_folded.safetensors"),
         quantBits: 4,
-        residentBytesEstimate: 3_114 * 1_048_576,
+        peakBytesEstimate: 3_114 * 1_048_576,
         contextCapTokens: 262_144)
 
     /// Llama-3.2-3B-Instruct-4bit — trimmable attention, its draft sibling is the 1B (same vocab).
@@ -98,23 +106,51 @@ public enum BASModelManifestRegistry {
         architecture: .trimmableAttention,
         draft: .draftSibling(modelID: "mlx-community/Llama-3.2-1B-Instruct-4bit"),
         quantBits: 4,
-        residentBytesEstimate: 2_542 * 1_048_576,
+        peakBytesEstimate: 2_542 * 1_048_576,
         contextCapTokens: 131_072)
 
-    /// Gemma-4-E4B-4bit — sliding/trimmable attention (window-masked verify), no self-draft
-    /// (E2B is the E4B draft; single-model here → prompt-lookup is its one decode accelerator).
+    /// Gemma-4-E4B-4bit — sliding/trimmable attention (window-masked verify). Its draft sibling IS
+    /// the nested MatFormer E2B (speculativePairings), so the draft-spec lane STRUCTURALLY exists —
+    /// but on the 12 GB Air it is memory-dormant: E4B peak 4314 MB + E2B peak 3114 MB = 7428 MB far
+    /// exceeds the 6.29 GB per-process jetsam cap (E4B alone was jetsam-killed twice at load). The
+    /// elector refuses the dual-residency draft plan and E4B runs single-model at its 42.6 tok/s
+    /// plain ceiling — this is exactly WHY E4B does not reach ~50 on this device. peak = DERIVED
+    /// 4314 MB (BASMLXMemoryBudget: 2700 weights + 1614 MatFormer runtime).
     public static let gemma4_E4B_4bit = BASModelCapabilityManifest(
         modelID: "mlx-community/gemma-4-e4b-it-4bit",
         architecture: .trimmableAttention,
+        draft: .draftSibling(modelID: "mlx-community/gemma-4-e2b-it-4bit"),
+        quantBits: 4,
+        peakBytesEstimate: 4_314 * 1_048_576,
+        contextCapTokens: 131_072)
+
+    /// Llama-3.2-1B-Instruct-4bit — Llama-3B's curated draft sibling (same vocab). Small (~1000 MB
+    /// peak), so the 3B+1B dual-residency DOES admit under the Air's cap (unlike Gemma E4B+E2B).
+    public static let llama32_1B_4bit = BASModelCapabilityManifest(
+        modelID: "mlx-community/Llama-3.2-1B-Instruct-4bit",
+        architecture: .trimmableAttention,
         draft: .none,
         quantBits: 4,
-        residentBytesEstimate: 2_593 * 1_048_576,
+        peakBytesEstimate: 1_000 * 1_048_576,
+        contextCapTokens: 131_072)
+
+    /// Gemma-4-E2B-4bit — the smallest variant (also E4B's draft). No smaller same-family draft, so
+    /// its one decode lever is prompt-lookup. peak 3114 MB MEASURED (deviceB, survived 261 MB under
+    /// the cap). As a standalone target its plain ceiling is higher (~42.6 tok/s, ~2B effective).
+    public static let gemma4_E2B_4bit = BASModelCapabilityManifest(
+        modelID: "mlx-community/gemma-4-e2b-it-4bit",
+        architecture: .trimmableAttention,
+        draft: .none,
+        quantBits: 4,
+        peakBytesEstimate: 3_114 * 1_048_576,
         contextCapTokens: 131_072)
 
     private static let byID: [String: BASModelCapabilityManifest] = [
         qwen35_4B_4bit.modelID: qwen35_4B_4bit,
         llama32_3B_4bit.modelID: llama32_3B_4bit,
+        llama32_1B_4bit.modelID: llama32_1B_4bit,
         gemma4_E4B_4bit.modelID: gemma4_E4B_4bit,
+        gemma4_E2B_4bit.modelID: gemma4_E2B_4bit,
     ]
 
     /// The chartered production default (2026-07-13): Qwen3.5-4B-4bit.
