@@ -1,4 +1,6 @@
 import XCTest
+import CryptoKit
+import BASSovereign
 @testable import QinaoRuntime
 @testable import QinaoSovereign
 @testable import QinaoRisk
@@ -31,6 +33,14 @@ final class WakeAndSleepDemo: XCTestCase {
     func testSessionWakesSleepsAndWakesAgain() async throws {
         let fx = PropertyDemoFixture.makeRuntime()
         try await PropertyDemoFixture.prepareHaltPlumbing(runtime: fx)
+        // deep-audit P0-4: signBundle's proof binds "anchor-host.v1" — register it so the proof
+        // verifies under the new registration check.
+        _ = try? await fx.snapshotManager.register(
+            anchor: BASSovereignSnapshotManager.SnapshotAnchor(
+                anchorID: "anchor-host.v1", safeSnapshotRef: "snap.anchor-host.v1",
+                integrityHash: SHA256.hash(data: Data("anchor-host.v1".utf8))
+                    .map { String(format: "%02x", $0) }.joined()),
+            sealedPayload: Data("anchor-host.v1".utf8))
 
         let intent = PropertyDemoFixture.intent(
             digest: "intent.wake-sleep",

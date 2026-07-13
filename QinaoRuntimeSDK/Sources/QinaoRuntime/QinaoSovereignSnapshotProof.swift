@@ -44,7 +44,7 @@ extension QinaoSovereignControlPlane {
     public func isSnapshotProofValid(
         _ proof: QinaoRuntime.SnapshotContinuityProof,
         for intent: Intent
-    ) -> Bool {
+    ) async -> Bool {
         // deep-audit MEDIUM-1: constant-time MAC verify (was hex String ==).
         guard Self.tokenTagValid(
             key: tokenTagKey,
@@ -57,6 +57,11 @@ extension QinaoSovereignControlPlane {
         guard proof.sessionID == intent.sessionID else { return false }
         guard proof.intentDigest == intent.digest else { return false }
         guard proof.expiresAt > now() else { return false }
+        // deep-audit P0-4: the proof's anchor must be REGISTERED with the snapshot manager right
+        // now. Signing an arbitrary anchorID (never registered, or deregistered/rotated within the
+        // TTL) previously produced a proof that verified purely as a signed string — it never
+        // proved a live snapshot chain. Fail closed on an anchor the control plane does not know.
+        guard await isAnchorRegistered(proof.anchorID) else { return false }
         return true
     }
 }

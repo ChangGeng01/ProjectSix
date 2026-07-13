@@ -57,6 +57,14 @@ public actor QinaoSovereignControlPlane {
             outputByteCount: 32)
     }
 
+    /// deep-audit P0-4: is `anchorID` currently registered with the snapshot manager? The snapshot-
+    /// continuity-proof verify (in the QinaoRuntime module) consults this so a proof for an
+    /// unregistered/deregistered anchor fails closed. `package` so the proof extension reaches it
+    /// without widening public surface (mirrors `tokenTagKey`).
+    package func isAnchorRegistered(_ anchorID: String) async -> Bool {
+        await coordinator.isAnchorRegistered(anchorID)
+    }
+
     // MARK: - Errors
 
     public enum SovereignError: Error, Equatable, Sendable {
@@ -693,7 +701,9 @@ public actor QinaoSovereignControlPlane {
     /// regular `Sendable`; the previous `@unchecked Sendable`
     /// was concurrency-checker bypass for no actual reason.
     public struct SubstrateHandle: Sendable {
-        internal let snapshotManager: BASSovereignSnapshotManager
+        // deep-audit P0-4: `package` (was internal) so same-package hosts/tests can seed snapshot
+        // anchors through the assembled host — the proof verify now requires a registered anchor.
+        package let snapshotManager: BASSovereignSnapshotManager
         internal let hostVersionTree: BASSovereignHostVersionTree
     }
 

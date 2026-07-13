@@ -117,6 +117,15 @@ final class QinaoRuntimeGateTests: XCTestCase {
             toolExecutor: executor,
             now: now)
 
+        // deep-audit P0-4: register the anchor `validProof` mints against, so the happy-path proofs
+        // verify under the new registration check (a proof for an unregistered anchor is refused).
+        _ = try? await snapshotManager.register(
+            anchor: BASSovereignSnapshotManager.SnapshotAnchor(
+                anchorID: "anchor-host.v1",
+                safeSnapshotRef: "snap.host.v1",
+                integrityHash: Self.sha256Hex(Data("host.v1".utf8))),
+            sealedPayload: Data("host.v1".utf8))
+
         return Fixture(
             runtime: runtime,
             recorder: recorder,
@@ -221,6 +230,41 @@ final class QinaoRuntimeGateTests: XCTestCase {
         }
         let count = await recorder.callCount
         XCTAssertEqual(count, 1, "the tool must have run exactly once despite the replay attempt")
+    }
+
+    // MARK: - deep-audit P0-4: proof must prove a LIVE anchor
+
+    /// A structurally valid, correctly-signed, unexpired proof whose anchorID is NOT registered
+    /// must be refused — the proof previously "verified" as a signed string that proved no live
+    /// snapshot chain. execute() throws missingSnapshotProof for it.
+    func testProofForUnregisteredAnchorIsRefused() async throws {
+        let fx = await makeRuntime()
+        let it = intent()
+        let permit = try await fx.risk.requestActionPermit(for: it)
+        let warrant = try await fx.sovereign.issueWarrant(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID))
+        // Mint a proof for an anchor that was never registered.
+        let orphanProof = await fx.sovereign.issueSnapshotContinuityProof(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID),
+            anchorID: "anchor.NEVER-REGISTERED", ttlSeconds: 10)
+
+        let valid = await fx.sovereign.isSnapshotProofValid(
+            orphanProof,
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID))
+        XCTAssertFalse(valid, "a proof for an unregistered anchor must not verify")
+
+        await XCTAssertThrowsErrorAsync(
+            try await fx.runtime.execute(
+                toolName: "calendar.add_event", payload: Data(), intent: it,
+                signatures: .init(permit: permit, warrant: warrant, snapshotProof: orphanProof))
+        ) { error in
+            guard case QinaoRuntime.RuntimeError.missingSnapshotProof = error else {
+                return XCTFail("expected missingSnapshotProof, got \(error)")
+            }
+        }
     }
 
     // MARK: - audit F1: tool-swap rejection (valid signatures, wrong tool)

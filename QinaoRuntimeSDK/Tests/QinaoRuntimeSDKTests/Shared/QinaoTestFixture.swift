@@ -65,6 +65,19 @@ package struct QinaoTestFixture: Sendable {
 
         let snapshotManager = BASSovereignSnapshotManager(
             now: now)
+        // deep-audit P0-4: pre-register the anchors that fixture-based tests mint snapshot-
+        // continuity proofs against, so those proofs verify under the new registration check
+        // (a proof for an unregistered anchor is now refused). Extra registrations are harmless.
+        for anchorID in ["anchor", "anchor-triple", "anchor-v0", "anchor.demo", "anchor-host.v1",
+                         "anchor.host.v1", "a.v1", "a-demo-warm", "a-demo-reserved"] {
+            let payload = Data(anchorID.utf8)
+            _ = try? await snapshotManager.register(
+                anchor: BASSovereignSnapshotManager.SnapshotAnchor(
+                    anchorID: anchorID, safeSnapshotRef: "snap.\(anchorID)",
+                    integrityHash: SHA256.hash(data: payload)
+                        .map { String(format: "%02x", $0) }.joined()),
+                sealedPayload: payload)
+        }
         let versionTree = BASSovereignHostVersionTree(now: now)
         let ledger = BASSovereignAuditLedger(
             signingSecret: SymmetricKey(size: .bits256))

@@ -121,6 +121,14 @@ final class QinaoSovereignHostAssemblyTests: XCTestCase {
         let log = ToolLog()
         let host = try await makeHost(toolLog: log)
 
+        // deep-audit P0-4: register the anchor the proof binds, so it verifies under the new
+        // registration check (a proof for an unregistered anchor is refused).
+        _ = try? await host.substrate.snapshotManager.register(
+            anchor: BASSovereignSnapshotManager.SnapshotAnchor(
+                anchorID: "anchor.host.v1", safeSnapshotRef: "snap.host.v1",
+                integrityHash: SHA256.hash(data: Data("host.v1".utf8)).map { String(format: "%02x", $0) }.joined()),
+            sealedPayload: Data("host.v1".utf8))
+
         let intent = QinaoRiskGate.ActionIntent(
             digest: "intent.assembly.tool",
             toolName: "journal.append",
