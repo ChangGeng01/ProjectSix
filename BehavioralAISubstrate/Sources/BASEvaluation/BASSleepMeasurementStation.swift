@@ -1,6 +1,17 @@
 import Foundation
 import BASRuntimeCore
 
+/// deep-audit P2-24 (2026-07-13): a lock-guarded byte box. The sleep station reads a child
+/// process's stdout on a background queue and consumes it on the main thread after a
+/// possibly-timed-out wait; this box makes that synchronization visible to the compiler
+/// (replacing a captured `var` + external NSLock the compiler flagged as a concurrent mutation).
+private final class OutBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+    func set(_ d: Data) { lock.lock(); data = d; lock.unlock() }
+    func get() -> Data { lock.lock(); defer { lock.unlock() }; return data }
+}
+
 // P3 睡眠窗测量站(RSI 章程 2026-07-07)——dream-loop 的既有形状,严格 verdict-only。
 // 宪法界:站只【测量并记账】,产物是判决候选账本行;不采纳、不改任何开关/常数(采纳权
 // 见 P2 candidate:人签)。提案功能不存在(先决门=章程暗点3 的 4B 利用力实验)。
@@ -199,16 +210,18 @@ public enum BASSleepMeasurementStation {
             // the station halt below (killTargetForTimeout self-protects if the child didn't detach).
             setpgid(proc.processIdentifier, proc.processIdentifier)
             // 超时看门狗:后台读避免管道阻塞;截止即 terminate(升级 group-kill)。
-            var outData = Data()
-            // audit organ-eval MED-1: outData is WRITTEN by the read thread and READ by this
-            // thread after a wait that CAN TIME OUT — so on the timeout path the read raced an
-            // in-flight write of a value struct (torn read / UB). Guard both ends with a lock.
-            let outLock = NSLock()
+            // audit organ-eval MED-1: the child's stdout is WRITTEN by the read thread and READ
+            // by this thread after a wait that CAN TIME OUT — so on the timeout path the read
+            // raced an in-flight write (torn read / UB). deep-audit P2-24 (2026-07-13): a
+            // lock-guarded box makes that synchronization VISIBLE to the compiler (was a captured
+            // `var outData` + external NSLock, which reads as a concurrent mutation of a captured
+            // var — a warning today, a Swift-6-language-mode error tomorrow).
+            let outBox = OutBox()
             let readQueue = DispatchQueue(label: "bas.station.read")
             let readDone = DispatchSemaphore(value: 0)
             readQueue.async {
                 let d = pipe.fileHandleForReading.readDataToEndOfFile()
-                outLock.lock(); outData = d; outLock.unlock()
+                outBox.set(d)
                 readDone.signal()
             }
             let deadline = Date().addingTimeInterval(manifest.perSuiteTimeoutS)
@@ -238,9 +251,7 @@ public enum BASSleepMeasurementStation {
             }
             proc.waitUntilExit()
             _ = readDone.wait(timeout: .now() + 10)
-            outLock.lock()
-            let out = String(data: outData, encoding: .utf8) ?? ""   // audit organ-eval MED-1: read under lock
-            outLock.unlock()
+            let out = String(data: outBox.get(), encoding: .utf8) ?? ""   // organ-eval MED-1: read under lock
             let dt = Date().timeIntervalSince(t0)
             let agg = parseAggregate(out)
             let verdict: String

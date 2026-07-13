@@ -236,10 +236,15 @@ public enum BASMetalGPUProbe {
         enc.endEncoding()
 
         let sem = DispatchSemaphore(value: 0)
+        // deep-audit P2-24 (2026-07-13): capture only the Sendable pieces (`budget` is
+        // @unchecked Sendable — see the thread-safety rationale on Budget), not the whole
+        // non-Sendable `rig`. Behaviour-identical; silences the Sendable-capture warning that
+        // surfaced in every BASMetalSubstrate build (and would be a Swift-6-mode error).
+        let budget = rig.budget
         // Release the in-flight slot when the buffer completes (even on error). A buffer
         // that never completes (a true wedge) holds its slot forever — which is the point:
         // outstanding saturates the cap and subsequent probes short-circuit to .timedOut.
-        cb.addCompletedHandler { _ in rig.budget.release(); sem.signal() }
+        cb.addCompletedHandler { _ in budget.release(); sem.signal() }
         cb.commit()
 
         let waitResult = sem.wait(timeout: .now() + timeoutSec)
