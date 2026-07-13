@@ -612,3 +612,57 @@ func XCTAssertThrowsErrorAsync<T>(
         errorHandler(error)
     }
 }
+
+/// deep-audit P0-3 (2026-07-13) — durability pin for the LAST-await halt re-check.
+///
+/// execute() checks `sovereign.isSessionHalted` at the TOP (first of four suspension points) and
+/// AGAIN right before the external effect, after the bundle is atomically consumed. The second
+/// re-check is the load-bearing one: a `markSessionHalted` landing during the intervening
+/// permit/warrant/proof awaits would otherwise be missed and the executor would still fire. The
+/// existing halt tests halt BEFORE execute (caught by the FIRST check), so they don't exercise the
+/// re-check — deleting it reds nothing. A deterministic behavioural test would need a production
+/// test-seam; instead this source-pins that the re-check exists AT the last-await position (after
+/// the bundle consume, before the executor). Removing it reds this.
+final class QinaoRuntimeHaltReCheckPinTests: XCTestCase {
+    func testExecuteReChecksHaltAfterBundleConsumeBeforeEffect() throws {
+        let runtimeSrc = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // QinaoRuntimeSDKTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // QinaoRuntimeSDK
+            .appendingPathComponent("Sources/QinaoRuntime/QinaoRuntime.swift")
+        let text = try String(contentsOf: runtimeSrc, encoding: .utf8)
+
+        // Isolate the execute(...) body: from its signature to the next `public func` after it,
+        // so counts are scoped to execute.
+        guard let execStart = text.range(of: "func execute(") else {
+            return XCTFail("execute() not found")
+        }
+        let after = String(text[execStart.upperBound...])
+        let execBody: String
+        if let nextFunc = after.range(of: "\n    public func ") {
+            execBody = String(after[..<nextFunc.lowerBound])
+        } else {
+            execBody = after
+        }
+
+        // Non-comment lines only.
+        let code = execBody.split(separator: "\n", omittingEmptySubsequences: false)
+            .map(String.init)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+
+        let haltChecks = code.components(separatedBy: "sovereign.isSessionHalted").count - 1
+        XCTAssertGreaterThanOrEqual(haltChecks, 2,
+            "execute() must re-check halt (top + last-await) — found \(haltChecks) isSessionHalted checks")
+
+        // The re-check must come AFTER the atomic bundle consume (so a halted turn's bundle is
+        // already burned) and BEFORE the executor call.
+        guard let consumeIdx = code.range(of: "consumedBundles[bundleKey] =")?.upperBound,
+              let executorIdx = code.range(of: "toolExecutor(")?.lowerBound else {
+            return XCTFail("bundle-consume or executor call not found in execute()")
+        }
+        let tail = String(code[consumeIdx..<executorIdx])
+        XCTAssertTrue(tail.contains("sovereign.isSessionHalted"),
+            "P0-3: the halt re-check must sit AFTER the bundle consume and BEFORE the executor")
+    }
+}
