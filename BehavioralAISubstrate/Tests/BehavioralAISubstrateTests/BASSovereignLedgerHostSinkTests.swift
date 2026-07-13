@@ -106,6 +106,47 @@ final class BASSovereignLedgerHostSinkTests: XCTestCase {
             "the digest component must differ for distinct turns (clock-independent)")
     }
 
+    /// deep-audit P2-17 (2026-07-13, semantic): the CONTENT digest — not just turnID — must
+    /// discriminate. Holds turnID CONSTANT (same session + same frozen recordedAt) and varies only
+    /// the content (snapshotRef / actionRefs), proving distinct-content → distinct auditID even
+    /// under a frozen clock; and that byte-identical inputs → identical auditID (idempotent replay).
+    /// The drivenTurn tests can't isolate this because each turn runs at a distinct wall-clock time.
+    /// Reversal: a derivation that digests turnID alone reds the distinct-content assertions.
+    func testAuditIDContentDigestDiscriminatesUnderAFrozenTurnID() {
+        let turnID = "sess.frozen#123456.0"   // same session + same recordedAt tick for all
+        let verdictID = "verdict.sess.frozen"
+        let level = "advisory"
+
+        let base = BASEBrainRuntimeCoordinator.deriveSovereignAuditID(
+            turnID: turnID, verdictID: verdictID, verdictLevelRaw: level,
+            snapshotRef: "snap.A", actionRefs: ["commit.1"])
+
+        // Idempotent: byte-identical inputs (the SAME turn) → the SAME auditID.
+        let baseAgain = BASEBrainRuntimeCoordinator.deriveSovereignAuditID(
+            turnID: turnID, verdictID: verdictID, verdictLevelRaw: level,
+            snapshotRef: "snap.A", actionRefs: ["commit.1"])
+        XCTAssertEqual(base, baseAgain, "identical turn inputs must re-derive an identical auditID")
+
+        // Distinct content at the SAME turnID → distinct auditID (via snapshotRef).
+        let diffSnapshot = BASEBrainRuntimeCoordinator.deriveSovereignAuditID(
+            turnID: turnID, verdictID: verdictID, verdictLevelRaw: level,
+            snapshotRef: "snap.B", actionRefs: ["commit.1"])
+        XCTAssertNotEqual(base, diffSnapshot,
+            "a different thought-fold (snapshotRef) at the SAME frozen turnID must give a distinct auditID")
+
+        // Distinct content at the SAME turnID → distinct auditID (via actionRefs).
+        let diffActions = BASEBrainRuntimeCoordinator.deriveSovereignAuditID(
+            turnID: turnID, verdictID: verdictID, verdictLevelRaw: level,
+            snapshotRef: "snap.A", actionRefs: ["commit.2"])
+        XCTAssertNotEqual(base, diffActions,
+            "different commit/warrant tokens at the SAME frozen turnID must give a distinct auditID")
+
+        // The trailing digest is 16 lowercase hex (8-byte SHA-256), not a UUID.
+        let last = String(base.split(separator: ".").last ?? "")
+        XCTAssertEqual(last.count, 16)
+        XCTAssertTrue(last.allSatisfy { $0.isHexDigit && !$0.isUppercase })
+    }
+
     // MARK: - 1. Real turn → signed + chained
 
     func testRecordsSignedChainedEntryFromRealTurn() async throws {

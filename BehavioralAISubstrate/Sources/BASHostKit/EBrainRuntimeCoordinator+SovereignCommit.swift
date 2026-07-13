@@ -19,6 +19,42 @@ import BASWorldPrior
 // Extracted from the 6099-line monolith during the M71 cohesion split.
 
 extension BASEBrainRuntimeCoordinator {
+
+    /// deep-audit P2-17 (2026-07-13): the auditID derivation, EXTRACTED as a pure static function
+    /// so its uniqueness/determinism contract is directly unit-testable with `turnID` held constant
+    /// (the drivenTurn-based tests can't isolate the content digest because each turn runs at a
+    /// distinct wall-clock time, so turnID already differs).
+    ///
+    /// Contract: the trailing component is a DETERMINISTIC SHA-256 (8-byte, 16 hex) over the turn's
+    /// identifying fields — turnID (session + recordedAt), verdictID, level, snapshotRef, and the
+    /// commit/warrant/quarantine action refs. Two turns that differ in ANY of these get distinct
+    /// auditIDs even under a host-FROZEN clock where turnID alone would collide; byte-identical
+    /// inputs are the SAME turn and correctly map to the same auditID (idempotent — the
+    /// replay-determinism harness requires it, which is why this is a content digest, not a UUID).
+    ///
+    /// DECISION (P2-17 sub-part 2): NO monotonic per-turn sequence component is added. Genuinely
+    /// distinct turns differ in snapshotRef (from the thought fold) and/or actionRefs (their commit/
+    /// warrant/quarantine tokens are per-turn unique), so a same-tick collision requires
+    /// byte-identical content — which IS the same turn. Adding a sequence would break the
+    /// idempotent-replay determinism the harness pins for no real-world uniqueness gain.
+    static func deriveSovereignAuditID(
+        turnID: String,
+        verdictID: String,
+        verdictLevelRaw: String,
+        snapshotRef: String,
+        actionRefs: [String]
+    ) -> String {
+        let auditDiscriminator = [
+            turnID,
+            verdictID,
+            verdictLevelRaw,
+            snapshotRef,
+            actionRefs.joined(separator: ","),
+        ].joined(separator: "\u{1F}")
+        let auditDigest = SHA256.hash(data: Data(auditDiscriminator.utf8))
+            .prefix(8).map { String(format: "%02x", $0) }.joined()
+        return "audit.\(turnID).\(verdictLevelRaw).\(auditDigest)"
+    }
     func buildSovereignCommitTokens(
         sovereignVerdict: BASSovereignVerdict,
         runtimeTrace: BASRuntimeTrace,
@@ -698,16 +734,12 @@ extension BASEBrainRuntimeCoordinator {
         // turns differ in at least one → distinct digest, even under a host-frozen clock where
         // turnID alone collided; identical inputs mean the SAME turn, which correctly maps to
         // the same auditID (idempotent). turnID stays the grep-able prefix.
-        let auditDiscriminator = [
-            turnID,
-            sovereignVerdict.verdictID,
-            sovereignVerdict.verdictLevel.rawValue,
-            snapshotRef,
-            actionRefs.joined(separator: ","),
-        ].joined(separator: "\u{1F}")
-        let auditDigest = SHA256.hash(data: Data(auditDiscriminator.utf8))
-            .prefix(8).map { String(format: "%02x", $0) }.joined()
-        let auditID = "audit.\(turnID).\(sovereignVerdict.verdictLevel.rawValue).\(auditDigest)"
+        let auditID = Self.deriveSovereignAuditID(
+            turnID: turnID,
+            verdictID: sovereignVerdict.verdictID,
+            verdictLevelRaw: sovereignVerdict.verdictLevel.rawValue,
+            snapshotRef: snapshotRef,
+            actionRefs: actionRefs)
         // M299 — derive frontier summary from the candidate
         // observation bundle. `summarize()` is a pure value-type
         // transform; emits at most three status codes per turn
