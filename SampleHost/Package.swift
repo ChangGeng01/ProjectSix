@@ -11,11 +11,21 @@
 // standalone SPM package that depends on BehavioralAISubstrate
 // via a sibling-path dependency。
 //
-// Platform target:**iOS 18 only**。 SampleHost contains UIKit-
-// using bench panels + SwiftUI iOS app shells (5 UIKit-using
-// files,11 SwiftUI-only files,38 cross-platform helpers)。
-// Pure `swift build` from macOS will fail on UIKit imports —
-// build via xcodebuild + iOS simulator:
+// Platform target:**iOS 18** (macOS floor aligned to v14 for
+// resolution only)。 SampleHost contains UIKit-using bench panels +
+// SwiftUI iOS app shells (5 UIKit-using files,11 SwiftUI-only
+// files,38 cross-platform helpers)。
+//
+// deep-audit P2-22 (2026-07-13): a bare `swift build` from macOS
+// does NOT fail first on UIKit — it fails EARLIER, during dependency
+// resolution, because BehavioralAISubstrate declares `.macOS(.v14)`
+// while this package's implicit macOS floor was the SPM default
+// (macOS 12): "the product depends on macOS 14, but the target
+// requires macOS 12". We now declare `.macOS(.v14)` so the manifest
+// resolves and the (correct, expected) UIKit compile error is what a
+// macOS builder actually sees. Either way the sanctioned path is
+// xcodebuild + an iOS simulator — `swift build` on macOS is not a
+// supported build of an iOS-only host:
 //
 //   (run from INSIDE SampleHost/ — `-package-path` stopped resolving
 //    under Xcode 27 beta, operator-verified 2026-07-11)
@@ -42,7 +52,11 @@ import PackageDescription
 let package = Package(
     name: "SampleHost",
     platforms: [
-        .iOS(.v18)
+        .iOS(.v18),
+        // deep-audit P2-22 (2026-07-13): align the macOS floor with BAS (.macOS(.v14)) so a
+        // macOS `swift build` fails on the real UIKit imports, not a confusing implicit-floor
+        // (macOS 12 default) vs dependency-floor mismatch during resolution.
+        .macOS(.v14)
     ],
     products: [
         .library(name: "SampleHost", targets: ["SampleHost"])
