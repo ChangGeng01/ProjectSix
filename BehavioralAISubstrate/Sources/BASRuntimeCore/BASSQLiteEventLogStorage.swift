@@ -650,8 +650,12 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 code: -1,
                 message: "db handle nil after init")
         }
-        return try Self.pruneBefore(
-            db: db, cutoff: cutoff)
+        let pruned = try Self.pruneBefore(db: db, cutoff: cutoff)
+        // deep-audit P2-18 (2026-07-13): a retention prune's deleted event payloads live on as the
+        // original INSERT frames in the -wal until a checkpoint truncates it. Truncate now (post-
+        // COMMIT, non-hot retention path) so a forensic reader of the sidecar can't recover them.
+        try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
+        return pruned
     }
 
     fileprivate static func pruneBefore(

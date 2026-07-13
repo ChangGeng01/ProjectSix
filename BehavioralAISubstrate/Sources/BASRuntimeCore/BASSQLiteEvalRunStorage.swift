@@ -384,17 +384,21 @@ public actor BASSQLiteEvalRunStorage: BASEvalRunStorage {
                 message: "db handle nil after init")
         }
         try Self.runExec(db: db, sql: "BEGIN TRANSACTION;")
+        let removed: Int
         do {
             try Self.deleteOldReports(
                 db: db, cutoff: cutoff)
-            let removed = try Self.deleteOldRuns(
+            removed = try Self.deleteOldRuns(
                 db: db, cutoff: cutoff)
             try Self.runExec(db: db, sql: "COMMIT;")
-            return removed
         } catch {
             try? Self.runExec(db: db, sql: "ROLLBACK;")
             throw error
         }
+        // deep-audit P2-18 (2026-07-13): truncate the WAL after the prune COMMIT so deleted eval
+        // run/report rows don't survive as INSERT frames in the -wal (non-hot retention path).
+        try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
+        return removed
     }
 
     fileprivate static func deleteOldReports(

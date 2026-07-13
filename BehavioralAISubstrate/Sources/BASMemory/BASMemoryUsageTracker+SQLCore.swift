@@ -283,6 +283,9 @@ extension BASMemoryUsageTracker {
         if let db = db {
             try Self.ensureTombstoneSchema(db: db)
             try Self.purgeTombstonedRows(db: db)
+            // deep-audit P2-18 (2026-07-13): truncate the WAL so purged usage-record notes don't
+            // survive as INSERT frames in the -wal (explicit purge, non-hot).
+            try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
         }
         return count
     }
@@ -689,6 +692,9 @@ extension BASMemoryUsageTracker {
         }
         if let db {
             try Self.deleteOlderThan(db: db, cutoff: cutoff)
+            // deep-audit P2-18 (2026-07-13): truncate the WAL after the age-based purge so deleted
+            // usage records don't linger as INSERT frames in the -wal.
+            try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
         }
         return stale.count
     }

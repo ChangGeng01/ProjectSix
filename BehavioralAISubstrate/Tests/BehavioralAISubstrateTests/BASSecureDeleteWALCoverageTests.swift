@@ -100,4 +100,27 @@ final class BASSecureDeleteWALCoverageTests: XCTestCase {
         XCTAssertNil(walBytes(u).range(of: secretData),
             "P2-18: a removed knowledge node's content must not survive in the -wal")
     }
+
+    // MARK: - P2-18 (2026-07-13): the RETENTION prune/purge paths must WAL-truncate too.
+
+    /// The three retention/purge paths (event-log prune, eval-run delete, usage-tracker purge)
+    /// delete plaintext rows that otherwise linger as INSERT frames in the -wal. The forensic
+    /// TRUNCATE mechanism is behaviourally reversal-proven by the four explicit-forget teeth above
+    /// and by BASSecureDeleteWALCoverageTests; these paths use the identical
+    /// `checkpointTruncateAfterSecureDelete` helper, so this source-pins that each retention path
+    /// actually calls it. Reversal: removing any of the calls drops the count and reds this.
+    func testRetentionPrunePathsTruncateTheWAL() throws {
+        let root = URL(fileURLWithPath: BASSourceTreeAudit.repoRoot)
+        let expectations: [(rel: String, minCalls: Int, what: String)] = [
+            ("Sources/BASRuntimeCore/BASSQLiteEventLogStorage.swift", 1, "event-log prune"),
+            ("Sources/BASRuntimeCore/BASSQLiteEvalRunStorage.swift", 1, "eval-run prune"),
+            ("Sources/BASMemory/BASMemoryUsageTracker+SQLCore.swift", 2, "usage-tracker purge (×2)"),
+        ]
+        for exp in expectations {
+            let text = try String(contentsOf: root.appendingPathComponent(exp.rel), encoding: .utf8)
+            let calls = text.components(separatedBy: "checkpointTruncateAfterSecureDelete(db:").count - 1
+            XCTAssertGreaterThanOrEqual(calls, exp.minCalls,
+                "P2-18: \(exp.what) must WAL-truncate after its delete (found \(calls) checkpoint calls in \(exp.rel))")
+        }
+    }
 }
