@@ -27,7 +27,7 @@ final class BASSustainedDecodeDeviceTests: XCTestCase {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let localDir = docs.appendingPathComponent("models/Qwen3.5-4B-4bit")
         let wURL = docs.appendingPathComponent("qwen35_mtp_folded.safetensors")
-        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        MLX.Memory.cacheLimit = 512 * 1024 * 1024
         let container = try await #huggingFaceLoadModelContainer(
             configuration: ModelConfiguration(directory: localDir, extraEOSTokens: ["<|im_end|>"]),
             progressHandler: { _ in })

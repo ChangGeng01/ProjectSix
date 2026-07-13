@@ -25,7 +25,7 @@ final class BASPressureLadderDeviceTests: XCTestCase {
             throw XCTSkip("arm TEST_RUNNER_BAS_PRESSURE_LADDER=1")
         }
         ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
-        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        MLX.Memory.cacheLimit = 512 * 1024 * 1024
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
         try await adapter.loadModel()
         let cap = try XCTUnwrap(BASMLXMemoryModel.resolvedActiveHardCapBytes())

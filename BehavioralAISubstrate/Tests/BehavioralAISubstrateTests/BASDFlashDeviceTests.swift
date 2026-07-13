@@ -53,7 +53,7 @@ final class BASDFlashDeviceTests: XCTestCase {
         // Jetsam discipline (take-1/2 kills: per-process-limit at 6.29GB): cap the MLX free-buffer
         // pool exactly as production loadModel does (ADR-038 — uncapped it grows to the memory
         // limit under the per-cycle ctx-concat churn), and keep ONE decoder resident at a time.
-        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        MLX.Memory.cacheLimit = 512 * 1024 * 1024
         let container = try await #huggingFaceLoadModelContainer(
             configuration: ModelConfiguration(directory: localDir, extraEOSTokens: ["<|im_end|>"]),
             progressHandler: { _ in })
@@ -81,14 +81,14 @@ final class BASDFlashDeviceTests: XCTestCase {
                     case "dflash":
                         if box.d == nil {                                   // one decoder resident
                             box.m = nil
-                            MLX.GPU.clearCache()
+                            MLX.Memory.clearCache()
                             box.d = try BASQwen35DFlashDecoder(model: qwen, draftWeightsURL: dURL)
                         }
                         run = box.d!.generateDFlash(prompt: ids, maxTokens: 256, eosTokens: eos)
                     default:
                         if box.m == nil {
                             box.d = nil
-                            MLX.GPU.clearCache()
+                            MLX.Memory.clearCache()
                             box.m = try BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
                         }
                         if arm == "mtp" {
@@ -106,7 +106,7 @@ final class BASDFlashDeviceTests: XCTestCase {
                 }
                 rows.append(r)
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
-                MLX.GPU.clearCache()
+                MLX.Memory.clearCache()
             }
         }
 

@@ -56,7 +56,7 @@ final class BASSessionLaneCrossoverDeviceTests: XCTestCase {
                 let sRun = dec.generateSpecKFused(prompt: fullPrompt, maxTokens: 32, k: 3, tCap: 5, adaptiveK: true)
                 eval(MLXArray(Int32(sRun.tokens.count)))
                 let statelessMs = Date().timeIntervalSince(a0) * 1000
-                MLX.GPU.clearCache()
+                MLX.Memory.clearCache()
 
                 // (b) KV-REUSE per-turn cost: prefill only the NEW turn against a warm cache + plain decode.
                 let cache = qwen.newCache(parameters: nil)
@@ -69,7 +69,7 @@ final class BASSessionLaneCrossoverDeviceTests: XCTestCase {
                 let reuseTotalMs = Date().timeIntervalSince(b0) * 1000 - plain.decodeSeconds * 1000 + plain.decodeSeconds * 1000
                 out.append(Row(depth: depth, histTokens: history.count,
                                statelessMs: statelessMs, reuseMs: reuseTotalMs))
-                MLX.GPU.clearCache()
+                MLX.Memory.clearCache()
             }
             return out
         }

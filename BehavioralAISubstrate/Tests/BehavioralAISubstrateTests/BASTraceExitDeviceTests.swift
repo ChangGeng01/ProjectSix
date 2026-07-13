@@ -73,7 +73,7 @@ final class BASTraceExitDeviceTests: XCTestCase {
                 rows.append(try await runOne(container: container, q: item.q, answers: item.a,
                                              arm: arm, cap: 384))
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
-                MLX.GPU.clearCache()
+                MLX.Memory.clearCache()
             }
         }
         // BUDGET regime @128 (the 96-tok artifact shape).
@@ -83,7 +83,7 @@ final class BASTraceExitDeviceTests: XCTestCase {
                 rows.append(try await runOne(container: container, q: item.q, answers: item.a,
                                              arm: arm, cap: 128))
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
-                MLX.GPU.clearCache()
+                MLX.Memory.clearCache()
             }
         }
 

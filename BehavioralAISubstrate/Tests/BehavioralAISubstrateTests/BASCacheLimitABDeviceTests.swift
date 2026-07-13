@@ -48,7 +48,7 @@ final class BASCacheLimitABDeviceTests: XCTestCase {
 
         let mib = 1024 * 1024
         // 在位值加载(生产同构),臂内再切换。
-        MLX.GPU.set(cacheLimit: 512 * mib)
+        MLX.Memory.cacheLimit = 512 * mib
         let container = try await #huggingFaceLoadModelContainer(
             configuration: config, progressHandler: { _ in })
 
@@ -96,8 +96,8 @@ final class BASCacheLimitABDeviceTests: XCTestCase {
             var aborted: [String] = []
             for (bi, block) in blocks.enumerated() {
                 for arm in block {
-                    MLX.GPU.set(cacheLimit: arm.bytes)
-                    MLX.GPU.clearCache()
+                    MLX.Memory.cacheLimit = arm.bytes
+                    MLX.Memory.clearCache()
                     MLX.GPU.resetPeakMemory()
                     var armAborted = false
                     for g in 0..<gensPerArm {
@@ -111,7 +111,7 @@ final class BASCacheLimitABDeviceTests: XCTestCase {
                             k: MLXOrganAdapter.mtpProductionK,
                             tCap: MLXOrganAdapter.mtpProductionTCap, adaptiveK: false)
                         let dt = Date().timeIntervalSince(g0)
-                        let snap = MLX.GPU.snapshot()
+                        let snap = MLX.Memory.snapshot()
                         rows.append(Row(
                             block: bi, arm: arm.tag, gen: g, prompt: p,
                             tokens: run.tokens.count, seconds: run.decodeSeconds > 0 ? run.decodeSeconds : dt,

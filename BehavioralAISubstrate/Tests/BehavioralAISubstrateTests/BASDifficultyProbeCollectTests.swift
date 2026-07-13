@@ -360,7 +360,7 @@ final class BASDifficultyProbeCollectTests: XCTestCase {
             fh.write("\n".data(using: .utf8)!)
             if done % 20 == 0 {
                 print("[probe-collect] \(done)/\(questions.count) running_acc=\(String(format: "%.2f", Double(correct) / Double(done)))")
-                MLX.GPU.clearCache()
+                MLX.Memory.clearCache()
             }
         }
         print("[probe-collect] DONE n=\(done) acc=\(String(format: "%.3f", Double(correct) / Double(done))) → \(outPath)")

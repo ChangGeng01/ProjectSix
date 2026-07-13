@@ -30,7 +30,7 @@ final class BASSessionSpillEnduranceDeviceTests: XCTestCase {
             throw XCTSkip("spill cert needs BAS_SESSION_CAPPED_FUSED=0 — capped turns bypass the pool otherwise")
         }
         ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
-        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        MLX.Memory.cacheLimit = 512 * 1024 * 1024
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
         try await adapter.loadModel()
         let codewords = ["lantern", "obsidian", "cascade", "juniper", "meridian", "tundra"]
@@ -119,7 +119,7 @@ final class BASSessionSpillEnduranceDeviceTests: XCTestCase {
         #if canImport(MLXLLM)
         XCTAssertTrue(MLXOrganAdapter.sessionCappedFusedEnabled, "runner must arm the lane")
         ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
-        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        MLX.Memory.cacheLimit = 512 * 1024 * 1024
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
         try await adapter.loadModel()
         let codewords = ["lantern", "obsidian", "cascade"]
@@ -167,7 +167,7 @@ final class BASSessionSpillEnduranceDeviceTests: XCTestCase {
         #if canImport(MLXLLM)
         XCTAssertTrue(MLXOrganAdapter.sessionCappedFusedEnabled)
         ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
-        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        MLX.Memory.cacheLimit = 512 * 1024 * 1024
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
         try await adapter.loadModel()
         let codewords = ["lantern", "obsidian", "cascade", "juniper", "meridian", "tundra"]

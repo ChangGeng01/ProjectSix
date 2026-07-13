@@ -63,7 +63,7 @@ final class BASSeam8Tests: XCTestCase {
         }
         #if os(iOS)
         ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
-        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        MLX.Memory.cacheLimit = 512 * 1024 * 1024
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
         #else
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
@@ -109,7 +109,7 @@ final class BASSeam8Tests: XCTestCase {
         }
         #if os(iOS)
         ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
-        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        MLX.Memory.cacheLimit = 512 * 1024 * 1024
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
         #else
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
@@ -147,7 +147,7 @@ final class BASSeam8Tests: XCTestCase {
         #if canImport(MLXLLM)
         #if os(iOS)
         ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
-        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        MLX.Memory.cacheLimit = 512 * 1024 * 1024
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
         #else
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)

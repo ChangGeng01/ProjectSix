@@ -164,7 +164,7 @@ final class BASB2R2CollectDeviceTests: XCTestCase {
                 line.append(0x0A)
                 fh.write(line)   // R4v2(MED-7):单次原子性更好的整行写
             }
-            MLX.GPU.clearCache()
+            MLX.Memory.clearCache()
             print("[r2-collect] \(written)/\(mine.count) batch_acc=\(String(format: "%.2f", Double(correct) / Double(cursor))) thermal=\(ProcessInfo.processInfo.thermalState.rawValue)")
         }
         let done = written - doneQs.count

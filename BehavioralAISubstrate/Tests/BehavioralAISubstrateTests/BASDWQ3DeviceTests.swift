@@ -57,7 +57,7 @@ final class BASDWQ3DeviceTests: XCTestCase {
                 throw XCTSkip("\(v.dir) not staged")
             }
         }
-        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        MLX.Memory.cacheLimit = 512 * 1024 * 1024
 
         var rows: [Row] = []
         for v in variants {
@@ -90,11 +90,11 @@ final class BASDWQ3DeviceTests: XCTestCase {
                     }
                     rows.append(r)
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    MLX.GPU.clearCache()
+                    MLX.Memory.clearCache()
                 }
             }
             // Release this trunk fully before the next (per-process limit discipline).
-            MLX.GPU.clearCache()
+            MLX.Memory.clearCache()
         }
 
         for r in rows {

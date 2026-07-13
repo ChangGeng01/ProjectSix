@@ -42,7 +42,7 @@ final class BASDFlashParityTests: XCTestCase {
         let streams = try JSONDecoder().decode([Stream].self, from: Data(contentsOf: streamURL))
         XCTAssertFalse(streams.isEmpty, "empty stream dump")
 
-        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        MLX.Memory.cacheLimit = 512 * 1024 * 1024
         let container = try await #huggingFaceLoadModelContainer(
             configuration: ModelConfiguration(id: "mlx-community/Qwen3.5-4B-4bit",
                                               extraEOSTokens: ["<|im_end|>"]),

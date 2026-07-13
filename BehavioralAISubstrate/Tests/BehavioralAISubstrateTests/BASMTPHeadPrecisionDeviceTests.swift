@@ -81,7 +81,7 @@ final class BASMTPHeadPrecisionDeviceTests: XCTestCase {
                 }
                 rows.append(r)
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
-                MLX.GPU.clearCache()
+                MLX.Memory.clearCache()
             }
         }
 
