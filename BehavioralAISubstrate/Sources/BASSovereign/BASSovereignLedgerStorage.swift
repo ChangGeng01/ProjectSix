@@ -185,6 +185,12 @@ public final class BASSovereignLedgerSQLiteStorage:
         case stepFailed(sql: String, message: String)
         case schemaVersionMismatch(found: Int, expected: Int)
         case corruptedRow(table: String, reason: String)
+        /// deep-audit P2-14(c) (2026-07-13): an append whose `audit_id` violates the PRIMARY KEY
+        /// is a REPLAY, not a generic step failure — surfaced distinguishably so a downstream
+        /// ingest gate can return a typed replay reason even on the concurrent append path (where
+        /// two requests both pass the sequential in-memory `hasEntry` pre-check, then the second
+        /// hits the DB uniqueness constraint).
+        case duplicateAuditID(auditID: String)
     }
 
     /// chapter 九百九十四.5 META-REVIEW Round-10 CRITICAL-1 fix:
@@ -465,7 +471,12 @@ public final class BASSovereignLedgerSQLiteStorage:
         // ch 994.5 CRITICAL-1 fix:bind entry.schemaVersion
         Self.bindText(stmt, 14, e.schemaVersion)
 
-        guard sqlite3_step(stmt) == SQLITE_DONE else {
+        let stepRC = sqlite3_step(stmt)
+        guard stepRC == SQLITE_DONE else {
+            // P2-14(c): a PRIMARY KEY (audit_id) collision is a REPLAY — throw it distinguishably.
+            if stepRC == SQLITE_CONSTRAINT {
+                throw StorageError.duplicateAuditID(auditID: e.auditID)
+            }
             throw StorageError.stepFailed(
                 sql: sql,
                 message: String(cString: sqlite3_errmsg(db)))

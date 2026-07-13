@@ -144,6 +144,15 @@ public enum BASMirrorLaneIngestGate {
             let appended = try await ledger.append(draft)
             return IngestOutcome(
                 appended: true, auditID: appended.entry.auditID, reason: nil)
+        } catch let e as BASSovereignLedgerSQLiteStorage.StorageError {
+            // deep-audit P2-14(c): a PRIMARY-KEY (audit_id) collision at append is a REPLAY that
+            // raced past the sequential hasEntry pre-check (both requests saw it absent in memory,
+            // then the second hit the DB uniqueness constraint). Return typed .replayed, not the
+            // generic .appendFailed the claim flagged.
+            if case .duplicateAuditID = e {
+                return IngestOutcome(appended: false, auditID: nil, reason: .replayed)
+            }
+            return IngestOutcome(appended: false, auditID: nil, reason: .appendFailed)
         } catch {
             return IngestOutcome(appended: false, auditID: nil, reason: .appendFailed)
         }

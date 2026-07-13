@@ -148,6 +148,40 @@ final class BASMirrorLaneConvergenceTests: XCTestCase {
 
     // MARK: - M3: verify-then-append, zero partial writes
 
+    /// deep-audit P2-14(c) (2026-07-13): a PRIMARY-KEY (audit_id) collision at append is a REPLAY,
+    /// typed .replayed — not the generic .appendFailed. Deterministic setup: two SQLite ledgers
+    /// over the SAME file, ledger B created BEFORE A appends, so B's in-memory hasEntry pre-check
+    /// never learns the audit_id → the ingest reaches the append path, where B hits the DB
+    /// uniqueness constraint. Reversal: the storage mapping SQLITE_CONSTRAINT to .stepFailed (or
+    /// the ingest not typing .duplicateAuditID) reds the .replayed assertion.
+    func testSQLiteConstraintReplayRaceIsTypedReplayed() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mirror-replay-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let path = dir.appendingPathComponent("ledger.sqlite").path
+        let secret = SymmetricKey(size: .bits256)
+
+        // B is created FIRST (empty in-memory), then A appends — so B's pre-check will miss.
+        let ledgerB = BASSovereignAuditLedger(
+            signingSecret: secret, storage: try BASSovereignLedgerSQLiteStorage(path: path))
+        let ledgerA = BASSovereignAuditLedger(
+            signingSecret: secret, storage: try BASSovereignLedgerSQLiteStorage(path: path))
+
+        guard case .accepted(let env) = dispose(candidate()) else { return XCTFail() }
+        let a = await BASMirrorLaneIngestGate.ingest(
+            env, key: key, ledger: ledgerA, sessionID: "s", turnID: "t", now: frozen)
+        XCTAssertTrue(a.appended, "first ingest must append")
+
+        // B ingests the SAME envelope: pre-check misses (B never learned the audit_id), append
+        // violates the audit_id PRIMARY KEY → typed .replayed.
+        let b = await BASMirrorLaneIngestGate.ingest(
+            env, key: key, ledger: ledgerB, sessionID: "s", turnID: "t", now: frozen)
+        XCTAssertFalse(b.appended)
+        XCTAssertEqual(b.reason, .replayed,
+            "a PRIMARY-KEY replay-race must be typed .replayed, not .appendFailed")
+    }
+
     func testIngestAppendsVerifiedEnvelope() async throws {
         let ledger = BASSovereignAuditLedger(
             signingSecret: SymmetricKey(size: .bits256))
