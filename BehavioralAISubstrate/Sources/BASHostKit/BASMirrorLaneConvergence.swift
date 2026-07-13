@@ -64,12 +64,18 @@ public struct BASMirrorLaneCandidate: Sendable, Equatable, Codable {
     ) {
         self.claimedKind = claimedKind
         self.content = content
+        // deep-audit P1-10 (2026-07-13): TRIM per element but do NOT independently empty-filter
+        // the two arrays. The old `.filter { !$0.isEmpty }` on each array separately dropped
+        // blanks at different indices, silently shifting surviving IDs onto the wrong digests
+        // while keeping counts equal. Lengths are preserved here; the disposer (the trust
+        // boundary, and the only signed-envelope mint) fails closed on any empty-after-trim
+        // entry — a rule Codable-decode cannot bypass because it skips this init entirely.
         self.evidenceIDs = evidenceIDs.map {
             $0.trimmingCharacters(in: .whitespacesAndNewlines)
-        }.filter { !$0.isEmpty }
+        }
         self.evidenceDigests = evidenceDigests.map {
             $0.trimmingCharacters(in: .whitespacesAndNewlines)
-        }.filter { !$0.isEmpty }
+        }
         self.modelID = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
         self.promptDigest = promptDigest.trimmingCharacters(in: .whitespacesAndNewlines)
         self.claimedPolicyHash = claimedPolicyHash
@@ -243,6 +249,10 @@ public enum BASMirrorLaneDisposer {
         /// ruling ③ hardening: evidenceDigests must pair 1:1 with evidenceIDs —
         /// unpair-able evidence is unverifiable evidence.
         case evidenceDigestMismatch = "evidence-digest-mismatch"
+        /// deep-audit P1-10 (2026-07-13): an empty-after-trim entry on EITHER evidence side.
+        /// A blank ID or digest makes the index-pairing ambiguous — fail closed rather than
+        /// drop-and-shift (which silently re-pairs surviving entries across the gap).
+        case evidenceEntryEmpty = "evidence-entry-empty"
     }
 
     public enum Disposition: Sendable, Equatable {
@@ -283,9 +293,26 @@ public enum BASMirrorLaneDisposer {
         guard policy.allowedKinds.contains(candidate.claimedKind) else {
             return .rejected(.kindNotAllowed)
         }
+        // deep-audit P1-10 (2026-07-13): enforce evidence PAIRING at the trust boundary,
+        // fail-closed. The candidate init no longer empty-FILTERS the two arrays independently
+        // (that dropped blanks at different indices and silently shifted surviving IDs onto the
+        // wrong digests while keeping counts equal). Here — the only path that can mint a signed
+        // envelope, and the one Codable-decode CANNOT bypass — any empty-after-trim entry on
+        // either side is rejected before the count check, so a surviving pair is always the
+        // pair the producer actually stated at that index.
+        let trimmedEvidenceIDs = candidate.evidenceIDs.map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let trimmedEvidenceDigests = candidate.evidenceDigests.map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !trimmedEvidenceIDs.contains(where: { $0.isEmpty }),
+              !trimmedEvidenceDigests.contains(where: { $0.isEmpty }) else {
+            return .rejected(.evidenceEntryEmpty)
+        }
         // ruling ③ hardening: every evidence ID must carry its content digest (1:1) —
         // ID-only evidence lets the referenced content be swapped after signing.
-        guard candidate.evidenceIDs.count == candidate.evidenceDigests.count else {
+        guard trimmedEvidenceIDs.count == trimmedEvidenceDigests.count else {
             return .rejected(.evidenceDigestMismatch)
         }
 
@@ -294,7 +321,7 @@ public enum BASMirrorLaneDisposer {
         // disposition so telemetry can see every reduction.
         let effectiveKind: BASMirrorLaneKind
         let droppedKind: BASMirrorLaneKind?
-        if candidate.claimedKind != .annotation && candidate.evidenceIDs.isEmpty {
+        if candidate.claimedKind != .annotation && trimmedEvidenceIDs.isEmpty {
             effectiveKind = .annotation
             droppedKind = candidate.claimedKind
         } else {
@@ -315,8 +342,8 @@ public enum BASMirrorLaneDisposer {
             kind: effectiveKind,
             content: content,
             contentDigest: BASConvergedProposalEnvelope.sha256Hex(content),
-            evidenceIDs: candidate.evidenceIDs,
-            evidenceDigests: candidate.evidenceDigests,
+            evidenceIDs: trimmedEvidenceIDs,
+            evidenceDigests: trimmedEvidenceDigests,
             modelID: candidate.modelID,
             promptDigest: candidate.promptDigest,
             policyHash: policy.trustedPolicyHash,

@@ -297,6 +297,50 @@ final class BASMirrorLaneEnvelopeV2Tests: XCTestCase {
         }
     }
 
+    // MARK: - deep-audit P1-10 (2026-07-13): pairing must not silently shift across blanks.
+
+    /// Blanks at DIFFERENT indices in each array. Pre-P1-10 the candidate init empty-filtered
+    /// each array independently → IDs ["a","c"] / digests ["da","db"] (counts equal!), signing
+    /// a SHIFTED pairing ("c"↔"db" instead of "c"↔the dropped blank). Now the disposer rejects
+    /// any empty-after-trim entry before the count check. Reverting EITHER the init filter or
+    /// the disposer check reds this (the mispair would be accepted).
+    func testMispairedBlankEvidenceIsRejectedNotShifted() {
+        guard case .rejected(.evidenceEntryEmpty) =
+            dispose(cand(evidence: ["a", "", "c"], digests: ["da", "db", ""])) else {
+            return XCTFail("mispaired blank evidence must fail closed, never sign a shifted pair")
+        }
+    }
+
+    /// Whitespace-only entries are empty-after-trim too.
+    func testWhitespaceOnlyEvidenceEntryIsRejected() {
+        guard case .rejected(.evidenceEntryEmpty) =
+            dispose(cand(evidence: ["a", "   "], digests: ["da", "db"])) else {
+            return XCTFail("a whitespace-only evidence ID is unusable — reject, don't sign")
+        }
+    }
+
+    /// The Codable-decode path SKIPS the custom candidate init entirely, so the pairing rule
+    /// MUST live at the disposer (the trust boundary / only signed-envelope mint). A decoded
+    /// candidate with a blank evidence entry must still be rejected — proving the check is not
+    /// merely init hygiene. Reversal: dropping the disposer's empty check signs a blank pair.
+    func testDecodedCandidateWithBlankEvidenceIsRejected() throws {
+        let json = """
+        {"claimedKind":"proposal","content":"observation",\
+        "evidenceIDs":["atom:1","","atom:3"],\
+        "evidenceDigests":["d1","d2","d3"],\
+        "modelID":"m1","promptDigest":"p1",\
+        "claimedPolicyHash":"policy.trusted.v1","provenance":"t"}
+        """
+        let decoded = try JSONDecoder().decode(
+            BASMirrorLaneCandidate.self, from: Data(json.utf8))
+        // The decode bypassed the init — the blank survives in the decoded value.
+        XCTAssertEqual(decoded.evidenceIDs, ["atom:1", "", "atom:3"],
+            "decode must not have run the custom init's normalization")
+        guard case .rejected(.evidenceEntryEmpty) = dispose(decoded) else {
+            return XCTFail("the disposer must reject a decoded candidate's blank evidence entry")
+        }
+    }
+
     func testEvidenceContentDigestIsSigned() throws {
         guard case .accepted(let a) = dispose(cand(digests: ["d1"])),
               case .accepted(let b) = dispose(cand(digests: ["DIFFERENT"])) else {
