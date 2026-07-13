@@ -110,8 +110,17 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     /// the payload_format column。
     public static let schemaVersion: Int = 2
 
+    // deep-audit runtimecore-b LOW #8 (2026-07-13): the three `nonisolated(unsafe) static var`
+    // flags below are SET-ONCE CONFIGURATION — a host sets them BEFORE the first store opens, and
+    // they are not mutated at runtime thereafter. Each is snapshotted into instance state at init
+    // (append() reads the instance copies, not these globals), so the only-dangerous combination
+    // (a torn binary-payload + integrity-chain pairing) is structurally impossible. The remaining
+    // exposure is a purely formal data race on set-before-init config; a lock on this per-open read
+    // path would add overhead for no real safety, so the contract is documented rather than locked.
+    // If a host ever needs to flip these at runtime, that use is unsupported without adding a lock.
+
     /// 先稳 P2 — OPT-IN (default off): run `PRAGMA integrity_check` at open + throw if corrupt. Off by
-    /// default (full-DB scan ⇒ boot latency). Static so a host can enable it before init.
+    /// default (full-DB scan ⇒ boot latency). SET-ONCE before first init (see note above).
     public nonisolated(unsafe) static var runIntegrityCheckOnOpen: Bool = false
 
     /// chapter 七百三十二 第三刀 — opt-in feature flag controlling
