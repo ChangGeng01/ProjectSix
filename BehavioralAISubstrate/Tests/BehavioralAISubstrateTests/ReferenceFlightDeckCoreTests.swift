@@ -3,6 +3,7 @@ import Testing
 import BASObservability
 import BASPolicy
 import BASRuntimeCore
+import BASAppleAdapters  // deep-audit sweep: gemmaE4BProviderID now lives in an adapter-side extension
 @testable import BASAdmin
 
 @Suite("BASReferenceFlightDeck")

@@ -322,7 +322,13 @@ public struct BASProviderRoutingPolicySource: Codable, Equatable, Sendable {
 }
 
 public enum BASReferenceProviderRuntime {
-    public static let gemmaE4BProviderID = "gemmaE4B"
+    // deep-audit sweep 2026-07-13: `gemmaE4BProviderID` (the one MODEL-FAMILY name literal here)
+    // moved OUT of the model-neutral core into an `extension BASReferenceProviderRuntime` in
+    // BASAppleAdapters (BASAppleReferenceProviderID.swift), beside its only consumers. Call sites
+    // stay textually identical (`BASReferenceProviderRuntime.gemmaE4BProviderID`); only the module
+    // that DECLARES the literal changed. The four constants below are neutral CATEGORIES, not
+    // model families, so they stay. Pinned by BASModelBoundaryPinTests (no model-family name
+    // literals in BASRuntimeCore sources).
     public static let openModelProviderID = "openModel"
     public static let foundationModelsProviderID = "foundationModels"
     public static let testingStubProviderID = "testingStub"

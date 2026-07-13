@@ -225,6 +225,45 @@ final class BASModelBoundaryPinTests: XCTestCase {
         XCTAssertFalse(Self.lineImportsModule("import Foundation", "CoreML"))
     }
 
+    /// deep-audit sweep 2026-07-13: the existing pins guard import TOPOLOGY, but nothing pinned
+    /// the model-NEUTRALITY of the core's identifiers — which is how `gemmaE4BProviderID` (a
+    /// Gemma name literal) survived in BASRuntimeCore uncaught. Pin it: no model-FAMILY name
+    /// token may appear in BASRuntimeCore .swift sources outside comments. (The neutral category
+    /// IDs — openModel / foundationModels / testingStub / template — are fine; only concrete
+    /// model families are banned.) A future `qwenX`/`llamaY` leaking into the core reds here.
+    func testRuntimeCoreSourcesHaveNoModelFamilyNameLiterals() throws {
+        let dir = packageRoot.appendingPathComponent("Sources/BASRuntimeCore")
+        let files = Self.swiftFilesRecursive(under: dir)
+        XCTAssertGreaterThan(files.count, 50, "sanity: BASRuntimeCore sources present")
+        let families = ["gemma", "qwen", "llama", "granite", "mistral", "deepseek", "mixtral"]
+        var offenders: [String] = []
+        for url in files {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for (idx, rawLine) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+                let line = String(rawLine)
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("//") { continue }   // comments are data, not code
+                // strip an inline trailing comment so a `// gemma` note doesn't false-positive
+                let code = line.components(separatedBy: "//").first ?? line
+                let lower = code.lowercased()
+                for fam in families where lower.contains(fam) {
+                    offenders.append("\(url.lastPathComponent):\(idx + 1)  \(trimmed) [\(fam)]")
+                }
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty,
+            "model-FAMILY name literal(s) in the model-neutral BASRuntimeCore — move to the "
+            + "adapter layer (see BASAppleReferenceProviderID.swift): \(offenders)")
+    }
+
+    /// Self-check: the family scanner has teeth (would catch a planted name).
+    func testModelFamilyScannerHasTeeth() {
+        let line = "    public static let qwenProviderID = \"qwen3.5\""
+        let code = line.components(separatedBy: "//").first ?? line
+        XCTAssertTrue(code.lowercased().contains("qwen"), "scanner must detect a planted family name")
+        XCTAssertFalse("    // gemma reference in a comment".trimmingCharacters(in: .whitespaces).hasPrefix("//") == false)
+    }
+
     /// deep-audit L-4: recursively enumerate .swift files (matches SwiftPM's glob).
     static func swiftFilesRecursive(under dir: URL) -> [URL] {
         guard let en = FileManager.default.enumerator(
