@@ -246,6 +246,16 @@ public actor QinaoRuntime {
         }
         consumedBundles[bundleKey] = signatures.permit.expiresAt
 
+        // deep-audit P0-3: re-check halt as the LAST await before the effect. The halt check at the
+        // top is the first of four suspension points; a markSessionHalted landing during the
+        // intervening permit/warrant/proof awaits would otherwise be missed and the executor would
+        // still fire. Re-checking here shrinks the TOCTOU window to the (unavoidable) gap between
+        // this await returning and the external executor call. The bundle is already consumed, so a
+        // halted turn's bundle is burned — the host must re-mint after unhalt (fail-closed).
+        if await sovereign.isSessionHalted(intent.sessionID) {
+            throw RuntimeError.sessionHalted(id: intent.sessionID)
+        }
+
         do {
             return try await toolExecutor(toolName, payload)
         } catch {
