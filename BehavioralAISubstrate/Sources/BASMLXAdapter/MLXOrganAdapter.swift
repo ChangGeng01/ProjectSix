@@ -1206,14 +1206,21 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         _pressureCheck(keeping: nil)                     // 案5: between-turn reclaim sample
         // 案5: ONE context per turn — every decider sees the same facts (and one telemetry line
         // says who could throttle and why; BAS_DECODE_CTX=1).
-        let ctx = MLXOrganAdapter._decodeContext(purpose: .scoutDefault, request: request)
+        // P1 (2026-07-13): purpose is ELECTED from the host's own preset — temp 0 (the host chose
+        // greedy) → .deterministic, unlocking the byte-identical model-free lanes (prompt-lookup /
+        // cross-turn) the device A/B proved 1.23×–2.05× on repetitive output; any other temperature
+        // stays .scoutDefault (the ADR-014 byte-equal default is untouched). Election lives in
+        // BASDecodeLanePolicy.productionPurpose (single doctrine point, invariant-pinned).
+        let purpose = BASDecodeLanePolicy.productionPurpose(
+            temperature: request.preset.temperature)
+        let ctx = MLXOrganAdapter._decodeContext(purpose: purpose, request: request)
         let strategy: BASDecodeStrategy = decodePlannerAutoSelect
             ? BASDecodeLanePolicy.decodeStrategy(
                 context: ctx, capabilities: _decodeCapabilities(),
                 profiler: draftProfiler, numDraftTokens: numDraftTokens)
             : .plain
         // 可解释性①: THE turn line is emitted by _execute once the EXECUTED lane is known.
-        return try await _execute(strategy, for: request, purpose: .scoutDefault, context: ctx)
+        return try await _execute(strategy, for: request, purpose: purpose, context: ctx)
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason

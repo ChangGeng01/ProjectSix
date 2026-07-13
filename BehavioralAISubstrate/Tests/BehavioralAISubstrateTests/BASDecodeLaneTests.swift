@@ -113,4 +113,34 @@ final class BASDecodeLaneTests: XCTestCase {
                 "\(purpose) is prompt-lookup-eligible but its preset isn't temp 0 — byte-identity would break")
         }
     }
+
+    // MARK: - P1 production purpose election (2026-07-13)
+
+    /// A host that elected greedy (temp 0) gets `.deterministic` — the model-free repetitive
+    /// lanes become production-eligible. Any other temperature stays `.scoutDefault`.
+    func testProductionPurposeElectsDeterministicOnlyAtTempZero() {
+        XCTAssertEqual(BASDecodeLanePolicy.productionPurpose(temperature: 0), .deterministic,
+            "a host-elected greedy turn must unlock the model-free repetitive lanes")
+        for temp in [0.1, 0.3, 0.7, 1.0] {
+            XCTAssertEqual(BASDecodeLanePolicy.productionPurpose(temperature: temp), .scoutDefault,
+                "temp \(temp) must keep the ADR-014 byte-equal default purpose")
+        }
+    }
+
+    /// The elected purpose composes with the pinned invariants: the temp-0 election is prompt-
+    /// lookup-eligible AND still maps to the greedy lane (no generation-param change); the scout
+    /// election stays ineligible. Reverting productionPurpose to always-.scoutDefault reds this.
+    func testProductionPurposeComposesWithEligibilityInvariants() {
+        let greedy = BASDecodeLanePolicy.productionPurpose(temperature: 0)
+        XCTAssertTrue(BASDecodeLanePolicy.promptLookupEligible(for: greedy),
+            "the temp-0 election exists precisely to make prompt-lookup production-eligible")
+        XCTAssertEqual(BASDecodeLanePolicy.lane(for: greedy), .greedy,
+            "the election must not change the lane a temp-0 host already chose")
+        let scout = BASDecodeLanePolicy.productionPurpose(temperature: 0.1)
+        XCTAssertFalse(BASDecodeLanePolicy.promptLookupEligible(for: scout),
+            "the default (temp 0.1) path must remain byte-equal — no model-free lane")
+        // NaN discipline (P0-5 family): a NaN temperature is NOT greedy-byte-safe → scout default.
+        XCTAssertEqual(BASDecodeLanePolicy.productionPurpose(temperature: .nan), .scoutDefault,
+            "NaN temperature must fail closed to the default purpose")
+    }
 }
