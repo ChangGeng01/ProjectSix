@@ -189,6 +189,40 @@ final class QinaoRuntimeGateTests: XCTestCase {
         XCTAssertEqual(count, 1)
     }
 
+    // MARK: - deep-audit P0-2: single-use bundle (no replay within TTL)
+
+    /// A fully-valid, unexpired (permit, warrant, proof) bundle fires the tool exactly ONCE.
+    /// A second execute() with the SAME bundle throws tokenAlreadyConsumed and does NOT re-run
+    /// the tool — proving the side effect cannot be replayed within the TTL. Pre-fix (stateless
+    /// validation, no consume) the second call would run the tool a second time.
+    func testSameBundleCannotBeReplayedWithinTTL() async throws {
+        let fx = await makeRuntime()
+        let runtime = fx.runtime
+        let recorder = fx.recorder
+        let it = intent()
+        let permit = try await fx.risk.requestActionPermit(for: it)
+        let warrant = try await fx.sovereign.issueWarrant(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID))
+        let proof = await validProof(for: it, sovereign: fx.sovereign)
+        let sigs = QinaoRuntime.Signatures(
+            permit: permit, warrant: warrant, snapshotProof: proof)
+
+        _ = try await runtime.execute(
+            toolName: "calendar.add_event", payload: Data("meet".utf8), intent: it, signatures: sigs)
+
+        do {
+            _ = try await runtime.execute(
+                toolName: "calendar.add_event", payload: Data("meet".utf8),
+                intent: it, signatures: sigs)
+            XCTFail("a consumed bundle must not execute again")
+        } catch QinaoRuntime.RuntimeError.tokenAlreadyConsumed {
+            // expected
+        }
+        let count = await recorder.callCount
+        XCTAssertEqual(count, 1, "the tool must have run exactly once despite the replay attempt")
+    }
+
     // MARK: - audit F1: tool-swap rejection (valid signatures, wrong tool)
 
     /// A caller with FULLY VALID signatures for intent A (tool "calendar.add_event") passes a

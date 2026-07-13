@@ -52,6 +52,9 @@ public actor QinaoRuntime {
         case permitExpired
         case warrantExpired
         case sessionHalted(id: String)
+        /// deep-audit P0-2: the (permit, warrant, proof) bundle was already consumed — a signed
+        /// bundle is single-use even within its TTL, so a replay cannot re-fire the side effect.
+        case tokenAlreadyConsumed
         case toolExecutionFailed(reason: String)
     }
 
@@ -134,6 +137,11 @@ public actor QinaoRuntime {
     public nonisolated let lifecycle: QinaoLifecycle?
 
     private let toolExecutor: ToolExecutor
+    /// deep-audit P0-2: the actor-held single-use set for `execute()` bundles — maps a
+    /// (permitID, warrantID, proofID) bundle key to the permit's expiry, so replays of the same
+    /// signed bundle within TTL are rejected. Actor isolation makes the claim atomic (no await
+    /// between the duplicate check and the insert), closing the reentrancy window before the effect.
+    private var consumedBundles: [String: Date] = [:]
     /// `package` (M171) so phase extension files in this same
     /// SPM package can stamp `emittedAt` consistently.
     package let now: @Sendable () -> Date
@@ -224,6 +232,19 @@ public actor QinaoRuntime {
         let proofOK = await sovereign.isSnapshotProofValid(
             signatures.snapshotProof, for: sovereignIntent)
         guard proofOK else { throw RuntimeError.missingSnapshotProof }
+
+        // deep-audit P0-2: CONSUME the bundle atomically before the side effect. The claim (check +
+        // insert) runs with no await in between, so actor isolation guarantees at-most-once even
+        // under concurrent re-entry with the same signed bundle. Burn-on-attempt: the claim is NOT
+        // released if the executor throws (a partial side effect may already have landed), so a
+        // failed call cannot be retried with the same bundle — the host must re-mint.
+        let bundleKey = signatures.permit.permitID + "\u{1F}"
+            + signatures.warrant.warrantID + "\u{1F}" + signatures.snapshotProof.proofID
+        consumedBundles = consumedBundles.filter { $0.value > present }   // bound: drop expired
+        guard consumedBundles[bundleKey] == nil else {
+            throw RuntimeError.tokenAlreadyConsumed
+        }
+        consumedBundles[bundleKey] = signatures.permit.expiresAt
 
         do {
             return try await toolExecutor(toolName, payload)
