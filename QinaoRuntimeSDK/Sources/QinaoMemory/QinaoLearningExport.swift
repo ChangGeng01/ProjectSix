@@ -276,11 +276,20 @@ public actor QinaoLearningExporter {
         }
 
         // Stage C: sovereignSafe — runs last so AB rejections don't
-        // burn warrant TTL on candidates that can't ship anyway. We
-        // collect one approval per candidate (in input order) and
-        // verify *all* are present before minting.
+        // burn warrant TTL on candidates that can't ship anyway.
+        //
+        // deep-audit P1-13 (2026-07-13): the comment above described a SKIP that the code
+        // never implemented — Stage C used to call `approver` for EVERY candidate, including
+        // ones already rejected by Stage A (PII) or Stage B (privacy boundary). The shipped
+        // bridge mints a warrant per approver call, and a host may install a side-effectful
+        // approver (e.g. a user-consent prompt), which must not fire for candidates that can't
+        // ship. We now skip any candidate already rejected by A/B. The 'all rejections in one
+        // shot' contract is preserved: A/B rejections still surface below, and when there are
+        // NO A/B rejections the skip set is empty so Stage C behaves exactly as before.
+        let abRejectedSourceIDs = Set(rejections.map { $0.sourceMemoryID })
         var approvals: [String] = []
         for candidate in candidates {
+            if abRejectedSourceIDs.contains(candidate.sourceMemoryID) { continue }
             if let token = try await approver(candidate),
                 !token.isEmpty
             {
@@ -360,7 +369,11 @@ public actor QinaoLearningExporter {
     /// colon (`<len>:<bytes>`), then concatenated — so no field's content (including any "|"
     /// or ":" or embedded delimiter) can be mistaken for a boundary. `["a|b","c"]` and
     /// `["a","b|c"]` now hash differently, closing the collision the raw "|"-join allowed.
-    static func canonicalJoin(_ fields: [String]) -> String {
+    ///
+    /// deep-audit P1-13 (2026-07-13): widened to `public` so the SDK's warrant bridge
+    /// (`QinaoSovereignLearningExportBridge.candidateIntentDigest`) can reuse the SAME
+    /// injective encoding instead of its own raw "|"-join (which had the collision this closes).
+    public static func canonicalJoin(_ fields: [String]) -> String {
         fields.map { "\($0.utf8.count):\($0)" }.joined()
     }
 
