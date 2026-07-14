@@ -23,6 +23,20 @@
 // per shape so the chapter-七百七-第三刀 auto-router can encode
 // the crossover thresholds。
 
+// ## ARCHIVE MARKER (skip triage, 2026-07-14) — DELETING THIS FILE BREAKS CI
+//
+// ★ BASChapter868FlashAttentionAssertedBenchmarkTests.swift:393 asserts this
+//   file EXISTS on disk (testChapter707TournamentStillReachable does an
+//   XCTAssertTrue(FileManager.default.fileExists(...)) against
+//   "BASChapter707AttentionTournamentTests.swift"). `rm` this file and 868 —
+//   an unrelated, passing suite — goes RED. Verified 2026-07-14.
+//
+// The skip message is otherwise HONEST and its replacement is REAL: chapter 868
+// covers the same CPU-vs-Metal-std-vs-FlashAttention contest with actual bounds
+// (5 tests / 9 asserts / 0 skips). Only genuine loss vs 868: the 16x16x16
+// "Small" shape (868 does tiny/medium/large). No orphaned FFI symbols —
+// brain.attention / brain.flashAttention are both exercised by 868.
+
 import XCTest
 @testable import BASRuntimeCore
 @testable import BASHostKit

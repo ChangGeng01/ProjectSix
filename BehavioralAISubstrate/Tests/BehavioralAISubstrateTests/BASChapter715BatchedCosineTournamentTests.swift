@@ -26,6 +26,28 @@
 // Use this output to pick the threshold field for the auto-
 // router in Knife 4。
 
+// ## ARCHIVE MARKER (skip triage, 2026-07-14) — CORRECTED SUPERSESSION CLAIM
+//
+// This file's skip previously read "superseded by BASChapter872BatchedCosine
+// RayonTests". That claim is FALSE as written, and it was the only stale
+// supersession in the six-file archive cluster. Verified 2026-07-14:
+//   - `grep -ci metal BASChapter872BatchedCosineRayonTests.swift` = 0. 872 is a
+//     Swift-vs-Rust(-rayon) bench with no Metal contestant, and its only
+//     assertions are self-labelled "Weak pin" in-source. This file is a
+//     Rust-SIMD-vs-METAL crossover tournament (rows 16/256/4096 x dim 128/512).
+//   - ★ this tournament is the ONLY measurement that ever backed the production
+//     threshold `batchedCosineMetalMinRows = 16384`, which is STILL asserted by
+//     two RUNNING tests: BASChapter715BatchedCosineRouterTests.swift:170 and
+//     BASQINAOSubstrateGatesBatch11Tests.swift:438. Deleting this file would
+//     leave those two asserting a number with no measurement behind it anywhere
+//     in the repo.
+//
+// So: DO NOT DELETE, and do not re-label as superseded. To retire it honestly,
+// ship an asserted Metal-crossover bench that actually pins 16384 first.
+// Dispatcher correctness remains covered by BASChapter715BatchedCosine
+// DispatcherTests (runs). This file has no XCTAssert, so it cannot itself go
+// red — it is a stale gate + doc-lie, not a suppressed red test.
+
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
@@ -45,9 +67,12 @@ final class BASChapter715BatchedCosineTournamentTests:
     override func setUp() async throws {
         try await super.setUp()
         throw XCTSkip(
-            "Chapter 八百七十八.5 deprecation skip — " +
-            "superseded by BASChapter872BatchedCosineRayonTests" +
-            " (asserted 3-way bench with rayon chunked v2)。")
+            "Chapter 八百七十八.5 archive skip — BASChapter872BatchedCosine" +
+            "RayonTests supersedes only the SWIFT-vs-RUST lane, NOT this " +
+            "file's Rust-SIMD-vs-METAL crossover: 872 has ZERO Metal " +
+            "contestant (verified 2026-07-14). The crossover this file " +
+            "measures — the sole evidence behind the production threshold " +
+            "batchedCosineMetalMinRows = 16384 — has NO asserted replacement。")
     }
 
     #if os(iOS) || os(macOS)
