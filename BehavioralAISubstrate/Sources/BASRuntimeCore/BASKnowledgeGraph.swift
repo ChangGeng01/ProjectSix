@@ -272,6 +272,14 @@ public actor BASKnowledgeGraph {
     /// extract/persist/snapshot for its duration.
     public static let defaultMaxCyclesReturned: Int = 32
 
+    /// Recursive `walkForCycles` invocations made by the most recent `detectCycles` call.
+    ///
+    /// Test seam for the WORK bound, deliberately counted rather than timed: a wall-clock
+    /// assertion would make the test a load detector (the mistake corrected in
+    /// BASChapter905StorePerfBenchmarkTests), whereas this number is deterministic for a
+    /// given graph. It exists because `maxCycles` bounds the OUTPUT only — see its doc.
+    public private(set) var lastDetectCyclesWalkSteps: Int = 0
+
     private var nodes: [String: BASKnowledgeNode] = [:]
     private var outgoingEdges: [String: [BASKnowledgeEdge]] = [:]
     private var edgeIDIndex: Set<String> = []
@@ -431,8 +439,34 @@ public actor BASKnowledgeGraph {
         }
         var cycles: [BASKnowledgeCycle] = []
         var seenCanonicalKeys: Set<String> = []
+        lastDetectCyclesWalkSteps = 0
+
+        // REACHABILITY PRUNE (2026-07-15). Built once per call: O(V+E).
+        //
+        // Without it the walk explores subtrees that provably cannot close a cycle at
+        // `start` within the remaining depth, and nothing stops it — `maxCycles` bounds the
+        // OUTPUT, and a filter-rejected cycle never increments that count, so on a graph
+        // whose cycles mostly fail the caller's filter the budget never fills. Measured on a
+        // modelled production graph: ~638 walk steps when the filter matches vs ~3,324,239
+        // when it does not (returning [] either way) — the same call, a ~5,200x swing.
+        //
+        // RESULT-PRESERVING by construction: a branch is cut only when `start` is
+        // unreachable from it within the depth that remains, so no cycle that the unpruned
+        // walk would have found can be lost. Surviving branches keep their visit ORDER, so
+        // `seenCanonicalKeys` sees the identical key sequence and the `maxCycles` cutoff
+        // lands on the identical prefix.
+        var incoming: [String: [String]] = [:]
+        for (from, edges) in outgoingEdges {
+            for e in edges { incoming[e.toNodeID, default: []].append(from) }
+        }
+
         for startNodeID in nodes.keys.sorted() {
             if cycles.count >= maxCycles { break }
+            // A node with no incoming edges cannot lie on any cycle — skip before paying for
+            // its BFS. Free now that the reverse index exists.
+            guard incoming[startNodeID]?.isEmpty == false else { continue }
+            let revDist = reverseDistances(
+                to: startNodeID, within: maxLength - 1, incoming: incoming)
             walkForCycles(
                 start: startNodeID,
                 current: startNodeID,
@@ -442,9 +476,35 @@ public actor BASKnowledgeGraph {
                 maxCycles: maxCycles,
                 cycles: &cycles,
                 seenCanonicalKeys: &seenCanonicalKeys,
-                filter: filter)
+                filter: filter,
+                revDist: revDist)
         }
         return cycles
+    }
+
+    /// BFS backwards from `target` over reversed edges, truncated at `maxDepth`.
+    /// `result[x] == d` ⇒ `target` is reachable from `x` in exactly `d` forward hops (the
+    /// shortest such). Absent ⇒ unreachable within `maxDepth`.
+    private func reverseDistances(
+        to target: String,
+        within maxDepth: Int,
+        incoming: [String: [String]]
+    ) -> [String: Int] {
+        var dist: [String: Int] = [target: 0]
+        var frontier = [target]
+        var depth = 0
+        while !frontier.isEmpty, depth < maxDepth {
+            depth += 1
+            var next: [String] = []
+            for node in frontier {
+                for pred in incoming[node] ?? [] where dist[pred] == nil {
+                    dist[pred] = depth
+                    next.append(pred)
+                }
+            }
+            frontier = next
+        }
+        return dist
     }
 
     private func walkForCycles(
@@ -456,8 +516,10 @@ public actor BASKnowledgeGraph {
         maxCycles: Int,
         cycles: inout [BASKnowledgeCycle],
         seenCanonicalKeys: inout Set<String>,
-        filter: ((BASKnowledgeCycle) -> Bool)?
+        filter: ((BASKnowledgeCycle) -> Bool)?,
+        revDist: [String: Int]
     ) {
+        lastDetectCyclesWalkSteps += 1
         guard cycles.count < maxCycles else { return }
         guard path.count <= maxLength else { return }
         for edge in outgoingEdges[current] ?? [] {
@@ -491,6 +553,11 @@ public actor BASKnowledgeGraph {
             // Skip if this would re-visit a non-start node
             // (we want simple cycles only)
             if path.contains(edge.toNodeID) { continue }
+            // REACHABILITY PRUNE: `start` must still be reachable from the candidate within
+            // the depth that remains, or no cycle can close down this branch. Cutting it
+            // cannot lose a cycle the unpruned walk would have found — see detectCycles.
+            guard let back = revDist[edge.toNodeID],
+                  back <= maxLength - path.count else { continue }
             walkForCycles(
                 start: start,
                 current: edge.toNodeID,
@@ -500,7 +567,8 @@ public actor BASKnowledgeGraph {
                 maxCycles: maxCycles,
                 cycles: &cycles,
                 seenCanonicalKeys: &seenCanonicalKeys,
-                filter: filter)
+                filter: filter,
+                revDist: revDist)
         }
     }
 
