@@ -34,8 +34,8 @@ final class BASScreenLockSkipTests: XCTestCase {
 
         // Sample the gate on BOTH sides of the probe. This state MOVES on a real
         // desktop — measured 2026-07-14 within one session: screenIsLocked went
-        // false -> true when the machine idle-locked mid-run (consoleIsInactive
-        // stayed true throughout). If the state moves across the probe, the gate
+        // false -> true when the machine idle-locked mid-run. If it moves across the probe,
+        // the gate
         // reading and the filesystem observation describe different worlds and any
         // verdict is a coin flip, so skip instead. Reading the gate AFTER a probe
         // taken BEFORE it is exactly the TOCTOU shape this codebase keeps finding,
@@ -73,29 +73,30 @@ final class BASScreenLockSkipTests: XCTestCase {
             + "verdict is possible on this run")
 
         if enforcedAfter {
-            XCTAssertFalse(
-                flipSucceeded,
-                "STALE GATE: BASScreenLockSkip reports the complete class is enforced "
-                + "(screenIsLocked=\(BASScreenLockSkip.screenIsLocked), "
-                + "consoleIsInactive=\(BASScreenLockSkip.consoleIsInactive)) — but the "
-                + "protection flip SUCCEEDED. The protection suites are being skipped for a "
-                + "reason that is no longer true; they would run. Narrow the gate.")
+            let msg = "STALE GATE: BASScreenLockSkip reports the complete class is enforced"
+                + " (screenIsLocked=\(BASScreenLockSkip.screenIsLocked)) but the protection"
+                + " flip SUCCEEDED. The protection suites are being skipped for a reason that"
+                + " is no longer true; they would run. Narrow the gate."
+            XCTAssertFalse(flipSucceeded, msg)
         } else {
-            XCTAssertTrue(
-                flipSucceeded,
-                "GATE TOO NARROW: BASScreenLockSkip reports protection is settable — but the "
-                + "flip FAILED, so the protection suites will RED by environment rather than "
-                + "skip. Widen the gate to cover this session state.")
+            let msg = "GATE TOO NARROW: BASScreenLockSkip reports protection is settable but"
+                + " the flip FAILED, so the protection suites will RED by environment rather"
+                + " than skip. Before widening, RE-RUN the probe: a disk-full artifact once"
+                + " mimicked enforcement and produced a bogus widening (reverted 2026-07-14)."
+            XCTAssertTrue(flipSucceeded, msg)
         }
         #endif
     }
 
-    /// The composed predicate must be exactly the disjunction it claims to be —
-    /// pins the wiring so a future edit cannot drop an arm and silently narrow
-    /// the gate back to the lock-only signal that produced the false reds.
-    func testProtectionEnforcedIsTheDisjunctionOfBothSignals() {
+    /// `protectionClassIsEnforced` must track the LOCK signal only.
+    ///
+    /// A `consoleIsInactive` arm was added and reverted on 2026-07-14 (misdiagnosis: the
+    /// evidence was a disk-full artifact — see BASScreenLockSkip). This pins the narrow
+    /// form so the widening is not re-introduced without new, re-run evidence.
+    func testProtectionEnforcedTracksTheLockSignalOnly() {
         XCTAssertEqual(
             BASScreenLockSkip.protectionClassIsEnforced,
-            BASScreenLockSkip.screenIsLocked || BASScreenLockSkip.consoleIsInactive)
+            BASScreenLockSkip.screenIsLocked)
     }
+
 }
