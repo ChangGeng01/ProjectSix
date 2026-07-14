@@ -59,12 +59,25 @@ extension AppleFoundationOrganAdapter: BASStreamingOrganAdapter {
                 }
 
                 #if canImport(FoundationModels)
-                if #available(iOS 26, macOS 26, visionOS 26, *) {
+                if #available(iOS 27, macOS 27, visionOS 27, *) {
                     do {
                         try await self.streamViaFoundation(
                             request: request,
                             continuation: continuation)
                         continuation.finish()
+                    } catch is CancellationError {
+                        // Never mapped: the endpoint cancels this pump when the consumer
+                        // breaks. Mapping it would let a router re-run the whole
+                        // generation after the caller already walked away.
+                        continuation.finish(throwing: CancellationError())
+                    } catch let afm as LanguageModelError {
+                        // Same contract as draft(): `session.streamResponse` throws the
+                        // identical raw set, so leaving this arm untranslated would make
+                        // the draft-path mapping a half-truth. organError(for:) returns nil
+                        // for the SAFETY-REFUSAL class, which is finished RAW so no router
+                        // can launder it onto a second model.
+                        continuation.finish(
+                            throwing: AppleFoundationOrganAdapter.organError(for: afm) ?? afm)
                     } catch {
                         continuation.finish(throwing: error)
                     }
@@ -88,7 +101,7 @@ extension AppleFoundationOrganAdapter: BASStreamingOrganAdapter {
     }
 
     #if canImport(FoundationModels)
-    @available(iOS 26, macOS 26, visionOS 26, *)
+    @available(iOS 27, macOS 27, visionOS 27, *)
     private nonisolated func streamViaFoundation(
         request: BASOrganRequest,
         continuation: AsyncThrowingStream<

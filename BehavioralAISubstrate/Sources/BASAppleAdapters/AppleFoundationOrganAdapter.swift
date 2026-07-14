@@ -15,7 +15,7 @@ import FoundationModels
 /// by delegating to `LanguageModelSession`.
 ///
 /// NOTE (version honesty): the live delegation path is gated
-/// `@available(iOS 26, macOS 26, visionOS 26, *)` — that is the OS floor
+/// `@available(iOS 27, macOS 27, visionOS 27, *)` — that is the OS floor
 /// where Apple actually shipped the on-device `FoundationModels`
 /// inference API this adapter calls. Earlier-OS builds (and non-Apple
 /// platforms) fall through to the unavailability stub via
@@ -86,11 +86,20 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
         }
 
         #if canImport(FoundationModels)
-        if #available(iOS 26, macOS 26, visionOS 26, *) {
+        // OS floor RAISED 26 -> 27 (operator decision, 2026-07-14). Rationale, measured
+        // not assumed: on 26 the framework throws `LanguageModelSession.GenerationError`;
+        // on 27 it throws `LanguageModelError` — a DIFFERENT enum with a different case
+        // set (probe on macOS 27: dynamicType = LanguageModelError, `error is
+        // GenerationError` == false). `respond` is untyped-throws, so supporting both
+        // floors means carrying two mapping arms, and the 26 arm is UNTESTABLE here (no
+        // macOS 26 host) — untestable error-mapping code is exactly the kind that rots
+        // into a lie. One floor, one arm, real-error teeth.
+        if #available(iOS 27, macOS 27, visionOS 27, *) {
             return try await draftViaFoundation(request)
         }
         throw BASOrganError.providerUnavailable(
-            reason: "FoundationModels LanguageModelSession requires iOS 26+ / macOS 26+")
+            reason: "FoundationModels LanguageModelSession requires iOS 27+ / macOS 27+ "
+                + "(the 26 error taxonomy is not mapped — see the floor note above)")
         #else
         throw BASOrganError.providerUnavailable(
             reason:
@@ -100,7 +109,9 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
 
     public func currentCapacity() async -> BASOrganCapacity {
         #if canImport(FoundationModels)
-        if #available(iOS 26, macOS 26, visionOS 26, *) {
+        // Must track draft()'s floor: advertising capacity on an OS where draft()
+        // unconditionally refuses would tell a router this organ is usable when it is not.
+        if #available(iOS 27, macOS 27, visionOS 27, *) {
             return .unlimited
         }
         return BASOrganCapacity(
@@ -117,10 +128,83 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
         #endif
     }
 
+    // MARK: - Error mapping (FoundationModels -> BASOrganError)
+
+    #if canImport(FoundationModels)
+    /// Translate a `LanguageModelError` into this adapter's declared error contract.
+    ///
+    /// `BASOrganAdapter` says `draft(_:)` throws `BASOrganError`. Before this, both
+    /// `session.respond` calls were bare `try await`, so raw FoundationModels errors
+    /// escaped the contract untranslated — the M181 translation matrix never saw the live
+    /// path, and hosts got an Apple type they were never told to expect.
+    ///
+    /// ## ★ The refusal class is deliberately NOT mapped
+    ///
+    /// `guardrailViolation` and `refusal` are the model's SAFETY DECISION — a RESULT, not
+    /// an outage — and they are rethrown RAW on purpose.
+    ///
+    /// `BASRoutingOrganAdapter` fails over to its secondary on exactly
+    /// `.providerUnavailable` and `.pressureRefusal` (three sites: :161/:163, :191/:193,
+    /// :216/:218), and a LIVE Apple-primary + MLX-Gemma-secondary router already ships in
+    /// QinaoSampleHost/SampleHostRuntimeBenchExtensions.swift:71-74. Mapping a refusal onto
+    /// either case would make that router silently RE-RUN the refused prompt on MLX —
+    /// laundering Apple's safety refusal into a second model until one complies. That
+    /// bypass does NOT exist today (a raw error matches neither catch), so a careless
+    /// mapping would CREATE it. No existing BASOrganError case means "the model refused
+    /// as its result" — `inputTooLong` / `deadlineExpired` would be lies — and a
+    /// `contentRefusal` case is deliberately out of scope (operator decision, 2026-07-14).
+    /// Until such a case exists, raw propagation is the honest and SAFE behaviour: the
+    /// router declines to handle what it does not recognise.
+    ///
+    /// Returns `nil` for the refusal class, meaning "rethrow unchanged".
+    @available(iOS 27, macOS 27, visionOS 27, *)
+    static func organError(for error: LanguageModelError) -> BASOrganError? {
+        switch error {
+        // ── Safety RESULTS — never mapped, never routed around. ──
+        case .guardrailViolation, .refusal:
+            return nil
+
+        // ── Caller-input violation: a hard limit the secondary would also reject. The
+        //    router propagates this class rather than failing over, which is correct.
+        case .contextSizeExceeded(let ctx):
+            // Apple hands us the GROUND TRUTH: `contextSize` is the model's real window
+            // (probe on macOS 27: 8192) and `tokenCount` is what the request actually
+            // weighed. Forward both rather than re-deriving a chars/4 estimate — the
+            // host-facing code is `input-too-long:<actual>/<limit>`, and an estimate
+            // there would be a fabricated number where a measured one is available.
+            return .inputTooLong(limit: ctx.contextSize, actual: ctx.tokenCount)
+
+        // ── Transient pressure: the secondary MAY succeed. Safe to fail over. ──
+        case .rateLimited:
+            return .pressureRefusal(reason: "afm-rate-limited: \(error)")
+
+        // ── Infrastructure / capability outages: the secondary MAY succeed. ──
+        // Interpolating the underlying error is LOAD-BEARING, not cosmetic:
+        // BASOrganRegistryEndpoint.reasonCode(for:) passes `reason` VERBATIM into
+        // LoopError.organUnavailable, and the AFM test helper detects the
+        // foreground-cache-cold state by substring ("ModelManagerError Code=1026"). If
+        // these reasons were sanitised English, that detection would die and the gated
+        // suite would hard-fail on any cold CLI host.
+        case .timeout:
+            return .providerUnavailable(reason: "afm-timeout: \(error)")
+        case .unsupportedCapability:
+            return .providerUnavailable(reason: "afm-unsupported-capability: \(error)")
+        case .unsupportedTranscriptContent:
+            return .providerUnavailable(reason: "afm-unsupported-transcript: \(error)")
+        case .unsupportedGenerationGuide:
+            return .providerUnavailable(reason: "afm-unsupported-guide: \(error)")
+        case .unsupportedLanguageOrLocale:
+            return .providerUnavailable(reason: "afm-unsupported-language: \(error)")
+        @unknown default:
+            return .providerUnavailable(reason: "afm-unknown-case: \(error)")
+        }
+    }
+    #endif
+
     // MARK: - FoundationModels delegation
 
     #if canImport(FoundationModels)
-    @available(iOS 26, macOS 26, visionOS 26, *)
+    @available(iOS 27, macOS 27, visionOS 27, *)
     private func draftViaFoundation(
         _ request: BASOrganRequest
     ) async throws -> BASOrganDraft {
@@ -154,18 +238,32 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
         // RUNTIME path is on-device-only and NOT yet exercised on hardware (the macOS host can't run the model).
         let body: String
         var schemaWired = false
-        if let outputSchema = request.outputSchema,
-           let parsed = BASGuidedSchemaTranslator.parse(
-               propertiesJSON: outputSchema.propertiesJSON,
-               schemaName: outputSchema.schemaName),
-           let genSchema = try? BASGuidedSchemaTranslator.makeGenerationSchema(from: parsed) {
-            let response = try await session.respond(
-                to: prompt, schema: genSchema, options: options)
-            body = response.content.jsonString
-            schemaWired = true
-        } else {
-            let response = try await session.respond(to: prompt, options: options)
-            body = response.content
+        do {
+            if let outputSchema = request.outputSchema,
+               let parsed = BASGuidedSchemaTranslator.parse(
+                   propertiesJSON: outputSchema.propertiesJSON,
+                   schemaName: outputSchema.schemaName),
+               let genSchema = try? BASGuidedSchemaTranslator.makeGenerationSchema(from: parsed) {
+                let response = try await session.respond(
+                    to: prompt, schema: genSchema, options: options)
+                body = response.content.jsonString
+                schemaWired = true
+            } else {
+                let response = try await session.respond(to: prompt, options: options)
+                body = response.content
+            }
+        } catch is CancellationError {
+            // FIRST, and never mapped. BASOrganRegistryEndpoint cancels the pump when the
+            // consumer breaks; mapping a cancellation into .providerUnavailable would make
+            // BASRoutingOrganAdapter re-run the whole generation on its secondary after the
+            // caller already walked away.
+            throw CancellationError()
+        } catch let afm as LanguageModelError {
+            // Honour the BASOrganAdapter contract. `organError(for:)` returns nil for the
+            // SAFETY-REFUSAL class (guardrailViolation / refusal) — those rethrow RAW so no
+            // router can launder them onto a second model. See its doc comment.
+            guard let mapped = Self.organError(for: afm) else { throw afm }
+            throw mapped
         }
 
         // Trace markers (typed, grep-able) composed from the bridge taxonomy — the bridge is now EXERCISED in
