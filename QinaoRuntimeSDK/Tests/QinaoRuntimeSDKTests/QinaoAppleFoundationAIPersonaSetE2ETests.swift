@@ -182,6 +182,37 @@ final class QinaoAppleFoundationAIPersonaSetE2ETests:
         }
     }
 
+    // MARK: - Doctrine A (UNGATED — the model cannot reach these assertions)
+
+    /// Doctrine A for the persona-panel lane: wrapping a review as an advisory NEVER
+    /// promotes the envelope, whatever the personas recommended.
+    ///
+    /// Split out UNGATED 2026-07-14 (skip triage). The assertion depends on the PARSED
+    /// report — `wrapAsAdvisory(report:envelope:)` takes a struct — so the model was never
+    /// load-bearing here, yet a single unparseable reply discarded the doctrine entirely
+    /// via XCTSkip (observed firing on 2026-07-14 even with the gate ON).
+    ///
+    /// Fixture uses the most dangerous answer (.approveSuggested, all checks passing): an
+    /// approving panel is exactly what would leak the envelope if the doctrine ever broke.
+    func test_panelReviewNeverPromotesEnvelope_doctrineOnly() {
+        let env = candidateEnvelope()
+        let report = BASWorldPriorAIReviewReport(
+            templateID: env.input.templateID,
+            checklistResults: BASWorldPriorReviewChecklistItem.allCases.map {
+                BASWorldPriorAIChecklistResult(
+                    item: $0, pass: true, comment: "fixture: persona approved")
+            },
+            overallRecommendation: .approveSuggested,
+            justification: "fixture: the whole persona panel approved")
+
+        let advisory = BASWorldPriorAIReviewerSimulation
+            .wrapAsAdvisory(report: report, envelope: env)
+
+        XCTAssertEqual(
+            advisory.producedEnvelope.provenance, .illustrative,
+            "AI persona panel + reviewer advisory MUST keep the envelope .illustrative")
+    }
+
     // MARK: - 3. Doctrine A: panel review never promotes
 
     func test_panelReviewDoesNotPromoteEnvelope()
@@ -205,8 +236,13 @@ final class QinaoAppleFoundationAIPersonaSetE2ETests:
                     templateID:
                         env.input.templateID)
         else {
+            // MODEL-CONFORMANCE only: the doctrine is asserted ungated by
+            // test_panelReviewNeverPromotesEnvelope_doctrineOnly, so an unparseable reply
+            // no longer discards it. This narrow skip means "the real AFM reply did not
+            // match our prompt format" — a prompt/model signal, not a substrate failure.
             throw XCTSkip(
-                "AFM unparseable")
+                "model conformance: the AFM reply did not parse as a review report "
+                + "(doctrine is covered ungated; this is a prompt-format/model signal)")
         }
         let advisory =
             BASWorldPriorAIReviewerSimulation

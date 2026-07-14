@@ -105,15 +105,62 @@ final class QinaoAppleFoundationAIReviewerSimulationE2ETests:
             }
         }
         guard let report else {
+            // MODEL-CONFORMANCE only. The DOCTRINE this file exists to protect is asserted
+            // ungated by test_advisoryNeverPromotesEnvelope_doctrineOnly, so an unparseable
+            // reply no longer discards it. What is skipped here is narrow and genuinely
+            // model-dependent: "a real AFM reply matches our prompt format". Reported as a
+            // MEASURED rate rather than a claimed cause — 0/5 is a prompt-builder or model
+            // signal worth an operator's attention, not a substrate failure.
             throw XCTSkip(
-                "AFM produced unparseable output across " +
-                "retries — body: \(lastBody)")
+                "model conformance 0/5: no AFM reply parsed as a review report. Doctrine is "
+                + "covered ungated; this is a prompt-format/model signal. Last body: "
+                + lastBody)
         }
         XCTAssertEqual(
             report.templateID,
             "tmpl-time-deadline-pressure")
         XCTAssertEqual(
             report.checklistResults.count, 6)
+    }
+
+    // MARK: - Doctrine A (UNGATED — the model cannot reach these assertions)
+
+    /// Doctrine A: an AI advisory NEVER promotes an envelope, and the envelope stays
+    /// typed-blocked from training — REGARDLESS of what the model recommended.
+    ///
+    /// Split out UNGATED 2026-07-14 (skip triage). This chain depends on the PARSED report,
+    /// not on the model: `wrapAsAdvisory(report:envelope:)` takes a struct. Previously it
+    /// ran only behind QINAO_FM_E2E=1 and, worse, a single unparseable reply threw the whole
+    /// doctrine away via XCTSkip — measured on 2026-07-14 this class reported "Executed 2
+    /// tests, with 2 tests skipped", i.e. ZERO doctrine coverage even with the gate ON.
+    ///
+    /// The report is a fixture built with the model's MOST DANGEROUS answer
+    /// (.approveSuggested, every checklist item passing): if the doctrine ever leaked, an
+    /// approving review is what would leak it. A real model reply can only produce a report
+    /// this fixture already covers.
+    func test_advisoryNeverPromotesEnvelope_doctrineOnly() {
+        let env = candidateEnvelope()
+        let report = BASWorldPriorAIReviewReport(
+            templateID: env.input.templateID,
+            checklistResults: BASWorldPriorReviewChecklistItem.allCases.map {
+                BASWorldPriorAIChecklistResult(
+                    item: $0, pass: true, comment: "fixture: model approved")
+            },
+            overallRecommendation: .approveSuggested,
+            justification: "fixture: the model enthusiastically approved this template")
+
+        let advisory = BASWorldPriorAIReviewerSimulation
+            .wrapAsAdvisory(report: report, envelope: env)
+
+        XCTAssertEqual(
+            advisory.producedEnvelope.provenance, .illustrative,
+            "Doctrine A: an AI advisory MUST keep the envelope .illustrative regardless of "
+            + "the model's recommendation")
+        XCTAssertEqual(
+            BASWorldPriorTrainingPipelineFilter
+                .rejectionReason(for: advisory.producedEnvelope),
+            .privateProvenance(.illustrative),
+            "an AI-advised envelope must stay typed-blocked from the training pipeline")
     }
 
     // MARK: - 2. Doctrine A: AFM-reviewed envelope NOT promoted

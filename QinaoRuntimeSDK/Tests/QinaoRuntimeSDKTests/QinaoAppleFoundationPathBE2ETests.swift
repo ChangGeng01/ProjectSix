@@ -122,6 +122,43 @@ final class QinaoAppleFoundationPathBE2ETests: XCTestCase {
         return (lastBody, nil)
     }
 
+    // MARK: - Doctrine (UNGATED — the model cannot reach these assertions)
+
+    /// A fixture standing in for a parsed AI draft. `wrapAsDraft(_:)` takes the PARSED
+    /// struct, so the model is not load-bearing for any doctrine assertion below.
+    private func fixtureDraftInput() -> BASWorldPriorTemplateAcceptance.Input {
+        BASWorldPriorTemplateAcceptance.Input(
+            templateID: "tmpl-boundary-saying-no-without-guilt",
+            perturbKindsCovered: ["dropPrecondition", "introduceBlocker"],
+            branchEvidenceRungs: [2, 1, 1],
+            description:
+                "Declining a request without justifying it tends to preserve the relationship, unless the other party expects a rationale.")
+    }
+
+    /// Doctrine A + the training-filter block, asserted on EVERY pass.
+    ///
+    /// Split out UNGATED 2026-07-14 (skip triage). These assertions depend on the parsed
+    /// input, not on the model — the file's own comment already said so ("this tests
+    /// doctrine, not LLM compliance") — yet an unparseable reply discarded the entire chain
+    /// via XCTSkip, and those skips FIRED for real on 2026-07-14.
+    func test_aiDraftedEnvelopeDoctrine_ungated() throws {
+        let wrapped = try XCTUnwrap(
+            BASWorldPriorAIDraftHelper.wrapAsDraft(fixtureDraftInput()),
+            "the fixture input must satisfy M295.0 acceptance")
+
+        XCTAssertEqual(
+            wrapped.envelope.provenance, .illustrative,
+            "an AI-drafted envelope must be .illustrative")
+        XCTAssertEqual(
+            wrapped.session.currentStage, .draft,
+            "AI drafts start at .draft")
+        XCTAssertEqual(
+            BASWorldPriorTrainingPipelineFilter
+                .rejectionReason(for: wrapped.envelope),
+            .privateProvenance(.illustrative),
+            "an AI-drafted envelope must stay typed-blocked from the training pipeline")
+    }
+
     // MARK: - Test 1: AI-drafted envelope is .illustrative
 
     func test_aiDraftedEnvelopeAlwaysIllustrative()
@@ -136,13 +173,14 @@ final class QinaoAppleFoundationPathBE2ETests: XCTestCase {
         let result = try await draftAndParseWithRetries(
             prompt: prompt)
 
-        // If parser failed, surface the body so we can see
-        // what AFM produced — but don't fail the suite (this
-        // tests doctrine, not LLM compliance).
+        // MODEL-CONFORMANCE only. The doctrine this file protects is asserted ungated by
+        // test_aiDraftedEnvelopeDoctrine_ungated, so an unparseable reply no longer discards
+        // it — which is what this skip used to do, despite the note below correctly saying
+        // the file tests doctrine rather than LLM compliance.
         guard let input = result.input else {
             throw XCTSkip(
-                "AFM produced unparseable output across " +
-                "retries — body was: \(result.body)")
+                "model conformance: no AFM reply parsed across retries (doctrine is covered "
+                + "ungated; this is a prompt-format/model signal). Body was: \(result.body)")
         }
 
         let wrapped = try XCTUnwrap(
