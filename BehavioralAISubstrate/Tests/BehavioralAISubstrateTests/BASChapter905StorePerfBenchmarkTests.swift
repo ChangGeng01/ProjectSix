@@ -43,6 +43,16 @@ import BASRustMemoryTrackerBinary
 #if os(iOS) || os(macOS)
 final class BASChapter905StorePerfBenchmarkTests: XCTestCase {
 
+    /// Each side is measured this many times and the MINIMUM is compared.
+    ///
+    /// Single-shot wall-clock ratios make this suite a LOAD DETECTOR rather than a
+    /// regression detector: measured 2026-07-14 on a machine busy with back-to-back
+    /// builds, Rust came out 2.14x slower and RED the 2x guard, then passed 3/3 in
+    /// isolation. Minimum-of-N is the robust estimator — noise only ever ADDS time, so the
+    /// min is the closest thing to true cost, and a real regression still moves it.
+    private static let benchmarkRepeats = 5
+
+
     private func makeTempDBURL(_ tag: String) -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent(
@@ -102,24 +112,30 @@ final class BASChapter905StorePerfBenchmarkTests: XCTestCase {
                 turnRef: "w", permitMode: "p")
         }
 
-        let swiftSec = try await timeit {
-            for i in 0..<n {
-                _ = try await swiftActor.record(
-                    atomID: "atom-\(i % 50)",
-                    sessionRef: "sess-\(i % 10)",
-                    turnRef: "turn-\(i)",
-                    permitMode: "permitted")
-            }
+        var minSwiftSec = Double.greatestFiniteMagnitude
+        var minRustSec = Double.greatestFiniteMagnitude
+        for _ in 0..<Self.benchmarkRepeats {
+            minSwiftSec = min(minSwiftSec, try await timeit {
+                for i in 0..<n {
+                    _ = try await swiftActor.record(
+                        atomID: "atom-\(i % 50)",
+                        sessionRef: "sess-\(i % 10)",
+                        turnRef: "turn-\(i)",
+                        permitMode: "permitted")
+                }
+            })
+            minRustSec = min(minRustSec, try await timeit {
+                for i in 0..<n {
+                    _ = try await rustActor.record(
+                        atomID: "atom-\(i % 50)",
+                        sessionRef: "sess-\(i % 10)",
+                        turnRef: "turn-\(i)",
+                        permitMode: "permitted")
+                }
+            })
         }
-        let rustSec = try await timeit {
-            for i in 0..<n {
-                _ = try await rustActor.record(
-                    atomID: "atom-\(i % 50)",
-                    sessionRef: "sess-\(i % 10)",
-                    turnRef: "turn-\(i)",
-                    permitMode: "permitted")
-            }
-        }
+        let swiftSec = minSwiftSec
+        let rustSec = minRustSec
         let ratio = swiftSec / rustSec
         print(
             "ch905 record N=\(n):" +
@@ -177,9 +193,12 @@ final class BASChapter905StorePerfBenchmarkTests: XCTestCase {
         // to avoid PK collisions(DB grows but append cost is per-txn,
         // not size-bound)。 Absorbs Mac scheduling noise(endurance
         // v5/v6 flaky)。
+        // MIN-vs-MIN (was min-rust vs MAX-swift, which compared Rust's best case against
+        // Swift's worst — biased toward passing, so it could hide a real Rust regression).
+        // Minimum is the robust estimator for both sides: noise only ever adds time.
         var minRustSec = Double.greatestFiniteMagnitude
-        var maxSwiftSec = 0.0
-        for trial in 0..<3 {
+        var minSwiftSec = Double.greatestFiniteMagnitude
+        for trial in 0..<Self.benchmarkRepeats {
             let base = (trial + 1) * 100_000
             let s = try await timeit {
                 for i in 0..<n {
@@ -194,17 +213,19 @@ final class BASChapter905StorePerfBenchmarkTests: XCTestCase {
                 }
             }
             minRustSec = min(minRustSec, r)
-            maxSwiftSec = max(maxSwiftSec, s)
+            minSwiftSec = min(minSwiftSec, s)
         }
-        let swiftSec = maxSwiftSec   // alias for print + assert
+        let swiftSec = minSwiftSec   // alias for print + assert
         let rustSec = minRustSec
         let ratio = swiftSec / rustSec
+        let reps = Self.benchmarkRepeats
         print(
-            "ch905 eventlog.append N=\(n) best-of-3:" +
+            "ch905 eventlog.append N=\(n) best-of-\(reps):" +
             " swift=\(String(format: "%.4f", swiftSec))s" +
             " rust=\(String(format: "%.4f", rustSec))s" +
             " swift/rust=\(String(format: "%.2fx", ratio))")
-        XCTAssertLessThan(rustSec, swiftSec * 2.0)
+        XCTAssertLessThan(rustSec, swiftSec * 2.0,
+            "Rust >2x slower than Swift = real regression")
     }
 
     // MARK: - HostConstitution.save() throughput
@@ -238,25 +259,36 @@ final class BASChapter905StorePerfBenchmarkTests: XCTestCase {
             _ = try await rustActor.save(makeVault(idx: i))
         }
 
-        let swiftSec = try await timeit {
-            for i in 0..<100 {
-                _ = try await swiftActor.save(
-                    makeVault(idx: i))
-            }
+        // MIN-of-N, distinct index base per trial so repeats don't collide (warm-up uses
+        // 9000+). Single-shot wall-clock made this a load detector — see runRecordBenchmark.
+        var minSwiftSec = Double.greatestFiniteMagnitude
+        var minRustSec = Double.greatestFiniteMagnitude
+        for trial in 0..<Self.benchmarkRepeats {
+            let base = trial * 1_000
+            minSwiftSec = min(minSwiftSec, try await timeit {
+                for i in base..<(base + 100) {
+                    _ = try await swiftActor.save(
+                        makeVault(idx: i))
+                }
+            })
+            minRustSec = min(minRustSec, try await timeit {
+                for i in (base + 100)..<(base + 200) {
+                    _ = try await rustActor.save(
+                        makeVault(idx: i))
+                }
+            })
         }
-        let rustSec = try await timeit {
-            for i in 100..<200 {
-                _ = try await rustActor.save(
-                    makeVault(idx: i))
-            }
-        }
+        let swiftSec = minSwiftSec
+        let rustSec = minRustSec
         let ratio = swiftSec / rustSec
+        let reps = Self.benchmarkRepeats
         print(
-            "ch905 vault.save N=100:" +
+            "ch905 vault.save N=100 best-of-\(reps):" +
             " swift=\(String(format: "%.4f", swiftSec))s" +
             " rust=\(String(format: "%.4f", rustSec))s" +
             " swift/rust=\(String(format: "%.2fx", ratio))")
-        XCTAssertLessThan(rustSec, swiftSec * 2.0)
+        XCTAssertLessThan(rustSec, swiftSec * 2.0,
+            "Rust >2x slower than Swift = real regression")
     }
 }
 #endif

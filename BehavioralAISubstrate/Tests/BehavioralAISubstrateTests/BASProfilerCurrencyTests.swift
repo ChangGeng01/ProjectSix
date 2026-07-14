@@ -30,17 +30,30 @@ final class BASProfilerCurrencyTests: XCTestCase {
             throw XCTSkip("set BAS_PROFILER_CURRENCY_TEST=1 (heavy — loads Qwen3.5-4B)")
         }
         #if canImport(MLXLLM)
+        // PRECONDITION, checked BEFORE the multi-GB load: the MTP weights must be staged,
+        // or the router cannot pick .mtpSpec and this test has nothing to measure. The
+        // sibling probes do exactly this (BASTokenRecyclingProbeTests.swift:30-31,
+        // BASCacheLimitABDeviceTests.swift:42-43) and name the path so an operator can arm
+        // it. Previously the absence of weights was only GUESSED at, after the fact, in a
+        // skip message ("weights missing?") that the code never verified.
+        let mtpWeights = URL(fileURLWithPath: "/tmp/gdn_coreai/qwen35_mtp_folded.safetensors")
+        guard FileManager.default.fileExists(atPath: mtpWeights.path) else {
+            throw XCTSkip("MTP weights missing at \(mtpWeights.path) — stage them to arm this")
+        }
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
         try await adapter.loadModel()
         _ = try await adapter.draft(BASOrganRequest(
             requestID: "cur-1", role: .core, preset: .greedyDeterministic,
             instruction: "Count from one to ten in words.", maxOutputTokens: 96))
         let profiler = await adapter.draftProfiler
-        let stat = BASDecodeLanePolicy.Purpose.allCases
+        let observed = BASDecodeLanePolicy.Purpose.allCases
             .compactMap { profiler.stat(BASDecodeStrategy.mtpSpecID, $0) }.first
-        guard let stat else {
-            throw XCTSkip("turn did not route .mtpSpec (weights missing?) — currency unverifiable")
-        }
+        // With the weights verified present above, a turn that does NOT route .mtpSpec is a
+        // ROUTING REGRESSION — one of the exact failures this only-live check exists to
+        // detect — so it must RED, not green-skip.
+        let stat = try XCTUnwrap(
+            observed,
+            "weights are staged but the turn did not route .mtpSpec — routing regression")
         XCTAssertGreaterThan(stat.emaAccepted, 0, "lane ran but accepted nothing")
         XCTAssertLessThanOrEqual(stat.emaHitRate, 1.0,
                                  "live fold produced an impossible hit-rate — proposed is not true tokens")
