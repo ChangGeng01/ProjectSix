@@ -80,10 +80,20 @@ final class QinaoSampleHostFlowTests: XCTestCase {
             .path
     }
 
+    /// Remove the ledger and its SQLite sidecars.
+    ///
+    /// Only removes files that EXIST. This is not just tidiness: this runs from
+    /// a `defer` during error unwind, and a `removeItem` on an absent sidecar
+    /// manufactures an NSError that CLOBBERS the in-flight thrown error in
+    /// XCTest's failure report — a real `missingSnapshotProof` surfaced for
+    /// months as an unrelated "…sqlite-shm couldn't be removed", sending
+    /// readers after a phantom file bug. Skipping absent files keeps the
+    /// reported error the one the test actually threw.
     private func cleanupLedger(_ path: String) {
         for suffix in ["", "-journal", "-wal", "-shm"] {
-            try? FileManager.default
-                .removeItem(atPath: path + suffix)
+            let p = path + suffix
+            guard FileManager.default.fileExists(atPath: p) else { continue }
+            try? FileManager.default.removeItem(atPath: p)
         }
     }
 
@@ -103,8 +113,20 @@ final class QinaoSampleHostFlowTests: XCTestCase {
             ledgerSigningSecret: Data("m201-host-flow".utf8),
             ledgerDatabasePath: ledgerPath,
             now: now)
-        let (sovereign, _) = QinaoSovereignControlPlane
+        let (sovereign, handle) = QinaoSovereignControlPlane
             .bootstrap(configuration: config)
+
+        // deep-audit P0-4: a snapshot-continuity proof is only valid while its
+        // anchor is REGISTERED with the snapshot manager. A real host seeds the
+        // anchor as part of bootstrap; this reference flow must model that, or
+        // step 3's proof is refused as unregistered.
+        let anchorPayload = Data("m201-demo-anchor".utf8)
+        _ = try await handle.snapshotManager.register(
+            anchor: BASSovereignSnapshotManager.SnapshotAnchor(
+                anchorID: "anchor.demo",
+                safeSnapshotRef: "snap.demo",
+                integrityHash: BASSovereignSnapshotManager.hash(anchorPayload)),
+            sealedPayload: anchorPayload)
 
         let risk = QinaoRiskGate(
             permitTTLSeconds: 30, now: now)
@@ -191,12 +213,13 @@ final class QinaoSampleHostFlowTests: XCTestCase {
         // ---------------------------------------------------------
         let toolName = "calendar.add_event"
         let payload = Data(draft.body.utf8)
-        let digest = SHA256.hash(
-            data: Data((toolName + "|" + draft.body).utf8))
-            .map { String(format: "%02x", $0) }.joined()
+        // deep-audit P0-1: hosts mint the intent digest via the SDK-canonical
+        // binding over (toolName, payload, session, host) — the shape
+        // `execute()` recomputes and enforces. This demo is the reference host
+        // flow, so it must model the contract hosts are meant to follow.
         let intent = QinaoRiskGate.ActionIntent(
-            digest: digest,
             toolName: toolName,
+            payload: payload,
             sessionID: "sess.demo.1",
             hostVersionID: "host.v1",
             summary: "demo: add LLM-suggested event")
