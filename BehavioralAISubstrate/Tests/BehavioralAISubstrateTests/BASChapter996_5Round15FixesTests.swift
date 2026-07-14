@@ -224,15 +224,27 @@ final class BASChapter996_5Round15FixesTests: XCTestCase {
             "Sources/BASObservability/" +
                 "BASUpdateTicketLifecycle.swift",
         ]
+        // P2-21 shape: a required callsite the anchor no longer matches must FAIL
+        // the lint, not vanish from it. The old `continue` dropped unreadable
+        // paths silently, so a renamed/moved callsite quietly left the sweep —
+        // and had all six moved, this test would have PASSED having asserted
+        // nothing. The stated justification ("CI tmp dirs etc.") was STALE:
+        // BASSourceTreeAudit.repoRoot resolves via BAS_PROJECT_ROOT and then
+        // walks up to Package.swift, so it is already tmp-dir-proof.
+        var linted = 0
         for relativePath in callSites {
             let fullPath = "\(projectRoot)/\(relativePath)"
             guard let content = try? String(
                 contentsOfFile: fullPath, encoding: .utf8)
             else {
-                // Skip silently if file not at expected path
-                // (CI tmp dirs etc.)。 Local dev catches this。
+                XCTFail(
+                    "required callsite not readable at \(relativePath) — " +
+                    "anchor drift silently disables this lint. Update the " +
+                    "path (or delete the entry deliberately) rather than " +
+                    "letting the sweep shrink unnoticed.")
                 continue
             }
+            linted += 1
             // ch 1011 / M3770 — Round-21 HIGH-1 evolution:
             // post-ch-1011 the literal `"1.1.0"` is replaced
             // by `BASSovereignAuditEntry.hardenedSchemaVersion`
@@ -253,5 +265,9 @@ final class BASChapter996_5Round15FixesTests: XCTestCase {
                 "via `BASSovereignAuditEntry" +
                 ".hardenedSchemaVersion` reference (post-ch-1011)")
         }
+        XCTAssertEqual(
+            linted, callSites.count,
+            "saturation: every declared callsite must have been read and " +
+            "linted — a shrinking sweep is a false green")
     }
 }
