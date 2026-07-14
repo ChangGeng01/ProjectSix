@@ -68,7 +68,9 @@ final class BASSleepConsolidationDriverTests: XCTestCase {
     /// A real driven turn whose budget frame we then override per
     /// scenario (the result struct is a value — mutation is local)。
     /// Cooperative-pool safe: the 27e0fcb2e stack class is fixed (CoW-boxed turn
-    /// result + stage-split runTurn, ≤80KB peak pinned by BASRunTurnFrameBudgetTests)。
+    /// result + stage-split runTurn; the 64,000B peak budget is asserted by
+    /// BASRunTurnFrameBudgetTests — which only measures bytes under a
+    /// `--build-system native` run, so it is NOT enforced by a default CI pass)。
     private static func drivenTurn() throws -> BASEBrainTurnResult {
         let runtime = BASHostRuntime(configuration: .fixtureGeneric)
         let result = try runtime.startSession(

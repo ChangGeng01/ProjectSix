@@ -5,8 +5,10 @@ import XCTest
 /// The original lint mandated: a swift-testing suite that drives full turns must be @MainActor,
 /// because the ~550KB debug turn frame overflowed the 512KB cooperative pool (27e0fcb2e SIGBUS
 /// class). Both structural roots are now fixed — the turn result is a CoW box (12,200B value →
-/// 1 pointer, flat inits) and runTurn is stage-split (129,792B single frame → ≤80KB budgeted
-/// peak, mechanically pinned by BASRunTurnFrameBudgetTests). Turn-driving suites run on the
+/// 1 pointer, flat inits) and runTurn is stage-split (129,792B single frame → 64,000B budgeted
+/// peak, asserted by BASRunTurnFrameBudgetTests — NOT "mechanically pinned" on a default
+/// pass: the byte-measuring lint needs `--build-system native`, which no repo script runs).
+/// Turn-driving suites run on the
 /// pool DELIBERATELY: they are the living regression teeth for that budget.
 ///
 /// The inverted enforcement: no test may REINTRODUCE the retired discipline — an `@MainActor`

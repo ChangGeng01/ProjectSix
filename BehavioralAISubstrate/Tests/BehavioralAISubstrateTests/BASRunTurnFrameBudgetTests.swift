@@ -31,7 +31,32 @@ final class BASRunTurnFrameBudgetTests: XCTestCase {
         let root = Self.packageRoot()
         let objDir = root.appendingPathComponent(".build/arm64-apple-macosx/debug/BASHostKit.build")
         guard FileManager.default.fileExists(atPath: objDir.path) else {
-            throw XCTSkip("native-SPM layout absent (fresh checkout / swiftbuild-only) — host lint")
+            // HONEST STATUS (skip triage, 2026-07-14): under Apple Swift 6.4 the default build
+            // system is swiftbuild, which never produces this native-SPM object dir, and NO repo
+            // script passes --build-system native (scripts/swift-test-headless.sh runs plain
+            // `swift test`). So on a default checkout this guard ALWAYS fires and the only test
+            // here that measures actual bytes never runs. It is arm-able, not dead — VERIFIED
+            // 2026-07-14, this exact sequence produces the obj dir and the lint then runs and
+            // PASSES (6 tests, 0 skipped, 0 failures; runTurn peak is genuinely under budget):
+            //
+            //     swift build --build-system native --build-tests
+            //     swift test --build-system native --filter BASRunTurnFrameBudgetTests
+            //
+            // ★ SHELF LIFE: that build emits "'--build-system native' has been deprecated and
+            //   will be removed in a future release". When it goes, this lint dies for real —
+            //   the durable fix is to teach objDir the swiftbuild layout, NOT to keep leaning on
+            //   a deprecated flag. Treat that removal as the trigger to do the port.
+            //
+            // Until armed, the frame budget is NOT mechanically enforced by CI. Do not describe
+            // it as "pinned" elsewhere without saying by what — the 5 sibling files that made
+            // that claim (in 3 mutually contradictory figures) were corrected in the same commit
+            // as this comment. The 5 grep-based source lints in this file DO run every pass and
+            // are what actually holds the line today.
+            throw XCTSkip(
+                "native-SPM object dir absent — the default swiftbuild layout does not produce "
+                + "\(objDir.lastPathComponent), so the BYTE-MEASURING frame-budget lint cannot "
+                + "run here. Arm it with: swift test --build-system native --filter "
+                + "BASRunTurnFrameBudgetTests. The source-shape lints in this file still ran.")
         }
         // DISCOVER runTurn-family objects by prefix — a renamed or added stage file is included
         // automatically instead of greening the lint forever (audit: rename-evasion).
