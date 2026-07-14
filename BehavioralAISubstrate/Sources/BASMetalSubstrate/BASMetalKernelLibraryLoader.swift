@@ -630,4 +630,38 @@ extension BASMetalKernelLibraryLoader {
     public static var isSsmScanResourceBundled: Bool {
         return ssmScanResourceURL != nil
     }
+
+    /// URL of the PRECOMPILED kernel library in the resource bundle, if the
+    /// active build system produced one。
+    public static var compiledMetallibURL: URL? {
+        return expectedBundle.url(
+            forResource: "default", withExtension: "metallib")
+    }
+
+    /// Is the SSMScan kernel reachable from `Bundle.module` AT ALL — as raw
+    /// source OR as the precompiled `default.metallib`?
+    ///
+    /// The two supported build systems stage the `.process(...)` resource
+    /// differently and BOTH are correct:
+    ///
+    ///   - classic SPM copies the raw `SSMScan.metal` into the bundle;
+    ///   - Swift Build (the Apple Swift 6.4 default) COMPILES the `.metal`
+    ///     inputs into `Contents/Resources/default.metallib` and does not copy
+    ///     the source.
+    ///
+    /// `isSsmScanResourceBundled` only sees the first, which made the
+    /// resource-availability tests skip 100% of the time under the default
+    /// toolchain while their skip text blamed a missing bundle — the bundle is
+    /// present either way.
+    ///
+    /// NOT a manifest tooth: this stays true if the
+    /// `.process("BASBuiltinKernels/SSMScan.metal")` entry is deleted, both
+    /// because the sibling kernels keep a `default.metallib` on disk and
+    /// because Swift Build compiles the target's `.metal` inputs regardless of
+    /// the `resources:` declaration (verified 2026-07-14). The kernel is pinned
+    /// by its compiled SYMBOL — see
+    /// `testSsmScanKernelSymbolIsReachableFromBundleModule`.
+    public static var isSsmScanKernelReachable: Bool {
+        return ssmScanResourceURL != nil || compiledMetallibURL != nil
+    }
 }
