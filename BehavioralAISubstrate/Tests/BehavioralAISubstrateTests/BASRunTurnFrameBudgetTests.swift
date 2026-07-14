@@ -29,57 +29,86 @@ final class BASRunTurnFrameBudgetTests: XCTestCase {
 
     func testRunTurnDebugPeakFrameStaysUnderBudget() throws {
         let root = Self.packageRoot()
-        let objDir = root.appendingPathComponent(".build/arm64-apple-macosx/debug/BASHostKit.build")
-        guard FileManager.default.fileExists(atPath: objDir.path) else {
-            // HONEST STATUS (skip triage, 2026-07-14): under Apple Swift 6.4 the default build
-            // system is swiftbuild, which never produces this native-SPM object dir, and NO repo
-            // script passes --build-system native (scripts/swift-test-headless.sh runs plain
-            // `swift test`). So on a default checkout this guard ALWAYS fires and the only test
-            // here that measures actual bytes never runs. It is arm-able, not dead — VERIFIED
-            // 2026-07-14, this exact sequence produces the obj dir and the lint then runs and
-            // PASSES (6 tests, 0 skipped, 0 failures; runTurn peak is genuinely under budget):
-            //
-            //     swift build --build-system native --build-tests
-            //     swift test --build-system native --filter BASRunTurnFrameBudgetTests
-            //
-            // ★ SHELF LIFE: that build emits "'--build-system native' has been deprecated and
-            //   will be removed in a future release". When it goes, this lint dies for real —
-            //   the durable fix is to teach objDir the swiftbuild layout, NOT to keep leaning on
-            //   a deprecated flag. Treat that removal as the trigger to do the port.
-            //
-            // Until armed, the frame budget is NOT mechanically enforced by CI. Do not describe
-            // it as "pinned" elsewhere without saying by what — the 5 sibling files that made
-            // that claim (in 3 mutually contradictory figures) were corrected in the same commit
-            // as this comment. The 5 grep-based source lints in this file DO run every pass and
-            // are what actually holds the line today.
-            throw XCTSkip(
-                "native-SPM object dir absent — the default swiftbuild layout does not produce "
-                + "\(objDir.lastPathComponent), so the BYTE-MEASURING frame-budget lint cannot "
-                + "run here. Arm it with: swift test --build-system native --filter "
-                + "BASRunTurnFrameBudgetTests. The source-shape lints in this file still ran.")
+
+        // TWO LAYOUTS. Ported 2026-07-14 so this lint runs under the DEFAULT toolchain
+        // instead of skipping forever:
+        //   - classic SPM  -> .build/arm64-apple-macosx/debug/BASHostKit.build/<name>.swift.o
+        //   - Swift Build  -> .build/out/Intermediates.noindex/**/BASHostKit*.build/
+        //                     Objects-normal/arm64/<name>.o                 (the default)
+        // NOT .build/out/v5/units/: that CAS holds one entry per source and replaces on
+        // change, but its `<name>.o-<HASH>` blobs are NOT Mach-O — `file` reports "data" and
+        // llvm-objdump rejects them. Measured 2026-07-14 before wiring them up.
+        // Previously only the native dir was consulted, and Apple Swift 6.4 defaults to
+        // swiftbuild, which never produces it — so the only test here that measures actual
+        // BYTES never ran, while five other files advertised the budget as enforced.
+        let nativeDir = root.appendingPathComponent(
+            ".build/arm64-apple-macosx/debug/BASHostKit.build")
+        // Locate the Swift Build object dir by SEARCH — the intermediate path embeds the
+        // target name and a build-system suffix ("BASHostKit-t.build") that we should not
+        // hardcode.
+        let swiftBuildDir: URL? = {
+            let base = root.appendingPathComponent(".build/out/Intermediates.noindex")
+            guard let e = FileManager.default.enumerator(
+                at: base, includingPropertiesForKeys: nil) else { return nil }
+            for case let u as URL in e
+            where u.lastPathComponent == "arm64"
+                && u.path.contains("BASHostKit")
+                && u.path.contains("Objects-normal") {
+                return u
+            }
+            return nil
+        }()
+        // Pick the layout that BUILT US, not merely one that exists on disk. A lingering
+        // native dir from an old `--build-system native` run must not be preferred over the
+        // CAS that produced this very test binary — that is how the lint ends up either
+        // skipping forever or certifying fossils.
+        let ourBundle = Bundle(for: Self.self).bundlePath
+        let usingNative = ourBundle.contains("arm64-apple-macosx")
+        guard let objDir = usingNative ? nativeDir : swiftBuildDir,
+              FileManager.default.fileExists(atPath: objDir.path) else {
+            throw XCTSkip("no BASHostKit object dir found for the "
+                + "\(usingNative ? "native" : "Swift Build") layout — build the package "
+                + "before running this lint")
         }
-        // DISCOVER runTurn-family objects by prefix — a renamed or added stage file is included
-        // automatically instead of greening the lint forever (audit: rename-evasion).
-        let objNames = try FileManager.default.contentsOfDirectory(atPath: objDir.path)
-            .filter { $0.hasPrefix(Self.runTurnObjectPrefix) && $0.hasSuffix(".swift.o") }
+
+        // DISCOVER runTurn-family objects by prefix — a renamed or added stage file is
+        // included automatically instead of greening the lint forever (audit:
+        // rename-evasion). Suffix differs per layout: `.swift.o` vs `.o-<hash>`.
+        let all = try FileManager.default.contentsOfDirectory(atPath: objDir.path)
+        let objNames = all
+            .filter {
+                $0.hasPrefix(Self.runTurnObjectPrefix)
+                    && $0.hasSuffix(usingNative ? ".swift.o" : ".o")
+            }
             .sorted()
         XCTAssertGreaterThanOrEqual(objNames.count, 4,
             "expected the runTurn + ≥3 stage objects under \(objDir.path); found \(objNames) — "
             + "if stage files were renamed out of the family prefix, update runTurnObjectPrefix")
 
-        // FOSSIL GUARD (audit: beta/swiftbuild runs measured stale stable-toolchain objects
-        // and passed on old code). Layout detection via OUR OWN bundle path: if this test
-        // process was built into the native-SPM layout, the objects come from THIS build and
-        // are fresh by construction; if we are running from the swiftbuild layout
-        // (.build/out/Products), the native objects belong to some OLDER stable-toolchain
-        // build — skip LOUDLY instead of certifying fossils. (mtime comparison is NOT usable:
-        // SPM skips recompiles by content hash, so a touched-but-unchanged source trips it.)
-        let ourBundle = Bundle(for: Self.self).bundlePath
-        guard ourBundle.contains("arm64-apple-macosx") else {
-            throw XCTSkip("running from a non-native build layout (\(ourBundle)) — the native "
-                + "objects may be fossils; the frame budget bites on stable-toolchain runs "
-                + "(swift-test-headless.sh)")
-        }
+        // FOSSIL GUARD — never certify bytes from an older build.
+        //
+        // NATIVE layout: detect via OUR OWN bundle path. If this test process was built into
+        // the native layout, the objects come from THIS build and are fresh by construction;
+        // if we are running from swiftbuild while a native dir lingers, those native objects
+        // belong to some OLDER build. (mtime is NOT usable: SPM skips recompiles by content
+        // hash, so a touched-but-unchanged source would trip it.)
+        //
+        // CAS layout: the store is content-addressed, so freshness needs a different proof.
+        // MEASURED 2026-07-14: the CAS holds exactly ONE object per source file and REPLACES
+        // it on a source change (probed by appending a comment to
+        // EBrainRuntimeCoordinator+RunTurn.swift and rebuilding — the count stayed 1). So a
+        // unique object per prefix IS the freshness proof. If duplicates ever appear we
+        // cannot tell which is current, and guessing would certify a fossil — skip loudly.
+        // Fresh by construction in BOTH layouts, and that is measured, not assumed: each
+        // object is named after its SOURCE FILE with no content hash, so a rebuild
+        // OVERWRITES it in place rather than accumulating variants (verified 2026-07-14 by
+        // appending a comment to EBrainRuntimeCoordinator+RunTurn.swift and rebuilding —
+        // the file count stayed at 4). Since `usingNative` is derived from OUR OWN bundle
+        // path, we always read the dir belonging to the build that produced this very test
+        // binary — a lingering native tree from an old `--build-system native` run can no
+        // longer be preferred over the layout that built us. (mtime is NOT usable: the
+        // compiler skips recompiles by content hash, so a touched-but-unchanged source
+        // would trip it.)
 
         var dis = ""
         for name in objNames {
@@ -127,8 +156,11 @@ final class BASRunTurnFrameBudgetTests: XCTestCase {
             frames.filter { $0.key.hasPrefix(name + "|") }.map(\.value)
                 .sorted(by: >).prefix(n).map { $0 }
         }
-        // main object = the one holding runTurn itself (exact file name, not a stage file)
-        let mainObj = objNames.first { $0 == "\(Self.runTurnObjectPrefix).swift.o" }
+        // main object = the one holding runTurn itself (exact file name, not a stage file).
+        // The suffix is layout-dependent: classic SPM emits `<name>.swift.o`, Swift Build
+        // emits `<name>.o`.
+        let mainObjName = Self.runTurnObjectPrefix + (usingNative ? ".swift.o" : ".o")
+        let mainObj = objNames.first { $0 == mainObjName }
         let main = mainObj.map { topFrames(inObject: $0, 1).first ?? 0 } ?? 0
         XCTAssertGreaterThan(main, 0, "runTurn body frame not found in \(mainObj ?? "?")")
         // worst stage object: top-2 sum = 1-level stage→helper chain bound (audit: the old

@@ -9,9 +9,8 @@ import Testing
 /// Runs on the cooperative pool (512KB threads) without main-actor pinning: the two structural
 /// roots of the 27e0fcb2e SIGBUS class are fixed — the turn result is a CoW box
 /// (12,200B → 1 pointer, flat inits) and runTurn is stage-split (single 129,792B frame →
-/// 56,304B peak MEASURED at the time of that cut against a 64,000B budget;
-/// BASRunTurnFrameBudgetTests re-measures it only under a `--build-system native` run,
-/// not on a default CI pass). This suite driving full turns on
+/// 56,304B peak measured at the time of that cut against a 64,000B budget;
+/// BASRunTurnFrameBudgetTests re-measures it on every default pass — 57,360B today). This suite driving full turns on
 /// pool threads IS the living regression teeth for that budget.
 @Suite("BASEBrain schemas")
 struct BASEBrainSchemaCoreTests {

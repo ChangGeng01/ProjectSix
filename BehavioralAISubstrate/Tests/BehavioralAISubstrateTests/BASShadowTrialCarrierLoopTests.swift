@@ -35,9 +35,8 @@ final class BASShadowTrialCarrierLoopTests: XCTestCase {
     }
 
     /// Cooperative-pool safe: the 27e0fcb2e stack class is fixed (CoW-boxed turn
-    /// result + stage-split runTurn; the 64,000B peak budget is asserted by
-    /// BASRunTurnFrameBudgetTests — which only measures bytes under a
-    /// `--build-system native` run, so it is NOT enforced by a default CI pass)。
+    /// result + stage-split runTurn; the 64,000B peak budget is MEASURED and enforced on
+    /// every default pass by BASRunTurnFrameBudgetTests (last measured peak: 57,360B)。
     private static func makeBrain() async throws -> BASCognitiveBrain {
         try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions())

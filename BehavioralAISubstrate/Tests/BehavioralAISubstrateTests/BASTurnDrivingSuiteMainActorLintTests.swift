@@ -6,8 +6,8 @@ import XCTest
 /// because the ~550KB debug turn frame overflowed the 512KB cooperative pool (27e0fcb2e SIGBUS
 /// class). Both structural roots are now fixed — the turn result is a CoW box (12,200B value →
 /// 1 pointer, flat inits) and runTurn is stage-split (129,792B single frame → 64,000B budgeted
-/// peak, asserted by BASRunTurnFrameBudgetTests — NOT "mechanically pinned" on a default
-/// pass: the byte-measuring lint needs `--build-system native`, which no repo script runs).
+/// peak, mechanically pinned by BASRunTurnFrameBudgetTests, which disassembles the real
+/// objects on every default pass — measured 57,360B against the 64,000B budget).
 /// Turn-driving suites run on the
 /// pool DELIBERATELY: they are the living regression teeth for that budget.
 ///
