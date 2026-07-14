@@ -243,12 +243,33 @@ public struct BASKnowledgeCycle:
 /// + reads are serialized through actor isolation。
 public actor BASKnowledgeGraph {
 
-    /// Maximum cycle length the cycle detector enumerates per
-    /// start node (chapter 一百八十五 anti-magic-number — pinned
-    /// to prevent runaway DFS on densely-connected graphs)。
+    /// Maximum cycle length the cycle detector enumerates per start node
+    /// (chapter 一百八十五 anti-magic-number)。
+    ///
+    /// ⚠️ CORRECTED 2026-07-15: this previously claimed it was "pinned to prevent runaway
+    /// DFS on densely-connected graphs". It does the OPPOSITE — it is the EXPONENT. The walk
+    /// enumerates simple paths, so cost is ~O(V · d^maxLength); RAISING this makes the DFS
+    /// runaway worse, and it is dense graphs where that bites hardest. Reading it as a brake
+    /// is exactly backwards.
     public static let defaultMaxCycleLength: Int = 8
 
     /// Maximum total cycles returned per detect call。
+    ///
+    /// ⚠️ This bounds the OUTPUT, not the WORK — and the distinction is load-bearing, not
+    /// pedantic. `walkForCycles` only counts a cycle toward this budget if it survives the
+    /// caller's `filter` (a filter-REJECTED cycle still gets its canonical key recorded but
+    /// never increments the count), so on a graph whose cycles mostly fail the filter the
+    /// budget never fills and the walk enumerates EVERYTHING.
+    ///
+    /// Measured 2026-07-15 against a modelled production graph using
+    /// `BASUserStateGraphAwareReducer`'s real filter (requires `.delays` AND the current
+    /// project's node): when that project HAS delays-cycles the guard fires after ~638
+    /// recursive calls; when it does NOT (while other projects do — an ordinary state) the
+    /// same call costs ~3,324,239 and returns []. A ~5,200x swing on a graph that looks
+    /// identical from the outside, and it grows linearly with event count.
+    ///
+    /// The graph is an actor, so that walk holds isolation and blocks concurrent
+    /// extract/persist/snapshot for its duration.
     public static let defaultMaxCyclesReturned: Int = 32
 
     private var nodes: [String: BASKnowledgeNode] = [:]

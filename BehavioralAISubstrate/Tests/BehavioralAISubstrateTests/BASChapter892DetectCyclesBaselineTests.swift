@@ -48,7 +48,14 @@ final class BASChapter892DetectCyclesBaselineTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         throw XCTSkip(
-            "Chapter 892 baseline DEFERRED — bench" +
+            "Chapter 892 baseline INFEASIBLE AS WRITTEN (measured 2026-07-15, was: " +
+            "\"DEFERRED — blocked by sweep contention\") — this bench does not terminate: " +
+            "78+ MINUTES of CPU without finishing on graphs of only 100-200 nodes. Cause is " +
+            "the fixture, not the machine: its circulant graph has ZERO cycles at maxLength " +
+            "8, so detectCycles' maxCycles guard never fires and it enumerates every simple " +
+            "path — 48,828,100 recursive calls per call at (100,500), x110 iterations. Do " +
+            "NOT simply re-enable this; the topology is one production cannot build. See the " +
+            "corrected makeGraph note. Old text follows: bench" +
             " infrastructure ready,measurement run blocked" +
             " by sweep contention during ch 891.5 fix work。" +
             " Re-enable skip + run interactively to capture" +
@@ -56,8 +63,14 @@ final class BASChapter892DetectCyclesBaselineTests: XCTestCase {
     }
 
     /// Build a deterministic graph at given (nodes, edges)。
-    /// Generates a mix of cycles + tree-shaped edges to match
-    /// realistic L13 / cognitive graph topology。
+    ///
+    /// ⚠️ CORRECTED 2026-07-15 — this claimed "a mix of cycles + tree-shaped edges to match
+    /// realistic L13 / cognitive graph topology". BOTH halves are FALSE. Edges only ever go
+    /// from `i` to `i+1 … i+k` (mod N), i.e. a circulant digraph. Closing a cycle requires
+    /// wrapping the whole ring (~N/k hops), which vastly exceeds maxLength 8 — so this graph
+    /// contains ZERO cycles at the detector's default depth, and cannot be built by the real
+    /// extractor (which SYNTHESISES closing edges via H7 precisely to make short cycles).
+    /// Had this bench ever terminated, its own print would have read "cycles found: 0".
     private func makeGraph(
         nodes nNodes: Int,
         edges nEdges: Int
@@ -75,7 +88,9 @@ final class BASChapter892DetectCyclesBaselineTests: XCTestCase {
         // Add M edges with deterministic but mixed topology
         for i in 0..<nEdges {
             let from = i % nNodes
-            // Mix of forward + back edges to create cycles
+            // Forward-only: to ∈ {from+1 … from+k} (mod N). NOT "a mix of forward + back
+            // edges to create cycles" as this line claimed until 2026-07-15 — the only
+            // backward-looking edge is the ring wrap, which needs ~N/k hops to close.
             let to = (from + 1 + (i / nNodes)) % nNodes
             if from == to { continue }
             let edge = BASKnowledgeEdge(
