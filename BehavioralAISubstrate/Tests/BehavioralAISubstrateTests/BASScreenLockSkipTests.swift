@@ -32,12 +32,28 @@ final class BASScreenLockSkipTests: XCTestCase {
             .appendingPathComponent("lockgate-\(UUID().uuidString).sqlite").path
         defer { try? FileManager.default.removeItem(atPath: path) }
 
-        try Data("x".utf8).write(to: URL(fileURLWithPath: path))
-        try FileManager.default.setAttributes(
-            [.protectionKey: FileProtectionType.complete], ofItemAtPath: path)
+        // Sample the gate on BOTH sides of the probe. This state MOVES on a real
+        // desktop — measured 2026-07-14 within one session: screenIsLocked went
+        // false -> true when the machine idle-locked mid-run (consoleIsInactive
+        // stayed true throughout). If the state moves across the probe, the gate
+        // reading and the filesystem observation describe different worlds and any
+        // verdict is a coin flip, so skip instead. Reading the gate AFTER a probe
+        // taken BEFORE it is exactly the TOCTOU shape this codebase keeps finding,
+        // and a flaky tooth is worse than none.
+        let enforcedBefore = BASScreenLockSkip.protectionClassIsEnforced
 
+        // The ENTIRE probe is fallible, not just the flip. Under enforcement the
+        // file can become unreachable the moment `.complete` lands — observed in
+        // a full-suite run: `setAttributes(.complete)` itself threw
+        // NSCocoaErrorDomain 257 / EPERM. An earlier cut guarded only the flip
+        // and RED by environment — the exact failure mode this test exists to
+        // prevent. Any step failing means the same thing: this session cannot
+        // freely set protection classes.
         var flipSucceeded: Bool
         do {
+            try Data("x".utf8).write(to: URL(fileURLWithPath: path))
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.complete], ofItemAtPath: path)
             try FileManager.default.setAttributes(
                 [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                 ofItemAtPath: path)
@@ -48,7 +64,15 @@ final class BASScreenLockSkipTests: XCTestCase {
             flipSucceeded = false
         }
 
-        if BASScreenLockSkip.protectionClassIsEnforced {
+        let enforcedAfter = BASScreenLockSkip.protectionClassIsEnforced
+        try XCTSkipUnless(
+            enforcedBefore == enforcedAfter,
+            "console lock/console-session state CHANGED across the probe "
+            + "(\(enforcedBefore) -> \(enforcedAfter)) — the gate reading and the "
+            + "filesystem observation describe different worlds, so no honest "
+            + "verdict is possible on this run")
+
+        if enforcedAfter {
             XCTAssertFalse(
                 flipSucceeded,
                 "STALE GATE: BASScreenLockSkip reports the complete class is enforced "
