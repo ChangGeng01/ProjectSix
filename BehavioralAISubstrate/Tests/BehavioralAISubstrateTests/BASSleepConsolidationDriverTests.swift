@@ -79,10 +79,14 @@ final class BASSleepConsolidationDriverTests: XCTestCase {
                 prompt: "How should I plan tomorrow?",
                 title: "t31-phase-b",
                 riskLevel: .low))
-        guard let turn = result.eBrainTurn else {
-            throw XCTSkip("fixture turn unavailable")
-        }
-        return turn
+        // A nil turn from a fixture startSession is a BROKEN TURN PIPELINE — the
+        // exact failure this suite exists to catch — so it must RED, not skip.
+        // (HostRuntimeCore builds a non-optional eBrainTurn and passes it straight
+        // into BASHostSessionResult, so this can only fire on a real regression.)
+        // Matches the 10+ sibling call sites that use XCTUnwrap.
+        return try XCTUnwrap(
+            result.eBrainTurn,
+            "fixture startSession must always produce an eBrainTurn")
     }
 
     /// The fixture turn naturally lands in `.quarantine` run mode
