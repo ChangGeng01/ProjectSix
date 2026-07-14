@@ -97,6 +97,34 @@ final class AppleFoundationErrorMappingTests: XCTestCase {
         #endif
     }
 
+    /// The assets/cold-cache class — the most common real AFM failure, and it lives in a
+    /// DIFFERENT enum (`SystemLanguageModel.Error`) than the rest. Without its own catch
+    /// arm it escapes the contract untranslated, which would make the whole mapping a
+    /// half-truth for the one failure it most needs to cover.
+    ///
+    /// Also pins the INTERPOLATION: host-side cold-cache detection greps the reason string
+    /// for "ModelManagerError Code=1026" and reasonCode(for:) forwards `reason` verbatim,
+    /// so sanitising this reason would silently break that detection across the package
+    /// boundary — a coupling no compiler checks.
+    func testAssetsUnavailableMapsToProviderUnavailableAndKeepsTheUnderlyingError() throws {
+        #if canImport(FoundationModels)
+        guard #available(iOS 27, macOS 27, visionOS 27, *) else {
+            throw XCTSkip("adapter floor is 27")
+        }
+        let mapped = AppleFoundationOrganAdapter.organError(
+            for: SystemLanguageModel.Error.assetsUnavailable(
+                .init(debugDescription: "ModelManagerError Code=1026 probe")))
+        guard case .providerUnavailable(let reason) = mapped else {
+            return XCTFail("assetsUnavailable must map to .providerUnavailable; got \(mapped)")
+        }
+        XCTAssertTrue(reason.contains("afm-assets-unavailable"), "got \(reason)")
+        XCTAssertTrue(
+            reason.contains("ModelManagerError Code=1026"),
+            "the underlying error must be INTERPOLATED, not sanitised: host-side cold-cache "
+            + "detection greps this exact substring. Got: \(reason)")
+        #endif
+    }
+
     /// A caller-input violation must stay a caller-input violation: the router propagates
     /// .inputTooLong rather than failing over, which is correct — a secondary would reject
     /// it too. Also pins that the host-facing numbers are the real ones, not placeholders.

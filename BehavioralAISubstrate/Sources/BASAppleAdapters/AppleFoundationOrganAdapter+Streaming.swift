@@ -70,6 +70,12 @@ extension AppleFoundationOrganAdapter: BASStreamingOrganAdapter {
                         // breaks. Mapping it would let a router re-run the whole
                         // generation after the caller already walked away.
                         continuation.finish(throwing: CancellationError())
+                    } catch let sys as SystemLanguageModel.Error {
+                        // The assets/cold-cache class lives in a DIFFERENT enum from
+                        // LanguageModelError and is the most common real AFM failure —
+                        // omitting it would leave the streaming contract a half-truth.
+                        continuation.finish(
+                            throwing: AppleFoundationOrganAdapter.organError(for: sys))
                     } catch let afm as LanguageModelError {
                         // Same contract as draft(): `session.streamResponse` throws the
                         // identical raw set, so leaving this arm untranslated would make

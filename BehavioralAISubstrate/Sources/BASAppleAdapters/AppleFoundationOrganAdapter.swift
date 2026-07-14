@@ -157,6 +157,30 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
     /// router declines to handle what it does not recognise.
     ///
     /// Returns `nil` for the refusal class, meaning "rethrow unchanged".
+    /// The OTHER enum. `SystemLanguageModel.Error` is separate from `LanguageModelError`
+    /// and owns `assetsUnavailable` — the model-assets/cold-cache class, which is the most
+    /// common real-world AFM failure (macOS releases assets when the caller is not
+    /// foreground; `swift test` from a CLI hits it routinely, surfacing as
+    /// `ModelManagerError Code=1026` nested in the underlying error).
+    ///
+    /// Missing this arm would leave exactly that class escaping the BASOrganAdapter
+    /// contract — the mapping would be a half-truth for the failure it most needs to cover.
+    /// It is an OUTAGE, so it maps to .providerUnavailable and a router MAY legitimately
+    /// fail over to a secondary.
+    ///
+    /// The reason INTERPOLATES the underlying error on purpose: host-side cold-cache
+    /// detection greps this string for "ModelManagerError Code=1026", and reasonCode(for:)
+    /// passes `reason` through verbatim.
+    @available(iOS 27, macOS 27, visionOS 27, *)
+    static func organError(for error: SystemLanguageModel.Error) -> BASOrganError {
+        switch error {
+        case .assetsUnavailable:
+            return .providerUnavailable(reason: "afm-assets-unavailable: \(error)")
+        @unknown default:
+            return .providerUnavailable(reason: "afm-system-model-unknown: \(error)")
+        }
+    }
+
     @available(iOS 27, macOS 27, visionOS 27, *)
     static func organError(for error: LanguageModelError) -> BASOrganError? {
         switch error {
@@ -264,6 +288,8 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
             // router can launder them onto a second model. See its doc comment.
             guard let mapped = Self.organError(for: afm) else { throw afm }
             throw mapped
+        } catch let sys as SystemLanguageModel.Error {
+            throw Self.organError(for: sys)
         }
 
         // Trace markers (typed, grep-able) composed from the bridge taxonomy — the bridge is now EXERCISED in
