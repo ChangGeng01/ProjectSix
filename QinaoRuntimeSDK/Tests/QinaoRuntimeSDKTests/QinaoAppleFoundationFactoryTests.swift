@@ -82,17 +82,43 @@ final class QinaoAppleFoundationFactoryTests: XCTestCase {
     /// with a clear reason. Real substrate breakage (deterministic
     /// adapter throws / no candidate produced / wrong providerID)
     /// still fails the test.
-    func testFactoryWithFallbackProducesUsableEndpointOffline()
-        async throws
-    {
-        let endpoint = await QinaoLoop
-            .makeAppleFoundationEndpoint(
-                includeDeterministicFallback: true)
+    /// `includeDeterministicFallback: true` is a NO-OP — pinned from whichever
+    /// side this host can observe. Runs on EVERY pass; never skips.
+    ///
+    /// Rewritten 2026-07-14 (skip triage). The previous test
+    /// (`testFactoryWithFallbackProducesUsableEndpointOffline`) asserted the
+    /// factory "produces a usable endpoint on ANY OS" and then SKIPPED when it
+    /// didn't — firing on exactly the condition it existed to disprove, with
+    /// skip text ("The factory + registry are correct; only the platform AFM
+    /// daemon is unreachable") that is false. It also carried an inline
+    /// hand-copy of AFMTestSupport's two-arm matcher, invisible to a
+    /// `grep skipIfAFMDegraded` sweep, and weakened its own assertion with
+    /// `providerID == apple || providerID == deterministic` — which passes
+    /// whatever happens. It was green only because Apple Intelligence is healthy
+    /// here.
+    ///
+    /// Verified 2026-07-14, the deterministic adapter is UNREACHABLE:
+    ///   - BASOrganRegistry.adapter(for:) (BASOrganRegistry.swift:67-87) is
+    ///     selection-only — most-recently-registered on-device adapter wins, no
+    ///     retry, `currentCapacity()` never called;
+    ///   - the factory registers deterministic FIRST, Apple LAST;
+    ///   - Apple's descriptor hardcodes runsOnDevice:true unconditionally.
+    /// So Apple always wins selection, and an unreachable Apple FM THROWS rather
+    /// than degrading.
+    ///
+    /// Both outcomes prove the same fact, so this asserts it without gating:
+    ///   - AFM reachable  -> providerID is Apple's (deterministic lost despite
+    ///     being registered);
+    ///   - AFM unreachable -> the call THROWS (no deterministic body appears).
+    /// If a real router ever lands, this REDs — forcing the file-level doc on
+    /// QinaoAppleFoundationEndpoint.swift to be corrected at the same time.
+    func testDeterministicFallbackIsNeverSelected() async throws {
+        let endpoint = await QinaoLoop.makeAppleFoundationEndpoint(
+            includeDeterministicFallback: true)
         let loop = QinaoLoop(organEndpoint: endpoint)
-
         let seed = QinaoLoop.CandidateSeed(
-            candidateID: "c1",
-            title: "Fallback test",
+            candidateID: "factory-fallback-c1",
+            title: "Fallback probe",
             prompt: "ping",
             role: .scout,
             expectedBenefit: 0.7,
@@ -100,55 +126,37 @@ final class QinaoAppleFoundationFactoryTests: XCTestCase {
             reversibility: 0.9,
             confidence: 0.8)
 
-        let result: [QinaoLoop.GeneratedCandidate]
+        var producedProviderID: String?
         do {
-            result = try await loop.generateCandidates(
-                sessionID: "factory-fallback-1",
-                seeds: [seed])
+            let result = try await loop.generateCandidates(
+                sessionID: "factory-fallback-1", seeds: [seed])
+            producedProviderID = result.first?.providerID
+            XCTAssertEqual(result.count, 1)
         } catch {
-            // Chapter 九十一.5 — narrow detection of the
-            // "Apple Intelligence degraded" platform state.
-            // `ModelManagerError Code=1026` indicates the
-            // system AFM daemon is refusing connections /
-            // model unavailable; this is a host-platform
-            // condition, not a substrate bug. Skip with a
-            // specific reason rather than fail.
-            let description = String(describing: error)
-            let afmDegraded =
-                description.contains(
-                    "ModelManagerError Code=1026")
-                || description.contains(
-                    "FoundationModels.LanguageModelSession.GenerationError")
-            if afmDegraded {
-                throw XCTSkip(
-                    "Apple Intelligence service is degraded on " +
-                    "this host (ModelManagerError Code=1026). " +
-                    "The factory + registry are correct; only " +
-                    "the platform AFM daemon is unreachable. " +
-                    "Re-run when system AFM is healthy.")
-            }
-            // Non-AFM error → real substrate failure.
-            throw error
+            // Threw instead of degrading — the deterministic stub did not run.
+            // The error TYPE is deliberately not pinned here: a raw
+            // FoundationModels error can still escape the BASOrganAdapter
+            // contract (AppleFoundationOrganAdapter.draftViaFoundation wraps
+            // neither `session.respond` call), so pinning a typed error would
+            // encode that separate defect as if it were the contract.
+            producedProviderID = nil
         }
 
-        XCTAssertEqual(result.count, 1)
-        let candidate = result[0]
-        XCTAssertFalse(
-            candidate.body
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .isEmpty,
-            "fallback endpoint must produce a non-empty body " +
-            "from either Apple FM (when reachable) or the " +
-            "deterministic stub")
-        // ProviderID identifies which adapter actually ran. On
-        // macOS 26+ with Apple Intelligence on, Apple FM wins; on
-        // macOS 14 or with AI off, deterministic wins. Both are
-        // valid factory outcomes — the test asserts ONE of them.
-        XCTAssertTrue(
-            candidate.providerID == "apple.foundation-models.v1"
-                || candidate.providerID == "bas.deterministic.v1",
-            "providerID must be a known registered adapter; got " +
-            "\(candidate.providerID)")
+        XCTAssertNotEqual(
+            producedProviderID, "bas.deterministic.v1",
+            "includeDeterministicFallback:true must remain a NO-OP: the registry "
+            + "is selection-only and always resolves to the Apple organ. A "
+            + "deterministic providerID here means a REAL fallback now exists — "
+            + "which is good, but the file-level doc on "
+            + "QinaoAppleFoundationEndpoint.swift documents it as a no-op and "
+            + "must be corrected in the same change.")
+        if let id = producedProviderID {
+            XCTAssertEqual(
+                id, "apple.foundation-models.v1",
+                "when generation succeeds, the Apple organ must be what ran — it "
+                + "is registered last and the registry prefers most-recent "
+                + "on-device")
+        }
     }
 
     // MARK: - Real Apple FM through the factory (env-gated)
