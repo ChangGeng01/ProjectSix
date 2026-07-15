@@ -1,8 +1,8 @@
 # iPhone Air → Future Apple Silicon 14-Layer System Architecture Design
 
-**Status:** Design consistency locked after adversarial review; implementation conformance remains `REVISE`
+**Status:** Design consistency and reuse-first convergence locked after adversarial review; implementation conformance remains `REVISE`
 **Date:** 2026-07-14
-**Scope:** Current iPhone Air/A19 Pro baseline, iOS 18–27 transition, and capability-driven future Apple Silicon
+**Scope:** Current iPhone Air/A19 Pro baseline, iOS 27 minimum across every workspace-owned iOS package slice/app/extension target, and capability-driven future Apple Silicon
 **Decision:** Adopt a capability-driven backend portfolio under invariant semantic, quality, state, and sovereign contracts
 
 ## 1. Executive Decision
@@ -140,7 +140,114 @@ The code audit captured these concrete ship blockers at the review snapshot:
 
 All entries in this table are implementation `REVISE`; none invalidates the selected target architecture.
 
-### 4.4 Current performance truth
+### 4.4 Reuse-first convergence doctrine
+
+The implementation default is **existing-owner convergence**, not an additive clean-room facade. A clearer boundary does not by itself justify a new public type, actor, target, registry, store, ledger, planner, compiler, receipt family, or state machine. An implementation is acceptable only when each semantic fact and each mutable transition has one canonical owner.
+
+The absence of an exact type name is not evidence that a capability is missing. The review found no exact-name collision between the proposed types and current declarations, while finding many semantic duplicates whose different names would evade the compiler and create contradictory digests, grants, release decisions, watermarks, receipts, or recovery states. Reuse review therefore compares responsibility and authority, not spelling.
+
+Every proposed component is classified before implementation:
+
+| Class | Meaning | Required action |
+|---|---|---|
+| **R — Reuse** | The invariant and production mechanism already exist | Call it directly; do not wrap unless a dependency/process boundary requires translation |
+| **E — Extend** | The current owner is correct but lacks fields, canonical identity, durability, or a stricter invariant | Modify that owner in place or add a same-owner extension; preserve wire/source compatibility |
+| **A — Adapter only** | A real module, process, framework, or legacy-wire boundary exists | Translate once; the adapter cannot rank, authorize, persist a second truth, cache independently, or execute a second effect |
+| **M — Missing** | No repository owner or public/upstream primitive satisfies the required invariant | A new owner is allowed only after the create gate below passes |
+
+#### Canonical owner map
+
+| Domain | Canonical owner to reuse or extend | Locked convergence rule |
+|---|---|---|
+| L1–L14 identity | `BASCognitiveLayer`, with existing motherboard mappings as compatibility views | `BASSemanticLayerID` is an alias/projection, never a second 14-case enum |
+| kernel/ring/plane identity | `BASMotherboardKernel` plus current motherboard compatibility types | Extend the four-kernel owner with stable K1–K4 projection; add only the genuinely missing ring and seven-view identities; explicitly map the legacy three-domain plane rather than treating it as the seven-view taxonomy |
+| layer execution | `BASLayerActor`, `BASLayerReferenceActor`, `BASLayerCascadeRunner`, `BAS14LayerMeshMap/Assembler`, `BASLayerSlice`, current kill-switch state | LayerCell adds pure ingress/core/egress membranes around this actor mesh; budgets and kill epochs have one owner and are projected, not deducted or advanced twice |
+| common envelopes | `BASResult`, `BASFrameEnvelope`, `BASPermit`, `BASBundle`, `BASCard` | New domain records reuse these low-entropy shapes unless a materially different canonical payload is proven |
+| event truth and replay order | `BASEventLogEntry`, `BASEventLogStorage`, `BASSQLiteEventLogStorage`, existing integrity chain and replay harnesses | State commit, replay identity, and manifest indexing derive from this sequence/hash truth; no second event log, cursor timeline, WAL, or hash chain |
+| retrieval mechanisms | `BASL8RoutedMemoryService`, `BASRAGRetriever`, vector/FTS/temporal/entity/graph stores | SemanticStateLake lanes are adapters and snapshot-bound projections; they never rebuild an index or retrieval engine |
+| context packing | `BASContextCompiler` in `ContextCompilerCore.swift` | Tokenize-once spans, exact budgets, and descriptor binding extend this owner; scoped/semantic/turn compilers supply inputs or compatibility projections |
+| model identity and invocation | `BASModelCapabilityManifest`, `BASModelManifestRegistry`, `BASLLMInvocationContract` | Quality identity is a canonical projection; the neural execution contract extends/nests the invocation contract rather than becoming a third editable model identity |
+| execution plan | `BASExecutionPlan`, `BASExecutionPlanElector`, current decode planner and MLX session/executor paths | One canonical execution binding root is owned by the plan; request, lease, and receipt reference it instead of repeating digest bundles |
+| memory and thermal evidence | `BASMLXMemoryModel/Budget`, `BASThermalTwin`, `BASSystemProbe`, existing pressure and device probes | A new process ledger consumes these measurements; it does not replace estimators, probes, or framework memory managers |
+| thermal and placement taxonomy | canonical system thermal classification in RuntimeCore; `BASComputeTier` for physical tier; a separate evidence-status axis | The duplicate five-case Metal thermal enum becomes an alias/adapter; physical tier never mixes with `observed/inferred/unknown` epistemic status |
+| risk and release decision | existing L10/L11 risk types, `BASExecutionGovernance`, `BASProviderReleaseGate`, current render/candidate types | Exact/provisional durability extends the current gate; no second independently permissive L11 or release authority |
+| sovereign issuance and audit | `BASSovereignTokenAuthority`, commit token/warrant/enforcer, `BASSovereignAuditLedger` | CapabilityGrant supplies the canonical attenuated semantic contract; durable K4 extends the one mint/reserve/claim/spend authority and explicitly migrates the existing token schema |
+| tool execution | `BASToolInvocation`, `BASToolResult`, `BASToolDispatcher` | Effect Broker wraps these payloads and becomes the only production dispatch path; it does not define a second tool protocol |
+| runtime scheduling | `BASTurnRuntimeEngine`, stage plan/ledger, native/parallel stage executors, `BASEBrainRuntimeCoordinator` | The semantic DAG becomes the v2 topology truth but executes through these mechanisms; the legacy stage plan is a frozen projection, not a second canonical topology |
+| public result | `BASEBrainTurnResult` and its current host projections | A pending/final authoritative artifact wraps and ultimately projects this result exactly once; it does not create another externally visible answer type |
+| Apple lifecycle/telemetry | existing BGTask bridge, device harnesses, signpost/field-metric collectors | New architecture gates aggregate their evidence; they do not create another background scheduler, live tracer, or device measurement protocol |
+
+#### Create gate
+
+Every new production `Create` must carry a reviewable proof containing all of the following:
+
+1. the repository search and exact existing-owner candidates;
+2. the relevant Apple/public/upstream primitive search;
+3. the one invariant that is absent today;
+4. why extension, composition, a generic low-entropy primitive, or a thin adapter cannot satisfy it;
+5. its single authority, mutable-state owner, storage owner, and failure/recovery boundary;
+6. its dependency direction and why it does not introduce a second source of truth;
+7. its compatibility projection and the old path's freeze, migration, or retirement condition;
+8. mutation, crash, replay, and duplicate-authority tests that would fail if a second owner appeared.
+
+A cleaner name, a preferred folder layout, a new `Core`/`Manager`/`Registry`/`Store` suffix, or an exact-name `rg` miss is never sufficient. When the proof is incomplete, the item defaults to **E** or **A**, not **M**.
+
+#### Identity and receipt normalization
+
+- A domain payload never encodes its own `BASArtifactID`, artifact digest, storage locator, or signature. The Artifact Mesh envelope alone owns its ID. The sole signature-byte payload is a child attestation: it may contain the proof over another artifact, but never its own ID/digest.
+- Attestation is an ordinary artifact payload stored through the same `put → BASArtifactStoreReceipt` path. There is no special attestation store or second identity algorithm.
+- New cross-plan artifact, receipt, signature, snapshot, spool, manifest, and authorization references use typed `BASArtifactID`; raw `String` references remain only in legacy-wire adapters.
+- A signature is a child attestation over an unsigned canonical artifact payload. A transport may be self-contained, but its signed transport envelope is not a second canonical artifact identity.
+- `BASCapabilityUseReceipt` and K4 claim receipt are one canonical durable consumption fact. Validation and claim cannot each consume or persist the same grant independently.
+- One ordered `BASLaneWatermark` representation carries lane, sequence, root/provenance, and required proof. Snapshot and replay reuse it; dictionary counters and replay-specific copies are forbidden.
+- A response spool is one Artifact Mesh object derived from the existing canonical rendered output. Verification, risk, release, sink, reservation, and finalization records reference its artifact ID instead of copying spool/digest/presentation tuples.
+- A replay manifest is stored as an artifact. Its index and publication journal may be separate ports, but they cannot become another immutable-object store.
+- The execution plan owns one canonical silicon execution binding. Requests, child leases, K4 authorization context, usage receipts, and replay records reference that binding root; caller-supplied parallel lists of quality/profile/ABI/fallback digests are forbidden.
+
+#### Public and upstream primitives that must not be rebuilt
+
+- Swift actors own business state; `TaskGroup` handles bounded fan-out; `AsyncStream` handles streams; `ContinuousClock` or the existing monotonic wrapper handles duration. No custom thread pool, blocking-semaphore scheduler, lock queue, or third time system is introduced.
+- Vendored MLX `WiredMemoryManager.shared`, `WiredMemoryTicket`, cancellation/waiting, hysteresis, baseline restoration, and `Memory.snapshot()` remain the sole MLX wired-memory mechanism. The BAS ledger is an application-level cross-framework reservation owner, not a second MLX limit manager.
+- Core ML uses public `computeUnits` and `MLState`; requested or planned device usage remains distinct from observed placement. No custom Core ML state-buffer manager or ANE scheduler is created.
+- MLX, MPSGraph, and MPS are preferred over custom Metal. A custom kernel requires a missing public primitive, numerical parity, measured device benefit, and a complete fallback. Vendor patches may add observation only and may not alter model mathematics or hidden scheduling semantics.
+- SQLite transactions, constraints, WAL, backup/checkpoint behavior, FTS5, and BM25 remain the database primitives. The project does not implement a WAL, B-tree, FTS engine, or lexical scorer. Every SQLite store reuses the existing file-protection, integrity, and secure-delete policy for the database and its WAL/SHM sidecars.
+- CryptoKit, Security, Keychain, Secure Enclave P-256, and system randomness own cryptographic primitives and encodings. The system does not implement signature algorithms, PRNGs, DER/ASN.1, or call a Keychain-stored exportable Ed25519 seed a Secure Enclave key.
+- Enhanced Security helper extensions and public XPC/ExtensionFoundation mechanisms own process isolation. No private Mach/XPC protocol, custom socket, or release-mode in-process imitation is accepted.
+- The existing `AppleBGTaskSchedulerBridge` owns background scheduling. Durable recovery must remain correct when no background launch occurs or a task expires; no daemon or keepalive loop is created.
+- `Logger`/`OSSignposter` mirror live structure and timings but do not replace canonical evidence. MetricKit is delayed field/canary evidence, not an E4 per-run deterministic verdict source.
+
+#### Genuinely missing owner allowlist
+
+The audit permits new ownership only for these currently absent invariants, while still reusing the mechanisms above:
+
+- keyed Artifact Mesh identity, CAS head/store, and ordinary child attestations;
+- immutable multi-lane semantic snapshot/barrier and typed state-requirement planning;
+- complete cross-backend StateABI and canonical execution-binding contracts;
+- one application-level process MemoryLedger/heavy-owner authority across MLX, Core ML/Core AI, Metal, retrieval, verifier, and spool memory;
+- durable response spool, hash-chain verification, idempotent publication reservation/finalization;
+- algorithm-agile trust manifest and optional Secure Enclave P-256 root, with the current fingerprint manifest as a v1 migration view;
+- durable K4 issue/reserve/claim/spend/recovery in the iOS 27 Enhanced Security helper;
+- durable Zone-C effect saga/outbox/reconciliation and sealed state prepare/stage/activate protocol;
+- canonical semantic DAG contracts, complete pre-publication replay manifest, aggregate E0–E5 certification, candidate-tree attestation, and source-entry audit.
+
+Adding any other new production owner requires an explicit amendment to this design. Tests, schemas, migrations, scripts, and deliberately thin adapters may still be new files, but their owning runtime concept must be one of the existing or allowlisted authorities above.
+
+#### Anti-duplication acceptance assertions
+
+The implementation plans and code gates must prove at least:
+
+1. semantic layer identity is an alias/projection of `BASCognitiveLayer`;
+2. LayerCell mechanism dispatch reaches the existing `BASLayerActor` mesh and cannot execute a second semantic actor path;
+3. exactly one capability/K4 authority can mint and atomically consume a grant, with one durable token schema and one use receipt;
+4. exactly one event sequence and integrity chain owns state-commit and replay source identity;
+5. exactly one context packer tokenizes, allocates, orders, and hashes a compiled prompt;
+6. exactly one execution plan/binding and one heavy-owner lease can actuate each neural phase;
+7. exactly one final spool/publication path can make response bytes visible, and one finalized `BASEBrainTurnResult` leaves the runtime;
+8. K3 outbox owns prepare/stage/seal/activation while Zone C owns dispatch/ack/indeterminate/reconcile; neither reducer can write the other's state;
+9. the semantic DAG runs through the current turn engine/stage executors and cannot execute a hidden second coordinator result;
+10. no adapter contains independent ranking, authorization, persistence, retry truth, cache authority, or external-effect logic.
+
+### 4.5 Current performance truth
 
 Repository device ledgers establish a more conservative reality than a headline peak:
 
@@ -409,17 +516,18 @@ encryptionKeyID + encryption metadata
 
 Changing or relocating `payloadRef` cannot change `artifactID`; storage reads recompute the keyed commitment from canonical decoded payload and IdentityCore before use.
 
-`ArtifactAttestation` is a separate child artifact:
+`ArtifactAttestationPayload` is a separate ordinary child-artifact payload:
 
 ```text
 targetArtifactID
 attestationPurpose
-producerReceiptRef / usageReceiptRefs[]
-signatureEnvelope or MAC metadata
+producerReceiptArtifactID / usageReceiptArtifactIDs[]
+signature/hash suite + key ID/epoch + custody class
+signedStatementDigest + signature/MAC bytes
 logicalTime + policy/key epoch
 ```
 
-Its signature signs `targetArtifactID + attestation context`. The attestation may have its own artifact ID after its signature bytes exist, but the target artifact never points backward to that child.
+Its signature signs `targetArtifactID + attestation context`. The payload contains no `attestationArtifactID` or self digest. After the proof bytes exist, the same Artifact Mesh `put` path derives the child artifact ID and returns the ordinary `ArtifactStoreReceipt`; a target index is only a query index. The target artifact never points backward to that child.
 
 The same canonical `ArtifactIdentityCore` in one protected user/device/tenant scope and key epoch has the same ID; the same payload with different provenance, parent, turn, or logical identity is intentionally a different artifact. Content across different scopes or key epochs is not publicly linkable. Public telemetry must not expose raw hashes of low-entropy private artifacts. The design separates:
 
@@ -437,7 +545,6 @@ Capability Mesh is default-deny authority. It never travels as an unscoped boole
 Minimum `CapabilityGrant` fields:
 
 ```text
-grantID
 issuer + subject + audience
 operation + resource
 requestDigest / inputDigest
@@ -449,11 +556,12 @@ turnID + branchID + logicalEpoch
 bootSessionID or durable warrant epoch
 notBefore + monotonicDeadline / durable expiry
 maxUses + maxFanout + maxBytes + maxCost
-parentGrantID
+parentGrantArtifactID
 revocationGeneration
 nonce
-signatureEnvelope
 ```
+
+The unsigned canonical grant payload is stored through Artifact Mesh; its `BASArtifactID` is the grant identity. Its K4 signature is a child attestation. A self-contained XPC/wire wrapper may carry grant bytes, artifact ID, and attestation together, but it is not another grant schema or identity. K4 remains the only mint/reserve/claim/spend authority.
 
 Rules:
 
@@ -483,8 +591,9 @@ monotonicGeneration
 activationSequence
 reason
 authority
-signature
 ```
+
+The epoch is an unsigned canonical artifact payload whose authorization is a child attestation. Runtime boundaries receive typed epoch and attestation artifact references; the epoch does not embed a second signature identity.
 
 Kill/revoke is checked at ingress, queue start, mechanism dispatch, effect authorization, and seal—not only once when an actor first receives input.
 
@@ -607,17 +716,19 @@ The current `BASStateLakeReader` reads a neural `.statelake` tensor bundle. It m
 
 ### 15.2 Turn snapshot
 
-At turn admission, K3 creates one immutable `StateReadSnapshot`:
+At turn admission, K3 creates one immutable `StateReadSnapshot` Artifact Mesh payload. Its artifact envelope supplies `semanticSnapshotArtifactID`; neither the payload nor replay manifest invents a parallel snapshot ID:
 
 ```text
 snapshotRoot
 versionVector
 eventLogHighWatermark
-laneWatermarks
+ordered laneWatermarks[]
 policyEpoch
 schemaEpoch
 openedLogicalTime
 ```
+
+There is one canonical `LaneWatermark` shape: lane ID, event/index sequence, root/integrity commitment, source/provenance identity, completeness, and required proof/attestation reference. Snapshot, lane result, and replay reuse that exact type. A dictionary of bare counters or a replay-specific watermark wrapper is not allowed because it would discard proof and ordering fields.
 
 Every lane query and result binds this snapshot. Required lanes that cannot satisfy it fail or remand according to policy. Optional late results are recorded for a later epoch and cannot change the completed turn.
 
@@ -640,11 +751,11 @@ Each `LaneQuery` carries:
 
 Each `LaneResult` carries:
 
-- lane ID, query digest, snapshot root, watermark, and completeness;
+- lane ID, query digest, semantic snapshot artifact ID, the canonical watermark, and completeness;
 - claim key and candidate ID;
 - `validFrom`, `validUntil`, `observedAt`, source revision, and provenance;
 - sensitivity, scope, authority, freshness, and projection label;
-- payload reference and integrity commitment;
+- typed payload artifact ID and integrity commitment;
 - missing/timeout/error receipt.
 
 Lane stores produce candidates; they do not decide final rank or truth.
@@ -754,10 +865,9 @@ L3 receives only L7-approved projections. It allocates a total context budget ac
 - position convention;
 - prefix-cache key;
 - context budget receipt;
-- QualityIdentity;
-- exact per-turn `NeuralExecutionContractDigest`.
+- the canonical `executionBindingArtifactID`, from which QualityIdentity and the exact per-turn `NeuralExecutionContractDigest` are derived and equality-checked.
 
-Tokenization is performed once per canonical compiled context. Any backend receiving the context must prove compatibility with the same tokenizer/template contract.
+Tokenization is performed once per canonical compiled context. That single call returns the flattened canonical tokens plus one ordered contiguous token span per selected segment. Spans cover the stream exactly and let L3 validate each segment's certified bound, exact per-class allocation, and the total limit without a second tokenization; malformed/missing/overlapping spans fail closed. Token and span digests are both part of the descriptor. Any backend receiving the context must prove compatibility with the same tokenizer/template and boundary-ownership contract.
 
 ## 17. Cache Taxonomy
 
@@ -780,10 +890,10 @@ Silicon Capability Fabric is the cross-plane contract that makes current Air opt
 
 ### 18.1 `CapabilitySnapshot`
 
-Contains raw or explicitly classified observations:
+Contains raw or explicitly classified observations and is stored as an Artifact Mesh payload. Its artifact envelope supplies identity:
 
 ```text
-snapshotID + capturedAt + freshness
+capturedAt + freshness
 device capability fingerprint
 OS build + runtime/vendor build
 public API availability
@@ -803,10 +913,9 @@ Rules:
 
 ### 18.2 `CertifiedBackendProfile`
 
-Certification key:
+The promoted profile is an Artifact Mesh payload; `profileArtifactID` is the profile identity. Its certification key is:
 
 ```text
-profileID
 QualityIdentity
 supported generationSemanticsDigest / contract family
 artifact/bundle digest
@@ -830,15 +939,14 @@ A lease is an app-level cooperative promise, not an OS silicon reservation. It c
 
 ```text
 leaseID
-snapshotID + snapshotEpoch
-profileID + fallbackGraphDigest
+parentRunLeaseArtifactID
+capabilitySnapshotArtifactID + snapshotEpoch
+profileArtifactID + executionBindingArtifactID
 phase + heavyOwnerID
 memory reservation + maximum transient
 deadline + expiry
 revalidation conditions
 cancellation/checkpoint policy
-StateABIDigest
-NeuralExecutionContractDigest
 authorization binding digest
 ```
 
@@ -849,8 +957,8 @@ Start uses compare-and-start revalidation. Thermal, memory, access, OS, or profi
 Records actual outcome:
 
 ```text
-lease/profile/snapshot identifiers
-QualityIdentity + NeuralExecutionContractDigest
+leaseArtifactID / parentRunLeaseArtifactID
+profileArtifactID / capabilitySnapshotArtifactID / executionBindingArtifactID
 actual backend and strategy
 requested, observed, inferred, and unknown placement fields
 phase times and accepted-token counts
@@ -859,9 +967,11 @@ thermal/power transitions
 cache/JIT/specialization state
 MTP proposed/accepted/fallback data
 command-buffer/runtime failures
-state migration/rebuild decision
+state migration/rebuild decision and resulting StateABI artifact reference
 quality/verifier/termination result
 ```
+
+Repeated quality/profile/StateABI/fallback fields in request, lease, authorization, and receipt are derived display projections only and must assert equality with the one execution binding; they are never independent caller inputs.
 
 Requested placement and actual placement remain separate. Unknown remains unknown.
 
@@ -994,6 +1104,8 @@ NeuralExecutionContractDigest = H(
 
 The model bundle declares the supported generation-semantics family. The exact per-turn `NeuralExecutionContractDigest` is bound into compiled context, lease, authorization, fallback edges, and usage/result receipts. Two backends are full-blood equivalent for a turn only if both QualityIdentity and this per-turn contract are identical.
 
+Canonical identity encoding is tagged, versioned, and exhaustive. Every stored field participates exactly once; `sovereignPolicyEpoch` and the per-turn maximum-output-token limit use fixed-width unsigned canonical bytes rather than native `Int` or JSON formatting. A count-pinned field-mutation suite must fail if any single stored field changes without changing its owning digest.
+
 The signed model bundle additionally binds runtime and execution material:
 
 ```text
@@ -1093,7 +1205,7 @@ runtime/function state version
 
 - Before prefill creates neural state, any admitted certified backend may be selected.
 - After state exists, bytes may cross a backend boundary only when `StateABIDigest` matches exactly or a certified source→target converter exists.
-- A converter has its own digest, quality proof, resource profile, and fallback receipt.
+- A converter has its own digest, quality proof, resource profile, expiry logical time, and fallback receipt. Selection receives the immutable turn logical time explicitly; a converter is invalid at or after expiry, and replay records the evaluated time and expiry rather than consulting wall clock.
 - Otherwise K2 discards NeuralStateCache and redoes prefill from canonical token history.
 - Finite-looking output is not evidence that a mismatched state interpretation is correct.
 
@@ -1123,6 +1235,8 @@ K1 owns one process-wide `MemoryLedger` covering:
 - current reservations;
 - safety reserve;
 - thermal and Low Power policy.
+
+The ledger does not reimplement framework-local memory management. For MLX work, it first grants the BAS application-level reservation and then acquires the vendored upstream `WiredMemoryManager.shared` ticket; release happens in reverse order. MLX waiting, cancellation, hysteresis, baseline restoration, wired-limit ownership, and live snapshots remain upstream responsibilities. A second MLX waiter/limit manager, direct `mlx_set_wired_limit` control path, or duplicated hysteresis state is forbidden. Core ML/Core AI/Metal reservations use their public runtime ownership and feed actual observations back into the same BAS application ledger.
 
 The phase transaction is:
 
@@ -1188,13 +1302,13 @@ The streaming gate is deliberately narrower than final L10 but has real L10 veri
 
 ### Medium/high-risk exact release
 
-- L12 deterministically projects and spools the complete presentation artifact without releasing it;
-- L10 verifies those exact bytes and their claim/projection mapping;
-- L11 issues the final risk permit/confirmation requirement over the exact spool digest;
-- L14 authorizes the exact result digest;
-- only the exact authorized bytes are released.
+- L12 deterministically projects the current canonical `BASRenderedOutput` into one spool artifact without releasing it;
+- L10 verifies the bytes addressed by that exact `spoolArtifactID` and their claim/projection mapping;
+- L11 issues the final risk permit/confirmation requirement over that same artifact ID;
+- L14 authorizes that exact result artifact ID;
+- L12 first emits an exact release-preparation artifact; K3 stores/reopens the complete pre-publication manifest and reserves one publication idempotency key; only then are the exact authorized bytes released, with the sink receipt appended as a publication finalization before the host API returns.
 
-If L10/L11 remands the presentation, L12 emits a new spool digest and the old authorization path is abandoned. Medium/high-risk output has no provisional release. Pure response release and external-effect execution are separate branches; an ordinary response does not enter the effect outbox. Provisional content never becomes an implicit state/effect instruction.
+If L10/L11 remands the presentation, L12 emits a new spool artifact and the old artifact's authorization path is abandoned. Medium/high-risk output has no provisional release. Pure response release and external-effect execution are separate branches; an ordinary response does not enter the effect outbox. Provisional content never becomes an implicit state/effect instruction.
 
 ## 27. Process and Security Zones
 
@@ -1204,17 +1318,17 @@ Contains L1–L13 semantic execution and host-side L14 decision invocation, MLX/
 
 ### Zone B — Enhanced Security helper / K4
 
-On supported OS versions, a minimal helper owns:
+On the iOS 27 minimum deployment, a minimal Enhanced Security helper owns:
 
 - signature operation;
-- issuance/reserve/spend/nonce ledger;
+- issuance/reserve/spend ledger plus non-deletable global nonce tombstones across authorization IDs and key rotation;
 - key manifest and rotation state;
 - audit-chain anchoring;
 - query-by-requestID recovery protocol.
 
 It contains no model, KV, prompt corpus, UI, or effect adapter. Its private storage is not writable by Zone A. Enhanced Security narrows process/sandbox exposure; it does not automatically provide transactionality, remote attestation, semantic correctness, or effect idempotency.
 
-On older supported OS versions, an in-process K4 compatibility mode must be explicitly attested and policy-limited. It cannot be described as equivalent process isolation.
+The product deployment floor is iOS 27. Production K4 therefore always uses the Enhanced Security helper extension boundary; there is no in-process production compatibility mode. A same-process signer/service may exist only in tests and must be labeled `testOnly`, use separate keys/storage, and remain impossible to select from a release build.
 
 ### Zone C — Effect Broker
 
@@ -1227,7 +1341,7 @@ Contains adapter-scoped external capabilities and a durable outbox. It receives 
 The current Ed25519 implementation stores a raw seed in Keychain and reconstructs a `Curve25519.Signing.PrivateKey` in process. The accurate claim is:
 
 - Keychain at-rest protection;
-- `ThisDeviceOnly` binding where configured;
+- `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` in the current binding;
 - process/helper isolation according to deployment;
 - not a non-exportable Secure Enclave Ed25519 private key.
 
@@ -1239,7 +1353,7 @@ The current Ed25519 implementation stores a raw seed in Keychain and reconstruct
 - optional hardware-root/epoch anchor: `SecureEnclave.P256.Signing.PrivateKey` where supported and policy-selected;
 - future suites only after public API availability and separate certification.
 
-Minimum `SignatureEnvelope`:
+Minimum `SignatureEnvelope` proof body inside an `ArtifactAttestationPayload` or self-contained transport wrapper:
 
 ```text
 signatureSuite
@@ -1248,14 +1362,15 @@ signatureEncoding
 canonicalizationVersion
 keyID + keyEpoch
 publicKeyDigest
-signedArtifactDigest
+targetArtifactID
+signedStatementDigest
 signatureBytes
 custodyClass
 ```
 
 Replay identity is `authID + nonce + exact request digest`, never ECDSA signature bytes.
 
-Rotation uses a signed trusted-key manifest, overlapping verification window, legacy verify-only status, explicit revocation, and audit continuity. Unknown suites, downgrade attempts, key/ledger discontinuity, or missing historical verification keys fail closed.
+Rotation uses one algorithm-agile signed trusted-key manifest, overlapping verification window, legacy verify-only status, explicit revocation, and audit continuity. The current `BASSovereignFingerprintManifest` is a v1 decode/migration view, not a second active trust root. Unknown suites, downgrade attempts, key/ledger discontinuity, or missing historical verification keys fail closed.
 
 ## 29. Durable Authorization Ledger
 
@@ -1264,8 +1379,8 @@ K4 commits issuance before returning a signature. The helper-private transaction
 ```text
 requestID uniqueness
 authID + nonce uniqueness
-canonical request/model/profile/lease/effect/fallback/StateABI digest
-QualityIdentity + NeuralExecutionContractDigest when neural output is in scope
+capabilityGrantArtifactID
+authorizationContextArtifactID + canonical root
 issued/reserved/spent/revoked status
 operationID binding
 key epoch + policy epoch + boot/warrant epoch
@@ -1273,7 +1388,9 @@ deadline
 audit-chain link
 ```
 
-The K4-local claim transaction atomically changes `issued/reserved → spent_for_operation` and persists a `ClaimReceipt` before returning it. That atomicity stops at the K4 storage boundary; it does not include Zone-C storage. A crash or lost IPC reply is recovered by querying the same `requestID/operationID`; the host does not ask for a fresh signature.
+The authorization-context artifact is owned by the exact execution/effect/release plan and binds its request, model/profile/lease/effect/fallback/StateABI/quality/neural facts once. K4 loads and recomputes the grant and context roots; a caller cannot supply a second `grantCanonicalDigest` or an optional list of equivalent identity fields.
+
+The K4-local claim transaction atomically changes `issued/reserved → spent_for_operation` and persists the one canonical capability-use/claim receipt before returning it. Validation and claim cannot each consume the grant or write competing receipts. That atomicity stops at the K4 storage boundary; it does not include Zone-C storage. A crash or lost IPC reply is recovered by querying the same `requestID/operationID`; the host does not ask for a fresh signature.
 
 Ledger corruption, rollback suspicion, missing schema migration, or loss enters quarantine. Recreating an empty ledger under the same signing key is forbidden.
 
@@ -1302,39 +1419,35 @@ This classification determines recovery. It is part of the adapter profile and e
 
 ### 30.2 Durable protocol
 
-The expanded saga is append-only:
+The end-to-end view is derived from three append-only state machines with non-overlapping write ownership:
 
 ```text
-proposed
-→ prepared
-→ authorized
-→ reserved
-→ zone_c_dispatch_pending
-→ k4_claimed
-→ dispatch_ready
-→ dispatched
-→ succeeded_unsealed
-   | failed_before_effect
-   | failed_final
-   | partial
-   | outcome_indeterminate
+K3 state/outbox:
+prepared → handed_to_zone_c → effect_terminal_recorded
+→ staged → sealed → activated
+
+K4 authorization:
+issued → reserved → claimed_for_operation / revoked / expired
+
+Zone C effect:
+dispatch_pending → claim_observed → dispatch_ready → dispatched
+→ succeeded | failed_before_effect | failed_final | partial | outcome_indeterminate
 → reconciling / compensating when allowed
 → succeeded | failed_final | compensated | reconciled_indeterminate
-→ receipt_unsealed
-→ sealed
-→ staged_state_activated
 ```
+
+Zone C never writes `staged`, `sealed`, or `activated`; K3 never writes provider dispatch/ack/reconciliation truth. A coordinator may expose a read-only joined transaction view, but cannot advance a fourth global reducer.
 
 Required ordering:
 
 1. L13 creates `StatePrepareIntent`, stable `operationID`, canonical `EffectRequestDigest`, expected base revision, allowed outcome/mutation constraints, and adapter recovery class. It does not guess the provider result or `newStateDigest`.
-2. K3 transactionally persists the outbox and prepare state before dispatch.
+2. K3 appends that typed intent to the existing `BASEventLogEntry` sequence/integrity chain and transactionally persists the outbox/prepare projection before dispatch. A state-commit store may own invisible staging rows, but not a second event sequence, projector-cursor timeline, or hash chain.
 3. L14 decides exact authorization; K4 durably issues/reserves it.
 4. Zone C uses a local transaction to persist `dispatch_pending(operationID, authID, requestDigest, attemptID)`.
-5. Zone C asks K4 to claim that exact authorization. K4 uses its own transaction to bind/spend it for the operation and returns a durable signed `ClaimReceipt`.
-6. Zone C uses a second local transaction to persist the ClaimReceipt and move to `dispatch_ready`.
+5. Zone C asks K4 to claim that exact authorization. K4 uses its own transaction to bind/spend it for the operation and returns the durable capability-use/claim receipt artifact.
+6. Zone C uses a second local transaction to persist that receipt reference and move to `dispatch_ready`.
 7. Only then may Zone C persist the dispatch boundary and call the external adapter with the stable provider idempotency key where supported.
-8. The adapter executes; Zone C records provider transaction/result/observed-state data and a signed terminal or indeterminate receipt.
+8. The existing tool/effect adapter executes; Zone C records provider transaction/result/observed-state data as a terminal or indeterminate receipt artifact plus child signature attestation.
 9. L13 reconciles the exact receipt, creates `StateCommitIntent` with terminal receipt/outcome and `newStateDigest`, and stages the resulting state invisibly under compare-and-swap.
 10. L14 decides the terminal seal; K4 signs it.
 11. K3 activates staged state and advances the visible head only after seal.
@@ -1374,8 +1487,9 @@ result/observed-state digest
 cancellation/partial/unknown fields
 reconcile/compensation lineage
 authorization and lease references
-signature and seal status
 ```
+
+The effect-receipt payload has no self ID, embedded signature, or K3 seal state. Its Artifact Mesh envelope supplies identity; its signature is a child attestation; K3 records the terminal receipt artifact ID and owns the later seal/activation artifacts.
 
 ## 31. State Evolution
 
@@ -1414,6 +1528,8 @@ Latency and throughput are not collapsed into one tok/s number:
 - retrieval coverage/conflict/remand data;
 - effect recovery class and terminal saga state.
 
+`Logger` and `OSSignposter` may mirror these fields for live diagnosis. MetricKit contributes delayed E5 field/canary evidence only; its aggregated delivery cannot decide an E4 single-run certification verdict or replace the canonical device harness and Instruments evidence.
+
 ### 32.2 Replay record
 
 A replayable turn records references to:
@@ -1423,9 +1539,12 @@ A replayable turn records references to:
 - SemanticStateLake snapshot and lane watermarks;
 - admitted/selected artifacts and conflict manifest;
 - canonical compiled token history;
-- QualityIdentity, NeuralExecutionContractDigest, bundle, profile, lease, fallback graph, and StateABI;
+- the one execution-binding artifact plus its referenced bundle, profile, lease, fallback graph, and StateABI artifacts;
 - randomness seed/sampling receipt where policy permits;
-- every proposal, acceptance, fallback, remand, verification, risk, release, effect, state, and seal receipt.
+- every proposal, acceptance, fallback, remand, verification, risk, release-preparation, effect, state, and seal receipt;
+- the linked publication reservation, idempotency key, sink receipt, and publication finalization record.
+
+Publication uses a two-phase replay barrier. The complete pre-publication manifest contains the decision graph and prepared release but cannot contain a sink receipt that does not exist yet. K3 durably stores and reopens that manifest, reserves one publication identity/idempotency key, then L12 publishes. The sink receipt is appended as a linked finalization record before the host API returns. Recovery queries/reuses the same idempotency key, so a crash between release and finalization cannot cause a second visible release. A raw manifest alone is not proof that publication completed.
 
 Replay differentiates:
 
@@ -1448,6 +1567,8 @@ Tracing uses data minimization:
 ## 33. Production Certification Gates
 
 The following are target ship gates, not claims that current code already passes them.
+
+Final promotion evidence is bound to a Git candidate-tree ID and the exact installed runtime executable digest, not merely to a mutable working directory or branch name. The certification controller, verifier, package/app gates, and device binary all execute or build from a disposable materialization of that tree; controller/verifier/toolchain digests bind the verdict, the app reports its embedded tree identity and runtime digest, both physical-device receipts must match, and the eventual runtime commit must have the identical tree. Untracked or unstaged caller inputs cannot participate in a certified build or authorization decision.
 
 ### 33.1 Full-blood identity gate
 
@@ -1570,55 +1691,65 @@ Three independent domain reviews attacked semantic/state boundaries, performance
 
 These are abstract architecture results. The same loops remain `REVISE` against current implementation until the corresponding code and physical-device tests exist.
 
-## 35. Current Code: Preserve, Reframe, Replace, Add
+## 35. Current Code: Reuse, Extend, Adapt, Missing
 
-### 35.1 Preserve and promote
+Section 4.4 is the implementation authority for this classification. The architecture is not permission to create a parallel namespace that mirrors the current system.
 
-- stable layer IDs and naming intent;
-- `BASOrganAdapter`-style model abstraction;
-- MLX/Metal production trunk and fused token loop;
-- decode policy, acceptance, never-worse, and pressure primitives;
-- thermal sampling/freshness and entitlement-aware memory-cap work;
-- SQLite event-log transaction foundation;
-- sovereign envelope/token types after schema expansion;
-- Core AI default-deny shadow doctrine;
-- device ledgers and benchmark discipline.
+### 35.1 Reuse unchanged or through existing public extension points
 
-### 35.2 Reframe
+- stable `BASCognitiveLayer` identity and explicit motherboard compatibility mappings;
+- `BASLayerActor`, layer reference/cascade/mesh machinery, budgets and kill-switch foundations;
+- `BASLowEntropyPrimitives` and `BASSovereignCanonicalBytes`/Rust parity;
+- MLX/Metal production trunk, `BASExecutionPlan`, decode policy/planner, acceptance, rollback, sessions, pressure primitives, and upstream wired-memory manager;
+- `BASEventLogEntry/Storage`, SQLite WAL/integrity/replay foundations, current L8 stores/indexes, and current replay harnesses;
+- current context renderers/compilers as the one packing chain;
+- current model manifest, invocation contract, device/thermal probes, and Core AI shadow evidence;
+- current candidate/render/risk/provider-release types;
+- sovereign token, Keychain Ed25519, audit-ledger, tool invocation/result/dispatcher foundations;
+- current turn engine, stage executors/ledger, coordinator, public result, device harnesses, lifecycle bridge, and telemetry collectors.
 
-- current kernel mapping becomes migration/placement metadata, not semantic ownership;
-- scheduler/tensor-backing output becomes advisory observation until one actuator consumes it;
-- ANE/device capability estimates become `inferred/estimated`, never raw observations;
-- Core AI serialization becomes a MemoryLedger/thermal policy;
-- the existing `.statelake` name is explicitly neural state.
+### 35.2 Extend the existing owner
 
-### 35.3 Replace or unify
+- add stable K1–K4/ring/seven-plane projections without duplicating L1–L14;
+- add LayerCell membranes around the actor mesh without a new actor scheduler;
+- add canonical attenuated CapabilityGrant semantics while extending the one sovereign mint/consume authority;
+- add exact snapshot-bound eligibility/conflict/State Market projections without another retrieval or ranking truth;
+- add tokenize-once spans, exact allocation, and descriptor binding to `BASContextCompiler`;
+- add canonical quality/StateABI/execution binding to the existing manifest/invocation/plan chain;
+- add durable spool/finalization to the existing candidate/render/risk/release chain;
+- add algorithm agility and durable K4 lifecycle while explicitly migrating current fingerprint/token schemas;
+- add v2 semantic topology and receipts while freezing the current stage topology as a compatibility projection;
+- add complete artifact-indexed replay/certification around the existing event/result/device evidence.
 
-- overlapping ExecutionPlan, hardware scheduler, device-routing, and decode-planner authorities → one typed lease/profile/actuator spine;
-- native-v2 scaffold plus unconditional v1 result path → exactly one authoritative typed artifact result;
-- static device memory constants → live cap + certified peak + reservation ledger;
-- generic decode-purpose fallback → exact backend/strategy/bundle/StateABI edge;
-- permissive empty capability domains → default deny;
-- in-memory nonce/spent/consumed state → K4 durable transactional ledger;
-- direct effect closure and generic executed receipt → durable Zone-C saga and typed receipt;
-- random/wall-clock state folding without source-event CAS → deterministic event-derived state commit;
-- ambiguous legacy `.statelake` naming → explicit SemanticStateLake versus NeuralStateCache.
+### 35.3 Thin adapters only
 
-### 35.4 Add
+- motherboard aliases, legacy raw-value/wire decoding, and source-compatible result projections;
+- existing retrieval engines into snapshot-bound semantic lanes;
+- existing actor mesh into LayerCell ingress/egress;
+- MLX/Core AI/Core ML/Metal mechanisms into the single silicon execution authority;
+- current Ed25519/Keychain implementation into the algorithm-agile signer boundary;
+- current tool dispatcher behind the Effect Broker;
+- Enhanced Security transport, app composition, shadow comparators, legacy stage-to-node mapping, and manifest indexes.
 
-- `ArtifactIdentityCore`, `ArtifactStorageEnvelope`, `ArtifactAttestation`, `CapabilityGrant`, `LayerCell` membranes, and typed collaboration artifacts;
-- `StateReadSnapshot`, lane query/result, coverage, conflict, and State Market contracts;
-- `QualityIdentity`, `NeuralExecutionContractDigest`, `StateABIDigest`, `CertifiedBackendProfile`, signed fallback graph;
-- process-wide `MemoryLedger` and heavy-owner lease;
-- K4 helper-private ledger, algorithm-agile signer, key manifest, interruption/recovery protocol;
-- Zone-C Effect Broker, durable outbox, adapter recovery class, reconciliation state machine;
-- exact response spool/release grant and provisional-stream isolation;
-- evidence-grade registry, profile invalidation, demotion/quarantine, and replay manifest.
+Adapters cannot mint authority, select a competing result, maintain a second ledger/cache, independently retry an effect, or become an alternate production entry point.
+
+### 35.4 New owners permitted only for missing invariants
+
+- Artifact Mesh identity/CAS/ordinary attestation store;
+- immutable semantic snapshot barrier and typed state-requirement planner;
+- complete cross-backend StateABI/execution binding and application-level process MemoryLedger;
+- durable response spool and publication journal;
+- algorithm-agile trust manifest, durable Enhanced Security K4 lifecycle, and optional P-256 hardware root;
+- Zone-C effect saga plus sealed state prepare/stage/activate protocol;
+- canonical semantic DAG contract, pre-publication replay manifest, and aggregate certification/attestation gate.
+
+Every other proposed production `Create` is presumed to be an extension or adapter until its Section 4.4 create proof is approved.
 
 ## 36. Dependency Seams for Later Planning
 
 This section defines architectural seams, not an implementation plan. A later implementation plan must preserve these dependency constraints:
 
+- an inventory/owner/public-primitive proof must precede every production `Create`;
 - typed identity/canonicalization must precede signatures and cross-process persistence;
 - one execution authority and MemoryLedger must precede adding another production backend;
 - StateABI must precede any cross-backend resident-state handoff;
@@ -1627,12 +1758,13 @@ This section defines architectural seams, not an implementation plan. A later im
 - observation-only profile collection must precede promotion automation;
 - Core AI and future-device work remains shadow-only until certification closes.
 
-Compatibility adapters may bridge existing paths, but only one path may own the authoritative result or effect for a turn.
+Compatibility adapters may bridge existing paths, but only one path may own the authoritative result or effect for a turn. Plans must name the current owner they modify, the exact adapter boundary, and the old path's freeze or retirement gate; a semantically parallel type with a different name is still a duplicate.
 
 ## 37. Acceptance Matrix
 
 | Area | Required verification |
 |---|---|
+| reuse/authority | every production `Create` has an R/E/A/M proof; semantic duplicate scan; one-owner mutation tests; adapters contain no independent decision/storage/retry/effect path |
 | counts/naming | compile/schema test finds exactly L1–L14, K1–K4, four ring IDs, seven plane IDs; aliases round-trip to stable IDs |
 | LayerCell purity | dependency/lint tests reject direct I/O/private mechanism calls from pure cores; deterministic fixture replay |
 | artifact canonicalization | cross-process/platform vectors; parent/schema/epoch tamper rejection; privacy commitment non-linkability tests |
@@ -1708,8 +1840,17 @@ These questions can change backend profiles and performance claims. They cannot 
 - [Managing Core AI model specialization and caching](https://developer.apple.com/documentation/coreai/managing-model-specialization-and-caching)
 - [Compiling Core AI models ahead of time](https://developer.apple.com/documentation/coreai/compiling-core-ai-models-ahead-of-time)
 - [Core ML compute units](https://developer.apple.com/documentation/coreml/mlcomputeunits)
+- [Core ML MLState](https://developer.apple.com/documentation/coreml/mlstate)
+- [Swift Concurrency](https://developer.apple.com/documentation/swift/concurrency)
+- [ContinuousClock](https://developer.apple.com/documentation/swift/continuousclock)
+- [OSSignposter](https://developer.apple.com/documentation/os/ossignposter)
+- [MetricKit](https://developer.apple.com/documentation/metrickit)
+- [ProcessInfo](https://developer.apple.com/documentation/foundation/processinfo)
+- [BGTaskScheduler](https://developer.apple.com/documentation/backgroundtasks/bgtaskscheduler)
 - [Scheduling CPU work efficiently](https://developer.apple.com/documentation/xcode/scheduling-cpu-work-efficiently)
 - [Creating Enhanced Security helper extensions](https://developer.apple.com/documentation/xcode/creating-enhanced-security-helper-extensions)
+- [AppExtensionPoint.Definition and EnhancedSecurity](https://developer.apple.com/documentation/extensionfoundation/appextensionpoint/definition)
+- [Enabling enhanced security for your app](https://developer.apple.com/documentation/xcode/enabling-enhanced-security-for-your-app)
 - [SecureEnclave P-256 Signing](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing)
 - [Protecting keys with the Secure Enclave](https://developer.apple.com/documentation/security/protecting-keys-with-the-secure-enclave)
 
@@ -1727,10 +1868,14 @@ The design was grounded against, among others:
 
 - `BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardLayerMapping.swift`
 - `BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardArchitecture.swift`
+- `BehavioralAISubstrate/Sources/BASRuntimeCore/BASLowEntropyPrimitives.swift`
+- `BehavioralAISubstrate/Sources/BASRuntimeCore/BASEventLog.swift`
 - `BehavioralAISubstrate/Sources/BASOrgan/BASExecutionPlan.swift`
 - `BehavioralAISubstrate/Sources/BASOrgan/BASExecutionPlanElector.swift`
 - `BehavioralAISubstrate/Sources/BASOrgan/BASDecodePlanner.swift`
 - `BehavioralAISubstrate/Sources/BASMLXAdapter/MLXOrganAdapter.swift`
+- `BehavioralAISubstrate/Vendor/mlx-swift/Source/MLX/WiredMemory.swift`
+- `BehavioralAISubstrate/Vendor/mlx-swift/Source/MLX/Memory.swift`
 - `BehavioralAISubstrate/Sources/BASHostKit/BASNativeStageExecutor.swift`
 - `BehavioralAISubstrate/Sources/BASHostKit/BASTurnRuntimeEngine.swift`
 - `BehavioralAISubstrate/Sources/BASAppleAdapters/BASStateLakeReader.swift`
@@ -1754,6 +1899,7 @@ For current iPhone Air, the elegant path is to make the existing MLX trunk more 
 
 Before this design was locked:
 
+- three independent reuse audits compared every proposed production `Create`, cross-plan public contract, and Apple/upstream mechanism against current repository owners. They found no exact-name collision but identified semantic duplicates that would otherwise create parallel digest, grant, event, release, lease, and recovery truth; Section 4.4 and the R/E/A/M owner map close those gaps before planning;
 - three independent domain red teams reviewed semantic/state correctness, performance/thermal/memory behavior, and security/future-device behavior; a fourth independent lock reviewer found nine integration blockers over two rounds, all of which were corrected before its final `PASS`;
 - the eight adversarial loops in Section 34 were revised to a design-level pass;
 - the final broad abstract model executed 832 assertions and the post-lock-review focused model executed another 264 assertions: 1,096 final-design assertions covering capability mutation, branch/release ordering, effect crashes and cross-domain gaps, StateABI, memory admission, bounded remand, exact generation identity, keyed artifact identity, and the thermally-cold 40 entry protocol;
