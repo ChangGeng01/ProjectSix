@@ -113,6 +113,12 @@ public actor BASMetalFlashAttentionDispatcher {
     private var maskedPipeline: MTLComputePipelineState?
     private var causalPipeline: MTLComputePipelineState?
     private var commandQueue: MTLCommandQueue?
+    // audit x-concurrency LOW-12: single-flight the (expensive) pipeline compile. `makeComputePipelineState`
+    // is an `await` suspension point, so two concurrent first-use dispatches both pass the `nil` guard and
+    // BOTH compile. Caching the in-flight Task lets the second caller await the first's compile instead.
+    private var forwardPipelineTask: Task<MTLComputePipelineState, Error>?
+    private var maskedPipelineTask: Task<MTLComputePipelineState, Error>?
+    private var causalPipelineTask: Task<MTLComputePipelineState, Error>?
     #endif
 
     public init(loader: BASMetalKernelLibraryLoader) {
@@ -342,6 +348,13 @@ public actor BASMetalFlashAttentionDispatcher {
         library: MTLLibrary, device: MTLDevice
     ) async throws {
         if forwardPipeline != nil { return }
+        // audit x-concurrency LOW-12: a compile is already in flight — await it instead of racing a
+        // duplicate. All state reads/writes below happen between suspension points (actor isolation),
+        // so the guard→task-set is atomic; only the `await task.value` yields.
+        if let task = forwardPipelineTask {
+            forwardPipeline = try await task.value
+            return
+        }
         guard let fn = library.makeFunction(
             name: Self.forwardSymbol)
         else {
@@ -349,10 +362,14 @@ public actor BASMetalFlashAttentionDispatcher {
                 .functionNotFound(
                     name: Self.forwardSymbol)
         }
+        let task = Task { try await device
+            .makeComputePipelineState(function: fn) }
+        forwardPipelineTask = task
         do {
-            forwardPipeline = try await device
-                .makeComputePipelineState(function: fn)
+            forwardPipeline = try await task.value
+            forwardPipelineTask = nil
         } catch {
+            forwardPipelineTask = nil  // allow a retry after a transient compile failure
             throw BASMetalFlashAttentionDispatcherError
                 .pipelineCreationFailed(
                     message: String(describing: error))
@@ -363,6 +380,10 @@ public actor BASMetalFlashAttentionDispatcher {
         library: MTLLibrary, device: MTLDevice
     ) async throws {
         if maskedPipeline != nil { return }
+        if let task = maskedPipelineTask {
+            maskedPipeline = try await task.value
+            return
+        }
         guard let fn = library.makeFunction(
             name: Self.maskedSymbol)
         else {
@@ -370,10 +391,14 @@ public actor BASMetalFlashAttentionDispatcher {
                 .functionNotFound(
                     name: Self.maskedSymbol)
         }
+        let task = Task { try await device
+            .makeComputePipelineState(function: fn) }
+        maskedPipelineTask = task
         do {
-            maskedPipeline = try await device
-                .makeComputePipelineState(function: fn)
+            maskedPipeline = try await task.value
+            maskedPipelineTask = nil
         } catch {
+            maskedPipelineTask = nil
             throw BASMetalFlashAttentionDispatcherError
                 .pipelineCreationFailed(
                     message: String(describing: error))
@@ -384,6 +409,10 @@ public actor BASMetalFlashAttentionDispatcher {
         library: MTLLibrary, device: MTLDevice
     ) async throws {
         if causalPipeline != nil { return }
+        if let task = causalPipelineTask {
+            causalPipeline = try await task.value
+            return
+        }
         guard let fn = library.makeFunction(
             name: Self.causalSymbol)
         else {
@@ -391,10 +420,14 @@ public actor BASMetalFlashAttentionDispatcher {
                 .functionNotFound(
                     name: Self.causalSymbol)
         }
+        let task = Task { try await device
+            .makeComputePipelineState(function: fn) }
+        causalPipelineTask = task
         do {
-            causalPipeline = try await device
-                .makeComputePipelineState(function: fn)
+            causalPipeline = try await task.value
+            causalPipelineTask = nil
         } catch {
+            causalPipelineTask = nil
             throw BASMetalFlashAttentionDispatcherError
                 .pipelineCreationFailed(
                     message: String(describing: error))

@@ -49,8 +49,12 @@ final class BASHostKitFacadeGuardTests: XCTestCase {
     /// The pinned facade surface. `import BASHostKit` transitively re-exports exactly these 8 — by design
     /// (one-line host integration), but it MUST be a conscious set. Growing it blurs boundaries → update here
     /// only with intent.
+    // charter audit 2026-07-12 T4 (deliberate update): BASAppleAdapters → BASAppleLifecycleKit.
+    // The LLM-outside cut: the core umbrella now re-exports the PURE lifecycle kit; the
+    // model-invoking adapter module left the facade's link closure entirely
+    // (BASModelBoundaryPinTests pins the exclusion mechanically).
     static let pinnedExports: Set<String> = [
-        "BASAdmin", "BASAppleAdapters", "BASEvaluation", "BASMemory",
+        "BASAdmin", "BASAppleLifecycleKit", "BASEvaluation", "BASMemory",
         "BASObservability", "BASOrchestration", "BASPolicy", "BASRuntimeCore",
     ]
 
@@ -88,13 +92,29 @@ final class BASHostKitFacadeGuardTests: XCTestCase {
         "EBrainRuntimeCoordinator+RunTurn.swift": 2350,
         "EBrainRuntimeCoordinator+SovereignCommit.swift": 1925,
         "BASAuditObservationProjections.swift": 1665,
-        "EBrainTurnResult.swift": 1625,
+        // 2026-07-12 CoW-box extraction: 1496→707 (main file keeps struct+Storage+fields+all-fields
+        // init; convenience inits + Codable extracted to +BundleInits/+BundleInitsLegacy/+Codable).
+        // Re-pinned TIGHT at current+~6% so the ratchet keeps teeth (~5 fields of headroom: a new
+        // field costs ~9 LOC here — Storage var+init arg+assign+clone+equals+computed get/set).
+        "EBrainTurnResult.swift": 750,
         "HostRuntimeCore.swift": 1365,
-        "BASTurnRuntimeEngine.swift": 1055,
+        // 2026-07-11 reconciliation: grew 1055→1123 across the 07-09 audit fixes (M-k F1
+        // ledger-locality + the BAS_TURN_SERIAL per-key in-flight gate — both commit-traceable,
+        // deliberate safety work, not drift). Re-pinned TIGHT at current+7 so the ratchet keeps teeth.
+        "BASTurnRuntimeEngine.swift": 1130,
         "EBrainConsoleSupport.swift": 960,
         "BASCognitiveOSConvenience.swift": 895,
         "HostKitCore.swift": 890,
         "EBrainHostRuntime+TriSelfService.swift": 885,
+        // 2026-07-11 reconciliation: crossed 800 on 07-09 (hostkit-rest HIGH-2 — the .all-tier
+        // watcher effective-inputs fix, 7321781f1). Genuine composition (fabric seat wiring), but
+        // flagged for the deferred extraction list. Pinned TIGHT at current+8.
+        "BASAgentFabricHostPipeline.swift": 815,
+        // 2026-07-12 context-IR step 4: runTurn's stage bodies moved VERBATIM into stage-method
+        // files (declared read surfaces); two carry two stages each. Pinned TIGHT at current+~8
+        // so the ratchet keeps teeth — new logic goes in lower modules, not here.
+        "EBrainRuntimeCoordinator+RunTurnStagesEscalateRender.swift": 815,
+        "EBrainRuntimeCoordinator+RunTurnStagesAuditAssemble.swift": 880,
     ]
 
     func testNoNewLargeFileAndKnownGodFilesDoNotGrow() {
@@ -119,9 +139,18 @@ final class BASHostKitFacadeGuardTests: XCTestCase {
 
     func testHostKitFileCountStaysInBand() {
         // 255 today. A band (not a hard pin) — a big influx of new HostKit files signals leaked logic.
+        // 2026-07-12 deliberate raise 285→288: the EBrainTurnResult CoW-box extraction split the
+        // 1919-LOC god file into main + BundleInits(×2) + Codable (net +3) — pure structural
+        // extraction of an EXISTING type demanded by the LOC leak-cap above, zero new logic.
+        // 2026-07-12 deliberate raise 288→292: context-IR arc (operator-ordered) — StageContexts +
+        // TurnResponse + TurnContextCompiler + 3 stage-method files (verbatim-moved runTurn bodies),
+        // minus the deleted BundleInitsLegacy. Structural extractions, zero new business logic.
+        // 2026-07-12 deliberate raise 292→294: mirror-lane charter M1-M3 (operator ruling ① —
+        // "汇合管线落 BASHostKit": convergence is EXPLICITLY HostKit property) — Convergence
+        // (envelope + deterministic disposer) + LedgerIngest (verify-then-append gate).
         let count = Self.swiftFiles().count
-        XCTAssertLessThanOrEqual(count, 285,
-            "BASHostKit grew to \(count) files (band 285). New files likely belong in a lower module "
+        XCTAssertLessThanOrEqual(count, 294,
+            "BASHostKit grew to \(count) files (band 294). New files likely belong in a lower module "
             + "(composition stays small) — or raise the band deliberately.")
         XCTAssertGreaterThan(count, 100, "sanity: expected to find the HostKit sources; found \(count)")
     }

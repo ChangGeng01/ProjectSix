@@ -7,7 +7,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASRustAggregationTests: XCTestCase {
 
     // MARK: - recordCountByPermitMode
@@ -172,4 +171,3 @@ final class BASRustAggregationTests: XCTestCase {
         XCTAssertEqual(agg.distinctSessions, 0)
     }
 }
-#endif

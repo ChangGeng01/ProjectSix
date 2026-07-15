@@ -3,6 +3,17 @@ import Foundation
 // 六十五.4 — opt-in proposing protocol bridging seat verdicts
 // to v4 typed proposals.
 //
+// deep-audit DORMANT (2026-07-13): this is the HEART of the dormant seat-fabric lane. The
+// registry's `dispatchProposals` (proposeDelta → validate → lease-check → collect) has NO
+// production caller — the sovereign spine (QinaoDefaults.makeSovereignHost / QinaoRuntime)
+// never invokes it; live seats still emit `SeatVerdict` via `contribute`. The lease-agent
+// binding (P1-8) and the declarative commit gate (P1-9) are the already-hardened pieces of
+// this SAME lane. Per pin-boundary-defer-interface the lane stays dormant, honestly marked,
+// NOT wired speculatively; TRIGGER to go live = a host that adopts propose/dispose seats onto
+// the sovereign spine, at which point the commit path must be retyped to the signed-token gate
+// (see P1-9). QinaoSeatFabricDormancyBoundaryTests fails closed if any production module starts
+// calling `dispatchProposals`.
+//
 // ## Why this exists
 //
 // Existing `QinaoSeatProtocol.contribute(snapshotID:)`
@@ -121,7 +132,9 @@ public actor QinaoAgentProposalRegistry {
     ) async -> QinaoAgentProposalBoard {
         let seats = seatsByID.values
 
-        var allProposals: [QinaoAgentProposal] = []
+        // audit F12: keep the (emitting seat, proposal) association so each proposal's
+        // self-reported agent can be bound to the seat that actually sent it.
+        var allProposals: [(emitter: QinaoSeat, proposal: QinaoAgentProposal)] = []
         var failedSeats: [QinaoSeat: String] = [:]
 
         // Each task returns (seat, proposals?, error?).
@@ -155,8 +168,9 @@ public actor QinaoAgentProposalRegistry {
                 if let msg = item.errorMessage {
                     failedSeats[item.seat] = msg
                 } else {
-                    allProposals.append(
-                        contentsOf: item.proposals)
+                    for p in item.proposals {
+                        allProposals.append((emitter: item.seat, proposal: p))
+                    }
                 }
             }
         }
@@ -166,32 +180,40 @@ public actor QinaoAgentProposalRegistry {
         var rejected: [
             QinaoAgentRejectedProposal
         ] = []
-        for proposal in allProposals {
+        for (emitter, proposal) in allProposals {
             let cap = proposal.agent
                 .canonicalCapability
             var issues =
                 QinaoAgentProposalGate.validate(
                     proposal, capability: cap)
-            // Lease validity check (if enforcer present).
-            // Forwards the enforcer's typed reasons so
-            // downstream telemetry preserves the actual
-            // cause (expired / writesExhausted /
-            // loopsExhausted / targetOutsideScope /
-            // revoked / unknownLease) — instead of
-            // collapsing all 5 reasons to a single
-            // `leaseRequiredButMissing` flag.
-            if let leaseRef = proposal.leaseRef,
-                let enforcer = leaseEnforcer
-            {
-                let report =
-                    await enforcer.validity(
-                        leaseRef: leaseRef,
-                        target: proposal.delta.target)
-                if !report.isValid {
-                    issues.append(
-                        .leaseInvalid(
-                            agent: proposal.agent,
-                            reasons: report.reasons))
+            // audit F12: bind the self-reported agent to the seat that actually emitted the
+            // proposal — a seat cannot propose deltas claiming another agent's identity /
+            // capability. Fail closed on mismatch.
+            if proposal.agent != emitter {
+                issues.append(
+                    .seatIdentityMismatch(claimed: proposal.agent, actual: emitter))
+            }
+            // Lease validity check. audit F12: if a leaseRef is present but NO enforcer is
+            // wired, the lease is unverifiable — fail closed rather than trust it. With an
+            // enforcer, forward the typed reasons (expired / writesExhausted / … ).
+            if let leaseRef = proposal.leaseRef {
+                if let enforcer = leaseEnforcer {
+                    // deep-audit P1-8: bind the lease to the seat that ACTUALLY emitted the
+                    // proposal (not the self-reported proposal.agent) — a seat cannot present
+                    // another agent's leaseRef to spend its budget/scope. Fail closed on mismatch.
+                    let report =
+                        await enforcer.validity(
+                            leaseRef: leaseRef,
+                            agent: emitter,
+                            target: proposal.delta.target)
+                    if !report.isValid {
+                        issues.append(
+                            .leaseInvalid(
+                                agent: proposal.agent,
+                                reasons: report.reasons))
+                    }
+                } else {
+                    issues.append(.leaseUnverifiable(agent: proposal.agent))
                 }
             }
             if issues.isEmpty {

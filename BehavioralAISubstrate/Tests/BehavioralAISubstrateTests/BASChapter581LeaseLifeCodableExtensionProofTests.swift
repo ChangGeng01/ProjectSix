@@ -23,24 +23,33 @@
 
 import XCTest
 @testable import BASLeaseLife
+@testable import BASRuntimeCore
 
 final class BASChapter581LeaseLifeCodableExtensionProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBreathSchedulerRequestConformsToCodable() {
-        assertCodable(BASBreathScheduler.Request.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASBreathScheduler.Request(
+                id: "",
+                maintenanceClass: .none,
+                earliestFireAt: Date(timeIntervalSince1970: 0),
+                reasonCodes: []))
     }
 
     func testBreathSchedulerScheduledBreathConformsToCodable()
     {
-        assertCodable(
-            BASBreathScheduler.ScheduledBreath.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASBreathScheduler.ScheduledBreath(
+                request: BASBreathScheduler.Request(
+                    id: "",
+                    maintenanceClass: .none,
+                    earliestFireAt: Date(timeIntervalSince1970: 0),
+                    reasonCodes: []),
+                scheduledAt: Date(timeIntervalSince1970: 0),
+                guardLevelAtSchedule: .nominal))
     }
 }

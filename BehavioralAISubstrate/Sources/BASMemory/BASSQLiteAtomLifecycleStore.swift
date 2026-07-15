@@ -29,6 +29,7 @@
 
 import Foundation
 import SQLite3
+import BASRuntimeCore
 
 public actor BASSQLiteAtomLifecycleStore: BASAtomLifecycleStore {
 
@@ -81,6 +82,15 @@ public actor BASSQLiteAtomLifecycleStore: BASAtomLifecycleStore {
         // WAL + sync mode for concurrent reader compatibility
         // (mirrors BASSQLiteMemoryAtomStore pattern)。
         try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete zeroes freed pages
+        // at delete time — default-on, BAS_SECURE_DELETE=0 kill-switch.
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            try Self.runExec(db: handle, sql: sdSQL)
+        }
+        // memory-a F4 residual: one-time legacy freelist purge (secure_delete only
+        // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
+        // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
         try Self.runExec(db: handle, sql: "PRAGMA synchronous=NORMAL;")
 
         // PRAGMA user_version branch:0 = empty DB,write our version;
@@ -297,7 +307,12 @@ public actor BASSQLiteAtomLifecycleStore: BASAtomLifecycleStore {
                    recorded_at_ms, actor_ref
             FROM atom_lifecycle_events
             WHERE \(whereClause)
-            ORDER BY recorded_at_ms ASC, rowid ASC
+            -- deep-audit MED: the protocol mandates INSERTION order, and reconstructCurrentPhaseByte
+            -- takes the LAST advanced event's phase. Ordering by recorded_at_ms first reorders events
+            -- whose caller-supplied/clock-skewed timestamps disagree with insertion order, diverging
+            -- from the in-memory reference conformer (and picking a wrong "current" phase). rowid is the
+            -- monotonic implicit insertion counter for this append-only, TEXT-PK table ⇒ true insertion order.
+            ORDER BY rowid ASC
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)

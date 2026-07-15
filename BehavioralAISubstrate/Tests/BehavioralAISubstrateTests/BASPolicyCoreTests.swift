@@ -168,4 +168,65 @@ struct BASPolicyCoreTests {
         #expect(decision.ruleID == "deny-cloud-output")
         #expect(decision.matchedRuleIDs == ["confirm-output", "deny-cloud-output"])
     }
+    // MARK: - H19(大审计立即层,2026-07-08):默认分支 fail-closed
+
+    @Test("H19: unmatched action with cloudRequested is denied (fail-closed), not allowed")
+    func unmatchedCloudRequestIsDenied() {
+        // localOnly 只有 route/output 两规则——toolCall 无匹配。
+        // 旧行为:低风险云端 toolCall 走"no rule matched"→ allow(fail-open)。
+        let profile = BASPolicyProfiles.make(.localOnly)
+        let decision = profile.decide(
+            at: .toolDispatch,
+            actionClass: .toolCall,
+            riskLevel: .low,
+            scope: .device,
+            sensitivity: .low,
+            cloudRequested: true
+        )
+        #expect(decision.decision == .deny)
+        #expect(decision.reason.contains("fail-closed"))
+    }
+
+    @Test("H19: unmatched memoryWrite with cloudRequested is denied under localOnly")
+    func unmatchedCloudMemoryWriteIsDenied() {
+        let profile = BASPolicyProfiles.make(.localOnly)
+        let decision = profile.decide(
+            at: .memoryWrite,
+            actionClass: .memoryWrite,
+            riskLevel: .low,
+            scope: .user,
+            sensitivity: .medium,
+            cloudRequested: true
+        )
+        #expect(decision.decision == .deny)
+    }
+
+    @Test("H19: unmatched LOCAL action stays allowed (sovereign-local default unchanged)")
+    func unmatchedLocalActionStaysAllowed() {
+        let profile = BASPolicyProfiles.make(.localOnly)
+        let decision = profile.decide(
+            at: .toolDispatch,
+            actionClass: .toolCall,
+            riskLevel: .low,
+            scope: .device,
+            sensitivity: .low,
+            cloudRequested: false
+        )
+        #expect(decision.decision == .allow)
+    }
+
+    @Test("H19: childSafe blocks high-sensitivity output release")
+    func childSafeBlocksHighSensitivityOutput() {
+        // 旧 childSafe 无 output 规则 → 任意敏感度输出放行。
+        let profile = BASPolicyProfiles.make(.childSafe)
+        let decision = profile.decide(
+            at: .outputRelease,
+            actionClass: .outputRelease,
+            riskLevel: .low,
+            scope: .session,
+            sensitivity: .high
+        )
+        #expect(decision.decision == .deny)
+    }
+
 }

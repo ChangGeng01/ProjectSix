@@ -16,7 +16,7 @@ environment (install Xcode 27) → recompile → fix any new SDK deprecations �
 | SDKROOT | `iphoneos` (unpinned, not `iphoneos26.5`) | ✅ auto-uses the active Xcode's iOS SDK → iOS 27 once Xcode 27 is installed |
 | Availability gates | only reach `iOS 26` (Apple Foundation Models in `AppleFoundationOrganAdapter[+Streaming].swift`) | ✅ `if #available(iOS 26, *)` is TRUE on 27 → those Apple-LLM paths activate; forward-compatible |
 | Hardcoded version gates | none — OS version only logged (`operatingSystemVersionString`) | ✅ none |
-| Swift language mode | app `SWIFT_VERSION = 5.10`; package `swift-tools-version: 6.0` | ✅ independent of the iOS SDK; leave as-is (don't bump speculatively) |
+| Swift language mode | app `SWIFT_VERSION = 6.0` (project.yml + pbxproj); package `swift-tools-version: 6.0` | ✅ independent of the iOS SDK; leave as-is (don't bump speculatively) |
 
 **Conclusion:** no speculative code changes are warranted now. Bumping the deploy target or Swift mode
 without the iOS 27 SDK to verify would be a 亏的不要上 violation (claiming adaptation we can't compile).

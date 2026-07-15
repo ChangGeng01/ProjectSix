@@ -3,6 +3,7 @@ import SwiftUI
 import QinaoLoop
 import QinaoAppleFoundation
 import QinaoMLX
+import QinaoDefaults
 
 /// Closure type used by `SampleSession` to lazily build an
 /// endpoint for a chosen provider. Default implementation
@@ -35,19 +36,33 @@ public final class SampleSession: ObservableObject {
 
     private let endpointBuilder: SampleEndpointBuilder
 
+    /// integration sample-upgrade (2026-07-12) — the LLM-free sovereign spine the sample
+    /// feeds each exchange into as DATA (see SampleSovereignSpine.swift). Lazily
+    /// assembled once; nil until the first recorded turn.
+    var cachedSovereignHost: QinaoSovereignHost?
+
+    /// Directory for the sample's persistent keyed ledger (+ its locally-generated HMAC
+    /// secret). Nil = Application Support/QinaoSample. Tests inject a temp directory.
+    let ledgerDirectory: URL?
+
     /// Initialise with the default real-Qinao endpoint builder.
     /// Production hosts call this; tests use the
     /// `init(endpointBuilder:)` overload to inject a mock.
-    public init() {
+    public init(ledgerDirectory: URL? = nil) {
         self.endpointBuilder = SampleSession.defaultEndpointBuilder
+        self.ledgerDirectory = ledgerDirectory
     }
 
     /// Initialise with a custom endpoint builder. Tests pass a
     /// closure that returns a deterministic stub endpoint so the
     /// session's caching + state-transition behavior can be
     /// exercised without network or MLX model loading.
-    public init(endpointBuilder: @escaping SampleEndpointBuilder) {
+    public init(
+        endpointBuilder: @escaping SampleEndpointBuilder,
+        ledgerDirectory: URL? = nil
+    ) {
         self.endpointBuilder = endpointBuilder
+        self.ledgerDirectory = ledgerDirectory
     }
 
     /// Lazily build (or fetch from cache) the endpoint for the

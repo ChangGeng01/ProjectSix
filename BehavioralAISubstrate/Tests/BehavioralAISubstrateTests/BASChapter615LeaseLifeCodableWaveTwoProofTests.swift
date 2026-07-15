@@ -43,18 +43,15 @@ final class BASChapter615LeaseLifeCodableWaveTwoProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testCapabilityConformsToCodable() {
-        assertCodable(
+        // #18: real round-trip — CaseIterable enum, every case
+        assertCodableRoundTripsAllCases(
             BASDeviceRouting.Capability.self)
     }
 
     func testRoleConformsToCodable() {
-        assertCodable(BASDeviceRouting.Role.self)
+        // #18: real round-trip (Role is not CaseIterable)
+        assertCodableRoundTrips(BASDeviceRouting.Role.scout)
+        assertCodableRoundTrips(BASDeviceRouting.Role.core)
     }
 }

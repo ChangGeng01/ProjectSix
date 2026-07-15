@@ -51,8 +51,13 @@ pub fn decide(input: &DecisionInput) -> DecisionOutput {
         };
     }
     if matches!(input.risk_climate, RiskClimate::Crisis) {
+        // Crisis forces AT LEAST Defer — a severity FLOOR, never a
+        // downgrade。 A sovereign Refuse/Quarantine is MORE severe
+        // than Defer and must survive; the old code hard-returned
+        // Defer, WEAKENING an already-severe verdict precisely when
+        // the climate is most dangerous。 (blindspot-② HIGH)
         return DecisionOutput {
-            verdict: Verdict::Defer,
+            verdict: input.sovereign_verdict.max_severity(Verdict::Defer),
             throttle: true,
             log_loudly: true,
         };
@@ -110,11 +115,36 @@ mod tests {
 
     #[test]
     fn crisis_forces_defer() {
+        // Allow (rank 0) floored UP to Defer — the correct direction。
         let mut inp = base_input();
         inp.risk_climate = RiskClimate::Crisis;
         let out = decide(&inp);
         assert_eq!(out.verdict, Verdict::Defer);
         assert!(out.throttle);
+    }
+
+    #[test]
+    fn crisis_floor_never_downgrades_severe_verdict() {
+        // blindspot-② HIGH: "at least Defer" is a FLOOR。 A sovereign
+        // Refuse/Quarantine is stricter than Defer and must survive —
+        // the old code hard-returned Defer, downgrading it under the
+        // most dangerous climate。
+        for (input_v, expected) in [
+            (Verdict::Allow, Verdict::Defer),           // floored up
+            (Verdict::AllowWithGuard, Verdict::Defer),  // floored up
+            (Verdict::Defer, Verdict::Defer),           // at the floor
+            (Verdict::Refuse, Verdict::Refuse),         // NOT downgraded
+            (Verdict::Quarantine, Verdict::Quarantine), // NOT downgraded
+        ] {
+            let mut inp = base_input();
+            inp.risk_climate = RiskClimate::Crisis;
+            inp.sovereign_verdict = input_v;
+            let out = decide(&inp);
+            assert_eq!(out.verdict, expected,
+                "Crisis floor must not downgrade {:?}", input_v);
+            assert!(out.throttle);
+            assert!(out.log_loudly);
+        }
     }
 
     #[test]

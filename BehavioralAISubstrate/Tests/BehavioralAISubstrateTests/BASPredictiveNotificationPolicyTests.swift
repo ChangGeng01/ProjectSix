@@ -115,6 +115,23 @@ final class BASPredictiveNotificationPolicyTests: XCTestCase {
         )
     }
 
+    // audit blindspot-② HIGH: the required-evidence count must be MONOTONIC in risk — the highest
+    // tier ("extreme") must never require MORE signals than a lower tier. Reversal (extreme → the
+    // default 99) reds: extreme would demand more signals than high, i.e. never notify.
+    func testExtremeRiskRequiresFewestSignalsNotNever() {
+        let extreme = BASPredictiveNotificationPolicyEngine.minimumEvidenceSignalCount(for: "extreme")
+        let high = BASPredictiveNotificationPolicyEngine.minimumEvidenceSignalCount(for: "high")
+        let medium = BASPredictiveNotificationPolicyEngine.minimumEvidenceSignalCount(for: "medium")
+        XCTAssertLessThanOrEqual(extreme, high,
+            "extreme (highest risk) must require NO MORE signals than high — it was 99 (never notify)")
+        XCTAssertLessThanOrEqual(high, medium + 0, "high must not require more than medium")
+        XCTAssertNotEqual(extreme, 99, "extreme must be reachable, not the never-notify sentinel")
+        XCTAssertLessThan(extreme, 99)
+        // Unknown/garbage level stays fail-closed (never notify).
+        XCTAssertEqual(BASPredictiveNotificationPolicyEngine.minimumEvidenceSignalCount(for: "banana"), 99)
+        XCTAssertEqual(BASPredictiveNotificationPolicyEngine.minimumEvidenceSignalCount(for: "low"), 99)
+    }
+
     private func localDate(year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Date {
         var components = DateComponents()
         components.calendar = Calendar.autoupdatingCurrent

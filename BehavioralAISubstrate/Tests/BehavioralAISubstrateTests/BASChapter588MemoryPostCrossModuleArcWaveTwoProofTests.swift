@@ -27,19 +27,22 @@ final class BASChapter588MemoryPostCrossModuleArcWaveTwoProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testHostCandidatePipelineRejectionRecordConformsToCodable() {
-        assertCodable(
-            BASHostCandidatePipeline.RejectionRecord.self)
+        // #18: real round-trip
+        let value = BASHostCandidatePipeline.RejectionRecord(
+            candidateID: "",
+            reason: "",
+            recordedAt: Date(timeIntervalSince1970: 0))
+        assertCodableRoundTrips(value)
     }
 
     func testMemoryMutationEventEmitterEmitOutcomeConformsToCodable() {
-        assertCodable(
-            BASMemoryMutationEventEmitter.EmitOutcome.self)
+        // #18: real round-trip
+        let value = BASMemoryMutationEventEmitter.EmitOutcome(
+            appended: 0,
+            skipped: 0,
+            duplicateAppendsSkipped: 0,
+            payloads: [])
+        assertCodableRoundTrips(value)
     }
 }

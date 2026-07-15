@@ -15,7 +15,6 @@ import Foundation
 @testable import BASMemory
 @testable import BASOrchestration
 
-#if !os(iOS) // ch1022 source-gate (parity with BASMLMemoryServiceTests)
 final class BASL8RoutedMemoryServiceTests: XCTestCase {
 
     // MARK: - Helpers
@@ -181,4 +180,3 @@ final class BASL8RoutedMemoryServiceTests: XCTestCase {
         XCTAssertEqual(r.atoms.first?.summary, "sync path")
     }
 }
-#endif

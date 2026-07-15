@@ -14,7 +14,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASRuntimeCore
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainPerformanceTests: XCTestCase {
 
     // MARK: - Adapter latency
@@ -37,7 +36,7 @@ final class BASCognitiveBrainPerformanceTests: XCTestCase {
             _ = try adapter.classify(text: text)
         }
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 1.0,
+        BASPerfGate.assertBelow(elapsed, 1.0,
             "100 classify() calls took \(elapsed)s," +
             " expected < 1.0s (= < 10ms each on Apple" +
             " Silicon)。 Real regression check.")
@@ -52,7 +51,7 @@ final class BASCognitiveBrainPerformanceTests: XCTestCase {
         let start = Date()
         _ = try adapter.classify(text: "hello world")
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 0.050,
+        BASPerfGate.assertBelow(elapsed, 0.050,
             "Single classify() call took \(elapsed)s," +
             " expected < 50ms。 Model load should be" +
             " amortized in init,not per-call.")
@@ -76,7 +75,7 @@ final class BASCognitiveBrainPerformanceTests: XCTestCase {
         _ = await brain.process(
             "compile the swift package")
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 0.500,
+        BASPerfGate.assertBelow(elapsed, 0.500,
             "Single brain.process() call took" +
             " \(elapsed)s,expected < 500ms。")
     }
@@ -94,7 +93,7 @@ final class BASCognitiveBrainPerformanceTests: XCTestCase {
                 "compile the swift package \(i)")
         }
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 10.0,
+        BASPerfGate.assertBelow(elapsed, 10.0,
             "50 brain.process() calls took \(elapsed)s," +
             " expected < 10s。")
     }
@@ -110,10 +109,9 @@ final class BASCognitiveBrainPerformanceTests: XCTestCase {
         _ = try await BASCognitiveBrain
             .makeWithDefaults()
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 1.0,
+        BASPerfGate.assertBelow(elapsed, 1.0,
             "makeWithDefaults() took \(elapsed)s," +
             " expected < 1s。 If this fails the model" +
             " compilation is slow or the bundle is fat.")
     }
 }
-#endif

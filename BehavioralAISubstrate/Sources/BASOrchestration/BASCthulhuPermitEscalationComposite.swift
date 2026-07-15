@@ -124,19 +124,35 @@ public enum BASCthulhuPermitEscalation {
         var firedNonEuclidean = false
         var firedCosmicCold = false
 
-        // Source 1: non-Euclidean candidates → force .compare
+        // Source 1: every L9 non-Euclidean failure mode is, by
+        // definition, a "fails when grasped naively" condition and
+        // must escalate — none may be silently dropped. The switch is
+        // exhaustive (no default) so a future 5th mode forces a
+        // deliberate routing decision at compile time.
+        //   - Representation failures (collapse / topology) force
+        //     .compare — show the host multiple framings.
+        //   - Constitution / values failures (boundary crossing /
+        //     values conflict) force .mirror — a host-facing
+        //     reflection before the substrate commits. (blindspot
+        //     HIGH: the old code handled only the two representation
+        //     modes and dropped .boundaryViolation — a host-
+        //     constitution boundary crossing — and .consistencyLoss,
+        //     rationalized by a non-existent "other gating layer".)
         for candidate in nonEuclideanCandidates {
-            if candidate.failureModeWhenGrasped == .collapsedOnGrasp
-                || candidate.failureModeWhenGrasped == .topologyDistortion
-            {
-                if !stackedModes.contains(.compare) {
-                    stackedModes.append(.compare)
-                }
-                firedNonEuclidean = true
-                reasonCodes.append(
-                    "permit.escalated:cthulhu-noneuclidean:" +
-                    candidate.failureModeWhenGrasped.rawValue)
+            let escalationMode: BASActionPermitMode
+            switch candidate.failureModeWhenGrasped {
+            case .collapsedOnGrasp, .topologyDistortion:
+                escalationMode = .compare
+            case .boundaryViolation, .consistencyLoss:
+                escalationMode = .mirror
             }
+            if !stackedModes.contains(escalationMode) {
+                stackedModes.append(escalationMode)
+            }
+            firedNonEuclidean = true
+            reasonCodes.append(
+                "permit.escalated:cthulhu-noneuclidean:" +
+                candidate.failureModeWhenGrasped.rawValue)
         }
 
         // Source 2: cosmic-cold counterweight → force .mirror

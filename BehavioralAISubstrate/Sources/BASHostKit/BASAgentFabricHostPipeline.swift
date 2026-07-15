@@ -510,24 +510,18 @@ public struct BASAgentFabricHostPipeline {
             // the turn。 So invocation happens AFTER the turn
             // ran (read-only over the result snapshot)。
             if activation.tier == .all {
-                let watcherObs = BASAgentWatcherObservation(
+                // audit hostkit-rest HIGH-2: the watchers must see the EFFECTIVE (seat-filtered)
+                // inputs the turn actually ran on, with critic/hostAlignment BUILT — see the pure
+                // builder below. (Was: raw inputs + hardcoded critic/hostAlignment nil.)
+                let watcherObs = Self.makeAllTierWatcherObservation(
                     turnID: turnID,
-                    scout: BASScoutInput(),
-                    plannerCandidates:
-                        BASAgentFabricAdapters
-                            .plannerCandidates(
-                                from: candidatePaths),
-                    risk: BASRiskInput(),
-                    surface: BASSurfaceInput(),
-                    memory: memoryInput,
-                    critic: nil,
-                    hostAlignment: nil,
-                    sovereignSentinel:
-                        sovereignSentinelInput,
-                    evolutionShadow:
-                        evolutionShadowInput,
-                    emittedDeltas:
-                        result.turnResult.emittedDeltas,
+                    candidatePaths: candidatePaths,
+                    effectiveMemory: effectiveMemory,
+                    effectiveTriScores: effectiveTriScores,
+                    effectiveHostConstitution: effectiveHostConstitution,
+                    effectiveSovereignInput: effectiveSovereignInput,
+                    effectiveEvolutionInput: effectiveEvolutionInput,
+                    emittedDeltas: result.turnResult.emittedDeltas,
                     nowNanos: nowNanos)
                 var watcherSeq = 0
                 let hints = BASAgentFabricWatcherCollector
@@ -769,5 +763,44 @@ public struct BASAgentFabricHostPipeline {
             }
         }
         return out
+    }
+
+    /// audit hostkit-rest HIGH-2 — pure builder for the `.all`-tier watcher observation. Feeds the
+    /// EFFECTIVE (seat-filtered) inputs the turn ACTUALLY ran on and BUILDS critic/hostAlignment
+    /// (previously hardcoded nil, permanently blinding the axis/hostDrift watchers). Passing the RAW
+    /// inputs made memoryPollutionWatcher fire on a seat that was filtered OUT (false L14 audit
+    /// evidence). Mirrors the FullTurnAdapter's own effective-input logic: critic iff triScores are
+    /// present, hostAlignment iff a constitution is present.
+    static func makeAllTierWatcherObservation(
+        turnID: String,
+        candidatePaths: [BASCandidatePath],
+        effectiveMemory: BASMemorySeatInput?,
+        effectiveTriScores: [BASTriSelfScore],
+        effectiveHostConstitution: BASHostConstitution?,
+        effectiveSovereignInput: BASSovereignSentinelInput?,
+        effectiveEvolutionInput: BASEvolutionShadowInput?,
+        emittedDeltas: [BASAgentDelta],
+        nowNanos: Int64
+    ) -> BASAgentWatcherObservation {
+        let critic: BASCriticSeatInput? = effectiveTriScores.isEmpty ? nil
+            : BASAgentFabricAdapters.enrichCriticInput(
+                from: effectiveTriScores,
+                baseCriticInput: BASAgentFabricAdapters.criticInput(from: candidatePaths))
+        let hostAlignment: BASHostAlignmentInput? = effectiveHostConstitution.map {
+            BASAgentFabricAdapters.hostAlignmentInput(from: $0)
+        }
+        return BASAgentWatcherObservation(
+            turnID: turnID,
+            scout: BASScoutInput(),
+            plannerCandidates: BASAgentFabricAdapters.plannerCandidates(from: candidatePaths),
+            risk: BASRiskInput(),
+            surface: BASSurfaceInput(),
+            memory: effectiveMemory,
+            critic: critic,
+            hostAlignment: hostAlignment,
+            sovereignSentinel: effectiveSovereignInput,
+            evolutionShadow: effectiveEvolutionInput,
+            emittedDeltas: emittedDeltas,
+            nowNanos: nowNanos)
     }
 }

@@ -307,6 +307,30 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASQuantABProbe.run() }
             return
         }
+        // Surgical device cleanup of the decode-TEST models (BAS_PURGE_TEST_MODELS=1). DRYRUN by default —
+        // BAS_PURGE_DRYRUN=0 to actually delete. Allowlist-only; re-stageable via restage-decode-test-models.sh.
+        if (env["BAS_PURGE_TEST_MODELS"] ?? "0") == "1" {
+            launchSpecAux { await BASModelPurgeProbe.run() }
+            return
+        }
+        // Bandwidth-saturation gate for the fused-Metal-kernel lever (BAS_BW_PROBE=1): achieved decode BW vs A19 peak.
+        if (env["BAS_BW_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASBandwidthProbe.run() }
+            return
+        }
+        // device-recon id9 — spill-quantize-under-pressure A19 certification (BAS_SPILL_QUANTIZE_PROBE=1):
+        // the REAL headroom reader + the Q4-shrink EFFECT (MLX.quantized(bits:4) on the A19 Metal GPU,
+        // materially smaller than fp16 + restorable). NO model load ⇒ no jetsam risk. Self-asserts PASS/FAIL.
+        if (env["BAS_SPILL_QUANTIZE_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASSpillQuantizeProbe.run() }
+            return
+        }
+        // DecodePlan S4c — flag-off(legacy) vs flag-on(planner) byte-equivalence gate, before flipping
+        // decodePlannerAutoSelect (BAS_DECODE_PLANNER_AB=1). Needs the local 3-bit Llama staged. Device-only.
+        if (env["BAS_DECODE_PLANNER_AB"] ?? "0") == "1" {
+            launchSpecAux { await BASDecodePlannerABProbe.run() }
+            return
+        }
         // Tranche A2 — verifier default-flip evidence: same verify task in .scout vs .greedy lane,
         // per-stage outputs captured for human quality read (BAS_VERIFIER_LANE_AB=1)。 Device-only。
         if (env["BAS_VERIFIER_LANE_AB"] ?? "0") == "1" {
@@ -338,6 +362,20 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASCoreAIDecodeProbe.run() }
             return
         }
+        // M1 kill-switch — Qwen3.5-4B→CoreAI direction: does rdar 177354777 (linear-attention crash, Apple's
+        // seed notes name Qwen3.5) hit the GDN-hybrid STRUCTURE on this device? (BAS_QWEN35_RDAR_PROBE=1;
+        // stage Qwen35Real_probe.aimodel per the probe header.) Crash = direction BLOCKED at Apple until GA;
+        // SURVIVED = runnable → device M3 (fused-asset fidelity) / M4 (power).
+        if (env["BAS_QWEN35_RDAR_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASQwen35RdarProbe.run() }
+            return
+        }
+        // G3 — the ≥20 tok/s verdict: MTP spec lane vs plain on Qwen3.5-4B (BAS_QWEN35_MTP_PROBE=1;
+        // stage qwen35_mtp_folded.safetensors per the probe header). Bracketed protocol, identity+a gated.
+        if (env["BAS_QWEN35_MTP_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASQwen35MTPProbe.run() }
+            return
+        }
         // (BASRhoProbe + BASCoreAIGpuProbe peeled to Sources/Experiments/ — dead negatives, see git history /
         //  Docs + memory litert-onphone-reality. Their BAS_RHO_PROBE / BAS_COREAI_GPU_PROBE dispatch removed.)
         // Track E — SERIAL Saguaro end-to-end: MLX 3B target verifying a CoreAI Mamba (Llamba-1B) draft via
@@ -345,6 +383,19 @@ final class BASEnduranceAppController: ObservableObject {
         // target greedy + the draft/target time split + byte-identity. The 全面开发 Mamba capstone measurement.
         if (env["BAS_COREAI_SAGUARO_PROBE"] ?? "0") == "1" {
             launchSpecAux { await BASCoreAIMambaSaguaroProbe.run() }
+            return
+        }
+        // Decode-accel cascade Gate 2 (BAS_SPEC_ALPHA=1): GPU same-vocab draft (Llama-1B) free-form acceptance α vs the
+        // 3B target, via teacher-forcing (no ANE, no rewind). Gate 1 (ANE overlap) FAILED ρ=0.86; this asks whether a
+        // GPU draft model helps free-form at all. a<0.5 → Gate 3 (bandwidth); a≥0.5 → route the GPU sibling free-form.
+        if (env["BAS_SPEC_ALPHA"] ?? "0") == "1" {
+            launchSpecAux { await BASSpecAcceptanceProbe.run() }
+            return
+        }
+        // Decode-accel cascade Gate 2b (BAS_SPEC_SPEEDUP=1): end-to-end free-form tok/s, draft-model spec vs plain on
+        // ONE loaded adapter (3B + 1B) by toggling the kill-switch. Closes the α→net-speedup gap from Gate 2 (a=2.28).
+        if (env["BAS_SPEC_SPEEDUP"] ?? "0") == "1" {
+            launchSpecAux { await BASSpecSpeedupProbe.run() }
             return
         }
         // Track E — standalone Mamba-3 ANE decode (BAS_COREAI_MAMBA3_PROBE=1): the weights-free upgrade gate.
@@ -981,22 +1032,31 @@ final class BASEnduranceAppController: ObservableObject {
         // key custody; production needs keychain per ADR-032)。 Pure
         // side-channel: reads the entry off the result, never touches
         // the turn bytes (ADR-014 / 红线 7)。
+        // deep-audit LOW (INTERPRETABILITY_AUDIT hard-fact ③): opt-in gate (BAS_SOVEREIGN_LEDGER=1),
+        // default-OFF — mirrors the adjacent shadowTrialLoop and honors the ADR-014 / 红线 posture that
+        // signed owner-receipt persistence is NO until the operator opts in. Was armed UNCONDITIONALLY,
+        // writing an Ed25519 key file + SQLite chain to Documents and signing every turn on any run.
+        let sovereignLedgerEnabled = (env["BAS_SOVEREIGN_LEDGER"] ?? "0") == "1"
         let sovereignSink: BASSovereignLedgerHostSink?
-        do {
-            let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first!
-            sovereignSink = try BASSovereignLedgerHostSink
-                .makeReferenceHost(
-                    keyURL: docs.appendingPathComponent(
-                        "bas-sovereign-host.key"),
-                    storagePath: docs.appendingPathComponent(
-                        "bas-sovereign-ledger.sqlite").path)
-            await emitBoth("🔐 sovereign-loop ARMED — per-turn entries "
-                + "signed + chained (keyed Ed25519 ledger, Documents)")
-        } catch {
+        if sovereignLedgerEnabled {
+            do {
+                let docs = FileManager.default.urls(
+                    for: .documentDirectory, in: .userDomainMask).first!
+                sovereignSink = try BASSovereignLedgerHostSink
+                    .makeReferenceHost(
+                        keyURL: docs.appendingPathComponent(
+                            "bas-sovereign-host.key"),
+                        storagePath: docs.appendingPathComponent(
+                            "bas-sovereign-ledger.sqlite").path)
+                await emitBoth("🔐 sovereign-loop ARMED — per-turn entries "
+                    + "signed + chained (keyed Ed25519 ledger, Documents)")
+            } catch {
+                sovereignSink = nil
+                await emitBoth("⚠️ sovereign-loop init failed: \(error) "
+                    + "— continuing without ledger closure")
+            }
+        } else {
             sovereignSink = nil
-            await emitBoth("⚠️ sovereign-loop init failed: \(error) "
-                + "— continuing without ledger closure")
         }
 
         // ADR-018 P2 (2026-06-12) — opt-in shadow-trial N→N+1 carrier
@@ -1242,12 +1302,60 @@ final class BASEnduranceAppController: ObservableObject {
             "📍 ch1025 BASCognitiveBrain loaded load_ms=%.0f",
             cognitiveBrainMs))
 
+        // P1(a) 全面优化 setup (BAS_EFFORT_LOOP=1): construct the ε probe (live MiniLM) + flip the
+        // coordinator's effort-loop consumer via the reachability pipe. Env unset ⇒ nothing constructed,
+        // nothing flipped — every turn byte-equal with the prior build (ADR-014).
+        var effortProbe: BASTurnSurpriseProbe?
+        var effortDecodeCap: Int?
+        // dream-loop OBSERVATION activation (BAS_DREAM_LOOP=1): the sleep-consolidation driver with
+        // dryRun HARD-CODED true — the doctrine mandates manual reviewed promotion; this first
+        // activation only OBSERVES (checkpoints logged, no memory mutation). Guards stay honest:
+        // L1 maintenanceAllowed + non-zero window still decide per turn (expect frequent denials
+        // under load — that's the telemetry we want).
+        var dreamDriver: BASSleepConsolidationDriver?
+        // P3 契合: the ThermalTwin feed (hysteresis-bearing thermal signal) — constructed with the
+        // effort loop; each governed turn folds the twin's reading into the device state.
+        var thermalFeed: BASThermalTwinFeed?
+        if ProcessInfo.processInfo.environment["BAS_DREAM_LOOP"] == "1", let store = memoryStore {
+            BASMemorySleepConsolidationPass.sleepConsolidationEnabled = true
+            // audit memory-b F7 / hostkit-rest MED-4: supply the LIVE store's (atomID → tier)
+            // snapshot so the observation reflects the real corpus (was hard-coded empty → the
+            // instrument read a structural constant zero). Enumerates the concrete store's atoms
+            // at each pass; the driver never guesses at corpus shape.
+            let atomTiersProvider: @Sendable () async -> [String: BASMemoryTier] = {
+                let atoms = (try? await store.allAtoms()) ?? []
+                return Dictionary(
+                    atoms.map { ($0.id.uuidString, $0.tier) },
+                    uniquingKeysWith: { first, _ in first })
+            }
+            if let driver = BASSleepConsolidationDriver.makeObservation(
+                store: store, atomTiersProvider: atomTiersProvider) {
+                dreamDriver = driver
+                await emitBoth("📍 ch1025 dream-loop OBSERVATION armed (dryRun=true, three-guard live, real atomTiers)")
+            } else {
+                await emitBoth("📍 ch1025 dream-loop requested but rust tracker unavailable — OFF")
+            }
+        }
+        if ProcessInfo.processInfo.environment["BAS_EFFORT_LOOP"] == "1" {
+            if let provider = BASMiniLMEmbeddingProvider() {
+                let probe = BASTurnSurpriseProbe(provider: provider, dim: provider.dimension)
+                effortProbe = probe
+                thermalFeed = BASThermalTwinFeed()
+                await brain.setDeliberationLoopEnabled(true)
+                await emitBoth("📍 ch1025 effort-loop LIVE (ε probe + deliberation consumer + thermal twin)")
+            } else {
+                await emitBoth("📍 ch1025 effort-loop requested but MiniLM unavailable — staying OFF")
+            }
+        }
+
         // ch1063 — CROSS-RESTART proof: reload the durable store into the routed snapshot at start.
         // store_atoms is 0 on launch #1 over a fresh container, and >0 on launch #2 over the SAME
         // container — i.e. a prior run's self-populated memory survived an app restart.
         if let store = memoryStore {
             await brain.refreshMemory()
-            let preloaded = (try? await store.allAtoms().count) ?? 0
+            // audit devicetestapp MED-3: O(1) SELECT COUNT, not an O(N) full-store materialization
+            // just to read the count (cross-restart growth otherwise scales this load every run).
+            let preloaded = (try? await store.countOrThrow()) ?? 0
             let vidxEntries = (memoryVectorIndex != nil)
                 ? await memoryVectorIndex!.totalCount : 0
             await emitBoth(
@@ -1397,6 +1505,48 @@ final class BASEnduranceAppController: ObservableObject {
             model: mlxModel,
             kvCacheBits: kvBits,
             maxKVSize: maxKV)
+        // P1 T1-measurement COMPOSED TOPOLOGY (BAS_RICH_TOPOLOGY=1; SYSTEM_EFFICIENCY_CAMPAIGN):
+        // counting decorator (ground-truth LLM calls) + semantic adjudicator (inline T1 fact bank) +
+        // a reviewer-stage verifier per turn. BAS_T1_GATED=1 arms the avoided-compute levers
+        // (covered-factual short-circuit + stakes×thermal verify gate); =0 is the CONTROL arm
+        // (verdict-inject only + verifier always ⇒ 2.0 calls/turn expected). Env unset ⇒ nothing built.
+        let richTopology = (env["BAS_RICH_TOPOLOGY"] ?? "0") == "1"
+        let t1Gated = (env["BAS_T1_GATED"] ?? "0") == "1"
+        let llmCounter = BASLLMCallCounter()
+        var t1Organ: (any BASOrganAdapter)?
+        var t1Verifier: BASLLMVerifierPipeline?
+        if richTopology {
+            let counted = BASCountingOrganAdapter(wrapping: adapter, counter: llmCounter)
+            if let mini = BASMiniLMEmbeddingProvider() {
+                let bank = BASEmbeddingFactBank(facts: BAST1Topology.t1Facts(), provider: mini)
+                let adjudicator = BASSemanticAdjudicatingOrganAdapter(
+                    wrapping: counted, bank: bank, enabled: true,
+                    shortCircuitCovered: t1Gated)
+                await adjudicator.warmUp()
+                t1Organ = adjudicator
+            } else {
+                t1Organ = counted
+                await emitBoth("📍 t1 MiniLM unavailable — counting only, no adjudicator")
+            }
+            let verifyOrgan: any BASOrganAdapter = t1Organ ?? counted
+            t1Verifier = BASLLMVerifierPipeline(
+                adapters: [.reviewer: verifyOrgan],
+                verifyGate: t1Gated
+                    ? { @Sendable _, pkg in
+                        // stakes×thermal (the BASAdjudicationGate composition, closure-inlined): skip the
+                        // verify LLM pass on low-stakes turns or without thermal headroom. Stakes come from
+                        // the USER TURN (pkg.goal), not the draft body — the estimator is a prompt lexicon.
+                        let stakes = BASStakesEstimator.estimate(pkg.goal, context: [])
+                        let thermalOK = ProcessInfo.processInfo.thermalState.rawValue
+                            <= ProcessInfo.ThermalState.fair.rawValue
+                        return stakes >= 0.6 && thermalOK
+                    }
+                    : { @Sendable _, _ in true },
+                stageMaxOutputTokens: 96)
+            await emitBoth("📍 t1 topology ARMED gated=\(t1Gated) (adjudicator+verifier+counter)")
+        }
+        var t1CallsTotal = 0
+        var t1Turns = 0
         // U1 — opt-in between-turns speculation memory governor
         // (BAS_SPEC_GOVERNOR=1)。 Samples phys_footprint (jetsam
         // metric) + system pressure each iter and advises draft
@@ -1414,6 +1564,33 @@ final class BASEnduranceAppController: ObservableObject {
                 + "low_water=\(lowMB)MB strikes_to_drop="
                 + "\(g.configuration.strikesToDrop) clean_to_restore="
                 + "\(g.configuration.cleanSamplesToRestore)")
+        }
+        // B4 预测式热控 (BAS_THERMAL_PREDICT=1) — duty-budget hazard predictor + pre-fair duty
+        // shaping (FRONTIER_2026H2 B4): learn the nominal zone's decode-duty budget online, insert
+        // micro-cooldowns BEFORE the OS flips to fair (where the fused chain measured 0.91-0.99×).
+        // Per-device recalibration: restore the budget the LAST run learned (UserDefaults is
+        // per-device by construction); sanity-clamp so a corrupt store can't wedge the predictor.
+        // P0 (RSI charter): persistence lifted into BASRuntimeCore.BASThermalBudgetStore —
+        // same key string, same clamp; hosts share one implementation.
+        let restoredBudget = BASThermalBudgetStore.restore()
+        var thermalPredictor: BASThermalHazardPredictor? =
+            (env["BAS_THERMAL_PREDICT"] ?? "0") == "1"
+                ? BASThermalHazardPredictor(learnedBudget: restoredBudget) : nil
+        var predictGaps = 0
+        var predictGapSeconds = 0.0
+        if let tp = thermalPredictor {
+            await emitBoth(String(format:
+                "🌡 thermal-predict ARMED prior_budget=%.0fs (restored=%@) safety=%.2f recovery=%.2f gap=%.0fs",
+                tp.learnedBudget, restoredBudget.map { String(format: "%.0fs", $0) } ?? "none",
+                tp.config.safetyFraction,
+                tp.config.recoveryCredit, tp.config.cooldownSeconds))
+        }
+        // B4 效率核解码 (BAS_DECODE_QOS=utility) — the decode subtree runs at .utility so the
+        // scheduler prefers E-cores for the CPU-side encode work (MNN-AECS pattern; decode is
+        // memory-bound). Speed-neutrality is the gate; energy claims need the battery window.
+        let decodeQoSUtility = (env["BAS_DECODE_QOS"] ?? "") == "utility"
+        if decodeQoSUtility {
+            await emitBoth("🌡 decode-qos ARMED — draft() subtree at Task(priority: .utility)")
         }
         // U3 — opt-in decode liveness monitor (BAS_LIVENESS_MONITOR=1)。
         // DETECTION ONLY — never cancels (ch1066/ADR-038:the wedge is
@@ -1730,7 +1907,11 @@ final class BASEnduranceAppController: ObservableObject {
         // Default OFF — normal endurance/cert runs are unaffected.
         let probeConcurrent = (env["BAS_METAL_PROBE_CONCURRENT"] ?? "0") == "1"
         let probeHbIntervalSec = max(1.0, Double(env["BAS_METAL_PROBE_HB_SEC"] ?? "20") ?? 20.0)
-        let probeHbTimeoutSec = max(1.0, Double(env["BAS_METAL_PROBE_TIMEOUT_SEC"] ?? "6") ?? 6.0)
+        // audit devicetestapp LOW-2: the heartbeat gets its OWN timeout knob so it can be tuned
+        // independently of the standalone metal-probe-only run (BAS_METAL_PROBE_TIMEOUT_SEC). Falls
+        // back to the shared var, then 6s, so existing invocations keep their exact behavior.
+        let probeHbTimeoutSec = max(1.0, Double(
+            env["BAS_METAL_PROBE_HB_TIMEOUT_SEC"] ?? env["BAS_METAL_PROBE_TIMEOUT_SEC"] ?? "6") ?? 6.0)
         var metalProbeHeartbeat: Task<Void, Never>? = nil
         if probeConcurrent {
             await emitBoth(
@@ -1797,6 +1978,21 @@ final class BASEnduranceAppController: ObservableObject {
             iterAvailMemBefore.append(
                 snapBefore.availableMemoryMB)
 
+            // B4 — feed the hazard predictor + duty shaping (pre-fair micro-cooldown)。
+            if var tp = thermalPredictor {
+                tp.recordTier(ProcessInfo.processInfo.thermalState.rawValue)
+                if let gap = tp.recommendedCooldown {
+                    await emitBoth(String(format:
+                        "🌡 ch1025 thermal-predict iter=%d HAZARD duty=%.0fs budget=%.0fs → gap=%.0fs",
+                        iter, tp.dutyInWindow, tp.learnedBudget, gap))
+                    try? await Task.sleep(nanoseconds: UInt64(gap * 1_000_000_000))
+                    tp.recordIdle(seconds: gap)
+                    predictGaps += 1
+                    predictGapSeconds += gap
+                }
+                thermalPredictor = tp
+            }
+
             var iterTokens = 0
             // ADR-039 concurrency arc M1.1 — per-iter substrate (brain.process) vs MLX-decode (adapter.draft)
             // time, to measure what fraction of a turn is the parallelizable substrate vs the GPU decode.
@@ -1810,9 +2006,8 @@ final class BASEnduranceAppController: ObservableObject {
                     prompt = enriched
                     pendingEnrichedPrompt = nil
                 } else {
-                    prompt = Self.promptPool[
-                        (iter * mlxPrompts + p)
-                        % Self.promptPool.count]
+                    let pool = richTopology ? BAST1Topology.t1PromptPool : Self.promptPool
+                    prompt = pool[(iter * mlxPrompts + p) % pool.count]
                 }
                 let promptLen = prompt.count
 
@@ -1852,9 +2047,73 @@ final class BASEnduranceAppController: ObservableObject {
                 // activation yet (pipeline.runTurn deferred to ch 1025.6
                 // — needs fabric+roster+graph build in app target)。
                 let brainStartNs = monoNowNs()
-                let turnResult = await brain.process(prompt)
+                // P1(a) 全面优化 (BAS_EFFORT_LOOP=1): the surprise-gated effort loop, live. ε (MiniLM
+                // predictive-coding probe) × stakes × thermal headroom → governed plan carried on the turn
+                // request; the coordinator (deliberationLoopEnabled, flipped at setup) sizes deliberation
+                // passes by it. Env unset ⇒ the exact prior brain.process(prompt) path, byte-equal (ADR-014).
+                let turnResult: BASEBrainTurnResult
+                if let probe = effortProbe {
+                    // P3: twin-fed device state (guard level + accumulated pressure telemetry); falls
+                    // back to defaults when the feed is absent.
+                    var deviceState = BASCognitiveBrain.defaultDeviceState
+                    var twinNote = ""
+                    if let feed = thermalFeed {
+                        let folded = await feed.foldedDeviceState(base: deviceState)
+                        deviceState = folded.state
+                        twinNote = String(format: " twin_guard=%@ twin_pressure=%.2f",
+                                          folded.guardLevel, folded.pressure)
+                    }
+                    // B4 — predictive EARLY WARNING into the effort loop: hazard while still
+                    // nominal plans the turn as if fair had already arrived (shrink headroom →
+                    // smaller budgets BEFORE the OS throttles — avoided compute, not sleep-gaps;
+                    // the continuous-load A/B proved duty shaping throughput-negative at 100% duty)。
+                    if let tp = thermalPredictor, tp.hazard,
+                       deviceState.thermalLevel == .nominal {
+                        deviceState.thermalLevel = .warm
+                        twinNote += " predict_hazard=1"
+                    }
+                    let plan = await BASBrainChat.governedPlan(
+                        message: prompt, thermalLevel: deviceState.thermalLevel,
+                        probe: probe)
+                    var req = BASEBrainTurnRequest(
+                        userInput: prompt,
+                        deviceState: deviceState,
+                        hostID: BASCognitiveBrain.defaultHostID)
+                    req.effortPlan = plan
+                    turnResult = await brain.process(req)
+                    // P3 契合: the effort budget's decode-token dial COUPLES to the LLM request below —
+                    // a fast-tier turn answers in a short breath (the adaptive think-budget lever).
+                    effortDecodeCap = BASEffortBudget.forLevel(plan.applied).maxDecodeTokens
+                    await emitBoth(String(format: "📊 ch1025 effort iter=%d applied=%@ requested=%@ decode_cap=%d%@%@",
+                                          iter, "\(plan.applied)", "\(plan.requested)", effortDecodeCap ?? -1,
+                                          plan.overrideReason.map { " override=\($0)" } ?? "", twinNote))
+                } else {
+                    turnResult = await brain.process(prompt)
+                }
                 let brainMs = monoElapsedMs(since: brainStartNs)
                 iterBrainMs += brainMs   // M1.1 — substrate (L1-L14 cascade) time
+                // substrate #77 — per-stage wall-clock (coarse layer groups) from the runTurn stopwatch.
+                if let lt = turnResult.layerTimingsMs, !lt.isEmpty {
+                    let parts = lt.sorted { $0.key < $1.key }
+                        .map { String(format: "%@=%.1f", $0.key, $0.value) }
+                        .joined(separator: " ")
+                    await emitBoth("📊 ch1025 layer-latency iter=\(iter) \(parts)")
+                }
+                // dream-loop OBSERVATION: consult the three-guard driver post-turn (dryRun — logs only).
+                if let dreamDriver {
+                    if let cp = await dreamDriver.runIfPermitted(after: turnResult) {
+                        await emitBoth("📊 ch1025 dream-loop iter=\(iter) GRANTED stages=\(cp.completedStages.count) dryRun=true")
+                        // B5 tail: the granted window is the app's only certified-idle moment —
+                        // warm-park every pooled seat so a jetsam/kill after this point restores
+                        // at spill speed (device 122.9×) instead of re-prefilling.
+                        let parked = await adapter.snapshotWarmSeats()
+                        if parked > 0 {
+                            await emitBoth("📊 ch1025 dream-loop snapshot warm_seats=\(parked)")
+                        }
+                    } else {
+                        await emitBoth("📊 ch1025 dream-loop iter=\(iter) denied (flag/L1-maintenance/window guard)")
+                    }
+                }
                 // ADR-018 P2 — carry THIS turn's records for the next
                 // turn's injection (evaluate() itself skips
                 // non-pending ones)。
@@ -2036,17 +2295,50 @@ final class BASEnduranceAppController: ObservableObject {
                     preset: greedyLane ? .greedyDeterministic : .core,
                     instruction: prompt,
                     context: [],
-                    maxOutputTokens: maxDecodeTokens)   // WS2: explicit low decode cap (was preset 1024)
+                    // WS2 cap ∧ the effort budget's decode dial (P3 契合; nil when the loop is off = WS2 only)
+                    maxOutputTokens: min(maxDecodeTokens, effortDecodeCap ?? maxDecodeTokens))
                 // U3 — liveness marks bracket the decode (non-streaming:
                 // the threshold bounds the WHOLE call;a wedged draft()
                 // never returns, the checker task fires the verdict)。
                 await livenessMonitor?.beginTurn(
                     id: "ch1025-iter\(iter)-prompt\(p)")
                 do {
-                    let draft = try await adapter.draft(request)
+                    let draft: BASOrganDraft
+                    if let organ = t1Organ {
+                        await llmCounter.mark()
+                        draft = try await organ.draft(request)
+                        if let verifier = t1Verifier {
+                            _ = await verifier.verify(
+                                draft: draft,
+                                taskPackage: BASLLMTaskPackage(
+                                    taskID: request.requestID,
+                                    originSessionID: "t1-endurance",
+                                    compiledAtMs: Int64(Date().timeIntervalSince1970 * 1000),
+                                    intent: "verify",
+                                    goal: prompt))
+                        }
+                        let calls = await llmCounter.delta()
+                        await emitBoth("📊 ch1025 t1 iter=\(iter) prompt=\(p + 1) llm_calls=\(calls) gated=\(t1Gated)")
+                        t1CallsTotal += calls
+                        t1Turns += 1
+                    } else if decodeQoSUtility {
+                        // B4 — E-core preference for the decode subtree (priority propagates into
+                        // the adapter + MLX CPU-side encode threads; GPU work is unaffected)。
+                        let req = request
+                        let a = adapter
+                        draft = try await Task(priority: .utility) { try await a.draft(req) }.value
+                    } else {
+                        draft = try await adapter.draft(request)
+                    }
                     await livenessMonitor?.endTurn()
                     let mlxMs = monoElapsedMs(since: mlxStartNs)
                     iterMlxMs += mlxMs   // M1.1 — MLX GPU decode time (the dominant, non-parallelizable part)
+                    // B4 — duty at PROMPT granularity (validation #2 finding: per-iter recording is
+                    // too coarse — fair arrives before the account catches up to the hazard line)。
+                    if var tp = thermalPredictor {
+                        tp.recordDecode(seconds: mlxMs / 1000.0)
+                        thermalPredictor = tp
+                    }
                     let mlxPostSnap = snapshot()
                     let bodyLen = draft.body.count
                     // ch 1025.8 HIGH-1 fix:`outputTokensEstimated` is
@@ -2303,8 +2595,21 @@ final class BASEnduranceAppController: ObservableObject {
                 // attribution in MetricKit reports)。
                 BASFieldMetricsCollector.phase("cooldown")
                 let preCoolSnap = snapshot()
-                try? await Task.sleep(
-                    for: .seconds(cooldown))
+                if ProcessInfo.processInfo.environment["BAS_COOLDOWN_SPIN"] == "1" {
+                    // Locked-phone freeze guard (the Task.sleep-at-idle suspension, 2026-07-04): a sync
+                    // spin keeps the process schedulable; the GPU (what the cooldown cools) still rests.
+                    // ~1 e-core for `cooldown` seconds — accepted tax for unattended device runs.
+                    // audit devicetestapp LOW-6: gate the spin on the MONOTONIC clock (monoNowNs), not
+                    // Date() — a wall-clock NTP/DST step mid-cooldown could otherwise cut it short or
+                    // (backward step) stall it, exactly the hazard this file's monoNowNs helper exists for.
+                    let endNs = monoNowNs() &+ UInt64(Double(cooldown) * 1_000_000_000)
+                    var x = 1.0
+                    while monoNowNs() < endNs { x = sin(x) + 1.000001 }
+                    if x == .infinity { await emitBoth("unreachable") }
+                } else {
+                    try? await Task.sleep(
+                        for: .seconds(cooldown))
+                }
                 let postCoolSnap = snapshot()
                 let recovery =
                     "\(preCoolSnap.thermalState)" +
@@ -2419,12 +2724,29 @@ final class BASEnduranceAppController: ObservableObject {
             let rssPeakVsFirstMB = rssMaxMB
                 - (iterRssBefore.first ?? 0)
 
+            // audit devicetestapp LOW-1: report the ACTUAL completed count (iterDurationMs records
+            // one entry per finished iter), not the requested `totalIters` — a wall-cap-truncated run
+            // (the break at the time-cap check) otherwise over-reports how many iterations ran.
+            let completedIters = iterDurationMs.count
             await emitBoth(String(format:
-                "📊 ch1025 FINAL run_sec=%.0f iters=%d " +
+                "📊 ch1025 FINAL run_sec=%.0f iters=%d requested=%d " +
                 "avg_iter_ms=%.0f p50_iter_ms=%.0f " +
                 "p99_iter_ms=%.0f",
-                totalSec, totalIters,
+                totalSec, completedIters, totalIters,
                 avgDurMs, p50DurMs, p99DurMs))
+            if let tp = thermalPredictor {
+                await emitBoth(String(format:
+                    "📊 ch1025 FINAL thermal-predict gaps=%d gap_sec=%.0f "
+                    + "learned_budget=%.0fs transitions=%d",
+                    predictGaps, predictGapSeconds,
+                    tp.learnedBudget, tp.observedTransitions))
+                if tp.observedTransitions > 0 {
+                    BASThermalBudgetStore.persist(
+                        tp.learnedBudget, observedTransitions: tp.observedTransitions)
+                    await emitBoth(String(format:
+                        "📊 ch1025 thermal-predict PERSISTED learned_budget=%.0fs", tp.learnedBudget))
+                }
+            }
             // ch 1025.8 HIGH-1:est_total_tokens(chars/4,not real)。
             // p50/p99 below use nearest-rank percentiles via
             // `Self.nearestRankIndex(...)`(rank=ceil(p×N), 0-based
@@ -2437,6 +2759,11 @@ final class BASEnduranceAppController: ObservableObject {
                 "p99_lat_ms=%.0f est_total_tokens=%d",
                 allMlxLatenciesMs.count, avgMlxMs,
                 p50MlxMs, p99MlxMs, totalTokens))
+            if t1Turns > 0 {
+                await emitBoth(String(format:
+                    "📊 ch1025 FINAL t1_rate=%.2f t1_calls=%d t1_turns=%d gated=%@",
+                    Double(t1CallsTotal) / Double(t1Turns), t1CallsTotal, t1Turns, "\(t1Gated)"))
+            }
             await emitBoth(String(format:
                 "📊 ch1025 FINAL memory " +
                 "avg_rss_before_mb=%.1f " +
@@ -2464,7 +2791,8 @@ final class BASEnduranceAppController: ObservableObject {
         // provenance per atom over the whole run). No-op for the legacy backend.
         if let store = memoryStore {
             let mem = await brain.drainMemoryIntents()
-            let storedAtoms = (try? await store.allAtoms().count) ?? -1
+            // audit devicetestapp MED-3: O(1) count for the final summary, not a full-store load.
+            let storedAtoms = (try? await store.countOrThrow()) ?? -1
             await emitBoth(
                 "📊 ch1062 FINAL memory total_store_atoms=\(storedAtoms) " +
                 "final_flush_admitted=\(mem.admitted) " +
@@ -2476,9 +2804,12 @@ final class BASEnduranceAppController: ObservableObject {
         metalProbeHeartbeat?.cancel()
 
         let finalTokensSnapshot = totalTokens   // snapshot before the @Sendable MainActor.run capture (Swift-6)
+        // audit devicetestapp LOW-1: the terminal status reports the ACTUAL completed iters (0 for an
+        // empty run), not the requested target — mirrors the FINAL summary line above.
+        let finalCompletedIters = iterDurationMs.count
         await MainActor.run {
             self.status = .completed(
-                totalIters: totalIters,
+                totalIters: finalCompletedIters,
                 totalTokens: finalTokensSnapshot,
                 runSec: totalSec)
             self.started = false

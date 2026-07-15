@@ -23,6 +23,13 @@ public struct BASEBrainTurnRequest: Codable, Equatable, Sendable {
     /// operator TEMPORAL — caution reflects the sustained-pressure trajectory across turns. Not echoed
     /// into the result ⇒ result bytes unchanged; default nil ⇒ identical to the stateless operator.
     public var priorSSMState: [Float]?
+    /// OPT-IN per-turn effort plan (the surprise-gated tier from `BASEffortGovernor` / `BASBrainChat`). nil ⇒ no
+    /// effort sizing — byte-equal with the pre-effort pipeline (same pattern as `turnHistory` / `priorSSMState`).
+    /// When set, `runTurn` FLOORS the deliberation pass budget by
+    /// `BASEffortBudgetConsumer.deliberationPasses(applied)` (mirrors the thermal floor): a low tier spends fewer
+    /// refinement passes (avoided compute), and it can only TIGHTEN within the thermally/lease-routed budget —
+    /// never raise it (and always ≥ 1 pass). Not echoed into the result, so default-nil changes no result bytes.
+    public var effortPlan: BASEffortPlan?
 
     public init(
         userInput: String,
@@ -33,7 +40,8 @@ public struct BASEBrainTurnRequest: Codable, Equatable, Sendable {
         feedbackEvent: BASFeedbackEvent? = nil,
         activeKillSwitches: [BASKillSwitchID] = [],
         turnHistory: [String] = [],
-        priorSSMState: [Float]? = nil
+        priorSSMState: [Float]? = nil,
+        effortPlan: BASEffortPlan? = nil
     ) {
         self.userInput = userInput
         self.deviceState = deviceState
@@ -44,11 +52,12 @@ public struct BASEBrainTurnRequest: Codable, Equatable, Sendable {
         self.activeKillSwitches = activeKillSwitches
         self.turnHistory = turnHistory
         self.priorSSMState = priorSSMState
+        self.effortPlan = effortPlan
     }
 
     private enum CodingKeys: String, CodingKey {
         case userInput, deviceState, hostID, recordedAt
-        case riskHint, feedbackEvent, activeKillSwitches, turnHistory, priorSSMState
+        case riskHint, feedbackEvent, activeKillSwitches, turnHistory, priorSSMState, effortPlan
     }
 
     public init(from decoder: Decoder) throws {
@@ -65,5 +74,7 @@ public struct BASEBrainTurnRequest: Codable, Equatable, Sendable {
         turnHistory = try c.decodeIfPresent([String].self, forKey: .turnHistory) ?? []
         // Backward-compatible: absent ⇒ nil (stateless operator).
         priorSSMState = try c.decodeIfPresent([Float].self, forKey: .priorSSMState)
+        // Backward-compatible: absent ⇒ nil (no effort sizing — byte-equal pipeline).
+        effortPlan = try c.decodeIfPresent(BASEffortPlan.self, forKey: .effortPlan)
     }
 }

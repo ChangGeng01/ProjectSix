@@ -35,24 +35,33 @@ final class BASChapter633SovereignErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testTreeErrorConformsToCodable() {
-        assertCodable(
-            BASSovereignHostVersionTree.TreeError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignHostVersionTree.TreeError
+                .unknownVersion(id: ""))
+        assertCodableRoundTrips(
+            BASSovereignHostVersionTree.TreeError
+                .cycle(at: ""))
     }
 
     func testStoreErrorConformsToCodable() {
-        assertCodable(
-            BASSovereignFingerprintStore.StoreError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignFingerprintStore.StoreError
+                .manifestMalformed(reason: ""))
+        assertCodableRoundTrips(
+            BASSovereignFingerprintStore.StoreError
+                .rootSignatureInvalid)
     }
 
     func testAuthorityErrorConformsToCodable() {
-        assertCodable(
-            BASSovereignTokenAuthority.AuthorityError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignTokenAuthority.AuthorityError
+                .invalidIntent(""))
+        assertCodableRoundTrips(
+            BASSovereignTokenAuthority.AuthorityError
+                .expired(tokenID: ""))
     }
 }

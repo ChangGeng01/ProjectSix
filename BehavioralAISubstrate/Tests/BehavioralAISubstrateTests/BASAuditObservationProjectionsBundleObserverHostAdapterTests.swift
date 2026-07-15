@@ -142,6 +142,26 @@ final class BASAuditObservationProjectionsBundleObserverHostAdapterTests:
             timeIntervalSince1970: 1_705_000_000 + offset)
     }
 
+    /// Bounded, deadline-guarded drain — no fixed sleep. Polls until the observer
+    /// has recorded `count` emissions or the deadline elapses.
+    private func drain(
+        _ observer: BASAuditObservationProjectionsBundleObserver,
+        until count: Int,
+        deadlineSeconds: Double = 5.0
+    ) async {
+        let start = Date()
+        while await observer.emissionCount < count {
+            if Date().timeIntervalSince(start) > deadlineSeconds { return }
+            await Task.yield()
+        }
+    }
+
+    override func tearDown() {
+        // Never leak the test-only stagger hook into other suites.
+        BASAuditObservationProjectionsBundleObserver._recordStaggerForTesting = nil
+        super.tearDown()
+    }
+
     // MARK: - 1) handler routes emission to observer
 
     func testHandlerRoutesEmissionToObserver() async {
@@ -193,20 +213,54 @@ final class BASAuditObservationProjectionsBundleObserverHostAdapterTests:
                         cthulhuInputs: ci)
             adapter.handler(obs)
         }
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        await drain(observer, until: 5)
         let snap = await observer.snapshot()
         XCTAssertEqual(snap.count, 5,
             "5 emissions must reach observer")
-        // Due to Task.detached scheduling, exact arrival
-        // order is not guaranteed. Verify all 5 turnIDs
-        // present.
-        let turnIDs = Set(snap.map(\.turnID))
-        XCTAssertEqual(turnIDs.count, 5)
-        for i in 0..<5 {
-            XCTAssertTrue(
-                turnIDs.contains("t-\(i)"),
-                "missing emission t-\(i)")
+        // audit hostkit-rest MED-5: the ordered pump preserves ARRIVAL order — this
+        // is now an EXACT ordered-array assertion (was weakened to Set membership to
+        // accommodate the old Task.detached scheduling nondeterminism).
+        XCTAssertEqual(snap.map(\.turnID),
+                       (0..<5).map { "t-\($0)" },
+            "emissions must be recorded in strict arrival order")
+    }
+
+    // MARK: - 2b) Strict arrival order holds even under a per-emission stagger
+    //
+    // Deterministic teeth for the ordered pump. A descending stagger (t-0 delayed
+    // longest, t-7 shortest) is injected into the actor. The single-consumer pump
+    // processes each emission to completion before pulling the next, so the recorded
+    // order is arrival order REGARDLESS of the stagger. Reversal: restore the old
+    // per-emission `Task.detached` in the adapter's `handler` — the N concurrent
+    // records then append in stagger-completion order (reverse), reddening the exact
+    // equality below deterministically (no flake).
+
+    func testStrictArrivalOrderHoldsUnderPerEmissionStagger() async {
+        let n = 8
+        BASAuditObservationProjectionsBundleObserver._recordStaggerForTesting = { obs in
+            guard obs.turnID.hasPrefix("ord-"),
+                  let idx = Int(obs.turnID.dropFirst(4)) else { return }
+            // t-0 sleeps longest, t-(n-1) shortest → detached path would reverse.
+            try? await Task.sleep(nanoseconds: UInt64((n - idx) * 8_000_000))
         }
+        defer { BASAuditObservationProjectionsBundleObserver._recordStaggerForTesting = nil }
+
+        let observer =
+            BASAuditObservationProjectionsBundleObserver()
+        let adapter =
+            BASAuditObservationProjectionsBundleObserverHostAdapter(
+                observer: observer)
+        for i in 0..<n {
+            adapter.handler(.uncovered(
+                turnID: "ord-\(i)",
+                sessionID: "s",
+                emittedAt: fixedDate(TimeInterval(i))))
+        }
+        await drain(observer, until: n, deadlineSeconds: 10.0)
+        let snap = await observer.snapshot()
+        XCTAssertEqual(snap.map(\.turnID),
+                       (0..<n).map { "ord-\($0)" },
+            "the ordered pump must record in arrival order even when each record is staggered")
     }
 
     // MARK: - 3) snapshotAsBundle reflects accumulated

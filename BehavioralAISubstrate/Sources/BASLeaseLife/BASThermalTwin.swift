@@ -96,11 +96,23 @@ public actor BASThermalTwin {
     private var lastReading: Reading?
     private var accumulatedPressure: Double = 0
     private var observers: [UUID: AsyncStream<Reading>.Continuation] = [:]
-    /// M216 — task that owns the
-    /// `ProcessInfo.thermalStateDidChangeNotification` AsyncSequence
-    /// loop. `nil` until `startObservingSystemNotifications()` is
-    /// called; cancelled by `stop...()` or actor deinit.
-    private var notificationTask: Task<Void, Never>?
+    /// M216 — holder for the SYNCHRONOUS observer registration — see
+    /// `startObservingSystemNotifications(notificationCenter:)`.
+    ///
+    /// Boxed because `NSObjectProtocol` is not Sendable and a nonisolated `deinit` cannot
+    /// touch actor-isolated non-Sendable state. The box is only ever mutated from the actor
+    /// or from `deinit` (which runs when no other reference survives), so the unchecked
+    /// conformance is sound.
+    private final class ObserverBox: @unchecked Sendable {
+        var token: NSObjectProtocol?
+        var center: NotificationCenter?
+        func remove() {
+            if let token { (center ?? .default).removeObserver(token) }
+            token = nil
+            center = nil
+        }
+    }
+    private let observerBox = ObserverBox()
 
     public init(
         reader: @escaping Reader = BASThermalTwin.defaultReader,
@@ -144,6 +156,24 @@ public actor BASThermalTwin {
 
     public func currentReading() -> Reading? { lastReading }
 
+    /// Default freshness window for `readingFresherThan(_:)`. Thermal state moves on the order of
+    /// seconds; `sample()` is cheap (a `ProcessInfo.thermalState` read), so a short TTL is safe.
+    public static let defaultReadingMaxAge: TimeInterval = 2.0
+
+    /// audit policy-obs-misc LOW-6 — return the cached reading ONLY if it is younger than `maxAge`;
+    /// otherwise take a fresh `sample()`. Callers that preferred `currentReading()` unconditionally
+    /// (and the twin's notification observation is opt-in) could act on an arbitrarily stale thermal
+    /// state — e.g. a breath scheduled at `.nominal` guard while the device has since gone `.serious`.
+    @discardableResult
+    public func readingFresherThan(
+        _ maxAge: TimeInterval = BASThermalTwin.defaultReadingMaxAge
+    ) -> Reading {
+        if let last = lastReading, clock().timeIntervalSince(last.observedAt) < maxAge {
+            return last
+        }
+        return sample()
+    }
+
     // MARK: - Subscription
 
     /// Subscribe to reading updates. The stream terminates when the
@@ -185,20 +215,33 @@ public actor BASThermalTwin {
     ///
     /// Idempotent: calling twice cancels the first observer Task
     /// before starting the second.
+    /// ATTACHES SYNCHRONOUSLY — the twin IS observing when this returns.
+    ///
+    /// The previous implementation spawned a `Task` that only subscribed once it happened to
+    /// run (`notificationCenter.notifications(named:)` attaches on first iteration), so this
+    /// method returned BEFORE observation began and any notification posted in that window
+    /// was silently lost. The API name promises otherwise, and a host that starts observing
+    /// and immediately sees a thermal change would miss it.
+    ///
+    /// That race was real and measured, not theoretical: BASThermalTwinNotificationTests
+    /// normally completes in ~86ms but hung past a 2s timeout on roughly 1 run in 3, and the
+    /// timeout was being reported as an "OS NotificationCenter flake — not a substrate
+    /// regression". It was a substrate regression. `addObserver(forName:object:queue:using:)`
+    /// registers before it returns, which removes the window entirely.
     @available(macOS 12, iOS 15, tvOS 15, watchOS 8, *)
     public func startObservingSystemNotifications(
         notificationCenter: NotificationCenter = .default
     ) {
-        notificationTask?.cancel()
-        notificationTask = Task { [weak self] in
-            let stream = notificationCenter.notifications(
-                named: ProcessInfo
-                    .thermalStateDidChangeNotification)
-            for await _ in stream {
-                guard let self else { break }
-                if Task.isCancelled { break }
-                await self.sample()
-            }
+        stopObservingSystemNotifications()
+        observerBox.center = notificationCenter
+        observerBox.token = notificationCenter.addObserver(
+            forName: ProcessInfo.thermalStateDidChangeNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            // The block runs synchronously on the posting thread; hop back onto the actor to
+            // sample. Delivery is what must be race-free — sampling may land after.
+            Task { [weak self] in await self?.sample() }
         }
     }
 
@@ -206,17 +249,16 @@ public actor BASThermalTwin {
     /// `startObservingSystemNotifications(...)`. No-op if not
     /// running.
     public func stopObservingSystemNotifications() {
-        notificationTask?.cancel()
-        notificationTask = nil
+        observerBox.remove()
     }
 
     /// `true` while a notification observer task is active.
     public func isObservingSystemNotifications() -> Bool {
-        notificationTask != nil
+        observerBox.token != nil
     }
 
     deinit {
-        notificationTask?.cancel()
+        observerBox.remove()
     }
 
     // MARK: - Mapping (pure; safe to unit-test)

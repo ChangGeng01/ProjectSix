@@ -39,25 +39,26 @@ final class BASChapter648SovereignTertiaryErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASSovereignCleanRebootCoordinatorCoordinatorErrorConformsToCodable() {
-        assertCodable(
-            BASSovereignCleanRebootCoordinator
-                .CoordinatorError.self)
+        // #18: real round-trip (non-CaseIterable enum, representative case)
+        assertCodableRoundTrips(
+            BASSovereignCleanRebootCoordinator.CoordinatorError
+                .currentVersionUnknown(id: ""))
+        assertCodableRoundTrips(
+            BASSovereignCleanRebootCoordinator.CoordinatorError
+                .verdictDoesNotRequireReboot(level: .pass))
     }
 
     func testBASSovereignVerdictEngineEngineErrorConformsToCodable() {
-        assertCodable(
-            BASSovereignVerdictEngine.EngineError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignVerdictEngine.EngineError.auditAppendFailed(""))
     }
 
     func testBASSovereignDualKeySigningSigningErrorConformsToCodable() {
-        assertCodable(
-            BASSovereignDualKeySigning.SigningError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignDualKeySigning.SigningError
+                .sameKeyIDForBothSlots(""))
     }
 }

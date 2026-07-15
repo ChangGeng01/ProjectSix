@@ -158,6 +158,20 @@ struct BASObservabilityCoreTests {
         #expect(first.value.count == 64)
     }
 
+    @Test("audit policy-obs-misc LOW-3: distinct non-finite bundles get distinct fingerprints")
+    func replayFingerprintDistinguishesNonFiniteBundles() {
+        // Two DIFFERENT bundles, each with a non-finite reaction weight. The old code made encode()
+        // THROW on non-finite floats → both fell back to SHA256(empty) → they COLLIDED. The encoder's
+        // non-conforming-float strategy now serialises them distinctly.
+        var a = makeReplayBundle()
+        a.brainState.reactionWeights = BASReactionWeights(warmth: .nan, directness: 0.5, brevity: 0.8, actionBias: 0.6)
+        var b = makeReplayBundle()
+        b.brainState.reactionWeights = BASReactionWeights(warmth: .infinity, directness: 0.5, brevity: 0.8, actionBias: 0.6)
+        let fpA = BASObservabilityInspector.replayFingerprint(for: a)
+        let fpB = BASObservabilityInspector.replayFingerprint(for: b)
+        #expect(fpA.value != fpB.value)
+    }
+
     @Test("anomaly inspector catches release mismatches and latency spikes")
     func anomalyInspectorCatchesReleaseMismatchesAndLatencySpikes() {
         let trace = BASExecutionTrace(
@@ -571,7 +585,9 @@ struct BASObservabilityCoreTests {
         #expect(summary.averageLoadedPendingMemoryCountByKind["primary"] == 1)
         #expect(summary.pendingMemoryLoadRateByKind["primary"] == 1.0 / 3.0)
         #expect(summary.retrievalRejectionRateByKind["primary"] == 0.25)
-        #expect(summary.latestSnapshotFingerprintByKind["primary"] == "fp-q-1")
+        // audit policy-obs-misc LOW-4: "latest" must be the NEWEST (last) of the oldest-first traces,
+        // fp-q-2 — not fp-q-1 (the OLDEST) the field returned when it used firstValueByKind.
+        #expect(summary.latestSnapshotFingerprintByKind["primary"] == "fp-q-2")
         #expect(summary.snapshotVariantCountByKind["primary"] == 2)
         #expect(summary.lowTrustMemoryLoadRateByKind["primary"] == 0.375)
         #expect(summary.riskFlagCountsByKind["primary"]?[.lowTrustLoad] == 2)

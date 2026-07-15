@@ -1,6 +1,7 @@
 // ADR-039 Phase 2 — L8 Metal topK: deterministic selection + CPU-cosine correctness + Metal≈CPU parity.
 
 import XCTest
+import Metal
 @testable import BASMetalSubstrate
 
 final class BASMetalTopKParityTests: XCTestCase {
@@ -59,10 +60,16 @@ final class BASMetalTopKParityTests: XCTestCase {
         let dim = 4, k = 5
         let cpu = BASMetalTopKDispatcher.cpuReference(query: q, corpus: corpus, dim: dim, k: k)
 
-        let dispatcher = BASMetalTopKDispatcher(loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
-        guard let approx = try? await dispatcher.dispatch(query: q, corpus: corpus, dim: dim, k: k) else {
-            throw XCTSkip("Metal unavailable here — topK parity certified on-device via the BAS_METAL_SMOKE probe (ADR-039 / STATUS: iPhone Air, L8 dispatch gpu=true parity_set_ok max_score_err=0)")
+        // Skip ONLY on genuine GPU absence (the honest form used ~66x across this
+        // suite). The previous `try?` swallowed EVERY error, so a broken topK
+        // kernel — compile failure, shape error, dispatch error — green-skipped
+        // while claiming the GPU was missing AND citing an on-device
+        // certification that a swallowed error no longer establishes.
+        guard MTLCreateSystemDefaultDevice() != nil else {
+            throw XCTSkip("No Metal device on this host — topK parity is GPU-only")
         }
+        let dispatcher = BASMetalTopKDispatcher(loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
+        let approx = try await dispatcher.dispatch(query: q, corpus: corpus, dim: dim, k: k)
         let metal = approx.approximateOnly()   // test is on the approximate side (not a spine file)
         XCTAssertTrue(approx.provenance.didRunOnGPU)
         XCTAssertEqual(metal.count, cpu.count)

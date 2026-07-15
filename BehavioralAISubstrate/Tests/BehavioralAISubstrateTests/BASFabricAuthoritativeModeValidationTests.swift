@@ -29,7 +29,6 @@ import Foundation
 @testable import BASRuntimeCore
 @testable import BASPolicy
 
-#if !os(iOS) // ch1022 source-gate parity (mirrors the existing fabric tests)
 final class BASFabricAuthoritativeModeValidationTests: XCTestCase {
 
     // MARK: - deterministic stub fabric (no live LLM seats) — mirrors BASAgentFabricMultiRoundLoopTests
@@ -125,9 +124,10 @@ final class BASFabricAuthoritativeModeValidationTests: XCTestCase {
         // byte-equal (no projection to fold).
         let runtime = conflictingRuntime()
         // Positive control: the runtime IS authoritative, so the mode-guard early-return cannot fire — the
-        // ONLY reachable `.inert` path is the wireRosterToGraph throw (the single-writer conflict). The shared
-        // `.inert` constant's stopReason ("mode-inert") cannot by itself distinguish the two inert causes, so
-        // we pin the cause by construction here rather than relying on the stopReason string alone.
+        // ONLY reachable `.inert` path is the wireRosterToGraph throw (the single-writer conflict).
+        // hostkit-rest LOW-1 (89cdd0a77) then made the stopReason DISTINGUISH the two inert causes:
+        // a wiring failure is "wire-failed", the mode-guard skip stays "mode-inert". So the string now
+        // pins the cause directly (this test previously asserted the pre-LOW-1 generic "mode-inert").
         XCTAssertEqual(runtime.mode, .authoritative,
             "the conflicting runtime must be authoritative so the only reachable inert is the wiring throw")
         let loop = await BASAgentFabricMultiRoundLoop.run(
@@ -137,8 +137,9 @@ final class BASFabricAuthoritativeModeValidationTests: XCTestCase {
 
         XCTAssertEqual(loop.roundsRun, 0,
             "an overlapping-writeDomain roster must dispatch ZERO rounds (fail-closed before round 0)")
-        XCTAssertEqual(loop.stopReason, "mode-inert",
-            "fail-closed: with mode==authoritative pinned above, this `.inert` is the wireRosterToGraph throw")
+        XCTAssertEqual(loop.stopReason, "wire-failed",
+            "fail-closed via the wireRosterToGraph throw — the LOW-1 cause-specific stopReason (NOT the "
+            + "mode-guard's \"mode-inert\"), which the authoritative-mode pin above proves is unreachable")
         XCTAssertNil(loop.finalProjection,
             "a fail-closed loop produces no authoritative feed-forward")
         XCTAssertFalse(loop.converged)
@@ -433,4 +434,3 @@ final class BASFabricAuthoritativeModeValidationTests: XCTestCase {
             ])
     }
 }
-#endif

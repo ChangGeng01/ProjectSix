@@ -22,7 +22,11 @@ struct EvolutionSovereignBridgeProjection {
 }
 
 extension BASActionPermitMode {
-    var isProtective: Bool {
+    /// True for permit modes that WITHHOLD / guard emission (delay, draft-only, local-only, block,
+    /// replace, escalate) vs the freely-emitting answer/mirror/compare. Public so hosts (e.g. the
+    /// journal's governance-verdict fold) classify abstention off the substrate's own definition
+    /// rather than a hand-maintained subset that could drift.
+    public var isProtective: Bool {
         switch self {
         case .mirror, .compare:
             return false

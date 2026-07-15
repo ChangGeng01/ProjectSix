@@ -11,25 +11,34 @@ final class BASChapter651SovereignRebootVerdictLockTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASSovereignCleanRebootCoordinatorRebootPlanConformsToCodable() {
-        assertCodable(
-            BASSovereignCleanRebootCoordinator
-                .RebootPlan.self)
+        // #18: real round-trip (memberwise init reachable via @testable)
+        let value = BASSovereignCleanRebootCoordinator.RebootPlan(
+            planID: "",
+            sessionID: "",
+            sourceVersionID: "",
+            targetVersionID: "",
+            targetAnchorID: "",
+            actions: [],
+            auditRef: "",
+            verdictLevel: .pass,
+            bootstrapNextSession: false,
+            issuedAt: Date(timeIntervalSince1970: 0))
+        assertCodableRoundTrips(value)
     }
 
     func testBASSovereignVerdictEngineVerdictContextConformsToCodable() {
-        assertCodable(
-            BASSovereignVerdictEngine.VerdictContext.self)
+        // #18: real round-trip
+        let value = BASSovereignVerdictEngine.VerdictContext(
+            sessionID: "",
+            turnID: "",
+            operation: .pureInference)
+        assertCodableRoundTrips(value)
     }
 
     func testBASSovereignLockManagerScopeIdentifierConformsToCodable() {
-        assertCodable(
-            BASSovereignLockManager.ScopeIdentifier.self)
+        // #18: real round-trip (via public factory)
+        assertCodableRoundTrips(
+            BASSovereignLockManager.ScopeIdentifier.session(""))
     }
 }

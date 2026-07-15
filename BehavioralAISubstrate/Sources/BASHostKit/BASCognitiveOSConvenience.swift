@@ -111,6 +111,30 @@ public struct BASCognitiveOSConvenienceCadence:
     /// Defensive event-log size cap above which graph extract
     /// is SKIPPED (avoids long-session UI stall)。Default 5000
     /// (matches M862 observer cap)。
+    ///
+    /// ⚠️ INERT AS OF 2026-07-15 — this value is NEVER READ. It is declared, assigned and
+    /// precondition-checked, and nothing else consults it: no comparison, no slice, no
+    /// early-out anywhere in the package. So it caps NOTHING and the sentence above is not
+    /// true today.
+    ///
+    /// History, so this is not "fixed" the wrong way: pre-M881 it WAS a hard cap on total
+    /// log size, and M881 removed that deliberately as a P2.4 audit fix because it
+    /// PERMANENTLY DISABLED extraction past the mark. Re-enforcing it as a total cap would
+    /// reintroduce that bug. M881 intended to re-apply it to BATCH size instead (a guard
+    /// against one catastrophic extract) but never wired it up.
+    ///
+    /// TRIGGER to finish the job: implementing the batch cap is NOT a one-liner — the hwm
+    /// advance target is `maxObservedEventTimestampMs` (M886), so capping the batch while
+    /// still jumping the hwm to the max observed timestamp would PERMANENTLY SKIP the
+    /// truncated events. That is data loss, not throttling. Doing it properly means
+    /// advancing the hwm to the last event actually processed, which is a correctness
+    /// change deserving its own round.
+    ///
+    /// Kept (not deleted) because it is public API and two suites pass it.
+    /// CONSEQUENCE, stated plainly: the knowledge graph's node count is UNBOUNDED — nothing
+    /// caps it and no production path calls `remove(nodeID:)`. detectCycles' 2026-07-15
+    /// reachability prune cut the per-call slope by 16-3,000x, but cost still grows with
+    /// session length.
     public let graphExtractEventCap: Int
 
     /// M900 thermal sensitivity policy。Default `.ignoreThermal`
@@ -321,8 +345,11 @@ public actor BASCognitiveOSConvenience {
     /// permanently disabling extraction past that mark for any
     /// host using the helper directly。Post-M881 each extract
     /// passes `since: hwm+1` to the M877 incremental extractor,
-    /// bypassing the cap entirely (cap is now batch-size,not
-    /// total-log-size)。
+    /// bypassing the cap entirely。
+    ///
+    /// ⚠️ CORRECTED 2026-07-15: this said "cap is now batch-size, not total-log-size". The
+    /// batch cap was INTENDED but never implemented — `graphExtractEventCap` is read
+    /// nowhere. Removing the total cap was right; the replacement never landed.
     private var lastGraphExtractHwm: Int64?
 
     /// M886 fix (post-M885 deep review):highest event.timestampMs
@@ -732,9 +759,16 @@ public actor BASCognitiveOSConvenience {
         //
         // Post-M881:incremental extract (mirrors M877) — track
         // `lastGraphExtractHwm` and walk only events newer than
-        // last extract。The cap on `cadence.graphExtractEventCap`
-        // is now applied to the BATCH size rather than total log
-        // size — defensive guard against catastrophic single-
+        // last extract。
+        //
+        // ⚠️ CORRECTED 2026-07-15 — the text here claimed the cap "is now applied to the
+        // BATCH size rather than total log size — defensive guard against catastrophic
+        // single-batch extract". NO SUCH GUARD EXISTS: `cadence.graphExtractEventCap` is
+        // never read. The incremental `since: hwm+1` walk below is the only thing bounding
+        // an extract, and it bounds it to "events since last time" — which is unbounded if
+        // the host has been idle or the log burst is large. See the field's doc for why
+        // wiring the batch cap needs the hwm advance reworked first (M886). Old text:
+        // "defensive guard against catastrophic single-
         // batch growth (e.g.,per-extract interval mis-set so
         // large that a single extract walks millions of events)。
         let scanSince: Int64? =

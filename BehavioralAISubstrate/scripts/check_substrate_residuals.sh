@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # scripts/check_substrate_residuals.sh
+# NAME-COLLISION NOTE (2026-07-12): this BAS-side script is the residuals GATE
+# (print()-count + density; called by pre-commit-gates.sh). The parent repo's
+# scripts/check_substrate_residuals.sh is a DIFFERENT check (residual-MARKER regex
+# scan). Same filename, different jobs — compare like with like when triaging.
 # chapter 八百二十三 / M2768 — restored CI gate referenced in
 # wild-rolling-meerkat plan。
 #
@@ -48,6 +52,7 @@ count_matches() {
 # These are EXCLUDED from the print() check。
 EXCLUDED_DIRS_PRINT_CHECK=(
     "Sources/BASBrainCLI"
+    "Sources/BASJournalCLI"   # The Ledger CLI executable (2026-07 增) — stdout print() is its output, like BASBrainCLI
 )
 
 # Build find expression to exclude CLI dirs from print check

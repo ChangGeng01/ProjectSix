@@ -5,17 +5,31 @@ import XCTest
 @testable import BASHostKit
 
 final class BASChapter660HostProjectionTrioProofTests: XCTestCase {
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(String(describing: type),
-                       String(describing: type))
-    }
+
     func testBASEventLogTurnProjectionConformsToCodable() {
-        assertCodable(BASEventLogTurnProjection.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASEventLogTurnProjection(
+                turnID: "",
+                memoryAtomEvents: [],
+                turnLifecycleEvents: [],
+                parallelStageEvents: [],
+                permitEscalationEvents: []))
     }
+
     func testBASTrainingExampleSubmissionConformsToCodable() {
-        assertCodable(BASTrainingExampleSubmission.self)
+        // #18: compile-time-only fallback — BASTrainingExampleCandidate
+        // lives in BASOrgan (not imported by this test target); honest
+        // compile-time conformance rather than a guessed construction.
+        assertConformsToCodableAtCompileTime(
+            BASTrainingExampleSubmission.self)
     }
+
     func testBASShadowEvaluateThenUpgradeOutcomeConformsToCodable() {
-        assertCodable(BASShadowEvaluateThenUpgradeOutcome.self)
+        // #18: compile-time-only fallback — nested BASShadowEvaluationResult
+        // (BASEvaluation) + BASActionPermit (BASPolicy) are not imported
+        // here and are deeply nested; honest compile-time conformance.
+        assertConformsToCodableAtCompileTime(
+            BASShadowEvaluateThenUpgradeOutcome.self)
     }
 }

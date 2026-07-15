@@ -53,6 +53,12 @@ final class BASMemoryImportanceScorerTests: XCTestCase {
         XCTAssertEqual(
             score.tierDecayComponent,
             BASMemoryImportanceScorer.defaultTierDecayWarm)
+        // audit blindspot-③ HIGH: a no-history atom must score NEUTRAL and STAY, not near-min (~0.0077)
+        // and be demoted on arrival. Reversal (geometric mean governs) reds both of these.
+        XCTAssertEqual(score.totalScore, 0.5,
+            "a brand-new atom with no usage history must score neutral, not near-min")
+        XCTAssertEqual(score.recommendedTier, .warm,
+            "a no-history warm atom must STAY warm — never demoted to cold before it is ever used")
     }
 
     // MARK: - 2. Recency: just-now retrieval ≈ 1.0

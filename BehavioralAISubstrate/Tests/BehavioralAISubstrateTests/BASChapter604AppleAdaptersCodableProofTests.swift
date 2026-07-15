@@ -28,17 +28,24 @@ final class BASChapter604AppleAdaptersCodableProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testChengluPromptSignatureConformsToCodable() {
-        assertCodable(BASChengluPromptSignature.self)
+        // #18: real round-trip
+        let value = BASChengluPromptSignature(
+            tone: "",
+            domain: "",
+            stake: "",
+            timeframe: "",
+            confidant: "",
+            askShape: "")
+        assertCodableRoundTrips(value)
     }
 
     func testAppleProviderReleaseInputConformsToCodable() {
-        assertCodable(BASAppleProviderReleaseInput.self)
+        // #18: real round-trip — required `kernelSnapshot`
+        // (BASCognitionKernelSnapshot) is a deeply-nested struct
+        // from BASOrchestration not confidently constructible here;
+        // honest compile-time-only fallback.
+        assertConformsToCodableAtCompileTime(
+            BASAppleProviderReleaseInput.self)
     }
 }

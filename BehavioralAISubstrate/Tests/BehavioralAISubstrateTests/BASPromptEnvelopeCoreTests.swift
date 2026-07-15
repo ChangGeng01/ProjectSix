@@ -1,7 +1,6 @@
 import Testing
 @testable import BASOrchestration
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASPromptEnvelopeCore")
 struct BASPromptEnvelopeCoreTests {
     @Test("prompt envelope compiler preserves layered prompt budget and compaction trace")
@@ -129,4 +128,3 @@ private func dummyKernelSnapshot() -> BASCognitionKernelSnapshot {
         retrievalBlockCount: 0
     )
 }
-#endif

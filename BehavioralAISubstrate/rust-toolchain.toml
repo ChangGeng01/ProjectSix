@@ -19,7 +19,13 @@
 #   3. Updating BASRustCoreBridge.swift rustToolchain
 #      Version + corresponding test pin
 
+# deep-audit P2-23 (2026-07-13): PIN the exact version, not a floating "stable". A floating
+# channel contradicts the byte-reproducibility invariant this file exists to protect — a clean
+# rebuild on a machine whose "stable" has moved produces different codegen and breaks the
+# XCFramework SHA pin. 1.96.0 is the version the shipped BASRustMemoryTracker.xcframework was
+# built with (see BASRustCoreBridge.swift: "latest-languages" cut, rustup cargo 1.96.0). Bumping
+# it follows the 3-step checklist above (rebuild + two-clean-rebuild SHA match + update the pin).
 [toolchain]
-channel = "stable"
+channel = "1.96.0"
 profile = "minimal"
 components = ["rustfmt", "clippy"]

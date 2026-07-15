@@ -160,7 +160,11 @@ public struct BASMLContextService: BASContextServicing,
     /// could degenerate to an unknown label and the
     /// substrate would silently classify as chat,
     /// hiding the corruption from hosts。
-    private func mapLabel(
+    /// `internal static` (not private) so the unknown-label audit-hint
+    /// branch — the whole reason this fn exists — is directly testable
+    /// without a real .mlmodel-backed adapter. Uses no instance state
+    /// (only the label + a static hint prefix), so `static` is exact.
+    static func mapLabel(
         _ label: String
     ) -> (taskType: BASContextTaskType,
           unknownLabelHint: String?)
@@ -246,7 +250,7 @@ public struct BASMLContextService: BASContextServicing,
             let (label, confidence, logits) =
                 try adapter.classify(text: userInput)
             let (mappedType, unknownHint) =
-                mapLabel(label)
+                Self.mapLabel(label)
             taskType = mappedType
             // REAL ML-derived ambiguity:high confidence
             // ⇒ low ambiguity, low confidence ⇒ high

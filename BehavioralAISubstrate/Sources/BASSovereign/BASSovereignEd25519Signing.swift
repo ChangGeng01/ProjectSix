@@ -146,7 +146,14 @@ package func basSovereignAuditCanonicalBytes(
     // prefixing each field (`<utf8ByteCount>:<bytes>`) + a count marker per array makes
     // the encoding injective regardless of in-band bytes. Old 1.0.0/1.1.0 entries keep
     // their form below, so already-persisted chains still verify per-entry-version.
-    if entry.schemaVersion == "1.2.0" {
+    // audit M-d MED-3: gate the INJECTIVE form on schemaRank >= (1,2,0), not an exact `== "1.2.0"`.
+    // The append-floor admits by NUMERIC rank, so a version passing the floor but not spelled
+    // exactly "1.2.0" (e.g. a future "1.3.0") fell into the AMBIGUOUS delimiter-join below — a
+    // signed pre-image a crafted in-band separator could collide. The injective form is generic +
+    // carries the version in-band, so it stays injective for every future schema. Byte-equal for
+    // all existing 1.0.0 / 1.1.0 / 1.2.0 entries (their rank comparison yields the same branch).
+    if BASSovereignAuditLedger.schemaRank(entry.schemaVersion)
+        >= BASSovereignAuditLedger.schemaRank("1.2.0") {
         var parts: [String] = [
             entry.schemaVersion, entry.auditID, entry.sessionID, entry.turnID,
             entry.verdictRef]

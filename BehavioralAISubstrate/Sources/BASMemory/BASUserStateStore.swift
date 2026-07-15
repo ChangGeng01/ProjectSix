@@ -164,6 +164,15 @@ public actor BASSQLiteUserStateStorage: BASUserStateStorage {
         }
         self.db = handle
         try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete zeroes freed pages
+        // at delete time — default-on, BAS_SECURE_DELETE=0 kill-switch.
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            try Self.runExec(db: handle, sql: sdSQL)
+        }
+        // memory-a F4 residual: one-time legacy freelist purge (secure_delete only
+        // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
+        // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
 

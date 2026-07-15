@@ -26,7 +26,10 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
         _ request: BASOrganRequest
     ) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
         AsyncThrowingStream { continuation in
-            Task { [weak self] in
+            // audit H18: cancel the pump on stream termination, else a consumer cancel leaks the
+            // MLX decode loop (it runs to completion unwatched). onTermination propagates
+            // cooperative cancellation into `_streamDraft`'s await points.
+            let task = Task { [weak self] in
                 guard let self = self else {
                     continuation.finish()
                     return
@@ -40,6 +43,7 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 
@@ -54,10 +58,28 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
         }
 
         #if canImport(MLXLLM)
-        // 结构大重构 — route to the speculative decoder when a draft model is loaded AND the mode is live.
-        // Default off (no draft / `.off`) ⇒ this guard is skipped ⇒ the exact pre-speculative single-model path
-        // below runs, byte-identical. Deleting these three lines fully reverts the feature.
-        if shouldSpeculate(for: request) {
+        // audit mlx-adapter-core LOW-12: route the streaming turn through the SAME experience
+        // warm-start / persist / pressure funnel as the eager executor (`_execute` + `_finish`).
+        // Previously streaming turns bypassed it entirely — experience never warmed on a
+        // streaming-only session, and streamed deltas never persisted the fold or sampled reclaim.
+        // The defer covers BOTH the speculative and plain streaming sub-paths' exits.
+        await _ensureExperienceLoaded()
+        defer {
+            _persistExperienceIfDue()
+            _pressureCheck(keeping: nil)
+        }
+        // Planner-decided streaming (the same single decider as the eager path; kill-switch off = pure plain). With
+        // purpose .scoutDefault the planner yields .draftModelSpec (when a draft is loaded → the streaming spec path)
+        // or .plain; the model-free lanes don't stream, so .scoutDefault never selects them here.
+        var streamSpec = false
+        if decodePlannerAutoSelect,
+           case .draftModelSpec = BASDecodeLanePolicy.decodeStrategy(
+               purpose: .scoutDefault, temperature: request.preset.temperature,
+               capabilities: _decodeCapabilities(), profiler: draftProfiler, numDraftTokens: numDraftTokens,
+                thermalThrottled: MLXOrganAdapter._thermalThrottled()) {
+            streamSpec = true
+        }
+        if streamSpec {
             try await _streamDraftSpeculative(request, continuation: continuation)
             return
         }
@@ -68,12 +90,20 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
                     "loadModel(progressHandler:) before streamDraft(_:)"))
         }
 
+        // Opt-in `enable_thinking=false` for reasoning models (Qwen3.5 et al.): passed as an extra Jinja
+        // template variable via `additionalContext` — the swift equivalent of mlx_lm's
+        // `apply_chat_template(enable_thinking=False)`. The v12 honesty numbers were ALL measured with
+        // thinking OFF, so on-device parity (and decode latency) needs this. Env-gated (`BAS_DISABLE_THINKING=1`)
+        // so existing decode stays byte-unchanged when off; harmless on non-reasoning models (unknown template
+        // vars are ignored).
+        let disableThinking = ProcessInfo.processInfo.environment["BAS_DISABLE_THINKING"] == "1"
         let session = ChatSession(
             container,
             instructions: Self.systemInstructions(for: request),
             generateParameters: self._generateParameters(
                 for: request.preset,
-                maxOutputTokens: request.maxOutputTokens))
+                maxOutputTokens: request.maxOutputTokens),
+            additionalContext: disableThinking ? ["enable_thinking": false] : nil)
 
         let prompt = Self.prompt(for: request)
         var cumulative = ""

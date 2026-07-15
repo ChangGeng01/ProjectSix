@@ -109,6 +109,51 @@ final class BASChapter744KnowledgeGraphCodecTests: XCTestCase {
         #endif
     }
 
+    // MARK: - #19 / M-n: canonicalize_weight is LIVE in the shipped binary
+    //
+    // The 06-14 canonicalize_weight() -0.0 fix lived in the Rust source but the
+    // XCFramework shipped from a 06-11 build that predated it, so the fix had ZERO
+    // production reachability (mega-audit M-n). These end-to-end tests go through the FFI
+    // into the (now-rebuilt) binary and PIN the canonicalization so it can never silently
+    // drift out of the shipped .a again: -0.0 must encode byte-identically to +0.0, and any
+    // NaN must encode byte-identically to any other NaN.
+
+    func testEncodeEdgeNegativeZeroCanonicalizesToPositiveZero() {
+        #if os(iOS) || os(macOS)
+        let neg = BASAutoRouteRanker.kgCodecEncodeEdge(
+            edgeID: "e", fromNodeID: "a", toNodeID: "b", kindRaw: "k",
+            weight: -0.0, createdAtMs: 0)
+        let pos = BASAutoRouteRanker.kgCodecEncodeEdge(
+            edgeID: "e", fromNodeID: "a", toNodeID: "b", kindRaw: "k",
+            weight: 0.0, createdAtMs: 0)
+        XCTAssertNotNil(neg)
+        XCTAssertNotNil(pos)
+        // If the shipped binary lacked the fix, the -0.0 sign bit would survive and the two
+        // encodings would differ — replay-equality (canonical-bytes ABI) would break.
+        XCTAssertEqual(neg, pos,
+            "-0.0 must canonicalize to +0.0 in the SHIPPED codec (M-n binary-drift guard)")
+        #endif
+    }
+
+    func testEncodeEdgeNaNCanonicalizesAcrossPayloads() {
+        #if os(iOS) || os(macOS)
+        // Two DIFFERENT NaN bit patterns (signaling vs quiet, different payloads) must both
+        // collapse to the one canonical quiet NaN.
+        let nan1 = Double(bitPattern: 0x7FF8_0000_0000_0001)
+        let nan2 = Double(bitPattern: 0xFFF0_0000_0000_0007)
+        XCTAssertTrue(nan1.isNaN && nan2.isNaN)
+        let a = BASAutoRouteRanker.kgCodecEncodeEdge(
+            edgeID: "e", fromNodeID: "a", toNodeID: "b", kindRaw: "k",
+            weight: nan1, createdAtMs: 0)
+        let b = BASAutoRouteRanker.kgCodecEncodeEdge(
+            edgeID: "e", fromNodeID: "a", toNodeID: "b", kindRaw: "k",
+            weight: nan2, createdAtMs: 0)
+        XCTAssertNotNil(a)
+        XCTAssertEqual(a, b,
+            "all NaN payloads must canonicalize to one quiet NaN in the shipped codec")
+        #endif
+    }
+
     // MARK: - SQL migration schema bundled resource
 
     func testMigrationSQLResourceIsBundled() throws {

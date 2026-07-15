@@ -130,21 +130,31 @@ public enum BASRustCoreBridge {
     ///   - 全面进化 T2.1: bas-retrieval-ranker ABI v2
     ///     (+`bas_ranker_decayed_fuse_batch` + force-link anchor;cold ×2
     ///     byte-identical again)。
+    ///   - audit M-l MED-4 (2026-07-09): +`bas_l8_vector_index_cosine_topk_
+    ///     atom_ids_for_domain` (ATOMIC (atom_id, score) top-k, closes the
+    ///     rowid-reuse TOCTOU + deterministic tie-break)。 Cold ×2 byte-
+    ///     identical (rustup cargo 1.96.0)。
+    ///   - deep-audit 2026-07-11: usage-tracker query_json record_id
+    ///     tie-break (#4) + event-extractor faithful classify semantics
+    ///     (#5) + importance-scorer no-history=0.5 fix now IN the binary
+    ///     (un-skips the byte-parity test)。 Cold ×2 byte-identical。
     public static let macosArm64SliceSHA256: String =
-        "c798eaa2683cd52d96ff3cefca3db0de15201b01c5caa0c3cac51e749de3e896"
+        "941e8480119a72e856332a526f353f9ed4dab181703c1b5d9f1df6cf6e2c6cef"
 
     /// XCFramework ios-arm64 slice byte-equality SHA256。
     /// Bumped: chapter 七百八十三 / M2566 (+atom-lifecycle); "latest-languages"
     /// cut (Rust 1.96 + iOS-18 deployment-target pin); 全面进化 T2.1a
-    /// (canonical-bytes ABI v2 + cold-rebuild reproducibility pin)。
+    /// (canonical-bytes ABI v2 + cold-rebuild reproducibility pin);
+    /// audit M-l MED-4 (+atomic vector topk atom_ids)。
     public static let iosArm64SliceSHA256: String =
-        "f2312c63a277c7a882d3a30e66b583af6ff9e4f928ad72bd0a066ea5d11b8df5"
+        "0a56286f0f17c8e3c5e07ce61c9b793a7c6258676944852183a86997be50cac6"
 
     /// XCFramework ios-arm64-simulator slice byte-equality
     /// SHA256。 Bumped: chapter 七百八十三 / M2566; "latest-languages" cut;
-    /// 全面进化 T2.1a (canonical-bytes ABI v2 + cold-rebuild pin)。
+    /// 全面进化 T2.1a (canonical-bytes ABI v2 + cold-rebuild pin);
+    /// audit M-l MED-4 (+atomic vector topk atom_ids)。
     public static let iosArm64SimulatorSliceSHA256: String =
-        "d400251824c468129eaa9e9f2e23c82530b17419f1cba6e8b3e2515b4a191f08"
+        "18c2a32c9a604fd0d103351883791bf0d92ae18a74ecf0c5228c50880689b6d2"
 
     /// Total per-slice SHA256 count = shippedSlices
     /// .count。 Cross-mirror invariant pinned in tests

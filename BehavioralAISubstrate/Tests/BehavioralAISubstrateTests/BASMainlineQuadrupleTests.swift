@@ -13,7 +13,6 @@ import XCTest
 @testable import BASMetalSubstrate
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASMainlineQuadrupleTests: XCTestCase {
 
     // MARK: - 1. Rust verify_chain_hash
@@ -268,4 +267,3 @@ final class BASMainlineQuadrupleTests: XCTestCase {
         XCTAssertGreaterThan(value!, 0)
     }
 }
-#endif

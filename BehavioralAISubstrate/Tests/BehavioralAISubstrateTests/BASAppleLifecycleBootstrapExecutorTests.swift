@@ -1,7 +1,6 @@
 import Testing
 @testable import BASAppleAdapters
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Lifecycle Bootstrap Executor")
 struct BASAppleLifecycleBootstrapExecutorTests {
     @Test("executor preserves generic initial appearance action order")
@@ -98,4 +97,3 @@ struct BASAppleLifecycleBootstrapExecutorTests {
         ])
     }
 }
-#endif

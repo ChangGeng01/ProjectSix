@@ -307,4 +307,37 @@ final class BASShadowResultPermitUpgraderTests: XCTestCase {
             "Audit anchor pin (chapter 八十七 raw value " +
             "stability)")
     }
+
+    // MARK: - audit blindspot-② HIGH: an UP-grader must never DOWN-grade
+
+    /// A shadow result naming a LESS-restrictive mode must NOT weaken the permit. Reversal (drop the
+    /// strictnessRank guard) reds: it would escalate `.block`(7) → `.answer`(0), a downgrade.
+    func testLessRestrictiveTargetIsRefusedNotDowngraded() {
+        let permit = makePermit(mode: .block)   // strictnessRank 7
+        let result = makeShadowResult(shifted: true, postPermitMode: "answer") // rank 0
+        let decision = BASShadowResultPermitUpgrader.decide(
+            currentPermit: permit, shadowResult: result)
+        XCTAssertEqual(decision, .noChange,
+            "a less-restrictive target must be refused — an upgrader must never downgrade the permit")
+    }
+
+    func testStrictlyMoreRestrictiveTargetStillEscalates() {
+        let permit = makePermit(mode: .answer)  // rank 0
+        let result = makeShadowResult(shifted: true, postPermitMode: "block") // rank 7 — an upgrade
+        let decision = BASShadowResultPermitUpgrader.decide(
+            currentPermit: permit, shadowResult: result)
+        guard case .escalate(let target, _) = decision else {
+            return XCTFail("a strictly-more-restrictive target must still escalate; got \(decision)")
+        }
+        XCTAssertEqual(target, .block)
+    }
+
+    func testAdjacentDowngradeAlsoRefused() {
+        // delay(3) → compare(2) is a one-step downgrade; must be refused too.
+        let permit = makePermit(mode: .delay)
+        let result = makeShadowResult(shifted: true, postPermitMode: "compare")
+        XCTAssertEqual(
+            BASShadowResultPermitUpgrader.decide(currentPermit: permit, shadowResult: result),
+            .noChange, "even a one-step downgrade must be refused")
+    }
 }

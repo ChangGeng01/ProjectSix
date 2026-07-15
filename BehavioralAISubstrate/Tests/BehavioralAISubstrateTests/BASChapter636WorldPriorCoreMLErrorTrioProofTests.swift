@@ -39,24 +39,27 @@ final class BASChapter636WorldPriorCoreMLErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASWorldPriorVaultVaultErrorConformsToCodable() {
-        assertCodable(
-            BASWorldPriorVault.VaultError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASWorldPriorVault.VaultError
+                .duplicateTemplateID(""))
+        assertCodableRoundTrips(
+            BASWorldPriorVault.VaultError
+                .axiomCollision(id: "", incoming: "", resident: ""))
     }
 
     func testBASWorldPriorCounterfactualSeederSeederErrorConformsToCodable() {
-        assertCodable(
-            BASWorldPriorCounterfactualSeeder
-                .SeederError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASWorldPriorCounterfactualSeeder.SeederError
+                .unknownTemplate(""))
     }
 
     func testBASCoreMLAdapterErrorConformsToCodable() {
-        assertCodable(BASCoreMLAdapterError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASCoreMLAdapterError
+                .multiArrayConstructionFailed(expectedShape: []))
     }
 }

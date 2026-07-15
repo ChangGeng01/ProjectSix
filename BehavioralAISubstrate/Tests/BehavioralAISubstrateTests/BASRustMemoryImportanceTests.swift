@@ -14,7 +14,6 @@ import XCTest
 @testable import BASMemory
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASRustMemoryImportanceTests: XCTestCase {
 
     // MARK: - atom_importance_scores
@@ -392,4 +391,3 @@ final class BASRustMemoryImportanceTests: XCTestCase {
         }
     }
 }
-#endif

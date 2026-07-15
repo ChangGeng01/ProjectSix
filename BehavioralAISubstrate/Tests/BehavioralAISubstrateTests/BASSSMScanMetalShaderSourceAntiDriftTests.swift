@@ -170,11 +170,22 @@ final class BASSSMScanMetalShaderSourceAntiDriftTests:
             "transpose")
     }
 
-    // MARK: - Determinism
+    // MARK: - Line-count property cross-check
 
-    func testSourceMSLIsDeterministic() {
+    func testSourceLineCountMatchesIndependentNewlineCount() {
+        // blindspot LOW id16: the old testSourceMSLIsDeterministic
+        // compared the source literal to ITSELF — a tautology (a String
+        // literal is trivially deterministic) that pinned nothing and
+        // duplicated the real marker/line-count invariants above. Real
+        // teeth: the COMPUTED float32SourceLineCount must equal an
+        // independently-computed line count (newline count + 1), so a
+        // regression in the property's split logic reds.
+        let independent = S.float32SourceMSL
+            .filter { $0 == "\n" }.count + 1
         XCTAssertEqual(
-            S.float32SourceMSL,
-            S.float32SourceMSL)
+            S.float32SourceLineCount,
+            independent,
+            "float32SourceLineCount must equal the source's " +
+            "independent (newline count + 1)")
     }
 }

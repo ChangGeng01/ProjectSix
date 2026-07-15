@@ -2,6 +2,12 @@ import Foundation
 
 // 六十五.5 — speculative parallelism wrapper for council turns.
 //
+// deep-audit DORMANT (2026-07-13): test-only scaffolding — NO production consumer. Live council
+// turns run via QinaoLoopSeats' `runCouncilTurn`; this discard-on-veto speculative wrapper is
+// constructed only by tests. Honestly marked dormant per pin-boundary-defer-interface; TRIGGER
+// = the first host adopting the propose/dispose seat fabric onto the sovereign spine. See
+// QinaoSeatFabricDormancyBoundaryTests.
+//
 // ## Why this exists
 //
 // Manifesto v4 五.5 says "投机并行 — 在前哨还没完全结束

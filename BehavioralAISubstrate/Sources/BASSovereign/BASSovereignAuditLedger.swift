@@ -152,6 +152,20 @@ public actor BASSovereignAuditLedger {
     /// The chain itself. Ordered; appending is the only mutator.
     private var entries: [AppendedEntry] = []
 
+    /// mirror-lane charter ③ (2026-07-12): auditID existence probe — lets ingest gates
+    /// reject a REPLAYED envelope with a typed reason BEFORE append, on ANY storage
+    /// (the in-memory ledger has no uniqueness index; SQLite's audit_id PRIMARY KEY was
+    /// the only backstop and surfaced as an untyped append failure).
+    public func hasEntry(auditID: String) -> Bool {
+        ensureReloadVerified()
+        // deep-audit P2-14(a) (2026-07-13): O(1) via the existing auditRefIndex instead of an
+        // O(N) linear scan (an ingest gate calls this per envelope → O(N^2) over a growing
+        // chain). Semantics-identical: the index is keyed by auditID and rebuilt in full from
+        // `entries` on load (see the reload path) and kept in sync on every append, so
+        // presence-in-index ⇔ presence-in-entries.
+        return auditRefIndex[auditID] != nil
+    }
+
     /// Index for O(1) `query(byAuditRef:)`. Kept in sync with `entries`.
     private var auditRefIndex: [String: Int] = [:]
 
@@ -369,6 +383,30 @@ public actor BASSovereignAuditLedger {
     private func ensureReloadVerified() {
         guard !reloadVerified else { return }
         reloadVerified = true
+        // H14 (mega-audit 2026-07-07): tail truncation leaves an internally-consistent
+        // prefix that auditChainFull() cannot detect (all priorHash links + signatures
+        // still verify). Cross-check the loaded entry count against the persisted
+        // per-segment entryCounts — a high-water mark storage already keeps but no code
+        // consulted. entries < Σ entryCount ⇒ audit_entries rows were deleted; any
+        // mismatch ⇒ tamper ⇒ quarantine. Scoped to segment-persisting storages
+        // (segments non-empty); a segment-less storage stays byte-equal.
+        //
+        // audit F4 (2026-07-12): this cross-check now runs BEFORE the empty-entries early
+        // return — an errored/truncated read that yields ZERO entries while segments record
+        // a positive count is exactly the tamper signal (was fail-open: the old
+        // `guard !entries.isEmpty` returned first and skipped this). A genuinely fresh store
+        // has empty entries AND empty segments, so it still passes byte-equal.
+        if !segments.isEmpty {
+            let segmentTotal = segments.reduce(0) { $0 + $1.entryCount }
+            if segmentTotal != entries.count {
+                integrityQuarantined = true
+                FileHandle.standardError.write(Data(
+                    ("[BASSovereignAuditLedger] QUARANTINED on reload — entry/segment "
+                     + "count mismatch (entries=\(entries.count) segmentSum=\(segmentTotal))"
+                     + "; tail truncation or tamper suspected; refusing new appends.\n").utf8))
+                return
+            }
+        }
         guard !entries.isEmpty else { return }
         let report = auditChainFull()
         guard !report.corruptions.isEmpty else { return }
@@ -470,6 +508,16 @@ public actor BASSovereignAuditLedger {
         guard !draft.verdictRef.isEmpty else {
             throw LedgerError.invalidEntry("verdictRef must be non-empty")
         }
+        // deep-audit L-3 (2026-07-13): an append-level auditID-uniqueness guard was
+        // considered here to give the in-memory backend the same replay backstop the
+        // SQLite `audit_id PRIMARY KEY` provides. It was BACKED OUT because a distinct
+        // subsystem (EBrainRuntimeCoordinator+SovereignCommit.swift:686) derives auditID
+        // as `audit.<sessionID>.<verdictLevel>` — NOT turn-unique — so two turns of the
+        // same session+verdict legitimately collide today, and a guard here would break
+        // multi-turn on that path (it already fails on SQLite; only lax in-memory hides
+        // it). Fixing that collision is out of this remediation's scope (a separate task).
+        // The mirror lane's replay defense stays at the ingest gate (unique
+        // `mirror-<envelopeID>` auditID), scoped honestly in BASMirrorLaneLedgerIngest.
 
         let priorHash = entries.last?.selfHash ?? Self.genesisHash
         let canonical = canonicalBytes(for: draft, priorHash: priorHash)
@@ -522,13 +570,22 @@ public actor BASSovereignAuditLedger {
         //
         // LEGACY PATH (unchanged,kept for byte-pinned compat):
         //     let selfHash = hash(canonical)
-        let selfHash: String
-        if Self.useRoutedSeal {
-            selfHash = Self.hashViaAutoRouter(canonical)
-        } else {
-            selfHash = hash(canonical)
-        }
+        // audit sovereign LOW-8: seal AND verify must route through the SAME SHA impl. `sealHash`
+        // is the single source of that routing (used here + in verifyChainIntegrity), so append and
+        // verify can never diverge if the routed / plain implementations ever differ.
+        let selfHash = sealHash(canonical)
         let appended = AppendedEntry(entry: sealed, priorHash: priorHash, selfHash: selfHash)
+
+        // H13 (mega-audit 2026-07-07): capture rollback state BEFORE any mutation so a
+        // persist failure leaves the in-memory chain byte-identical to disk. The prior
+        // note ("actor state already mutated, acceptable") was WRONG: a phantom tail
+        // survives in memory, the NEXT append's priorHash points at it, disk gets a
+        // chain whose priorHash references a never-persisted entry, and cold-start
+        // reload quarantines the whole persistent ledger on one transient disk hiccup.
+        let priorRefIndex = auditRefIndex[sealed.auditID]
+        let segmentsCountBefore = segments.count
+        let priorOpenSegment = openSegmentBySession[sealed.sessionID]
+
         entries.append(appended)
         auditRefIndex[sealed.auditID] = entries.count - 1
 
@@ -542,17 +599,29 @@ public actor BASSovereignAuditLedger {
             openedAt: sealed.appendedAt)
         segments[segIndex].entryCount += 1
 
-        // M91 — mirror to persistent storage. Entries first so
-        // readers that tail the storage see the chain grow; then
-        // the updated segment (entryCount and any open-to-closed
-        // transition). Both are best-effort in the sense that any
-        // throw here propagates out of `append(_:)` — the actor
-        // state has already been mutated, which is acceptable
-        // because the ledger is integrity-over-availability: a
-        // storage write failure fails the whole append so the caller
-        // can decide whether to retry or abort.
-        try storage.persistAppended(appended)
-        try storage.persistSegment(segments[segIndex])
+        // M91 — mirror to persistent storage; H13 — atomic across memory; audit F3 — atomic
+        // across DISK too: the entry + its segment commit together or not at all, so a
+        // transient failure on the segment write can no longer leave a durable orphan entry
+        // that self-quarantines the ledger on the next cold start.
+        do {
+            try storage.persistAppendedEntryAndSegment(appended, segments[segIndex])
+        } catch {
+            // H13 rollback — undo every mutation in reverse so memory == disk.
+            segments[segIndex].entryCount -= 1
+            if segments.count > segmentsCountBefore {
+                // ensureOpenSegment opened a fresh segment (only when none existed) —
+                // drop it and restore the (nil) open-segment mapping.
+                segments.removeLast(segments.count - segmentsCountBefore)
+                openSegmentBySession[sealed.sessionID] = priorOpenSegment
+            }
+            if let priorRefIndex {
+                auditRefIndex[sealed.auditID] = priorRefIndex
+            } else {
+                auditRefIndex.removeValue(forKey: sealed.auditID)
+            }
+            entries.removeLast()
+            throw error
+        }
 
         return appended
     }
@@ -629,7 +698,9 @@ public actor BASSovereignAuditLedger {
                     throw LedgerError.chainIntegrityBroken(lastVerifiedAuditID: lastClean)
                 }
             }
-            let expectedSelfHash = hash(canonical)
+            // audit sovereign LOW-8: recompute via the SAME routing the seal used (sealHash), not a
+            // hardcoded plain `hash` — otherwise a routed-seal chain fails verify if routed ≠ plain.
+            let expectedSelfHash = sealHash(canonical)
             guard appended.selfHash == expectedSelfHash else {
                 throw LedgerError.chainIntegrityBroken(lastVerifiedAuditID: lastClean)
             }
@@ -783,8 +854,14 @@ public actor BASSovereignAuditLedger {
                 for: appended.entry,
                 priorHash: appended.priorHash)
 
-            // 2a. Self-hash.
-            if appended.selfHash != hash(canonical) {
+            // 2a. Self-hash. audit sovereign LOW-8 (id14): recompute via
+            // sealHash — the SAME impl append() sealed with and
+            // verifyChainIntegrity() recomputes with — NOT plain hash(),
+            // which ignores useRoutedSeal. auditChainFull was the missed
+            // third site: under a routed seal it would flag a false
+            // .selfHashMismatch on every entry if the routed digest ever
+            // diverged from CryptoKit.
+            if appended.selfHash != sealHash(canonical) {
                 reasons.append(.selfHashMismatch)
             }
 
@@ -1296,6 +1373,15 @@ public actor BASSovereignAuditLedger {
 
     private func hash(_ data: Data) -> String {
         Data(SHA256.hash(data: data)).base64EncodedString()
+    }
+
+    /// audit sovereign LOW-8 — the SINGLE source of the seal-hash routing decision, used by
+    /// `append` (seal), `verifyChainIntegrity` (recompute), AND `auditChainFull` (recompute).
+    /// Routing all three through one helper guarantees they can never use different SHA
+    /// implementations for the same chain. (id14: auditChainFull was the missed third site —
+    /// it recomputed via plain `hash(_:)`, ignoring the routed seal.)
+    func sealHash(_ canonical: Data) -> String {
+        Self.useRoutedSeal ? Self.hashViaAutoRouter(canonical) : hash(canonical)
     }
 
     // MARK: - M83 · Segment helpers (private)

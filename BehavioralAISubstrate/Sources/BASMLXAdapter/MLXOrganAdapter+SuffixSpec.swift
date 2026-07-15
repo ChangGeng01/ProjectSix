@@ -120,6 +120,20 @@ extension MLXOrganAdapter {
         return eos
     }
 
+    /// Shared prompt prologue (point-3 dedup): build the chat messages (system instructions + user prompt) and
+    /// prepare the `LMInput` in the given container. Deduped from ~9 byte-identical copies across the decode/measure
+    /// extensions so the prompt build can't drift between lanes (the parity-drift surface the audit flagged).
+    /// `sending` result: the freshly-prepared `LMInput` has no other references, so it is safe to transfer to the
+    /// caller's region (which then hands it to `perform(nonSendable:)`) — without this, extracting the prepare into
+    /// an async helper trips Swift 6's region-isolation `#SendingRisksDataRace`.
+    func _buildLMInput(for request: BASOrganRequest, container: ModelContainer) async throws -> sending LMInput {
+        var messages: [Chat.Message] = []
+        let instructions = Self.systemInstructions(for: request)
+        if !instructions.isEmpty { messages.append(.system(instructions)) }
+        messages.append(.user(Self.prompt(for: request)))
+        return try await container.prepare(input: UserInput(chat: messages))
+    }
+
     /// Shared decode: run a model-free source through the byte-identical `BASPromptLookupDecoder` loop in one
     /// container pass; return the postprocessed body + this turn's prompt/gen tokens + acceptance telemetry.
     // `internal` (not `private`) so the Tier-C3 funnel in MLXOrganAdapter+PromptLookup.swift (a different file)
@@ -132,11 +146,7 @@ extension MLXOrganAdapter {
             throw BASOrganError.providerUnavailable(
                 reason: MLXOrganAdapter.notLoadedReason(notLoadedHint))
         }
-        var messages: [Chat.Message] = []
-        let instructions = Self.systemInstructions(for: request)
-        if !instructions.isEmpty { messages.append(.system(instructions)) }
-        messages.append(.user(Self.prompt(for: request)))
-        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
+        let input = try await _buildLMInput(for: request, container: mainContainer)
         let params = self._greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
 
         let raw: _GenRaw = try await mainContainer.perform(nonSendable: input) { ctx, input in
@@ -163,9 +173,13 @@ extension MLXOrganAdapter {
     }
     #endif
 
-    /// Build the `BASOrganDraft` for a model-free accelerated turn (body already M256-postprocessed; metrics nil
-    /// — the prompt-lookup loop emits no `GenerateCompletionInfo`). Same shape as `draft(_:)`/`respondPromptLookup`.
-    func _modelFreeDraft(body: String, request: BASOrganRequest) -> BASOrganDraft {
+    /// Canonical `BASOrganDraft` builder — identical fields for EVERY decode lane (S1 dedup). `completionMetrics`
+    /// is nil for the model-free loop (no `GenerateCompletionInfo`) and the captured metrics for the
+    /// ChatSession/speculative paths. Replaces field-for-field copies in `draft(_:)`/`_draftSpeculative`/Saguaro.
+    func _buildDraft(
+        body: String, request: BASOrganRequest,
+        completionMetrics: BASOrganCompletionMetrics? = nil
+    ) -> BASOrganDraft {
         BASOrganDraft(
             requestID: request.requestID,
             providerID: descriptor.providerID,
@@ -177,7 +191,12 @@ extension MLXOrganAdapter {
             producedAt: Date(),
             traceID: BASOrganDeterministicAdapter.digest(
                 for: request, providerID: descriptor.providerID),
-            completionMetrics: nil)
+            completionMetrics: completionMetrics)
+    }
+
+    /// Model-free accelerated turn draft (metrics nil — the prompt-lookup loop emits no `GenerateCompletionInfo`).
+    func _modelFreeDraft(body: String, request: BASOrganRequest) -> BASOrganDraft {
+        _buildDraft(body: body, request: request)
     }
 
     /// Per-turn cross-turn-spec vs single-model-greedy-baseline result (for the on-device probe).
@@ -238,11 +257,7 @@ extension MLXOrganAdapter {
         }
         let request = BASOrganRequest(
             requestID: "ct-\(index)", role: role, preset: .greedyDeterministic, instruction: prompt, context: [])
-        var messages: [Chat.Message] = []
-        let instructions = Self.systemInstructions(for: request)
-        if !instructions.isEmpty { messages.append(.system(instructions)) }
-        messages.append(.user(Self.prompt(for: request)))
-        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
+        let input = try await _buildLMInput(for: request, container: mainContainer)
         let params = self._greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let null = Self.nullDrafter
         let specDrafter = BASCrossTurnDrafter(
@@ -295,11 +310,7 @@ extension MLXOrganAdapter {
         }
         let request = BASOrganRequest(
             requestID: "fwddiag", role: role, preset: .greedyDeterministic, instruction: prompt, context: [])
-        var messages: [Chat.Message] = []
-        let instructions = Self.systemInstructions(for: request)
-        if !instructions.isEmpty { messages.append(.system(instructions)) }
-        messages.append(.user(Self.prompt(for: request)))
-        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
+        let input = try await _buildLMInput(for: request, container: mainContainer)
         let params = self._greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let dLen = draftLen
         return try await mainContainer.perform(nonSendable: input) { ctx, input in
@@ -359,11 +370,7 @@ extension MLXOrganAdapter {
             throw BASOrganError.providerUnavailable(
                 reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before rawTargetForwardsMs"))
         }
-        var messages: [Chat.Message] = []
-        let instructions = Self.systemInstructions(for: request)
-        if !instructions.isEmpty { messages.append(.system(instructions)) }
-        messages.append(.user(Self.prompt(for: request)))
-        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
+        let input = try await _buildLMInput(for: request, container: mainContainer)
         let params = self._greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
         return try await mainContainer.perform(nonSendable: input) { ctx, input in
             let cache = BASWindowMaskedCache.verifyCache(for: ctx.model, parameters: params)

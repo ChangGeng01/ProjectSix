@@ -6,8 +6,15 @@ import BASRuntimeCore
 /// Given a `VerdictContext` describing the current turn (hard-rule
 /// observations, soft-signal scores, operation domain, evidence),
 /// produces a `BASSovereignVerdict` and appends it to the audit
-/// ledger in a single atomic step. This is the single authoritative
-/// place where L14 decides whether an action is allowed.
+/// ledger in a single atomic step.
+///
+/// blindspot MED id41: this is the SDK-façade / warrant-signing verdict
+/// authority and the reference engine for the OBSERVE-lane parity check
+/// (`BASSovereignTurnVerifier`) — NOT the sole runtime decider. The live
+/// per-turn path uses the hand-rolled `computeVerdictDecision`
+/// (`+SovereignVerdict.swift`); the BR-001..BR-012 kernel here is the
+/// parity oracle, not the production hot path. (Was overstated as "the
+/// single authoritative place where L14 decides.")
 ///
 /// ## Decision model
 ///
@@ -264,6 +271,46 @@ public actor BASSovereignVerdictEngine {
     /// The pure output of `evaluateLevel`: the verdict LEVEL plus its reason
     /// codes and revoked permissions — with NO verdict/audit IDs, NO clock, and
     /// NO ledger side-effect. (ADR-024.)
+    /// 可解释性②: Swift-hits-floor vs Rust-routed-level disagreement (should be impossible
+    /// while both derivations are healthy — the Rust table covers the hard-bit cap).
+    public struct RoutedDivergence: Sendable, Equatable {
+        public let rustLevel: BASSovereignVerdictLevel
+        public let swiftFloor: BASSovereignVerdictLevel
+    }
+    /// Process-lifetime divergence counter (telemetry; >0 = investigate the vendor/Rust pin).
+    /// ⚰️ P4 墓碑注 (RSI 章程 2026-07-07):本计数器现无生产读者(审计读者1实锤)——
+    /// 保留原因:reason code 已随裁决走(可解释性②的真载体),计数器是廉价的进程级
+    /// 聚合备胎,等 P3 测量站晨读或 R1 收据决议后自然获得读者。勿因零读者删除。
+    ///
+    /// audit x-concurrency MED-5 (2026-07-09): `verdict(...)` can run concurrently
+    /// across isolation domains, so the old `nonisolated(unsafe) static var` + a
+    /// non-atomic `+= 1` was a lost-update data race on the very ">0 = investigate"
+    /// interpretability signal — silently UNDER-counting real divergences. All
+    /// access is now lock-guarded; the public read API is preserved.
+    private static let _divergenceLock = NSLock()
+    nonisolated(unsafe) private static var _routedDivergenceCount = 0
+    public static var routedDivergenceCount: Int {
+        _divergenceLock.lock(); defer { _divergenceLock.unlock() }
+        return _routedDivergenceCount
+    }
+    static func _incrementRoutedDivergence() {
+        _divergenceLock.lock(); _routedDivergenceCount += 1; _divergenceLock.unlock()
+    }
+    /// Test-only reset for isolation (no production caller mutates the counter).
+    static func _resetRoutedDivergenceForTesting() {
+        _divergenceLock.lock(); _routedDivergenceCount = 0; _divergenceLock.unlock()
+    }
+    /// Pure floor application: returns the effective level plus the divergence record when the
+    /// Swift floor EXCEEDED the routed level. Host-unit-testable without the Rust FFI.
+    static func applyHitsFloor(
+        routed: BASSovereignVerdictLevel, floors: [BASSovereignVerdictLevel]
+    ) -> (BASSovereignVerdictLevel, RoutedDivergence?) {
+        var level = routed
+        for f in floors where f > level { level = f }
+        guard level > routed else { return (level, nil) }
+        return (level, RoutedDivergence(rustLevel: routed, swiftFloor: level))
+    }
+
     public struct LevelDecision: Sendable, Equatable {
         public let level: BASSovereignVerdictLevel
         public let reasonCodes: [String]
@@ -313,6 +360,7 @@ public actor BASSovereignVerdictEngine {
         var level: BASSovereignVerdictLevel
         let softPinnedDomain: String?
 
+        var routedDivergence: RoutedDivergence? = nil
         if useRouted,
            let routedLevel = Self.routedDeriveLevel(
             hardObservations: context.hardObservations,
@@ -323,9 +371,22 @@ public actor BASSovereignVerdictEngine {
             // Rust path:single C ABI call covers Stages 2+3
             // + hard bit cap promotion。 Cross-check max with
             // hits' min levels (belt-and-suspenders)。
-            level = routedLevel
-            for hit in hits where hit.minLevel > level {
-                level = hit.minLevel
+            // 可解释性② (2026-07-06): the belt-and-suspenders max() used to fire SILENTLY —
+            // but the Rust derive computes the hard-bit cap itself, so a Swift hits-floor that
+            // EXCEEDS the routed level means the two derivations DISAGREE (corruption /
+            // marshalling drift / vendor bump), not normal promotion. Record it: reason code +
+            // counter — the one dark spot that could silently corrupt the core dispose logic.
+            (level, routedDivergence) = Self.applyHitsFloor(routed: routedLevel, floors: hits.map { $0.minLevel })
+            if let d = routedDivergence {
+                Self._incrementRoutedDivergence()   // audit x-concurrency MED-5: atomic (lock-guarded)
+                BASDiagnosticLog.emit("⚠️ [verdict] ROUTED-DIVERGENCE rust=\(d.rustLevel) swiftFloor=\(d.swiftFloor) — Swift floor wins (fail-safe)")
+            }
+            // audit M-d MED-4: re-apply the Swift Stage-3 evidence floor over the routed level too.
+            // It previously lived ONLY in the Swift else-branch below, so a Rust derive that dropped
+            // the evidence-insufficient upgrade for an irreversible op could pass a level below
+            // .toolCut. The Swift floor is the fail-safe: it can only RAISE, never lower.
+            if isIrreversible(context.operation) && !context.evidenceSufficient && level < .toolCut {
+                level = .toolCut
             }
             let (_, pinned) =
                 evaluateSoftSignals(context.softSignals)
@@ -368,6 +429,9 @@ public actor BASSovereignVerdictEngine {
         }
         if isIrreversible(context.operation) && !context.evidenceSufficient && level == .toolCut {
             reasonCodes.append("EVIDENCE_INSUFFICIENT:\(context.operation.rawValue)")
+        }
+        if let d = routedDivergence {
+            reasonCodes.append("ROUTED_DIVERGENCE:rust=\(d.rustLevel.rawValue):swift=\(d.swiftFloor.rawValue)")
         }
 
         return LevelDecision(
@@ -501,8 +565,18 @@ public actor BASSovereignVerdictEngine {
         for entry in ordered {
             switch band(entry.score) {
             case .high:
-                // Non-compensatory: highest-priority .high pins, return.
-                return (entry.highLevel, entry.domain)
+                // audit blindspot-② HIGH: pin to the MOST-SEVERE .high, not the first in list order.
+                // The old `return (entry.highLevel, entry.domain)` on the first .high let a lower-
+                // severity domain MASK a co-present higher-severity one: privilegeViolation-high
+                // (→ .quarantine, rank 5, listed at index 1) short-circuited BEFORE selfMod-high
+                // (→ .deadStop, rank 7, index 2) was ever examined, so a self-modification attack
+                // co-present with a privilege violation was only QUARANTINED, not dead-stopped —
+                // an under-escalation of the strongest hard signal. Take the max; list order still
+                // breaks ties (strict `>` keeps the earlier domain when severities are equal).
+                if entry.highLevel > best {
+                    best = entry.highLevel
+                    bestDomain = entry.domain
+                }
             case .mid:
                 if entry.midLevel > best {
                     best = entry.midLevel

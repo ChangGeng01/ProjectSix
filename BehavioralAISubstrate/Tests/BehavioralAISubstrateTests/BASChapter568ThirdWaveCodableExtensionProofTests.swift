@@ -25,29 +25,39 @@ final class BASChapter568ThirdWaveCodableExtensionProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
+    // #18: real round-trip — construct a minimal valid instance
+    // and assert it survives an encode/decode cycle.
     func testKnowledgeGraphEventExtractionResultConformsToCodable()
     {
-        assertCodable(
-            BASKnowledgeGraphEventExtractionResult.self)
+        assertCodableRoundTrips(
+            BASKnowledgeGraphEventExtractionResult(
+                addedNodeCount: 0,
+                addedEdgeCount: 0,
+                skippedEventCount: 0,
+                totalEventsRead: 0,
+                reasonCodes: []))
     }
 
     func testHostCandidatePipelineObservationSnapshotConformsToCodable()
     {
-        assertCodable(
-            BASHostCandidatePipelineObservationSnapshot
-                .self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASHostCandidatePipelineObservationSnapshot(
+                activeVersionID: "",
+                committedVersionIDs: [],
+                pendingCandidateIDs: [],
+                rejectedCandidateIDs: [],
+                frozenVersionIDs: []))
     }
 
     func testForbiddenLifecycleGateDecisionConformsToCodable()
     {
-        assertCodable(
-            BASForbiddenLifecycleGateDecision.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASForbiddenLifecycleGateDecision(
+                action: nil,
+                reasonCodes: [],
+                refused: true))
     }
 
     /// BASHostCandidatePipelineObservationSnapshot

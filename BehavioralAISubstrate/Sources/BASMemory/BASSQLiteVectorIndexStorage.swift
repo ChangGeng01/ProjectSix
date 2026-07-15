@@ -93,6 +93,17 @@ public actor BASSQLiteVectorIndexStorage {
     /// magic-number。Used by encode/decode of embedding_blob。
     public static let floatByteSize: Int = 4
 
+    /// deep-audit LOW: overflow-safe embedding byte-size for an UNTRUSTED `dimension` read from the DB.
+    /// Throws `.dimensionMismatch` on a negative or `* floatByteSize`-overflowing value rather than
+    /// letting the raw multiply TRAP (crash) on a corrupt/tampered local vector DB.
+    static func safeEmbeddingByteSize(dimension: Int, atomID: String) throws -> Int {
+        let (product, overflowed) = dimension.multipliedReportingOverflow(by: floatByteSize)
+        guard dimension >= 0, !overflowed else {
+            throw StorageError.dimensionMismatch(atomID: atomID, expected: -1, got: dimension)
+        }
+        return product
+    }
+
     // MARK: - State
 
     public let databaseURL: URL
@@ -126,6 +137,15 @@ public actor BASSQLiteVectorIndexStorage {
         }
         self.db = handle
         try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete zeroes freed pages
+        // at delete time — default-on, BAS_SECURE_DELETE=0 kill-switch.
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            try Self.runExec(db: handle, sql: sdSQL)
+        }
+        // memory-a F4 residual: one-time legacy freelist purge (secure_delete only
+        // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
+        // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
         // 先稳 P2 — bound WAL growth over long sessions (mirrors the event log's M891 setting).
@@ -221,6 +241,11 @@ public actor BASSQLiteVectorIndexStorage {
             db: db, atomID: atomID)
         guard existed else { return false }
         try Self.delete(db: db, atomID: atomID)
+        // deep-audit P2-18 (2026-07-13): a forgotten atom's embedding still lives as the
+        // original INSERT frame in the -wal (secure_delete=ON only zeroes the main-DB page).
+        // remove(atomID:) is the explicit forget path — truncate the WAL so the vector of a
+        // forgotten memory is gone from disk too.
+        try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
         return true
     }
 
@@ -579,7 +604,10 @@ public actor BASSQLiteVectorIndexStorage {
         }
         let blobSize = Int(
             sqlite3_column_bytes(stmt, offset + 2))
-        let expectedSize = dimension * floatByteSize
+        // deep-audit LOW: `dimension` comes straight from the DB column; a corrupt/tampered value
+        // makes `dimension * floatByteSize` overflow and TRAP (crash) on a bad local vector DB.
+        // safeEmbeddingByteSize throws (recoverable) on negative/overflow instead of aborting.
+        let expectedSize = try Self.safeEmbeddingByteSize(dimension: dimension, atomID: atomID)
         guard blobSize == expectedSize else {
             throw StorageError.dimensionMismatch(
                 atomID: atomID,

@@ -16,8 +16,8 @@ final class BASGovernanceCoordinatorTests: XCTestCase {
     func testCoordinatorForwardsAdmissionToBudget() {
         let mon = BASDecodeLivenessMonitor(onStall: { _ in })
         let coord = BASGovernanceCoordinator(liveness: mon, drain: { })
-        XCTAssertTrue(coord.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e4b.it.4bit"))
-        XCTAssertFalse(coord.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e2b.it.4bit"))
+        XCTAssertTrue(coord.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e4b.it.4bit", capBytes: BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes))
+        XCTAssertFalse(coord.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e2b.it.4bit", capBytes: BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes))
     }
 
     func testCoordinatorResolveBudgetMatchesDirectBudget() {

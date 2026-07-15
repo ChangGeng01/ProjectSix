@@ -1,5 +1,6 @@
 import SwiftUI
 import BASHostKit
+import BASAdminUI   // BASHostConsoleView lives here since the M-o MED-2 SwiftUI split
 
 // M811 chapter 二百三十 — `SampleHostWindGatePresentationSupport`
 // extracted to dedicated foundation file
@@ -59,6 +60,9 @@ struct SampleHostView: View {
 
                     SampleHostActiveSessionPanel(model: model)
 
+                    // BASTurnRecord-consumer: audit-class — hands the FULL record to the
+                    // 13-layer inspection view (displays context/thought/trace deep fields
+                    // the host-response contract deliberately excludes).
                     SampleHostThirteenLayerTurnDetailView(
                         turn: model.result.eBrainTurn,
                         sourceBadgeDetail: "SampleHost is currently rendering the active 13-layer runtime turn returned by BASHostKit.")

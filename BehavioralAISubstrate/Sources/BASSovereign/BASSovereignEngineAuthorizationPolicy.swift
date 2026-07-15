@@ -3,6 +3,15 @@ import Foundation
 // M296.2.yy — typed engine-side authorization policy that joins
 // intent classification + dual-key gate.
 //
+// deep-audit DORMANT (2026-07-13): this CONVENIENCE FAÇADE has no production consumer. No engine
+// calls `policy.authorize` — the live high-consequence path constructs `BASSovereignGatedIntent`
+// and drives the gate directly (BASSovereignGatedCommit / BASConstitutionApprovalGate), so the
+// "Engines now adopt M296.2 in one line" claim below describes an adoption that has not happened.
+// LOWER stakes than a dark capability: the underlying authorization (the gate/enforcer) IS live
+// and exercised; only this one-call wrapper is inert. Per pin-boundary-defer-interface it stays
+// honestly marked, not stripped (consult-before-deleting). TRIGGER to make the claim true = the
+// first engine that centralizes its high-consequence intent list through this policy.
+//
 // ## Why this exists
 //
 // M296.2.y ship 了 `BASSovereignGatedIntent` (typed bundle) +

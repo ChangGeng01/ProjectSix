@@ -6,6 +6,7 @@ import BASPolicy
 import BASRuntimeCore
 import BASSovereign
 import BASWorldPrior
+import BASEvaluation
 
 public enum BASEBrainSchemaGovernanceRegistry {
     public static let governedSchemas: [BASSchemaGovernanceEntry] = [
@@ -1472,6 +1473,70 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "ChengluMeshRegistrationReport",
             versionedType: BASChengluMeshRegistrationReport.self,
             tests: ["schema.chenglu_mesh_registration_report.current", "schema.chenglu_mesh_registration_report.backward"]
+        ),
+        // ── old-audit schema-parity backfill (2026-07-11): 12 BASSchemaVersioned domain
+        // objects declared across BASMemory/BASOrchestration/BASPolicy/BASEvaluation but never
+        // registered — the whitepaper schema-parity gate had been red. Registered here with the
+        // established 2-migration-test-ID label convention (matching all 264 entries above).
+        entry(
+            "DistillationBank",
+            versionedType: BASDistillationBank.self,
+            tests: ["schema.distillation_bank.current", "schema.distillation_bank.backward"]
+        ),
+        entry(
+            "EvidenceAtom",
+            versionedType: BASEvidenceAtom.self,
+            tests: ["schema.evidence_atom.current", "schema.evidence_atom.backward"]
+        ),
+        entry(
+            "GuardBranch",
+            versionedType: BASGuardBranch.self,
+            tests: ["schema.guard_branch.current", "schema.guard_branch.backward"]
+        ),
+        entry(
+            "MemoryUsageRecord",
+            versionedType: BASMemoryUsageRecord.self,
+            tests: ["schema.memory_usage_record.current", "schema.memory_usage_record.backward"]
+        ),
+        entry(
+            "RegretProfile",
+            versionedType: BASRegretProfile.self,
+            tests: ["schema.regret_profile.current", "schema.regret_profile.backward"]
+        ),
+        entry(
+            "RiskCalibrationBundle",
+            versionedType: BASRiskCalibrationBundle.self,
+            tests: ["schema.risk_calibration_bundle.current", "schema.risk_calibration_bundle.backward"]
+        ),
+        entry(
+            "RiskCalibrationStratumDelta",
+            versionedType: BASRiskCalibrationStratumDelta.self,
+            tests: ["schema.risk_calibration_stratum_delta.current", "schema.risk_calibration_stratum_delta.backward"]
+        ),
+        entry(
+            "RiskCalibrationStratumSubModelRef",
+            versionedType: BASRiskCalibrationStratumSubModelRef.self,
+            tests: ["schema.risk_calibration_stratum_submodel_ref.current", "schema.risk_calibration_stratum_submodel_ref.backward"]
+        ),
+        entry(
+            "SacrificeMap",
+            versionedType: BASSacrificeMap.self,
+            tests: ["schema.sacrifice_map.current", "schema.sacrifice_map.backward"]
+        ),
+        entry(
+            "ShadowEvaluationResult",
+            versionedType: BASShadowEvaluationResult.self,
+            tests: ["schema.shadow_evaluation_result.current", "schema.shadow_evaluation_result.backward"]
+        ),
+        entry(
+            "ShadowEvaluatorMeridianResult",
+            versionedType: BASShadowEvaluatorMeridianResult.self,
+            tests: ["schema.shadow_evaluator_meridian_result.current", "schema.shadow_evaluator_meridian_result.backward"]
+        ),
+        entry(
+            "ShadowTrialTypedEffect",
+            versionedType: BASShadowTrialTypedEffect.self,
+            tests: ["schema.shadow_trial_typed_effect.current", "schema.shadow_trial_typed_effect.backward"]
         )
     ]
 

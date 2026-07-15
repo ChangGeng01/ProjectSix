@@ -155,7 +155,11 @@ final class BASChapter743L14CloseoutTests: XCTestCase {
 
     // MARK: - L14 sub-arc scorecard (chapter 七百四十三 第四刀)
 
-    func testPrintL14SubArcScorecard() {
+    func testPrintL14SubArcScorecard() throws {
+        // #18: assertion
+        guard ProcessInfo.processInfo.environment["BAS_PERF_PRINT"] == "1" else {
+            throw XCTSkip("perf print-only — set BAS_PERF_PRINT=1")
+        }
         print("")
         print("=================================================================")
         print(

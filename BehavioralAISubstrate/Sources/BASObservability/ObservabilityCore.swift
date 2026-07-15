@@ -751,6 +751,13 @@ public enum BASObservabilityInspector {
     public static func replayFingerprint(for bundle: BASReplayBundle) -> BASReplayFingerprint {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
+        // audit policy-obs-misc LOW-3: a non-finite Double (NaN/±inf) anywhere in the bundle used to
+        // make encode() THROW → the `?? Data()` fallback hashed EMPTY → every non-finite bundle
+        // collided to SHA256(""). Encode them to distinct sentinel strings so the fallback is
+        // unreachable for that trigger and such bundles keep distinct fingerprints. All-finite
+        // bundles encode byte-identically (the strategy only affects non-conforming floats).
+        encoder.nonConformingFloatEncodingStrategy = .convertToString(
+            positiveInfinity: "+inf", negativeInfinity: "-inf", nan: "nan")
         let data = (try? encoder.encode(bundle)) ?? Data()
         let digest = SHA256.hash(data: data)
         // LEGACY (chapter 七百十九 第三刀 / M2268):
@@ -1338,7 +1345,9 @@ public enum BASBrainSummaryBuilder {
                 numerator: averageBrainByKind(from: traces, value: { Double($0.screenedOutMemoryCount) }),
                 denominatorAugend: averageBrainByKind(from: traces, value: { Double($0.relevantMemoryCount) })
             ),
-            latestSnapshotFingerprintByKind: firstValueByKind(from: traces.map { ($0.kind, $0.snapshotFingerprint) }),
+            // audit policy-obs-misc LOW-4: the field is the LATEST snapshot per kind, so take the LAST
+            // (newest) of the oldest-first trace array — firstValueByKind returned the OLDEST.
+            latestSnapshotFingerprintByKind: lastValueByKind(from: traces.map { ($0.kind, $0.snapshotFingerprint) }),
             snapshotVariantCountByKind: variantCountByKind(from: traces.map { ($0.kind, $0.snapshotFingerprint) }),
             lowTrustMemoryLoadRateByKind: averageBrainByKind(from: traces, value: \.lowTrustMemoryLoadRate),
             riskFlagCountsByKind: aggregatedArrayCountsByKind(from: traces, value: \.riskFlags),
@@ -1869,6 +1878,18 @@ private func firstValueByKind<Value>(
     Dictionary(grouping: pairs, by: \.0)
         .compactMapValues { grouped in
             grouped.first?.1
+        }
+}
+
+/// audit policy-obs-misc LOW-4 — sibling of firstValueByKind for the "latest" fields: takes the LAST
+/// (newest) value per kind from an oldest-first pair list. `Dictionary(grouping:)` preserves array
+/// order, so `.last` is the most recent.
+private func lastValueByKind<Value>(
+    from pairs: [(String, Value)]
+) -> [String: Value] {
+    Dictionary(grouping: pairs, by: \.0)
+        .compactMapValues { grouped in
+            grouped.last?.1
         }
 }
 

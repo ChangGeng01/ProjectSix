@@ -17,21 +17,21 @@ import BASObservability
 /// Inherits the M340 scope statement. Numbers measure pure
 /// in-process JSON encode + decode round-trip — no I/O, no
 /// network, no actor hops.
-public struct JSONCodecBench {
+package struct JSONCodecBench {
 
-    public static let scopeStatement: String =
+    package static let scopeStatement: String =
         "[scope] regression alarm, not an SLA. measures " +
         "pure in-process BASSovereignAuditEntry JSON " +
         "encode + decode round-trip — no I/O, no network, " +
         "no actor hops. do not quote these numbers as " +
         "customer-facing latency."
 
-    public struct Outcome: Sendable, Equatable {
-        public let roundTripCount: Int
-        public let entrySerializedBytes: Int
-        public let elapsedSeconds: Double
-        public let outcome: BASBenchWarmupOutcome
-        public init(
+    package struct Outcome: Sendable, Equatable {
+        package let roundTripCount: Int
+        package let entrySerializedBytes: Int
+        package let elapsedSeconds: Double
+        package let outcome: BASBenchWarmupOutcome
+        package init(
             roundTripCount: Int,
             entrySerializedBytes: Int,
             elapsedSeconds: Double,
@@ -63,7 +63,7 @@ public struct JSONCodecBench {
     /// Drive `roundTripCount` encode-then-decode cycles on a
     /// representative audit entry. Reports per-cycle latency
     /// in milliseconds.
-    public static func run(
+    package static func run(
         roundTripCount: Int = 50_000
     ) throws -> Outcome {
         let entry = makeRepresentativeEntry()

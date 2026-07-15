@@ -11,7 +11,6 @@ import Foundation
 @testable import BASHostKit
 @testable import BASMemory
 
-#if !os(iOS) // ch1022 source-gate parity
 final class BASAgentFabricAuthoritativeProjectionTests: XCTestCase {
 
     // MARK: - fixtures
@@ -230,4 +229,3 @@ final class BASAgentFabricAuthoritativeProjectionTests: XCTestCase {
             "plainSummary must keep ordinary content")
     }
 }
-#endif

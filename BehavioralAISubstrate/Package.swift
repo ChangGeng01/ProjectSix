@@ -22,7 +22,13 @@ let package = Package(
         .library(name: "BASObservability", targets: ["BASObservability"]),
         .library(name: "BASEvaluation", targets: ["BASEvaluation"]),
         .library(name: "BASAdmin", targets: ["BASAdmin"]),
+        // audit M-o MED-2 — SwiftUI-only console view, split out of BASAdmin
+        // so the substrate core (and headless hosts) stay SwiftUI-free.
+        .library(name: "BASAdminUI", targets: ["BASAdminUI"]),
         .library(name: "BASAppleAdapters", targets: ["BASAppleAdapters"]),
+        // charter audit 2026-07-12 T4 — pure lifecycle half + edge-wiring ring.
+        .library(name: "BASAppleLifecycleKit", targets: ["BASAppleLifecycleKit"]),
+        .library(name: "BASAppleEdgeWiring", targets: ["BASAppleEdgeWiring"]),
         .library(name: "BASSovereign", targets: ["BASSovereign"]),
         .library(name: "BASWorldPrior", targets: ["BASWorldPrior"]),
         .library(name: "BASLeaseLife", targets: ["BASLeaseLife"]),
@@ -76,6 +82,24 @@ let package = Package(
         // direct deps still leaves SPM resolving transitives from
         // remote URLs, which defeats the purpose if upstream is
         // unreachable. Updates require an explicit `Vendor/` swap.
+        // audit M-o MED-3 — swift-crypto (Ed25519 sovereign seals +
+        // NIST-SHA256 chain hashes) was in the graph ONLY transitively via
+        // swift-huggingface / swift-transformers; a vendor refresh that
+        // dropped it would break 87 security-critical `import Crypto` files
+        // across 10 targets. Declared explicitly at root so the crypto
+        // dependency is first-class, not contingent on an ML tokenizer
+        // package. Same on-disk path SPM already resolves ⇒ same identity,
+        // no duplicate (byte-equal build).
+        .package(path: "Vendor/swift-crypto"),
+        // audit x-architecture LOW-4 — explicit mlx-swift (base MLX / MLXNN /
+        // MLXOptimizers) was in the graph ONLY transitively via mlx-swift-lm;
+        // BASMLXAdapter imports MLX/MLXNN/MLXOptimizers directly. Declared at
+        // root so the base MLX dependency is first-class, not contingent on the
+        // mlx-swift-lm LLM package (a vendor refresh that dropped mlx-swift-lm's
+        // dep would break the direct imports). Same on-disk path SPM already
+        // resolves (mlx-swift-lm references it as ../mlx-swift) ⇒ same identity,
+        // no duplicate (byte-equal build). Mirrors the swift-crypto MED-3 fix.
+        .package(path: "Vendor/mlx-swift"),
         .package(path: "Vendor/mlx-swift-lm"),
         .package(path: "Vendor/swift-transformers"),
         .package(path: "Vendor/swift-huggingface")
@@ -96,6 +120,8 @@ let package = Package(
             // matching the binary target。
             dependencies: [
                 "BASCSystemBridge",
+                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+                .product(name: "Crypto", package: "swift-crypto"),
                 .target(
                     name: "BASRustMemoryTrackerBinary",
                     condition: .when(
@@ -154,6 +180,8 @@ let package = Package(
             // gate matches the binary target's gate。
             dependencies: [
                 "BASRuntimeCore",
+                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+                .product(name: "Crypto", package: "swift-crypto"),
                 .target(
                     name: "BASRustMemoryTrackerBinary",
                     condition: .when(
@@ -191,7 +219,12 @@ let package = Package(
         // chapter 七百四十一 第一/二刀 Rust seal/verify primitives。
         .target(
             name: "BASSovereign",
-            dependencies: ["BASRuntimeCore"],
+            // audit M-o MED-3 — explicit swift-crypto: L14 sovereign seals
+            // (Ed25519) must not depend on an ML package's transitive graph.
+            dependencies: [
+                "BASRuntimeCore",
+                .product(name: "Crypto", package: "swift-crypto")],
+            resources: [.process("Resources")],
             plugins: [
                 .plugin(name: "BASSQLSchemaGen")
             ]),
@@ -220,7 +253,9 @@ let package = Package(
         // protocol + Scout/Core presets + an in-memory deterministic
         // fake for tests. Platform providers (Apple FoundationModels,
         // MLX, remote LLMs) live in adapter layers.
-        .target(name: "BASOrgan", dependencies: ["BASRuntimeCore"]),
+        .target(name: "BASOrgan", dependencies: ["BASRuntimeCore",
+            // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+            .product(name: "Crypto", package: "swift-crypto")]),
         // BASChatCompletionsAdapter — generic remote-LLM organ
         // provider. URLSession-backed, OpenAI Chat Completions
         // JSON shape. Conforms to BASOrganAdapter so it drops into
@@ -346,6 +381,14 @@ let package = Package(
             dependencies: [
                 "BASRuntimeCore",
                 "BASOrgan",
+                // audit x-architecture LOW-4 — explicit mlx-swift base products
+                // (was transitive-only via mlx-swift-lm). This target imports
+                // MLX / MLXNN / MLXOptimizers directly.
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "MLXOptimizers", package: "mlx-swift"),
+                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+                .product(name: "Crypto", package: "swift-crypto"),
                 .product(
                     name: "MLXLLM",
                     package: "mlx-swift-lm"),
@@ -355,9 +398,10 @@ let package = Package(
                 .product(
                     name: "Tokenizers",
                     package: "swift-transformers"),
-                .product(
-                    name: "Hub",
-                    package: "swift-transformers"),
+                // audit x-arch LOW-5: the "Hub" product edge was phantom — no `import Hub`, no
+                // #hubDownloader/#huggingFaceTokenizerLoader macro invocation in Sources/ (Tokenizers
+                // resolves Hub internally via the package graph). Removed 2026-07-10, full DeviceTestApp
+                // xcodebuild verified green.
                 // M221 — MLXHuggingFace freestanding macros
                 // (#hubDownloader / #huggingFaceTokenizerLoader)
                 // bridge HuggingFace.HubClient + Tokenizers into
@@ -369,14 +413,20 @@ let package = Package(
                     name: "HuggingFace",
                     package: "swift-huggingface")
             ]),
-        .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy"]),
+        .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy",
+            // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+            .product(name: "Crypto", package: "swift-crypto")]),
         // BASOrchestration depends on BASObservability because M58
         // `BASUpdateTicketObservationDerivation` needs to read
         // `BASUpdateTicket` (defined in BASObservability) to produce a
         // per-ticket observation bundle on the main-chain thought frame.
         // Safe topology: BASObservability does not import BASOrchestration,
         // so no cycle.
-        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASLeaseLife", "BASOrgan", "BASObservability"]),
+        // audit x-arch LOW-5: BASLeaseLife edge was phantom — no `import BASLeaseLife` in
+        // Sources/BASOrchestration/, no re-export dependency (removed 2026-07-10, build-verified).
+        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASOrgan", "BASObservability",
+            // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+            .product(name: "Crypto", package: "swift-crypto")]),
         .target(
             name: "BASEvaluation",
             // Memory + Policy dropped (audit ch1040): no BASEvaluation source imports them —
@@ -385,9 +435,36 @@ let package = Package(
             dependencies: ["BASRuntimeCore", "BASObservability"]
         ),
         .target(name: "BASAdmin", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASEvaluation", "BASWorldPrior"]),
+        // audit M-o MED-2 — the SwiftUI BASConsoleView (was inside BASAdmin,
+        // forcing headless hosts to link SwiftUI transitively). Isolated here
+        // so only explicit UI hosts pull in SwiftUI.
+        .target(name: "BASAdminUI", dependencies: ["BASAdmin"]),
+        // charter audit 2026-07-12 T4 — the LLM-outside cut. Pure-Swift Apple lifecycle /
+        // executor / config types that BASHostKit's public API is built on (they never
+        // invoke a model runtime; their old home in BASAppleAdapters wove the
+        // FoundationModels-linking module into the core host umbrella). BASHostKit now
+        // depends on THIS target only; BASAppleAdapters re-exports it for compatibility.
+        // BOUNDARY (pinned by BASModelBoundaryPinTests): this target must NEVER import
+        // CoreML / FoundationModels / CoreAI / MLX / Tokenizers.
+        // charter audit 2026-07-12 T4 — the edge-wiring ring: sees BOTH BASHostKit and
+        // BASAppleAdapters; cross-side model-bound conveniences live here so neither side
+        // links the other.
+        .target(
+            name: "BASAppleEdgeWiring",
+            dependencies: ["BASRuntimeCore", "BASHostKit", "BASAppleAdapters"]),
+        .target(
+            name: "BASAppleLifecycleKit",
+            dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASObservability", "BASOrchestration", "BASLeaseLife"]),
         .target(
             name: "BASAppleAdapters",
-            dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASAdmin", "BASOrgan", "BASLeaseLife"],
+            dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASAdmin", "BASOrgan", "BASLeaseLife",
+                // charter audit 2026-07-12 T4: the pure lifecycle half moved out; the
+                // re-export in Exports.swift keeps every existing importer compiling.
+                "BASAppleLifecycleKit",
+                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+                .product(name: "Crypto", package: "swift-crypto"),
+                // RoBERTa BPE tokenizer for the CoreAI NLI verifier (BASCoreAINLIVerifier)
+                .product(name: "Tokenizers", package: "swift-transformers")],
             // MiniLM-L6-v2 sentence embedder (CoreML, fp32) + its BERT WordPiece vocab,
             // for the on-device semantic memory backend (BASMiniLMEmbeddingProvider).
             resources: [
@@ -404,6 +481,10 @@ let package = Package(
         .target(
             name: "BASHostKit",
             dependencies: [
+                // (swift-crypto dep removed: commit 44ba14dad moved the sole
+                //  swift-crypto user, BASSovereignLedgerHostSink, to native
+                //  CryptoKit; all ~40 crypto files in this target now use
+                //  CryptoKit, so the M-o MED-3 explicit dep here is vestigial.)
                 "BASRuntimeCore",
                 "BASMemory",
                 "BASPolicy",
@@ -412,7 +493,11 @@ let package = Package(
                 "BASObservability",
                 "BASEvaluation",
                 "BASAdmin",
-                "BASAppleAdapters",
+                // charter audit 2026-07-12 T4: was BASAppleAdapters — the LLM-adapter
+                // module is no longer in the core host umbrella's link closure. Model
+                // probes (MiniLM embedder, CoreAI NLI) are now INJECTED by the edge.
+                "BASAppleLifecycleKit",
+                "BASLeaseLife",
                 // M320 — `buildSovereignAuditEntry` accepts an
                 // optional `BASUnknownReserve` projection (white
                 // paper §5.4). The schema lives in BASWorldPrior;
@@ -435,6 +520,15 @@ let package = Package(
                 // in-process telemetry without SQLite
                 // durability。
                 "BASRustCoreBridge",
+                // gaps-reconciliation x-architecture LOW-4 (2026-07-11): 11 BASHostKit files
+                // import BASRustMemoryTrackerBinary but the dep was TRANSITIVE-only (via
+                // BASRustCoreBridge) — if that path is ever trimmed, the one #if canImport site
+                // (BASCognitiveMetalKernels.swift) degrades SILENTLY. Declare it, conditioned
+                // exactly like BASRustCoreBridge's own dep (no watchOS slice).
+                .target(
+                    name: "BASRustMemoryTrackerBinary",
+                    condition: .when(
+                        platforms: [.iOS, .macOS])),
                 // ch1044 audit LOW-8 — declare BASOrgan explicitly.
                 // BASLLMNeuralCoreService.swift + BASTrainingExample
                 // Sublimator.swift `import BASOrgan`; it previously
@@ -452,7 +546,10 @@ let package = Package(
             // public BASCognitiveBrain facade)。 The .md
             // is documentation,not a SPM resource —
             // explicit exclude is the canonical fix。
-            exclude: ["BASCognitiveBrain.md"]
+            exclude: ["BASCognitiveBrain.md"],
+            // observe→DISPOSE: bundled CC0 Wikidata starter fact corpus (1131) so the adjudicator's
+            // fact bank loads on a sandboxed, network-less device. Expandable to the full dump offline.
+            resources: [.copy("Resources/wikidata_facts.json")]
         ),
         // M2167 chapter 七百一 第一刀 — MULTI-LANGUAGE
         // AUGMENTATION ARC scaffold (per user directive
@@ -576,12 +673,41 @@ let package = Package(
         .executableTarget(
             name: "BASBrainCLI",
             dependencies: [
+                // audit x-arch LOW-5: BASMemory/BASPolicy edges were phantom — main.swift imports
+                // only Foundation/BASHostKit/BASRuntimeCore, and BASHostKit already declares +
+                // @_exports both (removed 2026-07-10, build-verified).
                 "BASHostKit",
-                "BASRuntimeCore",
-                "BASMemory",
-                "BASPolicy"
+                "BASRuntimeCore"
             ],
             path: "Sources/BASBrainCLI"),
+
+        // BASJournalCLI — "The Ledger" (#20 first daily workload). A sovereign decision &
+        // thread journal over the real event-sourced memory store; the first LIVE workload
+        // that fires the memory / deletion-doctrine / pagination chambers on a daily path.
+        .executableTarget(
+            name: "BASJournalCLI",
+            dependencies: [
+                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+                .product(name: "Crypto", package: "swift-crypto"),
+                "BASMemory",
+                "BASRuntimeCore",
+                "BASSovereign",
+                // increment 3: the ShadowTrial "was I right?" loop. BASOrchestration is the only
+                // module that can see both BASMemory (the coordinator) and BASSovereign (the
+                // ledger), so it hosts the BASSovereignAuditLedger→BASShadowTrialLedger bridge +
+                // the makeWithDefaultStateMachine factory.
+                "BASOrchestration",
+                // increment 2b: route add through the L1-L14 spine for a governance verdict.
+                // BASHostKit holds BASCognitiveBrain + runTurn; BASPolicy holds the permit/risk
+                // enums (BASActionPermitMode / BASBrainRiskLevel) named in the honest verdict string.
+                "BASHostKit",
+                "BASPolicy",
+                // grounding increment 2 (semantic citation ASSISTANT, hint-only): the bundled
+                // MiniLM-L6-v2 CoreML embedder (BASMiniLMEmbeddingProvider) — genuinely imported
+                // by SemanticHint.swift, not a phantom edge (x-arch LOW-5 lesson).
+                "BASAppleAdapters"
+            ],
+            path: "Sources/BASJournalCLI"),
         .plugin(
             name: "BASSQLSchemaGen",
             capability: .buildTool(),
@@ -622,7 +748,8 @@ let package = Package(
             // exposed by the C++ cache target,plus bas_spsc_ring_*
             // exposed by the C system bridge target。
             "BASMPSGraphExecutableCacheCxx",
-            "BASCSystemBridge"
+            "BASCSystemBridge",
+            "BASAppleLifecycleKit", "BASAppleEdgeWiring",
         ]),
         // Universal Draft Layer — XCTest-ONLY target (no swift-testing), so these run in their OWN .xctest bundle
         // and are not blocked by the swift-testing/XCTest co-bundle load crash in BehavioralAISubstrateTests.

@@ -139,12 +139,34 @@ public struct BASLLMVerifierReport:
     /// M932 verifier feedback's `counterArguments` field。
     public let aggregatedCounterArguments: [String]
 
+    /// audit organ-eval MED-5: true when verification was GATED-SKIPPED (no
+    /// stage ran — the avoided-compute path). Distinguishes an UNREVIEWED draft
+    /// from a genuinely-verified one: the old empty-`perStage` report read
+    /// identically whether verification was skipped, unwired, or ran-and-passed,
+    /// so skipping verification looked like passing it (a fail-open). Consumers
+    /// must treat `gatedSkip == true` as "not verified", not "verified clean".
+    public let gatedSkip: Bool
+
+    /// audit organ-eval MED-5 (clause 2) — the failed stages' `verifier-stage-failed:<stage>`
+    /// labels in a DETERMINISTIC order (`BASLLMVerifierStage.allCases`, i.e. declaration order),
+    /// NOT nondeterministic Dictionary iteration. The M892 replay-determinism contract requires the
+    /// serialized verifier feedback to be byte-reproducible cross-process; iterating `perStage`
+    /// directly appended these labels in hash-seed-dependent order, so two identical runs produced
+    /// different feedback bytes. Pure + Mac-testable.
+    public var orderedFailureLabels: [String] {
+        BASLLMVerifierStage.allCases.compactMap { stage in
+            guard let outcome = perStage[stage], !outcome.succeeded else { return nil }
+            return "verifier-stage-failed:" + stage.rawValue
+        }
+    }
+
     public init(
         perStage: [BASLLMVerifierStage:
             BASLLMVerifierStageOutcome],
         finalRecommendedAnswer: String,
         overallConfidence: Double,
-        aggregatedCounterArguments: [String]
+        aggregatedCounterArguments: [String],
+        gatedSkip: Bool = false
     ) {
         self.perStage = perStage
         self.finalRecommendedAnswer =
@@ -152,6 +174,19 @@ public struct BASLLMVerifierReport:
         self.overallConfidence = overallConfidence
         self.aggregatedCounterArguments =
             aggregatedCounterArguments
+        self.gatedSkip = gatedSkip
+    }
+
+    // audit organ-eval MED-5: byte-stable decode — a report persisted BEFORE the
+    // gatedSkip field decodes with gatedSkip = false (absent key ⇒ not-gated).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        perStage = try c.decode(
+            [BASLLMVerifierStage: BASLLMVerifierStageOutcome].self, forKey: .perStage)
+        finalRecommendedAnswer = try c.decode(String.self, forKey: .finalRecommendedAnswer)
+        overallConfidence = try c.decode(Double.self, forKey: .overallConfidence)
+        aggregatedCounterArguments = try c.decode([String].self, forKey: .aggregatedCounterArguments)
+        gatedSkip = try c.decodeIfPresent(Bool.self, forKey: .gatedSkip) ?? false
     }
 }
 
@@ -233,8 +268,20 @@ public actor BASLLMVerifierPipeline {
         // evidence-gated step (needs a verification-quality A/B — the first device run was DEFERRED, device
         // thermally cooked; see SPEC_DECODE_CERT_RESULTS.md §A2). The default now routes THROUGH the policy,
         // so the doctrine encoder has a real production caller instead of zero.
-        decodeLane: BASDecodeLane? = nil
+        decodeLane: BASDecodeLane? = nil,
+        // P1(b) 全面优化 (SYSTEM_EFFICIENCY_CAMPAIGN): injectable AVOIDED-COMPUTE gate. The verifier's
+        // stages are EXTRA LLM calls per turn; on low-stakes / thermally-throttled turns they are the
+        // measured-waste case. Default `{ _, _ in true }` = byte-equal-ON (ADR-014). Hosts wire
+        // BASAdjudicationGate-style stakes×headroom closures here (BASOrgan cannot import BASHostKit —
+        // the closure is the layering-clean seam). A skipped verify returns an honest `gated` report
+        // (finalRecommendedAnswer = the unreviewed draft, confidence = default, gatedSkip counted).
+        verifyGate: @escaping @Sendable (BASOrganDraft, BASLLMTaskPackage) async -> Bool = { _, _ in true },
+        // P1 follow-up: stage decode cap. nil (default) = preset budget, byte-equal; hosts measuring
+        // turn-shaped cost pass a small cap (a review verdict needs ~a paragraph, not 1024 tokens).
+        stageMaxOutputTokens: Int? = nil
     ) {
+        self.verifyGate = verifyGate
+        self.stageMaxOutputTokens = stageMaxOutputTokens
         // §13 #12 opt-in: when an install is supplied, every stage adapter is contracted
         // (fail-closed) + traced; nil → adapters used unwrapped (byte-equal-off, R1).
         if let ci = contractInstall {
@@ -256,6 +303,13 @@ public actor BASLLMVerifierPipeline {
     /// host electing `decodeLane: .greedy` gets `.greedyDeterministic` → spec-decode + reproducibility.
     private let stagePreset: BASOrganPreset
 
+    /// P1(b): the avoided-compute gate (see init). True = run the stages; false = gated skip.
+    private let verifyGate: @Sendable (BASOrganDraft, BASLLMTaskPackage) async -> Bool
+    /// P1: per-stage decode cap (nil = preset budget, byte-equal).
+    private let stageMaxOutputTokens: Int?
+    /// Telemetry: verify() calls that were gated to a skip (avoided-compute wins, honest count).
+    private(set) var gatedSkips: Int = 0
+
     // MARK: - Verify
 
     /// Run the wired stages on `draft`。Returns typed report。
@@ -266,6 +320,19 @@ public actor BASLLMVerifierPipeline {
         taskPackage: BASLLMTaskPackage
     ) async -> BASLLMVerifierReport {
         totalVerifyCalls += 1
+
+        // P1(b) avoided-compute: a gated turn skips EVERY stage (each stage = one full LLM call) and
+        // returns the unreviewed draft honestly (default confidence, no stage entries — downstream
+        // consumers see exactly the "no stages wired" shape, which they already handle).
+        guard await verifyGate(draft, taskPackage) else {
+            gatedSkips += 1
+            return BASLLMVerifierReport(
+                perStage: [:],
+                finalRecommendedAnswer: draft.body,
+                overallConfidence: Self.defaultOverallConfidence,
+                aggregatedCounterArguments: [],
+                gatedSkip: true)   // audit organ-eval MED-5: mark unreviewed, not "passed"
+        }
 
         var outcomes: [BASLLMVerifierStage:
             BASLLMVerifierStageOutcome] = [:]
@@ -365,12 +432,12 @@ public actor BASLLMVerifierPipeline {
                 "\(taskPackage.taskID)-\(stage.rawValue)",
             role: .scout,
             preset: stagePreset,   // Tranche A2: `.scout` default (byte-equal) or the elected greedy lane.
-            instruction: instruction + "\n\n" + userPrompt)
+            instruction: instruction + "\n\n" + userPrompt,
+            maxOutputTokens: stageMaxOutputTokens)
         do {
             // P1: factual verification → elect prompt-lookup (TOKEN-identical under greedy; .scout/temp>0 stages
-            // fail-close to draft(_:), byte-equal).
-            let draft = try await adapter.draft(
-                request, electAccelerated: BASDecodeLanePolicy.promptLookupEligible(for: .factual))
+            // fail-close to draft(_:), byte-equal). S5: pass the purpose (.factual); the planner picks the lane.
+            let draft = try await adapter.draft(request, purpose: .factual)
             return BASLLMVerifierStageOutcome(
                 stage: stage,
                 rawOutput: draft.body,
@@ -492,22 +559,24 @@ extension BASLLMVerifierPipeline {
                 draft: draft,
                 taskPackage: taskPackage)
             // M940:approved iff all wired stages succeeded
+            // audit organ-eval MED-5 (clause 1): a GATED-SKIP report has an EMPTY perStage, so
+            // `allSatisfy` is VACUOUSLY true — an unverified draft used to read as verifier-accepted
+            // (fail-open), byte-identical to a clean pass. The report's gatedSkip flag was write-only
+            // (no consumer could see it); gate `approved` on it so an unverified draft is NOT accepted,
+            // and propagate the flag so downstream (L11) can tell "unverified" from "a stage failed".
             let allSucceeded = report.perStage.values
                 .allSatisfy { $0.succeeded }
+            let approved = allSucceeded && !report.gatedSkip
             // M940:append failure-stage names so downstream
             // can detect partial failure even when other
             // stages produced output
+            // audit organ-eval MED-5 (clause 2): append failure-stage labels in a DETERMINISTIC
+            // order (allCases), not nondeterministic Dictionary iteration (M892 replay-determinism).
             var counterArgs =
                 report.aggregatedCounterArguments
-            for (stage, outcome) in report.perStage {
-                if !outcome.succeeded {
-                    counterArgs.append(
-                        "verifier-stage-failed:" +
-                        stage.rawValue)
-                }
-            }
+            counterArgs.append(contentsOf: report.orderedFailureLabels)
             return BASLLMVerifierFeedback(
-                approved: allSucceeded,
+                approved: approved,
                 amendedAnswer:
                     report.finalRecommendedAnswer
                         != draft.body
@@ -516,7 +585,8 @@ extension BASLLMVerifierPipeline {
                 counterArguments: counterArgs,
                 confidenceScores: [
                     "overall": report.overallConfidence
-                ])
+                ],
+                gatedSkip: report.gatedSkip)
         }
     }
 }

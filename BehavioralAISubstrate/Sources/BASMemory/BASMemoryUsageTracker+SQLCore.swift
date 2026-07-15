@@ -283,6 +283,9 @@ extension BASMemoryUsageTracker {
         if let db = db {
             try Self.ensureTombstoneSchema(db: db)
             try Self.purgeTombstonedRows(db: db)
+            // deep-audit P2-18 (2026-07-13): truncate the WAL so purged usage-record notes don't
+            // survive as INSERT frames in the -wal (explicit purge, non-hot).
+            try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
         }
         return count
     }
@@ -375,10 +378,22 @@ extension BASMemoryUsageTracker {
             sessionRef: sessionRef,
             turnRef: turnRef,
             permitMode: permitMode)
+        // audit memory-a F5: durable write FIRST, then cache — so a failed
+        // insert (SQLITE_FULL, dropped table, …) throws WITHOUT leaving a phantom
+        // record in the in-memory cache that never reached disk (cache/disk fork).
+        if let db {
+            if Self._forceWriteFailureForTesting {
+                throw TrackerError.stepFailed(sql: "INSERT", message: "forced (testing)")
+            }
+            try Self.insertRecord(db: db, record: record)
+        }
         inMemory[record.recordID] = record
-        if let db { try Self.insertRecord(db: db, record: record) }
         return record.recordID
     }
+
+    /// Test seam (memory-a F5): force the durable write to fail so the
+    /// disk-then-cache ordering (no phantom on failure) is exercisable WAL-immune.
+    nonisolated(unsafe) public static var _forceWriteFailureForTesting = false
 
     /// Update the `.helped` / `.notHelped` flag on a recorded
     /// event. Throws if the recordID is unknown.
@@ -390,8 +405,15 @@ extension BASMemoryUsageTracker {
             throw TrackerError.unknownRecord(id: recordID)
         }
         record.helpedFlag = helped ? .helped : .notHelped
+        // audit memory-a F5: durable write FIRST — on upsert failure the cache
+        // keeps its prior value instead of forking to an unpersisted update.
+        if let db {
+            if Self._forceWriteFailureForTesting {
+                throw TrackerError.stepFailed(sql: "UPSERT", message: "forced (testing)")
+            }
+            try Self.upsertRecord(db: db, record: record)
+        }
         inMemory[recordID] = record
-        if let db { try Self.upsertRecord(db: db, record: record) }
     }
 
     /// Total number of records in the log.
@@ -417,9 +439,12 @@ extension BASMemoryUsageTracker {
     /// Every record in the log, sorted ascending by `retrievedAt`.
     /// Used by the scorer to compute global frequency stats.
     public func allRecords() -> [BASMemoryUsageRecord] {
-        inMemory.values.sorted {
-            $0.retrievedAt < $1.retrievedAt
-        }
+        // H11 (mega-audit 2026-07-07): filter tombstoned — the doc claimed a
+        // (nonexistent) LEFT JOIN did this; callers like the closed-loop importance
+        // scorer must NOT re-weight forgotten atoms. Now honored in-memory.
+        inMemory.values
+            .filter { !inMemoryTombstones.contains($0.recordID) }
+            .sorted { $0.retrievedAt < $1.retrievedAt }
     }
 
     // MARK: - 主线 全面 提升: native SQL query paths
@@ -650,7 +675,8 @@ extension BASMemoryUsageTracker {
 
     /// Look up one record by ID. Returns nil if absent.
     public func record(forID id: String) -> BASMemoryUsageRecord? {
-        inMemory[id]
+        // H11: a tombstoned (forgotten) record must not be served as live.
+        inMemoryTombstones.contains(id) ? nil : inMemory[id]
     }
 
     /// Garbage-collect records older than `olderThan`. Returns
@@ -666,6 +692,9 @@ extension BASMemoryUsageTracker {
         }
         if let db {
             try Self.deleteOlderThan(db: db, cutoff: cutoff)
+            // deep-audit P2-18 (2026-07-13): truncate the WAL after the age-based purge so deleted
+            // usage records don't linger as INSERT frames in the -wal.
+            try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
         }
         return stale.count
     }

@@ -228,10 +228,18 @@ extension QinaoRuntime {
     internal static func candidateIntentDigest(
         _ candidate: QinaoMemory.LearningExportCandidate
     ) -> String {
-        let payload =
-            candidate.sourceMemoryID.uuidString
-            + "|" + candidate.domain
-            + "|" + candidate.generalizedSkeleton
+        // deep-audit P1-13 (2026-07-13): raw "|"-join was collision-prone — domain and
+        // skeleton are arbitrary host strings, so (domain "a|b", skeleton "c") and
+        // (domain "a", skeleton "b|c") produced the SAME payload, letting a warrant issued for
+        // one candidate be misread as approving a colliding sibling (contradicting this
+        // function's own binding guarantee). Reuse the exporter's INJECTIVE length-prefixed
+        // join (<utf8ByteCount>:<bytes>) so no field boundary is ambiguous. Safe to change the
+        // digest: warrants are ephemeral (~30s TTL) and never persisted.
+        let payload = QinaoLearningExporter.canonicalJoin([
+            candidate.sourceMemoryID.uuidString,
+            candidate.domain,
+            candidate.generalizedSkeleton,
+        ])
         let hash = SHA256.hash(data: Data(payload.utf8))
         return hash.map { String(format: "%02x", $0) }.joined()
     }

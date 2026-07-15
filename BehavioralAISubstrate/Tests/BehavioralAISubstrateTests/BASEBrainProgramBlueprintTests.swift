@@ -423,7 +423,12 @@ struct BASEBrainProgramBlueprintTests {
             // M808 (chapter 三百二一) — Phase F (附录 X) 2nd code cut:
             // typed mesh registration report for canonical 8-slot
             // Chenglu CoreML adapter assembly.
-            "ChengluMeshRegistrationReport"
+            "ChengluMeshRegistrationReport",
+            // old-audit schema-parity backfill (2026-07-11): the 12 newly-registered objects
+            "DistillationBank", "EvidenceAtom", "GuardBranch", "MemoryUsageRecord",
+            "RegretProfile", "RiskCalibrationBundle", "RiskCalibrationStratumDelta",
+            "RiskCalibrationStratumSubModelRef", "SacrificeMap", "ShadowEvaluationResult",
+            "ShadowEvaluatorMeridianResult", "ShadowTrialTypedEffect",
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

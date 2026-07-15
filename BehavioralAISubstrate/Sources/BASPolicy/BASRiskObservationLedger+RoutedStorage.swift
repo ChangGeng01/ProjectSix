@@ -44,9 +44,13 @@ import Foundation
 extension BASRiskObservationLedger {
 
     /// Optional SQLite-backed storage for cross-process persistence。
-    /// Mirrors the V1 in-memory ring on every record() call,enabling
-    /// cold-restart replay。 nil = ring-only (pre-chapter-七百五十四
-    /// default behavior)。
+    /// audit policy-obs-misc MED-2 (comment-lie corrected): this does NOT auto-mirror on every
+    /// record() call — `record()` never calls `persistToSharedStorage`, and no in-repo caller does
+    /// either (the "production seam" is host-driven, not wired). Hosts that want cold-restart replay
+    /// must call `persistToSharedStorage(_:)` EXPLICITLY per bundle. Auto-wiring record() is
+    /// deliberately NOT done: `loadFromSharedStorage` seeds the ring by calling `record()`, so an
+    /// auto-persist would RE-persist every loaded bundle on cold start. nil = ring-only (the
+    /// pre-chapter-七百五十四 default behavior)。
     ///
     /// nonisolated(unsafe) because the storage instance is host-
     /// supplied at startup before the actor is constructed;all
@@ -97,9 +101,13 @@ extension BASRiskObservationLedger {
     public static func observationsToRecords(
         bundle: BASRiskObservationBundle
     ) -> [BASRiskObservationRecord] {
-        return bundle.observations.map { obs in
+        // audit policy-obs-misc MED-2: thread each observation's ordinal within the bundle into
+        // its event_id, so two observations minted in the SAME millisecond (same intent+kind) do
+        // NOT collide → the INSERT's ON CONFLICT DO NOTHING no longer silently drops the second.
+        // Deterministic per bundle order (idempotent re-persist of the same bundle).
+        return bundle.observations.enumerated().map { (ordinal, obs) in
             toStorageRecord(
-                observation: obs, bundle: bundle)
+                observation: obs, bundle: bundle, ordinal: ordinal)
         }
     }
 
@@ -112,7 +120,8 @@ extension BASRiskObservationLedger {
     ///     attention signal,bounded [0,1])
     public static func toStorageRecord(
         observation: BASRiskObservation,
-        bundle: BASRiskObservationBundle
+        bundle: BASRiskObservationBundle,
+        ordinal: Int = 0
     ) -> BASRiskObservationRecord {
         let observedAtMs = Int64(
             observation.observedAt.timeIntervalSince1970 * 1000)
@@ -123,7 +132,8 @@ extension BASRiskObservationLedger {
             turnID: bundle.turnID,
             intentID: observation.intentID,
             kindRaw: observation.kind.rawValue,
-            observedAtMs: observedAtMs)
+            observedAtMs: observedAtMs,
+            ordinal: ordinal)
         let payloadJSON: String?
         if observation.content.isEmpty {
             payloadJSON = nil
@@ -145,17 +155,21 @@ extension BASRiskObservationLedger {
     }
 
     /// Derive a stable opaque event_id from observation fields。
-    /// Same (session,turn,intent,kind,observedAt) → same
+    /// Same (session,turn,intent,kind,observedAt,ordinal) → same
     /// event_id deterministically (replay-friendly)。
+    /// audit policy-obs-misc MED-2: `ordinal` (the observation's position within its bundle)
+    /// disambiguates two observations that share (intent,kind,observedAtMs) — without it they
+    /// collided and the INSERT's ON CONFLICT DO NOTHING silently dropped the second.
     public static func deriveEventID(
         sessionID: String,
         turnID: String,
         intentID: String,
         kindRaw: String,
-        observedAtMs: Int64
+        observedAtMs: Int64,
+        ordinal: Int = 0
     ) -> String {
         return "obs-\(sessionID)-\(turnID)" +
-            "-\(intentID)-\(kindRaw)-\(observedAtMs)"
+            "-\(intentID)-\(kindRaw)-\(observedAtMs)-\(ordinal)"
     }
 
     /// Map score → risk_band per chapter 七百三十八 schema

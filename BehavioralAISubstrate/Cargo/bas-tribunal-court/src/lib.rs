@@ -188,12 +188,22 @@ pub fn derive_id_profile(
                     })
             })
             .collect();
-        per_candidate.iter()
-            .cloned()
-            .fold(f64::NEG_INFINITY, f64::max)
-            .max(control_recovery_need)
-            .min(1.0)
-            .max(0.0)
+        // Match Swift `perCandidate.max() ?? controlRecoveryNeed`
+        // (BASTribunalFullBody.derive): control_recovery_need is a
+        // FALLBACK used only when NO candidate has a matching tri_score
+        // (per_candidate empty), NOT a floor. The old `.max(control_
+        // recovery_need)` floored urgency_feel unconditionally, so a
+        // high control_recovery_need overrode a genuinely-low per-
+        // candidate urgency — diverging from the Swift source of truth.
+        // (blindspot MED id27)
+        let uf = if per_candidate.is_empty() {
+            control_recovery_need
+        } else {
+            per_candidate.iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max)
+        };
+        clamp01(uf)
     } else {
         control_recovery_need
     };
@@ -585,6 +595,29 @@ mod tests {
             &[cp("c1", 0.1, 0.5, 0.5, 0.5),
               cp("c2", 0.9, 0.5, 0.5, 0.5)]);
         assert!((p.urgency_feel - 0.81).abs() < 1e-9);
+    }
+
+    #[test]
+    fn id_profile_urgency_not_floored_by_control_recovery() {
+        // blindspot MED id27: control_recovery_need is a FALLBACK
+        // (Swift `perCandidate.max() ?? controlRecoveryNeed`), NOT a
+        // floor. Here every per-candidate urgency is LOW (0.09) while
+        // control_recovery_need is HIGH (0.9); the old `.max(control_
+        // recovery_need)` floored urgency_feel up to 0.9, diverging
+        // from Swift which keeps 0.09.
+        //   control_recovery_need = mean(id 0.9, 0.9) = 0.9
+        //   per_candidate = [0.9×(1−0.9), 0.9×(1−0.9)] = [0.09, 0.09]
+        let p = derive_id_profile(
+            "p1".into(),
+            &[ts("c1", 0.9, 0.5, 0.5),
+              ts("c2", 0.9, 0.5, 0.5)],
+            &[cp("c1", 0.9, 0.5, 0.5, 0.5),
+              cp("c2", 0.9, 0.5, 0.5, 0.5)]);
+        assert!((p.urgency_feel - 0.09).abs() < 1e-9,
+            "urgency_feel must be max(per_candidate)=0.09, NOT floored \
+             to control_recovery_need=0.9; got {}", p.urgency_feel);
+        // control_recovery_need itself is unchanged.
+        assert!((p.control_recovery_need - 0.9).abs() < 1e-9);
     }
 
     #[test]

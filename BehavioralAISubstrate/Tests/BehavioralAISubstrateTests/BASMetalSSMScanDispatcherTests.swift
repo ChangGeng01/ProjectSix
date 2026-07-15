@@ -9,7 +9,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASMetalSSMScanDispatcherTests: XCTestCase {
 
     // MARK: - Minimal smoke dispatch
@@ -173,4 +172,3 @@ final class BASMetalSSMScanDispatcherTests: XCTestCase {
         }
     }
 }
-#endif

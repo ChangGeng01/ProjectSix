@@ -194,6 +194,14 @@ int32_t bas_sovereign_integrity_scan(
  *
  * Returns the canonical-byte count required/written,or negative
  * on error (-1 if prior_hash32 or out_next_hash32 is NULL)。
+ *
+ * INTEROP CAVEAT (deep-audit rust LOW, 2026-07-13): the canonical bytes this
+ * function emits are a SELF-CONTAINED Rust wire shape (prior_hash first) and are
+ * NOT interoperable with the Swift `BASSovereignAuditLedger` canonicalBytes
+ * encoding。 A chain SEALED by this C ABI must be VERIFIED only by the C
+ * `bas_sovereign_verify_chain_c_abi` below (and vice-versa) — do NOT cross-verify
+ * a C-sealed chain with the Swift ledger or a Swift-sealed chain with this C
+ * verify;the encodings differ and cross-verification will FAIL。
  */
 int32_t bas_sovereign_seal_entry_c_abi(
     const uint8_t* prior_hash32,

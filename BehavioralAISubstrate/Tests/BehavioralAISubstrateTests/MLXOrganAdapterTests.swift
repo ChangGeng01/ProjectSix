@@ -115,6 +115,33 @@ final class MLXOrganAdapterTests: XCTestCase {
         }
     }
 
+    // gaps-reconciliation organ-eval LOW-2 (2026-07-11): the kill-switch path
+    // (decodePlannerAutoSelect=false) in the purpose/sessionID draft entry used to skip the
+    // supportedRoles guard entirely — an unsupported-role request reached _plainDraft instead of
+    // throwing .unsupportedRole, diverging from base draft(_:). The guard is now hoisted above
+    // the kill-switch (and outside the #if), so ALL paths reject before any model work.
+    func testKillSwitchPathStillRejectsUnsupportedRole() async {
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma3_4B_it_4bit,
+            supportedRoles: [.scout])
+        await adapter.setDecodePlannerAutoSelect(false)   // the kill-switch lane
+        let request = BASOrganRequest(
+            requestID: "req-ks",
+            role: .core,  // not in supported set
+            preset: .core,
+            instruction: "say hi",
+            context: [])
+        do {
+            _ = try await adapter.draft(request, purpose: .scoutDefault, sessionID: nil)
+            XCTFail("expected unsupportedRole on the kill-switch path")
+        } catch BASOrganError.unsupportedRole(let role) {
+            XCTAssertEqual(role, .core)
+        } catch {
+            XCTFail("expected unsupportedRole but got \(error) — the kill-switch path must not "
+                + "bypass role validation")
+        }
+    }
+
     func testDraftRejectsUnsupportedRole() async {
         let adapter = MLXOrganAdapter(
             model: MLXModelCatalog.gemma3_4B_it_4bit,
@@ -686,6 +713,7 @@ final class MLXOrganAdapterTests: XCTestCase {
         XCTAssertEqual(altIDs, [
             "mlx-community/Llama-3.2-3B-Instruct-4bit",
             "mlx-community/Qwen2.5-3B-Instruct-4bit",
+            "mlx-community/Qwen3.5-4B-4bit",          // 22f0b2807: opt-in alt (defaults are Gemma-only — R1 honesty held)
             "mlx-community/Llama-3.2-1B-Instruct-4bit",
             "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
         ])

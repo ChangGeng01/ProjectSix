@@ -67,11 +67,9 @@ final class BASSleepConsolidationDriverTests: XCTestCase {
 
     /// A real driven turn whose budget frame we then override per
     /// scenario (the result struct is a value — mutation is local)。
-    /// @MainActor — the debug-build turn pipeline needs ~550KB of
-    /// stack;async XCTest bodies run on 512KB cooperative-pool
-    /// threads (the 27e0fcb2e SIGBUS class),so the turn drive hops
-    /// to the main thread's 8MB stack。
-    @MainActor
+    /// Cooperative-pool safe: the 27e0fcb2e stack class is fixed (CoW-boxed turn
+    /// result + stage-split runTurn; the 64,000B peak budget is MEASURED and enforced on
+    /// every default pass by BASRunTurnFrameBudgetTests (last measured peak: 57,360B)。
     private static func drivenTurn() throws -> BASEBrainTurnResult {
         let runtime = BASHostRuntime(configuration: .fixtureGeneric)
         let result = try runtime.startSession(
@@ -82,10 +80,14 @@ final class BASSleepConsolidationDriverTests: XCTestCase {
                 prompt: "How should I plan tomorrow?",
                 title: "t31-phase-b",
                 riskLevel: .low))
-        guard let turn = result.eBrainTurn else {
-            throw XCTSkip("fixture turn unavailable")
-        }
-        return turn
+        // A nil turn from a fixture startSession is a BROKEN TURN PIPELINE — the
+        // exact failure this suite exists to catch — so it must RED, not skip.
+        // (HostRuntimeCore builds a non-optional eBrainTurn and passes it straight
+        // into BASHostSessionResult, so this can only fire on a real regression.)
+        // Matches the 10+ sibling call sites that use XCTUnwrap.
+        return try XCTUnwrap(
+            result.eBrainTurn,
+            "fixture startSession must always produce an eBrainTurn")
     }
 
     /// The fixture turn naturally lands in `.quarantine` run mode

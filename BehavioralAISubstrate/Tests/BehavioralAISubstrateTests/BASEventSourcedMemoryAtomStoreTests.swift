@@ -154,6 +154,25 @@ final class BASEventSourcedMemoryAtomStoreTests: XCTestCase {
         XCTAssertNil(removed)
     }
 
+    // audit memory-b F11: a constant eventID makes the remove event DEDUPE against the admit event
+    // (wasNew=false), so it never appends. remove() must report nothing removed + keep the content
+    // cache — not claim a removal that didn't land.
+    func testRemoveDedupedByEventIDIsANoOp() async throws {
+        let store = BASEventSourcedMemoryAtomStore(
+            eventLog: BASInMemoryEventLogStorage(),
+            sessionID: "s",
+            eventIDFactory: { "dup" },
+            clockMs: { 1_700_000_000_000 },
+            source: "test")
+        let atom = makeAtom()
+        _ = try await store.admit(atom)
+        let removed = await store.remove(forID: atom.id.uuidString)
+        XCTAssertNil(removed, "a deduped (never-appended) remove must report nothing removed")
+        let still = await store.atom(forID: atom.id.uuidString)
+        XCTAssertEqual(still?.content, atom.content,
+            "the atom + its cached content survive a no-op remove (the remove event never appended)")
+    }
+
     // MARK: - Actor-restart projection fidelity (5)
 
     func testProjectionRebuildsAfterStoreRestart() async throws {

@@ -107,6 +107,26 @@ final class BASChapter852MambaScanPerfTests: XCTestCase {
         print("     Rust parallel depending on measured ratios")
         print("   - Rust paths remain opt-in via BASAutoRouteRanker")
         print("   - Metal GPU continues as primary production path")
+
+        // Compute the flip verdict for the 3 documented scales using the
+        // threshold rule stated above: rayon (parallel) wins when
+        // B×D ≥ 64 AND total cells ≥ 10_000.
+        let scales = [
+            Scale(b: 1, l: 64, d: 32),   // B×D=32,  cells=2048   → no flip
+            Scale(b: 4, l: 128, d: 128), // B×D=512, cells=65536  → flip
+            Scale(b: 8, l: 256, d: 256), // B×D=2048,cells=524288 → flip
+        ]
+        let flips = scales.map { s -> Bool in
+            let bd = Int(s.b) * Int(s.d)
+            return bd >= 64 && s.bld >= 10_000
+        }
+        let flipCount = flips.filter { $0 }.count
+        print("   flip verdict per scale: \(flips) → \(flipCount)/3 flip")
+        // #18: assertion — threshold rule flips exactly the 2 larger scales,
+        // and never the tiny cold-start scale (independent expected values).
+        XCTAssertEqual(flipCount, 2)
+        XCTAssertFalse(flips[0])
+        XCTAssertTrue(flips[1] && flips[2])
     }
 
     // MARK: - Helpers

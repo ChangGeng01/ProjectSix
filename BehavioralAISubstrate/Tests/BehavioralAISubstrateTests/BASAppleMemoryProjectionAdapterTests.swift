@@ -3,7 +3,6 @@ import Testing
 @testable import BASAppleAdapters
 @testable import BASMemory
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Memory Projection Adapter")
 struct BASAppleMemoryProjectionAdapterTests {
     @Test("compile builds a governed projection with governance snapshot")
@@ -93,4 +92,3 @@ struct BASAppleMemoryProjectionAdapterTests {
         #expect(projection.embeddingScoresByID.count == 2)
     }
 }
-#endif

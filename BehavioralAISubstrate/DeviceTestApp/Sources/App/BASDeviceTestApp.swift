@@ -154,30 +154,48 @@ struct ContentView: View {
                 // so it captures within a brief foreground window, independent of (and
                 // concurrent with) the slower GPU probe chain below (no GPU contention).
                 Task { ssmVerify = await BASSSMCautionProbe.run() }
-                // MPSGraph:async(kernel evaluate)。 Serial,never
-                // concurrent with MLX(no GPU contention)。
-                Task {
-                    // MPSGraph cannot initialize a device on the iOS Simulator —
-                    // `MPSGraphDeviceDescriptor initWithMPSGraphDevice:` throws an uncaught
-                    // Obj-C NSException (NSArray insert nil) that Swift do/catch cannot
-                    // intercept, hard-aborting the app (SIGABRT). The probe is a DEVICE-only
-                    // check by design, so skip it on the simulator (run it on real hardware).
-                    #if targetEnvironment(simulator)
-                    mpsgraphVerify = "skipped (simulator)"
-                    #else
-                    mpsgraphVerify = await BASMPSGraphProbe.run()
-                    #endif
-                    // ch 1033:Mamba SSM after MPSGraph(serial,
-                    // same Task → never overlap GPU dispatch)。 The Mamba harness handles
-                    // gpuAvailable=false on the simulator gracefully (CPU scan still runs)。
-                    mambaVerify = await BASMambaProbe.run()
+                if ProcessInfo.processInfo.environment["BAS_V12_PROBE"] == "1" {
+                    // v12 on-device honesty + jetsam probe (loads the local-staged Qwen3.5-4B-4bit + the v12
+                    // adapter, base-vs-v12 A/B via the GDN-compatible streaming path). Runs EXCLUSIVELY: it
+                    // loads a 4B model, so we SKIP the MPSGraph/Mamba GPU chain below to avoid Metal contention
+                    // on the 8GB A19. Result reuses `mambaVerify` so no new @State is needed.
+                    Task { mambaVerify = await BASV12HonestyProbe.run() }
+                } else {
+                    // MPSGraph:async(kernel evaluate)。 deep-audit devicetestapp LOW-5: this Task
+                    // is serial w.r.t. the Mamba SSM below (same Task), BUT it is NOT guaranteed
+                    // free of GPU contention overall — when the v12 probe is OFF and
+                    // BAS_ENDURANCE_AUTOSTART=1, the endurance loop's MLX load kicks off in the SAME
+                    // onAppear (see the autostart gate below), so the cold-start GPU probe can
+                    // contend with MLX. The "no contention" property holds only when autostart is off.
+                    Task {
+                        // MPSGraph cannot initialize a device on the iOS Simulator —
+                        // `MPSGraphDeviceDescriptor initWithMPSGraphDevice:` throws an uncaught
+                        // Obj-C NSException (NSArray insert nil) that Swift do/catch cannot
+                        // intercept, hard-aborting the app (SIGABRT). The probe is a DEVICE-only
+                        // check by design, so skip it on the simulator (run it on real hardware).
+                        #if targetEnvironment(simulator)
+                        mpsgraphVerify = "skipped (simulator)"
+                        #else
+                        mpsgraphVerify = await BASMPSGraphProbe.run()
+                        #endif
+                        // ch 1033:Mamba SSM after MPSGraph(serial,
+                        // same Task → never overlap GPU dispatch)。 The Mamba harness handles
+                        // gpuAvailable=false on the simulator gracefully (CPU scan still runs)。
+                        mambaVerify = await BASMambaProbe.run()
+                    }
                 }
             }
             // ch 1025.4:if BAS_ENDURANCE_AUTOSTART=1,kick off
             // the endurance loop。 No-op otherwise(legacy
             // xcodebuild test mode still works because the
             // controller simply stays idle)。
-            endurance.autostartIfEnabled()
+            // audit devicetestapp LOW-5: the v12 probe (above) runs EXCLUSIVELY — it loads a 4B model
+            // on the 8GB A19 and skips the GPU chain to avoid contention. Don't also autostart the
+            // endurance loop alongside it (a second heavy load ⇒ OOM/jetsam); every other launch is
+            // unaffected.
+            if ProcessInfo.processInfo.environment["BAS_V12_PROBE"] != "1" {
+                endurance.autostartIfEnabled()
+            }
         }
     }
 }

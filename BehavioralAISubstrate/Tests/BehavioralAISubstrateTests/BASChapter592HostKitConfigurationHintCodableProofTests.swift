@@ -27,17 +27,17 @@ final class BASChapter592HostKitConfigurationHintCodableProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testCognitiveOSBundleOptionsConformsToCodable() {
-        assertCodable(BASCognitiveOSBundleOptions.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(BASCognitiveOSBundleOptions())
     }
 
     func testChengluPreflightHintConformsToCodable() {
-        assertCodable(BASChengluPreflightHint.self)
+        // #18: real round-trip
+        let value = BASChengluPreflightHint(
+            route: .afm,
+            probability: 0,
+            confidence: .high)
+        assertCodableRoundTrips(value)
     }
 }

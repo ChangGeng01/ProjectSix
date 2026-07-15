@@ -172,4 +172,15 @@ final class BASChapter761CSystemProbesTests: XCTestCase {
             BASTaskVmInfoError.unknownReturnCode(-99).caseIdentifier,
             "unknownReturnCode")
     }
+
+    // audit runtimecore-a #6: a negative or non-finite epoch reading must FLOOR to 0, not trap the
+    // process in `UInt64(Double)` (which precondition-crashes on a negative/non-finite argument).
+    func testNanosFromEpochSecondsClampsInsteadOfTrapping() {
+        XCTAssertEqual(BASWallclockNanos.nanosFromEpochSeconds(-1.0), 0,
+            "a pre-1970 wall clock must floor to 0, not crash")
+        XCTAssertEqual(BASWallclockNanos.nanosFromEpochSeconds(.infinity), 0)
+        XCTAssertEqual(BASWallclockNanos.nanosFromEpochSeconds(.nan), 0)
+        XCTAssertEqual(BASWallclockNanos.nanosFromEpochSeconds(1.5), 1_500_000_000,
+            "a normal reading converts unchanged")
+    }
 }

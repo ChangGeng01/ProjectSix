@@ -137,15 +137,16 @@ extension SampleHostModel {
                             prompt: prompt,
                             title: "iphone-bench-\(iter)",
                             riskLevel: riskLevel))
-                    if let turn = result.eBrainTurn {
-                        if let entry = turn.sovereignAuditEntry {
+                    // context-IR: ACT/SHOW reads go through the slim response contract
+                    if let response = result.turnResponse {
+                        if let entry = response.sovereignAuditEntry {
                             auditCount = entry.signalRefs.count
                         }
-                        permitMode = turn.actionPermit
+                        permitMode = response.actionPermit
                             .mode.rawValue
-                        let body = turn.thoughtFold
+                        let body = response.thoughtFold
                             .compactSlots["body"]
-                            ?? turn.thoughtFold
+                            ?? response.thoughtFold
                                 .compactSlots["summary"]
                             ?? ""
                         bodyLength = body.count

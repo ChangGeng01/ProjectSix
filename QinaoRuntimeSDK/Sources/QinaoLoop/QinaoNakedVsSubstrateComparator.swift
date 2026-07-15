@@ -47,7 +47,7 @@ public struct QinaoNakedVsSubstrateComparison:
     public let nakedAFMResponse: String?
     /// Naked Gemma 4 E2B response text. nil when MLX/Gemma
     /// unavailable.
-    public let nakedGemmaResponse: String?
+    public let nakedOpenModelResponse: String?
     /// Substrate's reason-code count from audit emission.
     public let substrateAuditCodeCount: Int
     /// Substrate's final permit mode (e.g. "answer", "compare",
@@ -59,8 +59,8 @@ public struct QinaoNakedVsSubstrateComparison:
     /// meaningful when nakedAFMResponse != nil.
     public let nakedAFMRedLineCount: Int
     /// Red-line violation count in naked Gemma output text. Only
-    /// meaningful when nakedGemmaResponse != nil.
-    public let nakedGemmaRedLineCount: Int
+    /// meaningful when nakedOpenModelResponse != nil.
+    public let nakedOpenModelRedLineCount: Int
     /// Red-line violation count in substrate output body. Only
     /// meaningful when substrateOutputBody != nil.
     public let substrateRedLineCount: Int
@@ -68,22 +68,22 @@ public struct QinaoNakedVsSubstrateComparison:
     public init(
         prompt: String,
         nakedAFMResponse: String?,
-        nakedGemmaResponse: String?,
+        nakedOpenModelResponse: String?,
         substrateAuditCodeCount: Int,
         substratePermitMode: String,
         substrateOutputBody: String?,
         nakedAFMRedLineCount: Int,
-        nakedGemmaRedLineCount: Int,
+        nakedOpenModelRedLineCount: Int,
         substrateRedLineCount: Int
     ) {
         self.prompt = prompt
         self.nakedAFMResponse = nakedAFMResponse
-        self.nakedGemmaResponse = nakedGemmaResponse
+        self.nakedOpenModelResponse = nakedOpenModelResponse
         self.substrateAuditCodeCount = substrateAuditCodeCount
         self.substratePermitMode = substratePermitMode
         self.substrateOutputBody = substrateOutputBody
         self.nakedAFMRedLineCount = nakedAFMRedLineCount
-        self.nakedGemmaRedLineCount = nakedGemmaRedLineCount
+        self.nakedOpenModelRedLineCount = nakedOpenModelRedLineCount
         self.substrateRedLineCount = substrateRedLineCount
     }
 }
@@ -92,29 +92,29 @@ public struct QinaoNakedVsSubstrateComparison:
 public struct QinaoComparatorAggregate: Sendable, Equatable {
     public let totalPrompts: Int
     public let nakedAFMTotalViolations: Int
-    public let nakedGemmaTotalViolations: Int
+    public let nakedOpenModelTotalViolations: Int
     public let substrateTotalViolations: Int
     public let nakedAFMAvailableCount: Int
-    public let nakedGemmaAvailableCount: Int
+    public let nakedOpenModelAvailableCount: Int
     public let substrateOutputAvailableCount: Int
 
     public init(
         totalPrompts: Int,
         nakedAFMTotalViolations: Int,
-        nakedGemmaTotalViolations: Int,
+        nakedOpenModelTotalViolations: Int,
         substrateTotalViolations: Int,
         nakedAFMAvailableCount: Int,
-        nakedGemmaAvailableCount: Int,
+        nakedOpenModelAvailableCount: Int,
         substrateOutputAvailableCount: Int
     ) {
         self.totalPrompts = totalPrompts
         self.nakedAFMTotalViolations = nakedAFMTotalViolations
-        self.nakedGemmaTotalViolations =
-            nakedGemmaTotalViolations
+        self.nakedOpenModelTotalViolations =
+            nakedOpenModelTotalViolations
         self.substrateTotalViolations = substrateTotalViolations
         self.nakedAFMAvailableCount = nakedAFMAvailableCount
-        self.nakedGemmaAvailableCount =
-            nakedGemmaAvailableCount
+        self.nakedOpenModelAvailableCount =
+            nakedOpenModelAvailableCount
         self.substrateOutputAvailableCount =
             substrateOutputAvailableCount
     }
@@ -123,19 +123,19 @@ public struct QinaoComparatorAggregate: Sendable, Equatable {
         comparisons: [QinaoNakedVsSubstrateComparison]
     ) -> QinaoComparatorAggregate {
         var afmViolations = 0
-        var gemmaViolations = 0
+        var openModelViolations = 0
         var substrateViolations = 0
         var afmAvail = 0
-        var gemmaAvail = 0
+        var openModelAvail = 0
         var substrateAvail = 0
         for c in comparisons {
             if c.nakedAFMResponse != nil {
                 afmAvail += 1
                 afmViolations += c.nakedAFMRedLineCount
             }
-            if c.nakedGemmaResponse != nil {
-                gemmaAvail += 1
-                gemmaViolations += c.nakedGemmaRedLineCount
+            if c.nakedOpenModelResponse != nil {
+                openModelAvail += 1
+                openModelViolations += c.nakedOpenModelRedLineCount
             }
             if c.substrateOutputBody != nil {
                 substrateAvail += 1
@@ -146,10 +146,10 @@ public struct QinaoComparatorAggregate: Sendable, Equatable {
         return QinaoComparatorAggregate(
             totalPrompts: comparisons.count,
             nakedAFMTotalViolations: afmViolations,
-            nakedGemmaTotalViolations: gemmaViolations,
+            nakedOpenModelTotalViolations: openModelViolations,
             substrateTotalViolations: substrateViolations,
             nakedAFMAvailableCount: afmAvail,
-            nakedGemmaAvailableCount: gemmaAvail,
+            nakedOpenModelAvailableCount: openModelAvail,
             substrateOutputAvailableCount: substrateAvail)
     }
 }
@@ -164,23 +164,23 @@ public enum QinaoNakedVsSubstrateComparator {
     public static func makeComparison(
         prompt: String,
         nakedAFMResponse: String?,
-        nakedGemmaResponse: String?,
+        nakedOpenModelResponse: String?,
         substrateAuditCodeCount: Int,
         substratePermitMode: String,
         substrateOutputBody: String?,
         nakedAFMRedLineCount: Int,
-        nakedGemmaRedLineCount: Int,
+        nakedOpenModelRedLineCount: Int,
         substrateRedLineCount: Int
     ) -> QinaoNakedVsSubstrateComparison {
         QinaoNakedVsSubstrateComparison(
             prompt: prompt,
             nakedAFMResponse: nakedAFMResponse,
-            nakedGemmaResponse: nakedGemmaResponse,
+            nakedOpenModelResponse: nakedOpenModelResponse,
             substrateAuditCodeCount: substrateAuditCodeCount,
             substratePermitMode: substratePermitMode,
             substrateOutputBody: substrateOutputBody,
             nakedAFMRedLineCount: nakedAFMRedLineCount,
-            nakedGemmaRedLineCount: nakedGemmaRedLineCount,
+            nakedOpenModelRedLineCount: nakedOpenModelRedLineCount,
             substrateRedLineCount: substrateRedLineCount)
     }
 
@@ -193,8 +193,8 @@ public enum QinaoNakedVsSubstrateComparator {
         let afm = c.nakedAFMResponse != nil
             ? "✓ (\(c.nakedAFMRedLineCount) RLs)"
             : "skip"
-        let gemma = c.nakedGemmaResponse != nil
-            ? "✓ (\(c.nakedGemmaRedLineCount) RLs)"
+        let gemma = c.nakedOpenModelResponse != nil
+            ? "✓ (\(c.nakedOpenModelRedLineCount) RLs)"
             : "skip"
         let substrate = c.substrateOutputBody != nil
             ? "✓ (\(c.substrateRedLineCount) RLs, \(c.substrateAuditCodeCount) codes, permit:\(c.substratePermitMode))"

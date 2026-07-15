@@ -1,0 +1,84 @@
+{
+ "rule": "J4 (charter part 6, pure confirmation on new banks)",
+ "fresh": {
+  "sha256": "b604c1ddf8ed1d2a0413c8aae9ed315ae7bdc26225149d943487dce7c425051b",
+  "n": 572
+ },
+ "arm_shas": {
+  "incumbent": "cf8276421e5d12bf",
+  "r1_rejected": "2eac90211acaae7d",
+  "r2_candidate": "1aa86c252a7415fa"
+ },
+ "attempt_history": "\u7b2c 3 \u6b21\u5224\u51b3\u5c1d\u8bd5(R1 \u4eba\u9a73/R2 J2 \u9a73/R4)\u2014\u2014\u591a\u91cd\u6bd4\u8f83\u6ce8\u8bb0",
+ "alpha_primary": {
+  "n": 277,
+  "n_neg": 86,
+  "inc": 0.4448,
+  "cand": 0.5924,
+  "delta": 0.1476,
+  "ci95_strat": [
+   0.0563,
+   0.2394
+  ],
+  "ci95_cluster": {
+   "ci95": [
+    0.0607,
+    0.2568
+   ],
+   "n_clusters": 97,
+   "valid_resamples": 10000
+  }
+ },
+ "math_guard": {
+  "n": 258,
+  "n_neg": 193,
+  "inc": 0.8993,
+  "cand": 0.7842,
+  "delta": -0.1151,
+  "ci95_strat": [
+   -0.175,
+   -0.0563
+  ]
+ },
+ "overall_guard": {
+  "n": 572,
+  "n_neg": 292,
+  "inc": 0.8109,
+  "cand": 0.7857,
+  "delta": -0.0252,
+  "ci95_strat": [
+   -0.0588,
+   0.0081
+  ]
+ },
+ "descriptive": {
+  "reverse": {
+   "n": 16,
+   "n_neg": 13,
+   "inc": 0.7436,
+   "cand": 0.7436,
+   "delta": 0.0,
+   "ci95_strat": [
+    -0.2051,
+    0.2051
+   ]
+  },
+  "elements": {
+   "n": 21,
+   "n_neg": 0,
+   "inc": null,
+   "cand": null,
+   "delta": null,
+   "ci95_strat": null
+  }
+ },
+ "criteria": {
+  "alpha_n_neg_ge_60": true,
+  "alpha_strat_ci_lo_gt_0": true,
+  "alpha_cluster_ci_lo_gt_0": true,
+  "alpha_delta_ge_0.10": true,
+  "math_noninferior_ci_lo_gt_-0.03": false,
+  "overall_ci_lo_gt_-0.02": false
+ },
+ "verdict": "REJECTED"
+}

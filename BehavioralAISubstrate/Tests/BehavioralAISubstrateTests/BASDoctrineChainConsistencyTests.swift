@@ -20,11 +20,15 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
 
     // MARK: - Doctrine version M-number matches latest chapter
 
-#if false  // chapter 七百五十二 第二刀 deactivated
     func testDoctrineVersionMatchesLatestChapterMNumber() {
-        // The doctrine version's M-suffix must equal the
-        // mNumberLast of the latest chapter doctrine in
-        // Phase 2。
+        // blindspot MED id45: this cross-check was #if false-deactivated
+        // (chapter 七百五十二 第二刀) because it referenced the since-
+        // removed BASChapter446EntropyDoctrine — yet the file header
+        // still advertised it as an active PR-time guard (comment-vs-
+        // code drift, disease #3). Reactivated + re-pointed at the live
+        // chapter registry (the same surface testPhase2DoctrineEnds...
+        // uses). The doctrine version's M-suffix must not LAG the latest
+        // shipped chapter's mNumberLast.
         let docVersion = BASCognitiveOSCompletionDoctrine
             .doctrineVersion
         // Format: "ADR-016.M<n>"
@@ -38,21 +42,15 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
                 "doctrineVersion '\(docVersion)' has " +
                 "non-integer M-suffix")
         }
-        // Latest chapter must end at this M-number。 Today
-        // chapter 四百四十六 is the latest with mNumberLast
-        // M1163 (POST-RADICAL Wave 17 — POST-RADICAL
-        // EVOLUTION SWEEP close-out meta-doctrine);the
-        // doctrine version should be M1163 OR any later
-        // M-number bumped by a NEW chapter that we haven't
-        // yet listed in this test。 Sweep complete。
+        let latest = BASChapterDoctrineRegistry
+            .recordFor(chapterTag: "chapter 七百三十四")!
         XCTAssertGreaterThanOrEqual(
             docMNumber,
-            BASChapter446EntropyDoctrine.mNumberLast,
-            "doctrineVersion M-suffix must be >= latest" +
-            " known chapter mNumberLast (currently " +
-            "chapter 四百四十六 at M\(BASChapter446EntropyDoctrine.mNumberLast))")
+            latest.mNumberLast,
+            "doctrineVersion M-suffix must be >= the latest " +
+            "chapter's mNumberLast (chapter 七百三十四 at " +
+            "M\(latest.mNumberLast))")
     }
-#endif  // chapter 七百五十二 第二刀
 
     // MARK: - Phase 2 doctrine ends at latest chapter
 
@@ -140,16 +138,33 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
             "(got \(ratio))")
     }
 
-    // MARK: - Determinism
+    // MARK: - Doctrine version M-suffix ties the Phase-2 chain
 
-    func testConsistencyChecksAreDeterministic() {
-        let v1 = BASCognitiveOSCompletionDoctrine
+    func testDoctrineVersionMSuffixMatchesPhase2MNumber() {
+        // blindspot LOW id15: the old testConsistencyChecksAreDeterministic
+        // compared doctrineVersion and mNumberLast to THEMSELVES (v1==v2,
+        // mNumberLast==mNumberLast) — a tautology that pinned nothing and
+        // slipped past the tautology-budget lint (which only sees the
+        // XCTAssertTrue(true) form). Real teeth: the doctrineVersion's
+        // M-suffix must equal the Phase-2 doctrine's mNumberLast, so a
+        // commit that bumps one without the other reds — exactly the
+        // PR-time guard the file header claims.
+        let docVersion = BASCognitiveOSCompletionDoctrine
             .doctrineVersion
-        let v2 = BASCognitiveOSCompletionDoctrine
-            .doctrineVersion
-        XCTAssertEqual(v1, v2)
+        let parts = docVersion.split(separator: ".")
+        XCTAssertEqual(parts.count, 2,
+            "expected 'ADR-016.M<n>', got '\(docVersion)'")
+        XCTAssertEqual(parts.first, "ADR-016")
+        guard let m = Int(String(parts[1])
+            .replacingOccurrences(of: "M", with: "")) else {
+            return XCTFail(
+                "doctrineVersion '\(docVersion)' has " +
+                "non-integer M-suffix")
+        }
         XCTAssertEqual(
+            m,
             BASPhase2EntropyClosureDoctrine.mNumberLast,
-            BASPhase2EntropyClosureDoctrine.mNumberLast)
+            "doctrineVersion M-suffix must equal Phase-2 " +
+            "mNumberLast (coordinated-bump guard)")
     }
 }

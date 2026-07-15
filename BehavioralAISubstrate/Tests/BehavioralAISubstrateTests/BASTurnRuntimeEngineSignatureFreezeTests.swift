@@ -48,9 +48,9 @@ final class BASTurnRuntimeEngineSignatureFreezeTests:
                 stagePlan: stagePlan,
                 timestampMsOverride: timestampMsOverride)
         }
-        XCTAssertTrue(true,
-            "runTurn signature compiled — typed surface " +
-            "frozen at chapter 四百九 / M1008")
+        // M824 doctrine (no XCTAssertTrue(true) tautology): the closure assignment above IS the
+        // contract — if runTurn's typed surface narrows/widens this file fails to COMPILE. The freeze
+        // is at chapter 四百九 / M1008.
     }
 
     // MARK: - 6 typed scaffolding params + 1 timestamp override
@@ -88,10 +88,8 @@ final class BASTurnRuntimeEngineSignatureFreezeTests:
             BASTurnRuntimeEngine.self
         let _: BASTurnRuntimeEngineConfiguration.Type =
             BASTurnRuntimeEngineConfiguration.self
-        XCTAssertTrue(true,
-            "BASTurnRuntimeEngine + " +
-            "BASTurnRuntimeEngineConfiguration types " +
-            "exist as documented by M968/M998")
+        // M824 doctrine: the two metatype bindings above ARE the contract — if either type stops
+        // existing (M968/M998) this fails to COMPILE. No runtime tautology needed.
     }
 
     // MARK: - Actor isolation pin
@@ -105,7 +103,7 @@ final class BASTurnRuntimeEngineSignatureFreezeTests:
             _ = a
         }
         acceptActor(BASTurnRuntimeEngine.self)
-        XCTAssertTrue(true,
-            "BASTurnRuntimeEngine is actor-isolated")
+        // M824 doctrine: the `acceptActor(_:)` call above only compiles if BASTurnRuntimeEngine is an
+        // `Actor` — that IS the pin (chapter 四百四 V2). A regression to struct/class fails to COMPILE.
     }
 }

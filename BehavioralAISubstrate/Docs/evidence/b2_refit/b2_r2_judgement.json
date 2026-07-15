@@ -1,0 +1,41 @@
+{
+ "rule": "J2 (paired bootstrap, RSI charter part 5 R2)",
+ "corpus": {
+  "sha256": "a72caf597821bfb29878606f4ab6c8163e402cf62b60e79c92a2698f37b34f8b",
+  "n": 1171,
+  "n_test": 360
+ },
+ "incumbent_on_device_heldout": {
+  "auc": 0.8843,
+  "math": 0.9159,
+  "broad": 0.6381,
+  "note": "Mac-fit weights on device features \u2014 drift shows here"
+ },
+ "candidate": {
+  "auc": 0.886,
+  "math": 0.8999,
+  "broad": 0.8044,
+  "lam": 0.01,
+  "iters": 9000
+ },
+ "paired_bootstrap": {
+  "n_resamples": 10000,
+  "seed": 20260709,
+  "delta": 0.0017,
+  "ci95": [
+   -0.0297,
+   0.0344
+  ]
+ },
+ "criteria": {
+  "ci_lower_gt_zero": false,
+  "delta_ge": 0.01,
+  "domain_tol": 0.01
+ },
+ "verdict": "REJECTED",
+ "r1_rejected_comparison_arm": {
+  "auc": 0.8948,
+  "math": 0.9182,
+  "broad": 0.7399
+ }
+}

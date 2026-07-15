@@ -104,7 +104,8 @@ public struct BASMLXMemoryBudget: Sendable, Equatable {
     /// a model the data proved survivable is never falsely refused).
     public static func wouldExceedActiveHardCap(
         targetProviderID: String,
-        capBytes: Int = measurediPhoneAirActiveHardCapBytes,
+        capBytes: Int = BASMLXMemoryModel.resolvedActiveHardCapBytes()
+            ?? measurediPhoneAirActiveHardCapBytes,
         safetyMarginBytes: Int = 128 * 1024 * 1024
     ) -> Bool {
         guard let peak = estimatedPeakFootprintBytes(forProviderID: targetProviderID) else {

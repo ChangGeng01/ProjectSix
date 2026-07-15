@@ -289,6 +289,62 @@ final class BASTrainingDataExporterTests: XCTestCase {
             "Final file must exist after successful export")
     }
 
+    // MARK: - audit TrainingDataExporter §0: the commit is genuinely atomic
+
+    /// FAITHFUL atomicity teeth. The old code did `removeItem(destination)` THEN `moveItem` despite
+    /// a "Atomic rename" comment — a failed move left the destination GONE. The default
+    /// `atomicCommitStrategy` (replaceItemAt safe-save) must instead PRESERVE the prior destination
+    /// when the swap fails. Force a failure with an ABSENT temp (nothing to move in).
+    func testAtomicCommitStrategyPreservesDestinationOnFailedSwap() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("M903-commit-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let dest = dir.appendingPathComponent("export.jsonl")
+        let temp = dest.appendingPathExtension("tmp")   // never created ⇒ the swap must fail
+        try "PRIOR-EXPORT-A".data(using: .utf8)!.write(to: dest)
+
+        XCTAssertThrowsError(
+            try BASTrainingDataExporter.atomicCommitStrategy(temp, dest),
+            "a commit from a missing temp must fail")
+        // The atomicity property: a FAILED commit must NOT destroy the prior destination.
+        let survived = try String(contentsOf: dest, encoding: .utf8)
+        XCTAssertEqual(survived, "PRIOR-EXPORT-A",
+            "a failed commit must leave the prior export intact (the old removeItem-then-moveItem lost it)")
+    }
+
+    /// Integration companion: an export whose COMMIT fails surfaces as `.fileWriteFailed`, leaves the
+    /// prior export byte-intact, and cleans up the half-written temp (via the injectable seam).
+    func testExportCommitFailurePreservesPriorExportAndCleansTemp() async throws {
+        let log = BASInMemoryEventLogStorage()
+        _ = try await log.append(makeEvent(index: 1))
+        let url = makeTempURL()
+
+        // A healthy first export → url holds a valid prior export.
+        _ = try await BASTrainingDataExporter(eventLog: log)
+            .exportToJSONL(filter: .all, to: url, exportedAtMs: 1_700_000_000_000)
+        let priorBytes = try Data(contentsOf: url)
+        XCTAssertGreaterThan(priorBytes.count, 0)
+
+        // A second export whose commit strategy throws before touching url.
+        struct CommitBoom: Error {}
+        let failing = BASTrainingDataExporter(
+            eventLog: log, commitStrategy: { _, _ in throw CommitBoom() })
+        do {
+            _ = try await failing.exportToJSONL(filter: .all, to: url, exportedAtMs: 1_700_000_000_001)
+            XCTFail("a throwing commit strategy must surface as a failed export")
+        } catch let e as BASTrainingDataExportError {
+            guard case .fileWriteFailed = e else { return XCTFail("wrong error: \(e)") }
+        }
+
+        let after = try Data(contentsOf: url)
+        XCTAssertEqual(after, priorBytes,
+            "a failed commit must leave the prior export byte-intact (no destination-gone window)")
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: url.appendingPathExtension("tmp").path),
+            "the half-written temp must be cleaned up on commit failure")
+    }
+
     // MARK: - JSONL formatting
 
     func testEachLineIsValidJSON() async throws {

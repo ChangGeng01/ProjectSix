@@ -26,17 +26,19 @@ final class BASChapter593HostKitHintCodableWaveTwoProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testChengluLengthHintConformsToCodable() {
-        assertCodable(BASChengluLengthHint.self)
+        // #18: real round-trip
+        let value = BASChengluLengthHint(
+            predictedLengthChars: 0,
+            confidence: .high)
+        assertCodableRoundTrips(value)
     }
 
     func testChengluLatencyHintConformsToCodable() {
-        assertCodable(BASChengluLatencyHint.self)
+        // #18: real round-trip
+        let value = BASChengluLatencyHint(
+            predictedDurationMs: 0,
+            confidence: .high)
+        assertCodableRoundTrips(value)
     }
 }

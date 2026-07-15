@@ -40,7 +40,12 @@ extension BASAutoRouteRanker {
     ) -> [Int32]? {
         #if os(iOS) || os(macOS)
         let n = candidates.count
-        guard n == benefits.count, n == costs.count
+        // deep-audit MED (rs-dream-loop): the Rust kernel reads exactly n*query.count f32 via
+        // from_raw_parts(flat_ptr, n*dim). Without a per-ROW length check, a candidate row shorter
+        // (or longer) than query.count makes flat.count != n*dim → the FFI reads out of bounds past
+        // the Swift buffer (UB). Enforce the flat.count == n*query.count invariant here.
+        guard n == benefits.count, n == costs.count,
+              query.count > 0, candidates.allSatisfy({ $0.count == query.count })
         else { return nil }
         // Flatten candidates row-major
         var flat: [Float] = []
@@ -306,7 +311,35 @@ extension BASAutoRouteRanker {
     public static func _setForceFallbackForTesting(_ force: Bool) {
         _testForceFallback = force
     }
+
+    // audit orchestration MED-2 — test seam: substitute an injected raw index array for the FFI's
+    // output, so a test can PROVE the wrapper's permutation validation rejects a corrupt (OOB /
+    // short / duplicate) return by falling back to nil, instead of passing it to a call site whose
+    // precondition would abort the whole process. #if DEBUG-gated; the symbol is absent in Release.
+    nonisolated(unsafe) private static var _testInjectRawIndices: [Int32]? = nil
+
+    /// Set/clear the injected raw-index array. When non-nil, `dreamLoopDominanceOrderDouble`
+    /// validates THESE indices (as if the C ABI had returned them) instead of calling the FFI.
+    @_spi(BASTestSeam)
+    public static func _setInjectRawIndicesForTesting(_ raw: [Int32]?) {
+        _testInjectRawIndices = raw
+    }
     #endif
+
+    /// audit orchestration MED-2 — validate that a Rust dominance-order FFI return is a genuine
+    /// permutation of `0..<count` (exact length, every index in range, no duplicates). Returns nil
+    /// on ANY violation so callers fall back to the Swift `.sorted` path instead of aborting the
+    /// process with a call-site `precondition`. Pure + injectable ⇒ unit-testable without the FFI.
+    /// A healthy kernel always returns a full permutation, so this is a no-op on the happy path.
+    public static func validatedPermutation(_ raw: [Int32], count: Int) -> [Int32]? {
+        guard raw.count == count else { return nil }
+        var seen = Set<Int32>()
+        seen.reserveCapacity(count)
+        for idx in raw {
+            guard idx >= 0, idx < Int32(count), seen.insert(idx).inserted else { return nil }
+        }
+        return raw
+    }
 
     // MARK: - L9 Dominance order (f64 — chapter 八百四十七 / M2886)
     //
@@ -343,6 +376,16 @@ extension BASAutoRouteRanker {
         #if os(iOS) || os(macOS)
         let n = scores.count
         if n == 0 { return [] }
+        #if DEBUG
+        // audit orchestration MED-2 seam: validate injected indices exactly as a real FFI return.
+        if let injected = _testInjectRawIndices {
+            guard let permutation = Self.validatedPermutation(injected, count: n) else {
+                atomicAdd1(&_f64FallbackCount)
+                return nil
+            }
+            return permutation
+        }
+        #endif
         var out = [Int32](repeating: -1, count: n)
         let written = scores.withUnsafeBufferPointer { sp -> Int32 in
             out.withUnsafeMutableBufferPointer { op in
@@ -357,7 +400,15 @@ extension BASAutoRouteRanker {
             atomicAdd1(&_f64FallbackCount)
             return nil
         }
-        return Array(out.prefix(Int(written)))
+        // audit orchestration MED-2: validate the kernel's return is a full permutation of 0..<n.
+        // A corrupt / short / duplicate return becomes a SAFE nil fallback HERE (→ each call site's
+        // Swift `.sorted` path), never a process-aborting precondition at the 5 call sites — which
+        // now map over a guaranteed-valid permutation.
+        guard let permutation = Self.validatedPermutation(Array(out.prefix(Int(written))), count: n) else {
+            atomicAdd1(&_f64FallbackCount)
+            return nil
+        }
+        return permutation
         #else
         atomicAdd1(&_f64FallbackCount)
         return nil

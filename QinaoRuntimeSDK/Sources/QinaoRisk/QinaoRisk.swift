@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import BASRuntimeCore
 import BASPolicy
 
@@ -76,6 +77,40 @@ public actor QinaoRiskGate {
             self.hostVersionID = hostVersionID
             self.summary = summary
         }
+
+        /// deep-audit P0-1 (2026-07-13): the SDK-owned canonical action digest. It BINDS the tool,
+        /// the payload, the session and the host version, so a permit signed over `digest` cannot be
+        /// reused for a different tool or payload — `QinaoRuntime.execute()` recomputes this from the
+        /// PRESENTED toolName+payload and requires it to equal the signed `permit.digest`. Fields are
+        /// length-prefixed (`<len>:<field>`) so the join is injective (no delimiter ambiguity).
+        public static func canonicalDigest(
+            toolName: String, payload: Data, sessionID: String, hostVersionID: String
+        ) -> String {
+            let payloadHash = SHA256.hash(data: payload)
+                .map { String(format: "%02x", $0) }.joined()
+            func lp(_ s: String) -> Data {
+                let b = Data(s.utf8)
+                return Data("\(b.count):".utf8) + b
+            }
+            var canonical = Data()
+            for field in [toolName, payloadHash, sessionID, hostVersionID] { canonical += lp(field) }
+            return SHA256.hash(data: canonical)
+                .map { String(format: "%02x", $0) }.joined()
+        }
+
+        /// Build an intent whose `digest` IS the canonical tool+payload+session+host binding — the
+        /// form `execute()` enforces. Hosts should construct action intents this way.
+        public init(
+            toolName: String, payload: Data, sessionID: String,
+            hostVersionID: String, summary: String = ""
+        ) {
+            self.init(
+                digest: Self.canonicalDigest(
+                    toolName: toolName, payload: payload,
+                    sessionID: sessionID, hostVersionID: hostVersionID),
+                toolName: toolName, sessionID: sessionID,
+                hostVersionID: hostVersionID, summary: summary)
+        }
     }
 
     /// Normalised [0,1] risk input vector. Every field has a
@@ -101,15 +136,23 @@ public actor QinaoRiskGate {
             pressureAuthenticity: Double = 1,
             gsiScore: Double = 0
         ) {
-            func clamp(_ v: Double) -> Double { min(max(v, 0), 1) }
-            self.harmSeverity = clamp(harmSeverity)
-            self.harmScope = clamp(harmScope)
-            self.irreversibility = clamp(irreversibility)
-            self.uncertainty = clamp(uncertainty)
-            self.evidenceDebt = clamp(evidenceDebt)
-            self.manipulationIntensity = clamp(manipulationIntensity)
-            self.pressureAuthenticity = clamp(pressureAuthenticity)
-            self.gsiScore = clamp(gsiScore)
+            // deep-audit P0-5 (2026-07-13): NaN must FAIL CLOSED per field, not pass through
+            // `min(max(NaN,0),1)=NaN` and then slip every `>= threshold` block-check
+            // (NaN >= x is false) into a baseline .allow. `nan` is the field's fail-closed pole:
+            // harm-direction fields (blocked on HIGH) → 1.0; pressureAuthenticity is inverse
+            // (blocked on `<= 0.3`) → 0.0 so a NaN still trips its block.
+            func clamp(_ v: Double, nan: Double) -> Double {
+                guard !v.isNaN else { return nan }
+                return min(max(v, 0), 1)
+            }
+            self.harmSeverity = clamp(harmSeverity, nan: 1)
+            self.harmScope = clamp(harmScope, nan: 1)
+            self.irreversibility = clamp(irreversibility, nan: 1)
+            self.uncertainty = clamp(uncertainty, nan: 1)
+            self.evidenceDebt = clamp(evidenceDebt, nan: 1)
+            self.manipulationIntensity = clamp(manipulationIntensity, nan: 1)
+            self.pressureAuthenticity = clamp(pressureAuthenticity, nan: 0)
+            self.gsiScore = clamp(gsiScore, nan: 1)
         }
 
         /// Default "no risk raised" signals — used when the caller
@@ -139,6 +182,11 @@ public actor QinaoRiskGate {
         }
     }
 
+    /// integration permit-signing (2026-07-12): permits are HMAC-SHA256 signed at mint
+    /// (`signature` binds ALL fields incl. `mode` — a forged block→allow flip breaks the
+    /// tag) and verified signature-first in `isPermitValid`. This closes the last
+    /// field-binding-only lane of the three-signature gate; the permit is now safe to
+    /// carry across a process boundary when both sides share the gate's `permitTagKey`.
     public struct ActionPermit: Sendable, Equatable, Codable {
         public let permitID: String
         public let digest: String
@@ -147,6 +195,8 @@ public actor QinaoRiskGate {
         public let reasonCodes: [String]
         public let issuedAt: Date
         public let expiresAt: Date
+        /// HMAC-SHA256 tag over all seven fields (hex). Minted only by the risk gate.
+        public let signature: String
 
         public init(
             permitID: String,
@@ -155,7 +205,8 @@ public actor QinaoRiskGate {
             mode: Mode,
             reasonCodes: [String],
             issuedAt: Date,
-            expiresAt: Date
+            expiresAt: Date,
+            signature: String
         ) {
             self.permitID = permitID
             self.digest = digest
@@ -164,6 +215,7 @@ public actor QinaoRiskGate {
             self.reasonCodes = reasonCodes
             self.issuedAt = issuedAt
             self.expiresAt = expiresAt
+            self.signature = signature
         }
     }
 
@@ -171,6 +223,13 @@ public actor QinaoRiskGate {
     private let defaultDelaySeconds: TimeInterval
     private let now: @Sendable () -> Date
     private let permitEventRecorder: PermitEventRecorder?
+
+    /// integration permit-signing: HMAC key for permit tags. QinaoRisk deliberately
+    /// imports no sovereign module — the key is plain CryptoKit, injected by the
+    /// composition layer. Random default = mint/verify on the same instance works with
+    /// zero config (and forged permits still fail); cross-process hosts inject a shared
+    /// stable key on BOTH gates so a permit minted on one verifies on the other.
+    private let permitTagKey: SymmetricKey
 
     /// M99 — callback fired AFTER a permit is successfully issued
     /// but BEFORE it is returned to the caller. Designed to let the
@@ -202,12 +261,55 @@ public actor QinaoRiskGate {
         permitTTLSeconds: TimeInterval = 30,
         defaultDelaySeconds: TimeInterval = 60,
         permitEventRecorder: PermitEventRecorder? = nil,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        permitTagKey: SymmetricKey = SymmetricKey(size: .bits256)
     ) {
         self.permitTTL = permitTTLSeconds
         self.defaultDelaySeconds = defaultDelaySeconds
         self.permitEventRecorder = permitEventRecorder
         self.now = now
+        self.permitTagKey = permitTagKey
+    }
+
+    /// integration permit-signing — injective permit tag. Mirrors the sovereign
+    /// module's token-tag scheme (length-prefixed fields, dates via bitPattern) with a
+    /// domain label so a permit tag can never collide with a warrant/proof tag under a
+    /// shared key, and the reason-code COUNT is folded in so variable-arity reason
+    /// lists cannot alias adjacent fields.
+    /// The injective canonical bytes signed by a permit tag (fields shared by mint+verify).
+    static func permitCanonicalBytes(_ permit: ActionPermit) -> Data {
+        var fields = [
+            "qinao.permit.v1",
+            permit.permitID, permit.digest, permit.sessionID,
+            permit.mode.rawValue, String(permit.reasonCodes.count),
+        ]
+        fields.append(contentsOf: permit.reasonCodes)
+        fields.append("t\(String(permit.issuedAt.timeIntervalSince1970.bitPattern, radix: 16))")
+        fields.append("t\(String(permit.expiresAt.timeIntervalSince1970.bitPattern, radix: 16))")
+        return Data(fields.map { "\($0.utf8.count):\($0)" }.joined().utf8)
+    }
+
+    static func permitTag(
+        key: SymmetricKey, _ permit: ActionPermit
+    ) -> String {
+        Data(HMAC<SHA256>.authenticationCode(
+            for: permitCanonicalBytes(permit), using: key))
+            .map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// deep-audit MEDIUM-1: decode an even-length hex string to raw bytes; nil on any
+    /// malformed input (so a garbage signature fails closed at decode, before verify).
+    static func hexToBytes(_ hex: String) -> Data? {
+        guard hex.count % 2 == 0 else { return nil }
+        var out = Data(capacity: hex.count / 2)
+        var idx = hex.startIndex
+        while idx < hex.endIndex {
+            let next = hex.index(idx, offsetBy: 2)
+            guard let b = UInt8(hex[idx..<next], radix: 16) else { return nil }
+            out.append(b)
+            idx = next
+        }
+        return out
     }
 
     // MARK: - Permit issuance
@@ -273,6 +375,20 @@ public actor QinaoRiskGate {
         _ permit: ActionPermit,
         for intent: ActionIntent
     ) -> Bool {
+        // integration permit-signing: signature FIRST — a permit not minted with this
+        // gate's key (or tampered after mint, incl. a block→allow mode flip) fails closed.
+        // deep-audit MEDIUM-1 (2026-07-13): CONSTANT-TIME MAC verification (was a hex
+        // `String ==` that short-circuits on the first differing byte — a byte-by-byte MAC
+        // timing oracle, exactly what the ledger's ch1044 fix eliminated). The permit is
+        // advertised cross-process-carry-safe, which is precisely the threat model where a
+        // MAC oracle matters. Decode the stored hex to raw bytes and use the constant-time
+        // isValidAuthenticationCode; same accept/reject set, no timing side channel.
+        guard let rawSig = Self.hexToBytes(permit.signature),
+              HMAC<SHA256>.isValidAuthenticationCode(
+                rawSig,
+                authenticating: Self.permitCanonicalBytes(permit),
+                using: permitTagKey)
+        else { return false }
         guard permit.digest == intent.digest else { return false }
         guard permit.sessionID == intent.sessionID else { return false }
         guard permit.mode == .allow else { return false }
@@ -450,14 +566,26 @@ public actor QinaoRiskGate {
         switch assessment.mode {
         case .allow:
             let issuedAt = now()
-            let permit = ActionPermit(
+            // integration permit-signing: sign at mint, BEFORE the M99 recorder fires,
+            // so the audited permit is byte-identical to the returned one.
+            let unsigned = ActionPermit(
                 permitID: "permit-\(UUID().uuidString)",
                 digest: intent.digest,
                 sessionID: intent.sessionID,
                 mode: .allow,
                 reasonCodes: assessment.reasonCodes,
                 issuedAt: issuedAt,
-                expiresAt: issuedAt.addingTimeInterval(permitTTL))
+                expiresAt: issuedAt.addingTimeInterval(permitTTL),
+                signature: "")
+            let permit = ActionPermit(
+                permitID: unsigned.permitID,
+                digest: unsigned.digest,
+                sessionID: unsigned.sessionID,
+                mode: unsigned.mode,
+                reasonCodes: unsigned.reasonCodes,
+                issuedAt: unsigned.issuedAt,
+                expiresAt: unsigned.expiresAt,
+                signature: Self.permitTag(key: permitTagKey, unsigned))
             // M99 — fail-closed audit recording. If a recorder is
             // wired, it MUST succeed before the permit reaches the
             // caller. Any recorder error propagates out so the

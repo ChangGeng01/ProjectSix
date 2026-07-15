@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import BASMemory
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASMemoryDerivation")
 struct BASMemoryDerivationCoreTests {
     @Test("draft compiler derives preference goal semantic and support drafts from repeated evidence")
@@ -403,4 +402,3 @@ struct BASMemoryDerivationCoreTests {
         ISO8601DateFormatter().date(from: value) ?? .distantPast
     }
 }
-#endif

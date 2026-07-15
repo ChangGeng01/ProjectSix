@@ -248,7 +248,30 @@ pub fn monotonic_version_compare(
     if current.is_empty() || proposed.is_empty() {
         return None;
     }
-    Some(proposed > current)
+    // audit blindspot-③ HIGH: compare the version components NUMERICALLY, not with lexicographic
+    // `>`. Lexicographically "v10.0.0" < "v9.0.0" (because '1' < '9'), so the old `Some(proposed >
+    // current)` claimed v10 was NOT an increase over v9 (blocking a real upgrade) and — worse —
+    // that a v9 bundle WAS an increase over v10 ("v9" > "v10"), ACCEPTING A DOWNGRADE as monotonic
+    // (a stale/rolled-back calibration bundle would pass the monotonicity gate). Parse the dotted
+    // numeric components and compare element-wise; an unparseable version returns None (fail-closed
+    // — no monotonic claim, which the caller maps to -1/reject).
+    let cur = parse_version_components(current)?;
+    let prop = parse_version_components(proposed)?;
+    Some(prop > cur) // Vec<u64> compares element-wise numerically, then by length.
+}
+
+/// Parse a `v<maj>.<min>.<patch>…` (optional leading `v`) into numeric components. Returns None if
+/// any component is not a non-negative integer, so a malformed version makes no monotonicity claim.
+fn parse_version_components(v: &str) -> Option<Vec<u64>> {
+    let body = v.strip_prefix('v').unwrap_or(v);
+    if body.is_empty() {
+        return None;
+    }
+    let mut parts = Vec::new();
+    for component in body.split('.') {
+        parts.push(component.parse::<u64>().ok()?);
+    }
+    Some(parts)
 }
 
 // MARK: - C ABI exports (chapter 七百三十九 第二刀)
@@ -683,5 +706,37 @@ mod tests {
             monotonic_version_compare("", "v1.0.0"), None);
         assert_eq!(
             monotonic_version_compare("v1.0.0", ""), None);
+    }
+
+    // audit blindspot-③ HIGH: multi-digit components must compare NUMERICALLY, not lexicographically.
+    // Reversal (`Some(proposed > current)` on the raw &str) reds every one of these.
+    #[test]
+    fn monotonic_version_double_digit_upgrade_passes() {
+        // v9 -> v10 is a real increase; lexicographically "v10" < "v9" would wrongly reject it.
+        assert_eq!(
+            monotonic_version_compare("v9.0.0", "v10.0.0"),
+            Some(true));
+    }
+
+    #[test]
+    fn monotonic_version_double_digit_downgrade_rejected() {
+        // v10 -> v9 is a DOWNGRADE; lexicographically "v9" > "v10" would wrongly ACCEPT it (the
+        // stale/rolled-back calibration bundle the security gate exists to reject).
+        assert_eq!(
+            monotonic_version_compare("v10.0.0", "v9.0.0"),
+            Some(false));
+    }
+
+    #[test]
+    fn monotonic_version_minor_and_patch_numeric() {
+        assert_eq!(monotonic_version_compare("v1.9.0", "v1.10.0"), Some(true));
+        assert_eq!(monotonic_version_compare("v1.10.0", "v1.9.0"), Some(false));
+        assert_eq!(monotonic_version_compare("v1.0.9", "v1.0.10"), Some(true));
+    }
+
+    #[test]
+    fn monotonic_version_unparseable_is_faultclosed_none() {
+        assert_eq!(monotonic_version_compare("v1.x.0", "v2.0.0"), None);
+        assert_eq!(monotonic_version_compare("v1.0.0", "not-a-version"), None);
     }
 }

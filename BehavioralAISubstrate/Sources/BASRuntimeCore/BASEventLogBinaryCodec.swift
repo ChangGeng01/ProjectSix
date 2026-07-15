@@ -278,6 +278,11 @@ public enum BASEventLogBinaryCodec {
     public static func decode(
         _ buf: Data
     ) throws -> BASBinaryEventLogEntry {
+        // audit runtimecore-b #7: this decoder threads a 0-based `pos` through `buf[pos]`, but Data
+        // subscripts by its OWN indices — a non-zero-based SLICE (e.g. `data[5...]`, startIndex=5)
+        // would read the wrong bytes or trap. Rebase to a 0-based Data at the boundary (no copy when
+        // already 0-based).
+        let buf = buf.startIndex == 0 ? buf : Data(buf)
         var pos = 0
         guard pos < buf.count else {
             throw BASEventLogBinaryCodecError

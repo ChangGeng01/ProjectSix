@@ -37,7 +37,9 @@ final class BASChapter746L3SubArcCloseoutTests: XCTestCase {
 
         let actions = [
             "skip:checkpoint",
-            "permit:block:tool-write",
+            // deep-audit #5 (2026-07-11): EXACT permit form — the old suffixed
+            // "permit:block:tool-write" pinned the divergent prefix-match port.
+            "permit:block",
             "click:save",
             "weak-mention-of-project-x",
             "click:next-step",
@@ -88,7 +90,12 @@ final class BASChapter746L3SubArcCloseoutTests: XCTestCase {
 
     // MARK: - L3 sub-arc scorecard
 
-    func testPrintL3SubArcScorecard() {
+    func testPrintL3SubArcScorecard() throws {
+        // #18: assertion — pure human-read scorecard (only literal prints, no
+        // computed invariant to assert); gate behind env flag so it is opt-in.
+        guard ProcessInfo.processInfo.environment["BAS_PERF_PRINT"] == "1" else {
+            throw XCTSkip("perf print-only — set BAS_PERF_PRINT=1")
+        }
         print("")
         print("=================================================================")
         print(

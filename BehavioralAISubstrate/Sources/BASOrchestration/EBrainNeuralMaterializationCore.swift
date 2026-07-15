@@ -137,7 +137,8 @@ public enum BASNeuralMaterializationCompiler {
         riskLevelResolver: @Sendable (Double) -> BASBrainRiskLevel
     ) -> [BASRiskPermitBinding] {
         let critiqueLookup = Dictionary(grouping: thoughtFrame.critiques, by: \.candidateID)
-        let forecastLookup = Dictionary(uniqueKeysWithValues: thoughtFrame.forecasts.map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let forecastLookup = Dictionary(thoughtFrame.forecasts.map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
 
         return thoughtFrame.candidates.map { candidate in
             let critiques = critiqueLookup[candidate.candidateID] ?? []
@@ -282,7 +283,8 @@ public enum BASNeuralMaterializationCompiler {
             return nil
         }
 
-        let forecastLookup = Dictionary(uniqueKeysWithValues: thoughtFrame.forecasts.map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let forecastLookup = Dictionary(thoughtFrame.forecasts.map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
         let critiqueLookup = Dictionary(grouping: thoughtFrame.critiques, by: \.candidateID)
         let candidateIDs = thoughtFrame.candidates.map(\.candidateID)
         // chapter 八百三十八 / M2843 — L9 dominance order routed to
@@ -299,33 +301,33 @@ public enum BASNeuralMaterializationCompiler {
             let scores: [Double] = thoughtFrame.candidates.map {
                 Self.candidateDominanceScore($0)
             }
-            if let indices = BASAutoRouteRanker
-                .dreamLoopDominanceOrderDouble(scores: scores) {
-                return indices.map { idx -> String in
-                    let i = Int(idx)
-                    precondition(i >= 0
-                        && i < thoughtFrame.candidates.count,
-                        "Rust dominance_order_f64 returned " +
-                        "out-of-bounds index \(i) for n=" +
-                        "\(thoughtFrame.candidates.count)")
-                    return thoughtFrame.candidates[i].candidateID
-                }
+            // Swift legacy fallback (V1 implementation, kept active per 「依旧 不删除 只 comment」
+            // + cross-platform safety) — also the fail-safe when Rust returns a bad permutation.
+            let swiftFallback: () -> [String] = {
+                Self.dominanceFallbackOrder(thoughtFrame.candidates)
             }
-            // Swift legacy fallback (V1 implementation,kept active
-            // per 「依旧 不删除 只 comment」 + cross-platform safety)
-            return thoughtFrame.candidates
-                .sorted { lhs, rhs in
-                    Self.candidateDominanceScore(lhs)
-                        > Self.candidateDominanceScore(rhs)
-                }
-                .map(\.candidateID)
+            // audit orchestration MED-2: the Rust index list must be a VALID PERMUTATION of
+            // 0..<n (all in bounds, no duplicates, complete). An out-of-bounds index used to
+            // `precondition`-ABORT the whole process (a caller could feed a crash); a repeated
+            // index would silently drop/duplicate a candidateID. Fail-SAFE to the deterministic
+            // Swift sort instead. Mirrors the sibling fix at BASMLMemoryService (13a7e5b66).
+            guard let indices = BASAutoRouteRanker
+                    .dreamLoopDominanceOrderDouble(scores: scores),
+                  Self.isValidDominancePermutation(indices, count: thoughtFrame.candidates.count)
+            else {
+                return swiftFallback()
+            }
+            return indices.map { thoughtFrame.candidates[Int($0)].candidateID }
         }()
+        // audit orchestration HIGH-1: single source of truth for the bands (was 0.6, drifting from
+        // the adapter's 0.7). guardPaths = safe-retreat fallbacks (high reversibility) OR an explicit
+        // guard-lexicon match — consistent now with BASAgentFabricAdapters.
         let reversiblePaths = thoughtFrame.candidates
-            .filter { $0.reversibility >= 0.6 }
+            .filter { BASReversibilityBands.isReversiblePath(reversibility: $0.reversibility) }
             .map(\.candidateID)
         let guardPaths = thoughtFrame.candidates
             .filter { candidate in
-                candidate.reversibility >= 0.7
+                BASReversibilityBands.isGuardPath(reversibility: candidate.reversibility)
                     || containsGuardLexicon(candidate.title)
                     || containsGuardLexicon(candidate.actionSummary)
             }
@@ -394,14 +396,16 @@ public enum BASNeuralMaterializationCompiler {
         let sessionID = thoughtFrame.decomposeRef
         let emittedAt = Date()
 
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let candidateByID = Dictionary(
-            uniqueKeysWithValues:
-                thoughtFrame.candidates.map { ($0.candidateID, $0) })
+            thoughtFrame.candidates.map { ($0.candidateID, $0) },
+            uniquingKeysWith: { first, _ in first })
         let dominanceOrder = frontier.dominanceOrder
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let dominanceRank = Dictionary(
-            uniqueKeysWithValues:
-                dominanceOrder.enumerated()
-                .map { ($0.element, $0.offset) })
+            dominanceOrder.enumerated()
+                .map { ($0.element, $0.offset) },
+            uniquingKeysWith: { first, _ in first })
         let reversibleSet = Set(frontier.reversiblePaths)
         let guardSet = Set(frontier.guardPaths)
         let delayedSet = Set(frontier.delayedPaths)
@@ -555,8 +559,10 @@ public enum BASNeuralMaterializationCompiler {
         from thoughtFrame: BASThoughtFrame,
         critiqueBundles: [BASCritiqueBundle]?
     ) -> BASUncertaintyLedger? {
-        let critiqueLookup = Dictionary(uniqueKeysWithValues: (critiqueBundles ?? []).map { ($0.candidateID, $0) })
-        let forecastLookup = Dictionary(uniqueKeysWithValues: thoughtFrame.forecasts.map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let critiqueLookup = Dictionary((critiqueBundles ?? []).map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let forecastLookup = Dictionary(thoughtFrame.forecasts.map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
         let unresolvedUnknowns = unique(
             thoughtFrame.candidates.flatMap(\.requiredEvidence).filter { !$0.isEmpty }
         )
@@ -609,7 +615,8 @@ public enum BASNeuralMaterializationCompiler {
             return nil
         }
 
-        let critiqueLookup = Dictionary(uniqueKeysWithValues: (critiqueBundles ?? []).map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let critiqueLookup = Dictionary((critiqueBundles ?? []).map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
 
         return thoughtFrame.candidates.map { candidate in
             let critiqueBundle = critiqueLookup[candidate.candidateID]
@@ -774,7 +781,8 @@ public enum BASNeuralMaterializationCompiler {
             return nil
         }
 
-        let candidateLookup = Dictionary(uniqueKeysWithValues: candidates.map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let candidateLookup = Dictionary(candidates.map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
         let ordered = frontier.dominanceOrder.compactMap { candidateLookup[$0] }
         let seenIDs = Set(ordered.map(\.candidateID))
         let remaining = candidates.filter { !seenIDs.contains($0.candidateID) }
@@ -825,6 +833,18 @@ public enum BASNeuralMaterializationCompiler {
         }
     }
 
+    /// audit orchestration LOW-4 — the deterministic fallback dominance order: sort by dominance
+    /// score DESC, breaking ties on `candidateID` ASC so equal-score candidates get a STABLE order
+    /// (the byte-equality contract) rather than arbitrary input order. Internal for testability.
+    static func dominanceFallbackOrder(_ candidates: [BASCandidatePath]) -> [String] {
+        candidates.sorted { a, b in
+            let sa = candidateDominanceScore(a)
+            let sb = candidateDominanceScore(b)
+            if sa != sb { return sa > sb }
+            return a.candidateID < b.candidateID
+        }.map(\.candidateID)
+    }
+
     private static func candidateDominanceScore(
         _ candidate: BASCandidatePath
     ) -> Double {
@@ -834,16 +854,27 @@ public enum BASNeuralMaterializationCompiler {
             - (candidate.expectedCost * 0.25)
     }
 
+    /// audit orchestration MED-2 — a Rust dominance-order result is only usable if it is a VALID
+    /// PERMUTATION of `0..<count`: exactly `count` indices, every one in bounds, none repeated.
+    /// Anything else (out-of-bounds → would crash the array subscript / repeated → would drop or
+    /// duplicate a candidate) means fail-safe to the Swift sort. Pure + Mac-testable.
+    static func isValidDominancePermutation(_ indices: [Int32], count: Int) -> Bool {
+        guard indices.count == count else { return false }
+        var seen = Set<Int>()
+        seen.reserveCapacity(count)
+        for idx in indices {
+            let i = Int(idx)
+            guard i >= 0, i < count, seen.insert(i).inserted else { return false }
+        }
+        return true
+    }
+
     private static func containsGuardLexicon(
         _ value: String
     ) -> Bool {
-        let normalized = value.lowercased()
-        return normalized.contains("delay")
-            || normalized.contains("pause")
-            || normalized.contains("wait")
-            || normalized.contains("review")
-            || normalized.contains("bounded")
-            || normalized.contains("protect")
+        // deep-audit MED: delegate to the single source of truth (BASReversibilityBands) so this
+        // producer and the fabric adapter can never drift apart again.
+        BASReversibilityBands.containsGuardLexicon(value)
     }
 
     private static func isDelayedCandidate(

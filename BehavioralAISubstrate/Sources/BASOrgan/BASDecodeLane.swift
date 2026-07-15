@@ -108,6 +108,30 @@ public enum BASDecodeLanePolicy {
         }
     }
 
+    /// THE single byte-safety gate for every argmax-accept lane (point-2 dedup). All argmax-equality accept
+    /// (prompt-lookup, cross-turn, draft-model greedy spec, saguaro) is byte-valid ONLY at `temperature == 0`.
+    /// Defined ONCE here and referenced by `decodeStrategy` + `requestEligibleForSpeculation` +
+    /// `shouldUsePromptLookup` + `shouldUseSaguaro`, so this load-bearing invariant cannot drift between gates.
+    public static func isGreedyByteSafe(temperature: Double) -> Bool {
+        temperature == 0
+    }
+
+    /// P1 production purpose election (2026-07-13, GEMMA_E2B_DEVELOPMENT.md P1/P2): a request whose host
+    /// ALREADY elected greedy (preset temperature == 0) is classified `.deterministic`; every other
+    /// temperature stays `.scoutDefault`. Deliberately the NARROWEST unlock:
+    /// - `lane(.deterministic)` == .greedy == what a temp-0 host elected — generation params unchanged;
+    /// - at temp 0 every argmax-equality accept lane is byte-identical (invariant above), so the ONLY
+    ///   effect is that the model-free lanes (prompt-lookup / cross-turn) become planner-eligible —
+    ///   converting the device-proven repetitive win (1.23×–2.05×, byte-identical 5/5,
+    ///   Docs/UNIVERSAL_SSD_PROBE_RESULTS.md) from probe-only to production;
+    /// - `.scoutDefault` (temp 0.1) is untouched — this does NOT flip the ADR-014 byte-equal default.
+    /// The −8% free-form risk needs no content classifier here: the planner's hit-rate floor + EMA
+    /// router (`worthSpeculating` / `source(for:profiler:)`) drop a non-repetitive turn's model-free
+    /// lane once it measures cold (a miss costs ~nothing, f≈0).
+    public static func productionPurpose(temperature: Double) -> Purpose {
+        isGreedyByteSafe(temperature: temperature) ? .deterministic : .scoutDefault
+    }
+
     /// DOCTRINE end for the Saguaro (Mamba∥MLX) lane — same greedy-only invariant as prompt-lookup: Saguaro
     /// byte-identity is the target's argmax by construction, valid ONLY at temp 0, so `.creative` (temp>0) and
     /// `.scoutDefault` (0.1, and ADR-014 default-off) are never eligible. eligibility ⟹ greedy (temp 0).

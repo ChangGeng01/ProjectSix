@@ -21,20 +21,28 @@
 //
 // ## What this file ships
 //
-// Three extension methods that wrap M391 pattern for the
+// Four extension methods that wrap M391 pattern for the
 // chapter 一百十七 zone gate:
 //
 //   - `submitWithForbiddenZoneGate(_:zone:satisfiedReleaseConditions:)`
 //     — wraps `submit`. Quarantined candidates submit normally
 //     (registration carries no trust per chapter 一百十七 M447
-//     doctrine), so this is effectively a forwarding helper that
-//     records the zone state in audit reason codes.
+//     doctrine), so this forwards to `submit` unchanged. (audit M-b:
+//     `submit` has NO reason-code channel, so the gate decision is
+//     NOT persisted here — enforcement is at the gated transitions.)
 //   - `startTrialWithForbiddenZoneGate(ticketID:trialRecordRef:
 //     candidateRef:zone:satisfiedReleaseConditions:)` — wraps
 //     `startTrial`. If the candidate is in the zone AND release
 //     conditions are not all satisfied, the ticket is rejected
 //     instead of advancing. The trial-record ref is preserved in
 //     reason codes for audit traceability.
+//   - `approveForDistillationWithForbiddenZoneGate(ticketID:
+//     sovereignVerdictRef:candidateRef:zone:...)` — wraps
+//     `approveForDistillation` (the `.promote` action). If the
+//     candidate is quarantined with unmet release conditions the
+//     ticket is REJECTED instead of queued for distillation —
+//     invariant #3's guardrail (audit M-b: plain approveForDistillation
+//     had no zone check, so an isolated candidate entered the queue).
 //   - `ingestTicketsWithForbiddenZoneGate(_:zone:
 //     candidateRefByTicketID:satisfiedReleaseConditions:)` —
 //     batch wrapper.
@@ -67,12 +75,25 @@ public extension BASUpdateTicketLifecycleCoordinator {
     ///
     /// Per chapter 一百十七 M447 doctrine, `.registerCandidate`
     /// is ALWAYS allowed even when the candidate is in the zone
-    /// (registration carries no trust). This method is a
-    /// forwarding wrapper that records the gate's reason codes
-    /// in audit metadata when the candidate IS quarantined,
-    /// without rejecting the ticket.
+    /// (registration carries no trust), so this forwards to
+    /// `submit` unchanged.
+    ///
+    /// audit M-b / hostkit-rest MED-2 — HONESTY CORRECTION: the prior
+    /// docstring claimed this "records the gate's reason codes in
+    /// audit metadata", but `submit` carries NO reason-code channel,
+    /// so the gate decision here is discarded. Quarantine enforcement
+    /// (and the audit reason codes) happen at the GATED transitions
+    /// that CAN reject — `startTrialWithForbiddenZoneGate` and
+    /// `approveForDistillationWithForbiddenZoneGate` — not at submit.
     ///
     /// Returns the resulting entry's `state`.
+    ///
+    /// audit hostkit-rest MED-2 (count-inflation half) — this used to hardcode `return .proposed`,
+    /// so a re-presented ticket whose ID already existed in a TERMINAL state (`.rejected` /
+    /// `.distilled` / …) still reported `.proposed`. `ingestTicketsWithForbiddenZoneGate` counts a
+    /// `.proposed` result as "accepted", so an already-rejected duplicate inflated the accepted
+    /// count. The fix returns the ACTUAL persisted state (a fresh submit lands in `.proposed`, so
+    /// new tickets are unaffected; a duplicate reports its true state and is no longer miscounted).
     @discardableResult
     func submitWithForbiddenZoneGate(
         _ ticket: BASUpdateTicket,
@@ -91,9 +112,13 @@ public extension BASUpdateTicketLifecycleCoordinator {
         do {
             _ = try await submit(ticket)
         } catch LifecycleError.duplicateTicket {
-            // Idempotent: re-presenting a turn is fine.
+            // Idempotent: re-presenting a turn is fine — but the pre-existing entry's TRUE state
+            // may not be `.proposed` (it could already be `.rejected` / `.trialing` / `.distilled`).
         }
-        return .proposed
+        // Return the ACTUAL persisted state, not a hardcoded `.proposed`, so the ingest count of
+        // "reached .proposed" never counts an already-terminal duplicate as accepted (fail-closed
+        // to `.rejected` on the unreachable no-entry path — duplicateTicket implies the entry exists).
+        return entry(ticketID: ticket.ticketID)?.state ?? .rejected
     }
 
     /// **M457** — forbidden-zone-aware variant of
@@ -142,6 +167,54 @@ public extension BASUpdateTicketLifecycleCoordinator {
         try await startTrial(
             ticketID: ticketID,
             trialRecordRef: trialRecordRef)
+    }
+
+    /// **M457 / audit M-b (hostkit-rest MED-3)** — forbidden-zone-aware variant of
+    /// `approveForDistillation(ticketID:sovereignVerdictRef:extraReasonCodes:)`.
+    ///
+    /// This is the guardrail for invariant #3 ("private host experience stays OUT of base
+    /// weights"). `approveForDistillation` performs the `.promote` action — the moment a candidate
+    /// becomes visible to the offline weight-update pipeline. The plain `approveForDistillation` had
+    /// NO zone check, so a QUARANTINED candidate (in the forbidden zone with unmet release
+    /// conditions) could be queued for distillation — the exact isolation escape the zone exists to
+    /// prevent, and the gate's own `.promote` branch sat dead (no production caller). When the gate
+    /// denies `.promote`, the ticket is REJECTED (fail-closed) instead of queued; the gate's
+    /// pending-conditions reason codes + the sovereign verdict ref are preserved for audit.
+    ///
+    /// Hosts MUST route promotion through this variant (not plain `approveForDistillation`) whenever
+    /// a forbidden zone is in effect. Default-safe + opt-in per M457.
+    func approveForDistillationWithForbiddenZoneGate(
+        ticketID: String,
+        sovereignVerdictRef: String,
+        candidateRef: String,
+        zone: BASForbiddenCandidateZone?,
+        satisfiedReleaseConditions: Set<String> = [],
+        extraReasonCodes: [String] = []
+    ) async throws {
+        let decision = BASForbiddenCandidateZoneGate.gate(
+            action: .promote,
+            candidateRef: candidateRef,
+            zone: zone,
+            satisfiedReleaseConditions: satisfiedReleaseConditions)
+        if decision.denied {
+            var codes = decision.reasonCodes
+            codes.append("sovereign-verdict:\(sovereignVerdictRef)")
+            codes.append(contentsOf: extraReasonCodes)
+            do {
+                try await markRejected(ticketID: ticketID, reasonCodes: codes)
+            } catch let err as LifecycleError {
+                if case let .illegalTransition(from, _) = err, from == .rejected {
+                    // Already rejected — the gate's goal is achieved.
+                } else {
+                    throw err
+                }
+            }
+            return
+        }
+        try await approveForDistillation(
+            ticketID: ticketID,
+            sovereignVerdictRef: sovereignVerdictRef,
+            extraReasonCodes: extraReasonCodes)
     }
 
     /// **M457** — batch variant. Walks the ticket array; for

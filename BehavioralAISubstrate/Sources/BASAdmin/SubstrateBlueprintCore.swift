@@ -220,8 +220,10 @@ public enum BASSubstrateArchitectureBuilder {
     public static func build(
         from snapshot: BASConsoleSnapshot
     ) -> BASSubstrateArchitectureBlueprint {
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let reportsByKind = Dictionary(
-            uniqueKeysWithValues: snapshot.reports.map { ($0.kind, $0) }
+            snapshot.reports.map { ($0.kind, $0) },
+            uniquingKeysWith: { first, _ in first }
         )
         let capabilityCoverage = snapshot.capabilityCoverage
         let runtimeEvidence = snapshot.displayRuntimeSummary

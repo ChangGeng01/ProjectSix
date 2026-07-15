@@ -464,11 +464,23 @@ public enum BASAgentMergeEngine {
     /// `merge.<turnID>.<count>.<hex16>`。 Two merges with same
     /// turnID + count but different delta IDs get different mergeIDs
     /// (collision probability ≤ 2^-64 ≈ 5.4e-20)。
+    /// Test seam (deep-audit MED): exposes the private strongMergeID for the cross-language Rust
+    /// byte-order parity test. Never called in production.
+    static func _strongMergeIDForTesting(turnID: String, deltaIDs: [String]) -> String {
+        strongMergeID(turnID: turnID, deltaIDs: deltaIDs)
+    }
+
     private static func strongMergeID(
         turnID: String,
         deltaIDs: [String]
     ) -> String {
-        let canonical = turnID + "|" + deltaIDs.sorted()
+        // deep-audit MED (rs-scan-router / Rust↔Swift parity): the canonical mergeID hash is computed by
+        // the Rust kernel (bas-agent-fabric strong_merge_id) which sorts delta IDs with sort_unstable()
+        // = BYTE / Unicode-scalar order. Swift's `.sorted()` uses String Comparable = Unicode-CANONICAL
+        // (NFC) order, which DISAGREES for any non-ASCII / combining-mark deltaID → a DIFFERENT mergeID
+        // for the same delta set across the two implementations. Match the canonical Rust byte order.
+        let canonical = turnID + "|" + deltaIDs
+            .sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) }
             .joined(separator: ",")
         let hash = fnv1a64(canonical)
         // chapter 九百五十六.9 — MUST use %016llx,not %016x:Swift

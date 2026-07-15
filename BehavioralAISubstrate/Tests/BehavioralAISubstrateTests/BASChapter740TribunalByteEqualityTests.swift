@@ -134,9 +134,11 @@ final class BASChapter740TribunalByteEqualityTests:
                         return id * (1 - conf)
                     }
                 }
-            let maxPerCand = perCandidate.max() ?? Double.leastNormalMagnitude
-            urgencyFeel = clamp01(
-                max(maxPerCand, controlRecoveryNeed))
+            // deep-audit blindspot-② mirror (2026-07-11): controlRecoveryNeed is a FALLBACK used
+            // only when NO candidate has a matching triScore (perCandidate empty), NOT a floor. The
+            // old `max(maxPerCand, controlRecoveryNeed)` floored urgency_feel unconditionally; the
+            // rebuilt Rust binary matches Swift `perCandidate.max() ?? controlRecoveryNeed`.
+            urgencyFeel = clamp01(perCandidate.max() ?? controlRecoveryNeed)
         } else {
             urgencyFeel = controlRecoveryNeed
         }
@@ -452,6 +454,17 @@ final class BASChapter740TribunalByteEqualityTests:
                 swift.irreversible_warnings,
                 "frame \(i): irreversible_warnings")
         }
+        #endif
+    }
+
+    // audit runtimecore-b #9: an EMPTY inputJSON produces an empty byte array whose baseAddress is
+    // nil — the old force-unwrap crashed. It must now be handled deterministically without trapping.
+    func testTribunalDeriveEmptyInputDoesNotCrash() {
+        #if os(iOS) || os(macOS)
+        let r1 = BASAutoRouteRanker.tribunalDeriveIdProfile(inputJSON: "")
+        let r2 = BASAutoRouteRanker.tribunalDeriveIdProfile(inputJSON: "")
+        XCTAssertEqual(r1, r2,
+            "empty input must be handled deterministically without crashing on a nil baseAddress")
         #endif
     }
 }

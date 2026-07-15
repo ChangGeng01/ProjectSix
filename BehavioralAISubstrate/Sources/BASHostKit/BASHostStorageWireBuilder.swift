@@ -17,7 +17,7 @@
 // Hosts use this factory to opt in to SQLite-backed storage with
 // a single line:
 //
-//   let store = try BASHostStorageWireBuilder.makeAtomStore(
+//   let store = try await BASHostStorageWireBuilder.makeAtomStore(
 //       options: configuration.storageOptions)
 //
 // Without this factory, hosts had to manually construct
@@ -118,7 +118,7 @@ public enum BASHostStorageWireBuilder {
             "host.event-sourced-atom-store",
         failureLog:
             BASHostStorageInitialAtomAdmitFailureLog? = nil
-    ) throws -> any BASMemoryAtomStore {
+    ) async throws -> any BASMemoryAtomStore {
         // chapter 四百二 / M947 — event-sourced opt-in branch
         if options.useEventSourcedAtomStore {
             let eventLog = try makeEventLog(options: options)
@@ -128,29 +128,20 @@ public enum BASHostStorageWireBuilder {
             // Seed initial atoms by emitting admit events
             // (preserves typed contract — every atom-state change
             // flows through the event log)。
-            if !initial.isEmpty {
-                Task.detached {
-                    for atom in initial {
-                        // chapter 五百三十六 / M1522 — wire-in of
-                        // the typed observability sink (M1521)。
-                        // When `failureLog == nil`,behavior is
-                        // unchanged from M1517's documented
-                        // silent-swallow。 When non-nil,each
-                        // admission failure is recorded for
-                        // host inspection。 ADR-014 OPT-IN
-                        // preserved (default nil → no observation)。
-                        do {
-                            try await store.admit(atom)
-                        } catch {
-                            if let log = failureLog {
-                                await log.record(
-                                    atomID: atom.id,
-                                    error: error)
-                            }
-                        }
-                    }
-                }
-            }
+            //
+            // audit M-l MED-8 — seed INLINE (was `Task.detached`, now the
+            // factory is `async`). The detached seed let makeAtomStore
+            // RETURN the store before seeding finished: a caller reading it
+            // immediately raced the seed and saw an empty / partial store,
+            // silently violating the documented `initial:` contract. The
+            // SQLite / in-memory branches already seed synchronously via
+            // their `initial:` constructor — only this event-sourced branch
+            // was async, and only it was fire-and-forget.
+            // chapter 五百三十六 / M1522 — typed observability sink via
+            // the shared helper (blindspot MED id30: single testable
+            // definition). ADR-014 OPT-IN preserved.
+            await seedEventSourced(
+                store: store, initial: initial, failureLog: failureLog)
             return store
         }
         if options.shouldUseSQLiteAtomStore {
@@ -173,6 +164,32 @@ public enum BASHostStorageWireBuilder {
             }
         }
         return BASInMemoryMemoryAtomStore(initial: initial)
+    }
+
+    // MARK: - Event-sourced seed (shared by makeAtomStore + makeBundle)
+
+    /// Seed `initial` atoms into an event-sourced store by emitting
+    /// admit events. On admission failure, records to `failureLog` when
+    /// non-nil (M1522 typed observability sink); silently swallows when
+    /// nil (M1517 documented behavior, ADR-014 OPT-IN). Extracted from
+    /// the two identical inline loops in makeAtomStore + makeBundle so
+    /// the failure → sink wiring has ONE testable definition — a revert
+    /// to silent-swallow now reds a real test instead of passing green
+    /// behind the PROOF-test mocks. (blindspot MED id30)
+    static func seedEventSourced(
+        store: BASEventSourcedMemoryAtomStore,
+        initial: [BASGovernedMemory],
+        failureLog: BASHostStorageInitialAtomAdmitFailureLog?
+    ) async {
+        for atom in initial {
+            do {
+                try await store.admit(atom)
+            } catch {
+                if let log = failureLog {
+                    await log.record(atomID: atom.id, error: error)
+                }
+            }
+        }
     }
 
     // MARK: - chapter 四百二 / M947 event log factory
@@ -462,31 +479,18 @@ public enum BASHostStorageWireBuilder {
             let store = BASEventSourcedMemoryAtomStore(
                 eventLog: log,
                 sessionID: eventSourcedSessionID)
-            if !atomStoreInitial.isEmpty {
-                Task.detached {
-                    for atom in atomStoreInitial {
-                        // chapter 五百三十六 / M1522 — wire-in of
-                        // the typed observability sink (M1521)。
-                        // Parallel to makeAtomStore line ~130
-                        // path。 ADR-014 OPT-IN preserved
-                        // (default nil → no observation)。
-                        do {
-                            try await store.admit(atom)
-                        } catch {
-                            if let bundleLog =
-                                atomStoreFailureLog
-                            {
-                                await bundleLog.record(
-                                    atomID: atom.id,
-                                    error: error)
-                            }
-                        }
-                    }
-                }
-            }
+            // audit M-l MED-8 — seed INLINE (was `Task.detached`).
+            // makeBundle is already async; the detached seed returned the
+            // bundle with an un-seeded store, racing any immediate reader.
+            // chapter 五百三十六 / M1522 — typed observability sink via
+            // the shared helper (blindspot MED id30). ADR-014 OPT-IN.
+            await BASHostStorageWireBuilder.seedEventSourced(
+                store: store,
+                initial: atomStoreInitial,
+                failureLog: atomStoreFailureLog)
             atomStore = store
         } else {
-            atomStore = try makeAtomStore(
+            atomStore = try await makeAtomStore(
                 options: options,
                 initial: atomStoreInitial,
                 failureLog: atomStoreFailureLog)

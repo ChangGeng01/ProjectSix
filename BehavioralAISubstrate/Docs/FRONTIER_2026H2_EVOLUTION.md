@@ -1,0 +1,227 @@
+# FRONTIER 2026-H2 — Evolution Sweep (第四轮前沿扫荡)
+
+**Date:** 2026-07-04 · **Method:** 6 parallel research agents (decode-accel / small-models / memory+sleep /
+test-time-compute / Apple-platform / radical-futurist), ~100 web calls, every claim graded
+[SHIPPED] / [PAPER-MEASURED] / [BLOG/HYPE], datacenter-batched numbers quarantined from batch-1 phone claims.
+**Differential to:** DECODE_ACCEL_FRONTIER_2026.md, FRONTIER_2026_PLAYBOOK.md, biomimetic-brain (June 2026).
+**Hard filter:** A19 batch-1 bandwidth-bound · 满血 lossless trunk · ADR-014 opt-in · spec speedup=(1+a)/(1+f·K).
+
+---
+
+## ★ ARCHIVE STAMP — CAMPAIGN CLOSED 2026-07-06
+
+One continuous arc, 2026-07-04 → 07-06, every verdict device-evidenced:
+
+**Phase 1 — Sweep** (8223f94d1): 6 parallel research agents, ~100 web calls, 2 load-bearing agent
+conflicts hand-adjudicated (DFlash checkpoint EXISTS / mlx-lm has NO spec lane).
+**Phase 2 — Ten verdicts** (a6d805c3b → 65d432103): B3 shipped+promoted · B4 shipped · M3 closed ·
+B2 shipped · M1 honest-FAIL · M2 don't-swap · B5 shipped · B1 closed-rescoped (★Air=59GB/s
+re-base) · M4 closed (57% stable plateau) · M5 deferred-w/-triggers.
+**Phase 3 — Promotions + gap closures** (8890aa2de → 0e57fbad8): B2 promoted (composition co-gate)
+· B3 determinism fix · B5 spill default-ON (5-take endurance cert) · capped-fused session lane
+default-ON (mixed-traffic batch). Three REAL bugs caught by the cert machinery and fixed same-day:
+①B3 entropy-window round-structure coupling ②restored-session parameter loss ③session-lane B3 gap.
+
+**The stack as archived**: fused-MTP lane (25.7 tok/s, ABOVE the Air's 25.0 plain bandwidth wall)
++ B2 budget refinement (armed-when-capped) + B3 trace-exit (all lanes incl. sessions) + B4
+predictive thermal & QoS + B5 KV persistence/spill (default-on) + capped-fused session routing
+(default-on). All kill-switched, all device-certified. Next sweep runs differential to this doc.
+
+---
+
+**Conflict adjudicated by hand (2026-07-04):** agents disagreed on DFlash availability. Verified directly:
+`z-lab/Qwen3.5-4B-DFlash` **EXISTS on HF** (0.6B drafter, target = our exact base, block 8/16, Apache-2.0,
+40k-seq retrain) — but **mlx-lm ships NO spec lane** (README verified: zero mention of dflash/eagle/mtp;
+official support = SGLang, vLLM PR pending). The "mlx-lm native dflash lane" claim was agent overclaim.
+
+---
+
+## Thesis check (4th consecutive sweep)
+
+**"Efficient thinking = avoided-compute + bandwidth, not faster matmul" — REINFORCED again.**
+Every loud 10-10,000× claim audited back to datacenter batching (d-Matrix), simulation on custom silicon
+(Extropic), or discrete-GPU idle FLOPs (DiffusionGemma — Google's own page: unified-memory Apple Silicon
+"may not see the same acceleration", quality below standard Gemma 4). The batch-1 free-form decode wall
+STANDS everywhere; the frontier moved in exactly four places (BUILD/MEASURE below).
+
+---
+
+## VERDICTS
+
+### BUILD (evidence sufficient, start when campaign slots open)
+
+| # | Item | Evidence | Expected | Effort |
+|---|------|----------|----------|--------|
+| B1 | **Fused Metal decode kernel** — ✅ **B1-a MEASURE GATE CLOSED-RESCOPED 2026-07-06** (BASDecodeFloorTests, Mac+device, 3 probes): **iPhone Air raw read BW = 59GB/s** (1GB reduction probe) — the 42-45 tok/s target was built on a ~120GB/s Pro-class assumption and is DEAD. Device: MLX qmv effective 42GB/s (71% of raw), actual decode 51.2ms/tok, TRUE bandwidth floor 40.0ms → **plain-decode hard ceiling 25.0 tok/s — our shipped fused-MTP lane (25.7) is ALREADY ABOVE the plain wall** (spec = the only mechanism that beats bandwidth, E[tok]>1 per read). Addressable kernel-quality gap = 22% (42→59GB/s) — a custom qmv buys ≤1.28× on the qmv fraction; not worth the Metal engineering as its own mandate. Mac (dispatch-cheap): 28% addressable, ceiling 59.7 tok/s. Third finding: the naive 248-op sweep is SLOWER than real decode on device (65 vs 51ms) — kernel COUNT dominates dispatch-bound hardware, re-confirming the fused-chain law. **Rescope: kernel work only revives if the 3-bit composition (its ceiling at 59GB/s = 34 tok/s, 42% headroom) or an M1 revisit ever clears a gate. The decode ledger re-normalizes to 59GB/s: remaining speed levers = deeper acceptance (MTP chain), fewer bytes (blocked on kernel quality), avoided compute (B2/B3 shipped).** | measured on-device | the Air is a 59GB/s device — every prior ceiling estimate re-based | CLOSED-RESCOPED |
+| B2 | **Pre-generation difficulty probe → tier router** — ✅ v1 SHIPPED 2026-07-04 (opt-in BAS_DIFF_PROBE=1): the "prereq observation hook" was already OURS (the fused lane's own prefill hLast); trained a 2560-d L2-logistic head on 147 self-collected verifiable questions (7 families × 3 bands, seeded harness + Tools/fit_difficulty_probe.py). **Held-out AUC 0.833 vs qlen-baseline 0.584** (paper structure replicated; family+band "cheat" baseline 0.801 — the probe recovers question-type difficulty from the raw hidden state, which production lacks labels for; n=49 test ⇒ CI ±~0.07). Decoder postPrefillBudget hook (nil = certified lane untouched) + DiffAdapt-style ±1-tier refinement around the effort plan. F4 e2e: easy p=1.00→64-cap, hard p=0.00→384-cap, budget binds. Bonus: a 4B capability map (3d×3d mul 0%, speed ≤43%, percent 100%). **Follow-ups: broader-domain calibration before default-ON; device staging of probe_weights.json (Docs/probe_weights_v1); couple score→route-to-bigger-model tier.** | 2602.09924 AUC 0.931 / DiffAdapt -22.4% [PAPER-MEASURED] | signal real beyond surface features on OUR stack | MED |
+| B3 | **Thinking-trace entropy early-exit** — ✅ LANE SHIPPED 2026-07-04 (opt-in): BASTraceExitPolicy (windowed entropy convergence @ boundary tokens + deterministic budget guard reserving the answer tail) wired into generateSpecKFused (entropy packed into the ONE round readback, millinats int32; nil-config = untouched certified lane). Mac F3 e2e PASS: fired@think-42, answer continues after inject; CONTROL spent all 160 tok thinking with NO answer (the co-gate 96-tok artifact, now structurally fixed). Knobs BAS_TRACE_EXIT(_TAU/_WINDOW/_MIN/_RESERVE/_BUDGET_ONLY). **DEVICE A/B PASS 2026-07-04, TWO iPhone Airs, token-identical replication** (BASTraceExitDeviceTests,
+8 verifiable-answer prompts × 2 arms, interleaved): ENTROPY@384 think-cut **-79%**, total **-44%**,
+time **-41%**, quality EXIT **6/6** vs CTRL **0/6** — the control burned 384/384 tokens THINKING on
+every prompt including "23×17" and never answered: at realistic caps the un-exited lane is
+all-think-no-answer, so B3 is a CORRECTNESS fix, not just an optimizer. Fires 8/8 @τ=300.
+Honest misses (both since FIXED): BUDGET@128 reserve-32 tail too short → reserve now cap-scaled
+(48 @ ≤160); math-narrow quiz → **CO-GATE QUALITY SUITE PASS 2026-07-04 with B3 armed on the
+production route** (on-corpus anti-syco resist raw 10/10 + stack 10/10 with 7 live fires incl. a
+budget-guard save@288; off-corpus BYTE-IDENTITY 5/5 through the armed lane).
+**PROMOTED — 效率环 wire live**: any request carrying an explicit decode cap (the effort loop's
+maxDecodeTokens dial → request.maxOutputTokens, runner :2207) arms the policy in production;
+un-capped turns stay unarmed; BAS_TRACE_EXIT_OFF=1 = ADR-014 kill-switch. | EntroCut/DEER/EAT [PAPER-MEASURED]; 4B overthinks 2.5× vs 27B | -25-50% reasoning-phase tokens. TRAP honored: convergence window+boundary+min-trace, NOT raw answer-confidence | LOW |
+| B4 | **Predictive thermal + efficiency-core decode** — ✅ SHIPPED 2026-07-04 (opt-in): BASThermalHazardPredictor (duty-budget hazard model, prior 60s/safety 0.5 CALIBRATED from 4 device runs — transition duty {35,42.5,46,52}s, line below observed min by principle not knob-turning) + runner wiring BAS_THERMAL_PREDICT=1: (a) **EARLY-WARNING → effort loop** (hazard while nominal plans the turn as warm BEFORE the OS flips — DEVICE-PROVEN validation #4: predict_hazard=1 at iter-6, fair arrived iter-7) + (b) duty-shaping gaps (**honest verdict: throughput-negative at 100% duty** — nominal dies at ~50s full-duty, serious-pinned decode still delivers 25.3 tok/s > shaped-nominal ~15; the gap mechanism's domain is PACED workloads). QoS lever BAS_DECODE_QOS=utility: **speed-neutrality PASS** (45.7 vs 45.0 tok/s, token-identical outputs); energy gain honestly UNMEASURED (needs the battery-window protocol). | EnerInfer/MNN-AECS [PAPER-MEASURED] | -65%/-23% energy claims NOT reproduced (unmeasured on our stack); the shipped value = pre-emptive avoided-compute | LOW-MED |
+| B5 | **Persistent KV cache (cross-session warm-start)** — ✅ SHIPPED 2026-07-06 (opt-in API): BASSessionKVStore — hybrid-aware snapshot (attention KV + GDN recurrent state; **fp16-exact DEFAULT** per the house lossless bar, Q4 space tier optional) + ChatSession.withLiveCache (vendored additive) + adapter persistSession/restoreSession (pool install + LRU). **F6 (decoder, 1177-tok session): fp16 restore 6ms vs cold re-prefill 279ms = 45.7×, 48/48 EXACT greedy continuation; Q4: 33.6×, ~8KB/tok, tie-break divergence @~20. DEVICE (iPhone Air, 2026-07-06): cold 2264ms → restore 18ms = 122.9×, 48/48 EXACT — the slower device prefill AMPLIFIES the warm-start ratio far past the paper's 27-35× band.** **F7 (pool e2e): persist→clear→restore→"What is my name?"→Zebulon — the restored KV IS the memory, 32.4MB snapshot.** Two traps found+handled: upstream savePromptCache DROPS ArraysCache.offset (GDN mask geometry corrupts — our store persists it; F6 proved exact); Q4 on the GDN recurrent accumulator would compound (kept raw always). Follow-ups: device TTFT numbers; dream-loop-window auto-snapshot of warm seats; snapshot GC policy. | 2603.04428 [SHIPPED-CODE] | paper's 27-35× band CONFIRMED on our stack (45.7× fp16) | MED |
+
+### MEASURE (build the probe, let the device decide — our Gate protocol)
+
+| # | Item | Evidence | Gate | Effort |
+|---|------|----------|------|--------|
+| M1 | **DFlash block-diffusion drafter** — ⚙️ **GATE-a PASS 2026-07-05 (Mac)**: ran z-lab's OWN MLX reference (dflash/model_mlx.py — discovered shipping, incl. Qwen3.5 GDN capture-replay rollback; vendored to Tools/dflash_proto/zlab_model_mlx.py) on OUR 4-bit target + their 0.6B drafter. **Accept-len 3.2-6.2 per 16-block on our exact stack** (prose 3.3, math 6.2 — the free-form wall broken at the ACCEPTANCE level; our MTP chain E[tok]/iter is 1.76). **Drafter 4-bit/g64 costs ~ZERO acceptance** (5.02/3.29/6.24/3.57 vs bf16 5.12/3.21/6.12/3.57 — the M3 lesson repeats). Mac-Python e2e: reasoning 1.32-1.42×, prose 0.73-0.77× (bf16-drafter f≈0.55 + Python cycle overhead + 16-wide verify vs a 150 tok/s plain baseline). Algorithm fully specced (agents, cross-validated ×3 impls): block=[anchor]+15 masks, target-embed noise, h_ctx=hidden_norm(fc(concat-8-taps)) KV-injected per layer (ctx-KV cached, +accepted rows/cycle), 3 RoPE offsets, sliding=causal-in-block/full=bidirectional, draft logits via target lm_head[1:], commit accepted+1, GDN rollback = capture-replay (we ALREADY have snapshot-restore in Swift). **GATE-b PASS 2026-07-05 (Swift port, Mac)**: BASQwen35DFlashDecoder (drafter q4/g64 + FULL quantized vocab head — the 32K sub-head cost real acceptance, 2.72→3.38 mean; per-CYCLE head reads make full vocab affordable ≈20MB/tok amortized) + hiddenStatesWithTaps (additive vendored-model tap forward, certified paths untouched) + the generateSpecKFused loop mechanics verbatim (pending/snapshot-restore/single-packed-readback; ctx-purity rule: rejected-draft tap rows NEVER enter drafter ctx). Mac F5: accept 3.94/1.72/5.24/2.62 (mean 3.38, python-ref band 3.3-6.2; math ≈parity, prose ~half — fp16-vs-bf16 stream divergence, follow-up probe recorded), e2e 1.14-2.61× vs the (sync-readback-weak) Swift plain baseline. **GATE-c FAIL 2026-07-05 (device, iPhone Air) — M1 CLOSED with an honest negative**: 3-arm interleaved A/B (6 prompts × 256 tok): dflash 7.4 vs mtp 13.1 vs plain 11.5 tok/s — **df/plain 0.64×, df/mtp 0.57×** (reason 1.05×/0.86×, prose 0.49×/0.45×; coolest first-window: dflash 18.0 vs mtp 24.6 — loses everywhere). Acceptance PORTED PERFECTLY (device 3.0-4.9/block = Mac parity) — the killer is CYCLE COST on A19: (a) T=16 verify pays the qmv→qmm cliff EVERY cycle (~119ms — the exact knife the MTP lane's tCap=5 dodges), (b) the 6-layer drafter forward is DISPATCH-bound (~80-100 kernels ≈30ms, not the 8ms bandwidth estimate), (c) per-cycle ctx-concat churn. Same shape as the June draft-model verdict: cost, not acceptance, kills free-form spec on this SoC. Residual upside paths (recorded, not pursued): kernel-fused drafter (~-30-40% dispatch), block-8 (halves verify width, halves acceptance), Metal-4 tensor verify (B1 would shrink the qmm penalty — REVISIT M1 only after B1 lands). Take-1/2 device jetsam lessons: per-process limit ≈6.3GB on the 12GB Air; UNCAPPED MLX free pool + resident fp16 full-vocab head were the killers (use the target's own quantized head; cap the pool; per-tensor eval at init). Lane kept as gated experimental code (BASQwen35DFlashDecoder + F5 Mac gate + device test). | 2602.06036; z-lab model_mlx.py; checkpoint verified | acceptance proven ON-STACK; economics = drafter-quant + Swift loop discipline | MED-HIGH |
+| M2 | **DWQ-distilled 3-bit trunk** — ⚙️ **MAC GATE PASS 2026-07-05**: distilled qwen35_4b_dwq3 (mlx_lm dwq, bf16 teacher, 512 samples/seq1024/b1/grad-ckpt, ~2h Mac, val loss 0.138; **1.7GB vs 2.83GB = -40% weights**). QUALITY (the gate that killed naive 3-bit): 147-question paired harness — first take showed -7.5pp but was HARNESS CONTAMINATION (Swift labels had B3 answer-guarantee); **same-harness co-measure: 4-bit 0.612 vs 3-bit 0.585, Δ-2.7pp = parity within noise (n=147)**; 17-sheep PASS both; prose coherent both; percent-family wobble (0.90→0.67, n=21) noted. SPEED Mac: 173.5→203.6 = **1.17×**. **DEVICE SUB-GATE 2026-07-05 — M2 CLOSED: keep the 4-bit incumbent.** Mirrored-order A/B (take-1 4bit-first + take-2 reversed after cooldown; hot blocks collapse symmetrically ✓ design validated): cool-vs-cool **plain 19.4→23.9 = 1.23×** (the bandwidth lever is REAL on device) — but the production fused-MTP lane INVERTS on the 3-bit trunk: dwq3+mtp 22.8 < dwq3 plain 23.9 (0.95× against its own plain) and < 4bit+mtp **26.8**. Best-of-lanes: incumbent 4-bit+MTP beats 3-bit's best by 1.12×. Mechanism: acceptance HELD (0.73-1.37, same band) — the loss is verify ECONOMICS: (a) faster trunk raises the draft-cost fraction f in (1+a)/(1+f·K), (b) mlx 3-bit batched (T=4-5) qmv kernels are less efficient than 4-bit (non-power-of-2 packing; T=1 fine). **The two levers don't compose. DON'T SWAP.** DWQ-3bit remains a proven-quality trunk for MTP-less deployments; B1 (fused kernel) collects a THIRD mandate — custom 3-bit batched-verify kernels could re-open the composition. Honesty/v12-adapter sub-gate mooted by the speed verdict. Artifact: ~/mlx_models/qwen35_4b_dwq3. | DWQ [SHIPPED in mlx-lm] | the June "3-bit cliff" does NOT hold for DWQ-distilled 3-bit (math/factual parity) | MED |
+| M3 | **Native MTP head vs our folded head** — ✅ MEASURED + CLOSED 2026-07-04. Fact-check first: our folded head IS the native head (Tools/qwen35_fetch_mtp.py extracts mtp.* from the bf16 checkpoint); the real A/B = the production 4-bit-quantized head vs unquantized fp16 (headFP16 decoder arm, default-off). DEVICE (K=3/tCap=5/adaptive, 6 prompts × 2 arms interleaved): fp16 gains only **Δacc/iter +0.06** (0.74→0.80; reason +0.09, prose +0.03) and **LOSES 34% tok/s** (14.9→9.9) to the 3× draft-bandwidth tax. **VERDICT: production 4-bit head optimal — keep; frontier lead closed.** | [MEASURED on-device] | quantizing the head costs ~6-8% relative acceptance; bandwidth dominates | LOW |
+| M4 | **ANE sustained lane** ("ANE = power not speed" needs an "…except sustained" amendment) | iPhone 17 Pro 10-min continuous: MLX/GPU 48→**18** (38% retention) vs CoreML/ANE 33→**22** (67%) at ~half power; LiteRT-LM GPU 56→27 [MEASURED, rockyshikoku 2026-06] | measure OUR stack's 10-min sustained on the Air; if GPU sustained < ANE sustained, wire an ANE long-generation lane into ε→effort→thermal-lease | MED |
+| M5 | **9B-class main organ** — ✅ **DEFERRED-WITH-TRIGGERS 2026-07-06 (adjudicated, no eval spent)**. Killed by this sweep's own measurements: (1) SPEED — Air raw BW 59GB/s (B1-a) ⇒ 9B-4bit plain ceiling ~11.5 tok/s theoretical / ~8 real at MLX's 42GB/s (a 384-tok turn: 15s→~38s); (2) MEMORY — dual-residency routing (4B+9B ≈ 8.2GB) exceeds the MEASURED per-process jetsam limit 6.29GB (M1 forensics), iOS 27 grants no relief; swap-on-demand = 10-20s NAND loads; (3) DOMINATED — AFM-3 Core Advanced (Sept 2026: 20B-sparse, Apple's process = ZERO jetsam cost to us, higher capability tier than 9B — and 2606.06306 says sycophancy scales with SIZE: 9B is incremental, not categorical) is the strictly better "route-to-bigger" seat and already a WATCH item. REVIVAL TRIGGERS: AFM-3 GA disappoints on independent capability data; a product need accepting ~10 tok/s full-replacement; any per-process memory entitlement change. (Checkpoints + DFlash-9B drafter + our A/B patterns all remain on the shelf — the eval costs the same day whenever a trigger fires.) | this sweep's own B1-a/M1 numbers | closed by measurement, not opinion | DEFERRED |
+
+### WATCH (trigger events named; do nothing until they fire)
+
+| Tech | Trigger | Then |
+|------|---------|------|
+| **Diffusion-on-ANE** (verdict refined: dead on Apple unified-memory GPU, ALIVE on idle-NPU — llada.cpp Snapdragon 3.9× quality-held; ANE is exactly such an idle engine) | any credible diffusion-LLM-on-ANE batch-1 measurement | prototype masked-block head on ANE vs MTP lane |
+| **Small generative verifier ≤2B** (field converging on our propose/dispose; ThinkPRM/Generative-Verifiers/VeriBound) | released small-scale verifier checkpoint w/ selective-accuracy numbers | wire as L10/L14 dispose adjudicator vs honesty harness |
+| **AFM-3 Core Advanced as bigger-model seat** (20B sparse, 1-4B active, IFP flash-streaming, ships Sept 2026, framework open to any provider via `LanguageModelExecutor`) | iOS 27 GA + independent capability data | prototype executor over BASOrgan; route factual-belief tier to it |
+| **Phone-scale dense instruct hybrid ≤4B** (gap still open; datacenter closed: Nemotron-3-Nano 31.6B-A3.2B, Kimi-Linear-48B — usable as distill TEACHERS via our Mamba-3 route) | a ≤4B dense instruct hybrid, MLX-convertible | benchmark as L2 organ vs Qwen3.5 |
+| **MLX-iOS NAX enablement** (Metal 4 API supports A19 NA today; MLX NAX = macOS 26.2+ M5 only) | MLX release notes enable NAX on iOS | adopt for prefill (2-3× TTFT, decode unaffected) |
+| **mlx-lm PR #990** (native GDN MTP — our own snapshot-rollback technique, unmerged) | merge activity | adopt state-handling edge cases; consider upstreaming our adaptive-K + thermal tiering |
+| **Rotation-quant in MLX** (PolarQuant-class "3-bit beats fp16" — paper-only) | an MLX rotation-quant landing | fold into M2 |
+| **Ternary + linear-state convergence** (Ternary Mamba 2606.18114; BitNet still from-scratch + CPU-kernel-only) | native ternary ≥7B instruct + a non-CPU kernel path | reopen bandwidth-lever audit |
+| **Titans/Atlas TTT shipped** (surprise-gated neural memory — architecturally kin to our ε-gate; not in any product) | edge numbers in a shipped product | evaluate vs StateLake |
+
+### DEAD (confirmed again this sweep; do not revisit without new physics)
+
+- **EAGLE-3 on small Apple batch-1** — 1.05× re-confirmed (M3 Ultra 8B, mlx-lm #890). Independent 2026 sweep: conventional drafters 1.06-1.18× free-form on Apple metal.
+- **Naive/non-fused MTP on Metal** — llama.cpp #23752: **-11% to -28% net LOSS at every config** (validates exactly why our fused chain wins; upstream is behind our shipped lane).
+- **Cross-family/UAG drafts** — net loss batch-1 re-confirmed (2604.16368).
+- **KV-quant at our 1-4K lengths** — mlx #3404: **17.9× SLOWER** than native SDPA at 2K (Python dispatch dominates); long-context memory play only.
+- **A19 "Neural Accelerators for LLM" narrative** — PREFILL-ONLY (Apple's own M5 data: decode delta 1.19-1.27× = bandwidth, not NA; llama.cpp: 2-3× prompt processing, "generation speed identical").
+- **Multi-agent for capability** — 2604.02460: equal-token-budget single agent best-or-tied at every budget vs ALL MAS topologies ("MAS gains = compute effects, not architecture"). Our 8-seats-ONE-trunk validated; steal only quantized KV handoff (QKVShare 2.6× re-prefill avoidance, 3-bit KV near-lossless).
+- **Speculative-CoT / draft reasoning** — 2nd model in RAM, wall-clock not total-token wins; same 0.88× wall.
+- **Parallel self-consistency** — "losing its edge" (2511.00751); we run greedy single-trace.
+- **HRM as breakthrough** — ARC Prize hidden-set audit: 32%/2% (from 41% claimed), hierarchy contributes ≈0, outer refinement loop is the whole effect, memorizes tasks; not a language model.
+- **Extropic 10,000× / d-Matrix 10× / diffusion 4-6.4×** — simulation-on-custom-silicon / datacenter-batched / discrete-GPU. None pass the batch-1 unified-memory filter.
+- **SEAL-style self-edit weights nightly** — measured catastrophic forgetting COMPOUNDS with edits; only behind a regression-gated admission (which is our eval-rigor doctrine, now citeable: GRASP/SkillAudit/"verifiability constraint" 2507.21046).
+- **TTT layers as live memory** — +60-90%/token latency at 4 inner steps; fatal at the decode wall.
+- **Cartridge composition dream** — independent per-doc cartridges COLLAPSE to 26% when mixed; joint training mandatory. (Cartridges per-corpus = StateLake-with-numbers: 38.6×mem/26.4×throughput/≈ICL — gate on the shelved product axis.)
+- **Importing LoCoMo/LongMemEval 94s as our expectation** — GPT-5-mini-class ceilings; re-measure on the 4B (the crown-before-co-measuring trap).
+- **Swapping the 4B base** — NOTHING beats Qwen3.5-4B-4bit on MLX-phone: no small Qwen3.6 (min 27B), no Phi-5, no Llama-4-mini, Gemma-4-E4B loses text/reasoning double-digit, Ministral-3 MLX decode 10-20× slow, Kimi-Linear 48B too big, Nemotron-Nano-4B GGUF-only + trails MMLU.
+
+---
+
+## Corrections to ground truth (repo-relevant)
+
+1. **iPhone Air = 12GB RAM** (AFM Core Advanced tier device), not 8GB. 7-13B-4bit is ecosystem-consensus feasible. Jetsam/wired discipline unchanged (NO new entitlement in iOS 27 — searched three ways).
+2. **Our MTP fused lane is AHEAD of upstream** — llama.cpp naive MTP is a net loss; mlx-lm's native-MTP PR (#990, our same GDN snapshot-rollback) sits unmerged. We additionally ship adaptive-K + thermal tiering + EMA persistence, which no upstream has.
+3. **"ANE = power not speed"** amended: at 10-min sustained load ANE RETAINS 67% vs GPU 38% — sustained-marathon lane is an open measurement (M4).
+4. **Sycophancy routing reinforced**: 2606.06306 — sub-7B instruct tuning can make factual sycophancy WORSE than base; size is the structural axis. Our anti-syco-LoRA-net-negative result is now the literature's expected outcome.
+
+## Sleep-consolidation recipe (what the granted-path dream-loop should DO)
+
+Field-validated pipeline for our three-guard windows, all [SHIPPED-CODE/PAPER-MEASURED]:
+1. **Observer→Reflector text consolidation** (Mastra OM: LongMemEval 94.87 @GPT-5-mini ceiling, 10× token cut, NO vector DB) — the 4B condenses/supersedes session logs in the idle window.
+2. **Surprise/forgetting-curve replay selection** (SuRe/FOREVER) over memory atoms — pure selection logic, energy∝surprise-aligned, no training.
+3. **Q4 KV persistence** (B5) — snapshot warm session caches to disk in the same window.
+NOT in the window: weight edits (SEAL forgetting), TTT (latency), cartridge training (joint-training trap, 8B-only validated).
+
+## Priority order — ALL TEN ITEMS CLOSED (2026-07-04 → 07-06, one campaign)
+
+B3✅shipped+promoted · B4✅shipped · M3✅closed(4-bit head optimal) · B2✅shipped(AUC 0.833) ·
+M1✅honest-FAIL(device) · M2✅don't-swap(levers don't compose) · B5✅shipped(45.7× exact) ·
+B1✅closed-rescoped(**Air=59GB/s re-base**) · M4✅closed(sustained = stable 57% plateau) ·
+M5✅deferred-with-triggers(dominated by AFM-3).
+
+Four production levers shipped, three honest negatives, one ground-truth re-base, one adjudicated
+deferral. The shipped fused-MTP lane (25.7 tok/s) stands ABOVE the Air's plain bandwidth wall
+(25.0 @59GB/s) — remaining speed lives in acceptance depth, bytes (kernel-gated), and avoided
+compute. The next frontier sweep runs DIFFERENTIAL to this document.
+
+## Promotion round (2026-07-06, post-campaign)
+
+**B2 PROMOTED (a59b28d47)** — armed on budget-capped production turns (weights staged on-device;
+kill-switch BAS_DIFF_PROBE_OFF). Device co-gate with B2+B3 both live: resist 10/10+10/10,
+byte-identity 5/5; the probe downshifted every easy factual turn 320→160 (p_success 0.87-0.99).
+**B3 determinism fix en route (8890aa2de)** — the co-gate take-1 caught identity violations:
+nil-entropy tokens tied the entropy window to ROUND STRUCTURE (→ the cross-turn adaptive-K EMA);
+every emitted token now carries entropy. The co-gate's third real catch.
+**B5 production consumer (482525d55)** — the LRU-SPILL lane: evicted seats warm-park to disk,
+restore on return (one-shot files).
+**B5 SPILL DEFAULT-ON (2026-07-06)** — endurance cert PASS on device (6 seats over a 4-cap pool,
+6-min churn: **55 spill/55 restore cycles, codeword recall 10/10, latency stable at serious
+thermal, zero hangs**; BAS_SESSION_SPILL=0 = kill-switch). The cert run earned its keep THREE
+times over: (take-2/3) the per-turn watchdog + adapter probes caught **restored sessions running
+on ChatSession DEFAULT generate parameters** — no token cap, sampling temp; one "48-token" turn
+decoded 5,604 chars (also the take-1 1-hour silent hang) — FIXED (params flow through
+_restoreFromSpill + restoreSession); (take-4) exposed a STRUCTURAL gap: the pooled ChatSession
+lane has **no B3 trace-exit** — small-cap turns on a thinking model truncate inside the think
+block.
+**GAP CLOSED (2026-07-06)** — the CAPPED-FUSED session lane (BAS_SESSION_CAPPED_FUSED=1, opt-in):
+greedy session turns with cap ≤384 and history ≤1024 est-tokens route through the fused loop
+(B3+B2+MTP live) in transcript-land — no ChatSession, no KV pool pressure; history overflow
+transitions ONCE to ChatSession via init(history:). DEVICE CERT: **cap-48 recall 6/6**
+(the exact take-4 failure shape), pooled_sessions=0, all three levers composing in telemetry
+(probe 0.88-0.98, budget guard closing think at 2-16 tokens — correct for tiny caps). Noted
+behavior: sub-64 caps normalize UP to the 64 tier on easy questions (the probe's tier lattice).
+**DEFAULT ON (2026-07-06 endurance batch)**: mixed-traffic device batch (4 capped + 2 uncapped
+seats, 744s, per-turn watchdog) — recall **5/5 across all three route classes** (capped-lane@48,
+post-transition@160, pooled-uncapped), seat-0 transition exercised at turn 6, zero hangs.
+BAS_SESSION_CAPPED_FUSED=0 = kill-switch; the spill-cert suite pins it (its assertions need pool
+churn). Batch take-1 lesson: uncapped whale-turns starve probabilistic probe schedules —
+deterministic final probes per route class are the pattern.
+
+## Tail-closure round (2026-07-06 — "尾巴也需要收掉 最严苛")
+
+The five open follow-ups from the archive stamp, each closed with evidence:
+
+1. **M1 DFlash prose-parity probe — CLOSED, port EXONERATED.** Teacher-forced the SAME
+   fixed stream through both stacks (Tools/dflash_proto/parity_stream.py dumps the Python
+   greedy stream + official-drafter per-block accepts; BASDFlashParityTests replays it through
+   BASQwen35DFlashDecoder with identical block semantics). Result: **Swift = Python-q4
+   BLOCK-FOR-BLOCK IDENTICAL** on all 4 prompts (total accepted 120 = 120; e.g. prose blocks
+   [0,15,6,13,5,7,1] equal on both sides). Native-stream divergence measured: prose splits at
+   token 20-65/128 (fp16-vs-bf16), the reasoning stream is identical 128/128 — Gate-b's
+   "prose ~half" was 100% stream-divergence artifact (different TEXT was being drafted), zero
+   port/numerics gap. M1's honest-negative verdict unchanged (cycle cost was the killer);
+   the revival package now starts from a numerically-certified port. Bonus replication:
+   drafter q4 costs ~zero acceptance again (py bf16 6.00/2.57/6.71/2.57 vs q4 5.57/2.29/6.71/2.57).
+2. **B5 dream-loop warm-seat auto-snapshot — SHIPPED.** MLXOrganAdapter.snapshotWarmSeats()
+   parks EVERY pooled seat to its spill URL without evicting (idle-window contract: persist
+   walks each session's serial lock); wired into the endurance runner's dream-loop GRANTED
+   branch (the app's only certified-idle moment) with telemetry `dream-loop snapshot
+   warm_seats=N`. Mac gate: BASSpillGCTests.testSnapshotWarmSeats (2 seats parked, pool intact,
+   post-snapshot turns unaffected). Device firing inherits the dream-loop's own observation
+   status (three-guard windows are all-denied under load — by design).
+3. **B5 snapshot GC — SHIPPED.** Spill dir bounded at 32 newest files (~2GB worst-case),
+   pruned on every spill write and on snapshotWarmSeats; one-shot restore already consumes
+   reclaimed files, so GC only has to bound the never-reclaimed tail. Pure tests:
+   testPruneKeepsNewestUnderBound / NoopAtOrUnderBound / MissingDirIsSafe.
+4. **B4 thermal-prior per-device recalibration — SHIPPED.** The predictor now accepts a
+   persisted learnedBudget at init (BASThermalHazardPredictor(learnedBudget:)); the runner
+   restores it from UserDefaults (`bas.thermal.learned_budget`, sanity-clamped to 20-300s)
+   at arm — ARMED line logs `restored=...` — and persists it at FINAL when the run observed
+   ≥1 transition. Cross-run EMA continuity replaces re-paying the 60s prior each launch;
+   per-device by construction (UserDefaults is device-local). Unit gate:
+   testThermalPredictorRestoresPersistedBudget. Device firing is telemetry-observable
+   (`thermal-predict PERSISTED`) on the next BAS_THERMAL_PREDICT=1 endurance run.
+5. **B2 broader-domain calibration — MEASURED (see verdict below).** 4 new VERIFIABLE
+   non-math families (recall/reading/alpha/reverse, 84 questions, makeBroadQuestions seed
+   20260705) through the identical collect pipeline; Tools/eval_probe_ood.py scores the
+   frozen v1 probe out-of-domain (per-family AUC + act-band safety: what lands outside the
+   no-op band p∈[0.35,0.85] and whether those actions are safe).
+
+**B2 broad-domain VERDICT (2026-07-06): v1 did NOT generalize — v2 refit SHIPPED.**
+v1 out-of-domain on the 4 broad families: pooled AUC **0.507** (coin flip; reading 0.25
+INVERTED), and 62/84 prompts landed in the confident-downshift bucket p>0.85 with realized
+success only 0.71 (reverse: 16 downshifted at 0.38 success) — a harmful routing signal outside
+math. Pre-registered rule fired → v2 refit on the combined 231 (147 math + 84 broad):
+held-out **math 0.830** (v1 was 0.833 — zero in-domain regression), **broad 0.817** (from
+0.507), pooled 0.821 (baselines: qlen 0.442, family+band 0.806). Shipped as
+Docs/probe_weights_v2_2026-07-06.json, staged to BOTH phones' Documents/probe_weights.json;
+device re-cert (capped-fused recall): probe live, p_success 0.98-1.00 on easy session turns,
+recall 6/6, budget lattice unchanged. Scope honesty carried forward: "broad" = 4 verifiable
+non-arithmetic families; free-form/creative traffic remains uncharacterizable by a
+correctness-labeled probe (mid-band no-op is the designed safe default there).

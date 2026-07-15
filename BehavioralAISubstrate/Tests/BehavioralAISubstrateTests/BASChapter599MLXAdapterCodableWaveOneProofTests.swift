@@ -28,17 +28,30 @@ final class BASChapter599MLXAdapterCodableWaveOneProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testMLXModelCatalogEntryConformsToCodable() {
-        assertCodable(MLXModelCatalog.Entry.self)
+        // #18: real round-trip
+        let value = MLXModelCatalog.Entry(
+            id: "",
+            providerID: "",
+            providerName: "",
+            extraEOSTokens: [],
+            localDirectoryName: nil)
+        assertCodableRoundTrips(value)
     }
 
     func testMLXLoRATrainerTrainingProgressConformsToCodable() {
-        assertCodable(MLXLoRATrainer.TrainingProgress.self)
+        // #18: real round-trip (non-CaseIterable enum with
+        // associated values — cover a payload case + a nested-URL
+        // case to exercise the synthesized Codable both ways)
+        assertCodableRoundTrips(
+            MLXLoRATrainer.TrainingProgress.complete(
+                totalIterations: 0))
+        assertCodableRoundTrips(
+            MLXLoRATrainer.TrainingProgress.trainStep(
+                iteration: 0, loss: 0.0, tokensPerSecond: 0.0))
+        assertCodableRoundTrips(
+            MLXLoRATrainer.TrainingProgress.saved(
+                iteration: 0,
+                adapterURL: URL(fileURLWithPath: "/")))
     }
 }

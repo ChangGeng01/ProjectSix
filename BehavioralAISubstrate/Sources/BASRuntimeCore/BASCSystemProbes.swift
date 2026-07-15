@@ -79,7 +79,16 @@ public actor BASWallclockNanos {
     /// Wall-clock,includes sleep,subject to NTP adjustments。
     /// Tests pin on this being the V1 baseline。
     public static func defaultV1Nanos() -> UInt64 {
-        return UInt64(Date().timeIntervalSince1970 * 1_000_000_000)
+        return nanosFromEpochSeconds(Date().timeIntervalSince1970)
+    }
+
+    /// audit runtimecore-a #6: `UInt64(Double)` PRECONDITION-TRAPS on a negative or non-finite value.
+    /// A skewed/pre-1970 wall clock (NTP step, unset RTC) would crash the sovereign process here.
+    /// Fail closed: a pre-epoch or non-finite reading floors to 0 nanos rather than trapping.
+    static func nanosFromEpochSeconds(_ seconds: Double) -> UInt64 {
+        let nanos = seconds * 1_000_000_000
+        guard nanos.isFinite, nanos >= 0 else { return 0 }
+        return UInt64(nanos)
     }
 
     /// V2 raw C call。 Throws on non-zero return。

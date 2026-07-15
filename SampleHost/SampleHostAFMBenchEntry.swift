@@ -106,11 +106,12 @@ extension SampleHostModel {
                             surface: .application,
                             prompt: prompt,
                             riskLevel: riskLevel))
-                    if let turn = result.eBrainTurn {
-                        if let entry = turn.sovereignAuditEntry {
+                    // context-IR: ACT/SHOW reads go through the slim response contract
+                    if let response = result.turnResponse {
+                        if let entry = response.sovereignAuditEntry {
                             auditCount = entry.signalRefs.count
                         }
-                        permitMode = turn.actionPermit.mode.rawValue
+                        permitMode = response.actionPermit.mode.rawValue
                     }
                 } catch {
                     errorMessage = "substrate: \(error)"
@@ -136,6 +137,10 @@ extension SampleHostModel {
                             // inside the task body since the
                             // raw `Response<String>` type is not
                             // Sendable per Apple's API contract。
+                            // INTENTIONAL raw `LanguageModelSession` — this benchmarks *raw* Apple
+                            // Foundation Models latency/success. Do NOT route through
+                            // `AppleFoundationOrganAdapter`: that would time adapter+FM, not raw FM, and
+                            // corrupt the baseline. See Docs/CURRENCY_AUDIT_2026-06.md D3.
                             let content: String =
                                 try await withTimeout(
                                     seconds: afmTimeoutSec

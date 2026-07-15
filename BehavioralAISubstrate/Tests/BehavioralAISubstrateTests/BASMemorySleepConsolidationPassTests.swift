@@ -59,6 +59,16 @@ final class BASMemorySleepConsolidationPassTests: XCTestCase {
         let atomIDs = atoms.map { $0.id.uuidString }
         // Old, single-touch records for most atoms;recent,
         // multi-touch for the first `recentCount` (high importance)。
+        //
+        // FIXTURE ROOT-CAUSE FIX (2026-07-11): the applier reads usage history from ITS OWN
+        // tracker (`applyImportanceReport` → `tracker.allRecords()`), but this fixture used to
+        // hand it a brand-new EMPTY `BASMemoryUsageTracker()` while seeding only the Rust actor.
+        // Every atom therefore presented as NO-HISTORY to the Swift scorer. Pre-blindspot-③ the
+        // no-history bug demoted everything on arrival, so these tests passed FOR THE WRONG
+        // REASON (false-green over an empty universe); the ③ fix (no-history ⇒ stays) exposed
+        // them. Seed BOTH trackers with the same touches: the Rust actor feeds stage-②'s FFI
+        // importance count; the V1 tracker is what the applier under test actually scores.
+        let applierTracker = BASMemoryUsageTracker()
         for (i, id) in atomIDs.enumerated() {
             let isRecent = i < recentCount
             let age: TimeInterval = isRecent ? 60 : 14 * 24 * 3600
@@ -70,10 +80,16 @@ final class BASMemorySleepConsolidationPassTests: XCTestCase {
                     turnRef: "turn-\(i)-\(t)",
                     permitMode: "safe",
                     retrievedAt: referenceNow.addingTimeInterval(-age))
+                _ = try await applierTracker.record(
+                    atomID: id,
+                    sessionRef: "t31-session",
+                    turnRef: "turn-\(i)-\(t)",
+                    permitMode: "safe",
+                    retrievedAt: referenceNow.addingTimeInterval(-age))
             }
         }
         let applier = BASMemoryClosedLoopApplier(
-            store: store, tracker: BASMemoryUsageTracker())
+            store: store, tracker: applierTracker)
         let atomTiers = Dictionary(
             uniqueKeysWithValues: atomIDs.map { ($0, BASMemoryTier.warm) })
         return (tracker, applier, store, atomIDs, atomTiers)
@@ -129,6 +145,51 @@ final class BASMemorySleepConsolidationPassTests: XCTestCase {
             XCTAssertEqual(atom?.governanceStatus, .governed,
                 "dry-run leaves every atom untouched")
         }
+    }
+
+    // MARK: - audit memory-b F7 — a dry-run observation reflects the REAL universe
+    //
+    // Before the fix, a dry-run checkpoint's tier-move surface was structurally empty:
+    // appliedMutations/rejectedMutations are both [:] on a dry-run (nothing is written),
+    // and the scorer's report.mutations (the actual verdict) was dropped — so the
+    // "instrument read a constant zero" regardless of the corpus. recommendedTierMoves
+    // now carries the scorer's verdict on a dry-run, so the observation is informative
+    // WITHOUT writing anything.
+
+    func testDryRunSurfacesRecommendedTierMovesFromRealUniverse() async throws {
+        let fx = try await makeSeededFixture()
+        let pass = makePass(
+            tracker: fx.tracker, applier: fx.applier, store: fx.store)
+        let checkpoint = await pass.run(BASSleepConsolidationRequest(
+            atomTiers: fx.atomTiers,   // a REAL (atomID → .warm) universe
+            now: referenceNow,
+            retainFraction: 0.5,
+            maintenanceClass: .standard,
+            windowMs: 60_000,
+            dryRun: true))
+        // The load-bearing teeth: the scorer's tier-move verdict is surfaced on a dry-run.
+        XCTAssertFalse(checkpoint.recommendedTierMoves.isEmpty,
+            "a dry-run over a populated universe must surface the scorer's tier-move verdict, "
+            + "not a structural zero")
+        // Every recommendation is a genuine MOVE off the seeded .warm tier.
+        for (_, tier) in checkpoint.recommendedTierMoves {
+            XCTAssertNotEqual(tier, .warm, "recommendedTierMoves holds only actual changes")
+        }
+        // Pin the EXACT verdict (sharpened 2026-07-11 with the fixture root-cause fix): the 4 OLD
+        // atoms (1 touch, 14 days ⇒ geometric score ≈0.056 ≤ demote 0.20) move; the 2 RECENT atoms
+        // (3 touches, 60 s ⇒ ≈0.59, hold band) do NOT appear. This pins that the verdict reflects
+        // the seeded HISTORY — an empty-tracker regression (all-or-nothing verdicts) cannot pass.
+        let oldAtomIDs = Set(fx.atomIDs.dropFirst(2))
+        let recentAtomIDs = Set(fx.atomIDs.prefix(2))
+        XCTAssertEqual(Set(checkpoint.recommendedTierMoves.keys), oldAtomIDs,
+            "exactly the 4 old, single-touch atoms are recommended off .warm")
+        XCTAssertTrue(recentAtomIDs.isDisjoint(with: checkpoint.recommendedTierMoves.keys),
+            "recently-touched atoms HOLD — their usage history protects them")
+        // Still a proper dry-run — nothing written, hash unmoved.
+        XCTAssertTrue(checkpoint.appliedMutations.isEmpty, "dry-run applies nothing")
+        XCTAssertTrue(checkpoint.quarantinedAtomIDs.isEmpty, "dry-run quarantines nothing")
+        XCTAssertEqual(checkpoint.preChainHash, checkpoint.postChainHash,
+            "dry-run leaves no ledger mark")
     }
 
     // MARK: - 1+3. Applied pass: quarantine-never-remove + hash moves
@@ -201,6 +262,51 @@ final class BASMemorySleepConsolidationPassTests: XCTestCase {
         XCTAssertTrue(checkpoint.quarantinedAtomIDs.isEmpty)
     }
 
+    /// audit M-h F6 — the tamper-evidence invariant. The ledger mark
+    /// (⑥, the ONLY chain-hash mover) used to sit INSIDE the `pipeline`
+    /// block after ⑤, so a window-exhaust `break` AFTER a mutating stage
+    /// (③ tier-apply) skipped it → the store was mutated but
+    /// preChainHash == postChainHash. An external tamper that also
+    /// skipped the mark would then read as clean。 ⑥ now fires OUTSIDE
+    /// the window budget: any pass that mutated state moves the chain,
+    /// wherever the pipeline stopped。
+    func testMutationThenWindowExhaustStillMovesChainHash() async throws {
+        let fx = try await makeSeededFixture()
+        // step 10s per clock read; startedAt + guards at ①/②/③ ⇒
+        // elapsed 10s/20s/30s. A 25s window survives ①②③ (③ demotes
+        // the old atoms — a REAL store mutation) then exhausts at the
+        // tier-apply post-guard, BEFORE ④⑤。
+        let leaps = LeapClock(start: referenceNow, stepSeconds: 10)
+        let pass = makePass(
+            tracker: fx.tracker, applier: fx.applier, store: fx.store,
+            clock: { leaps.next() })
+        let checkpoint = await pass.run(BASSleepConsolidationRequest(
+            atomTiers: fx.atomTiers,
+            now: referenceNow,
+            retainFraction: 0.5,
+            maintenanceClass: .standard,
+            windowMs: 25_000,
+            dryRun: false))
+        XCTAssertTrue(checkpoint.partialCompletion,
+            "a 25s window exhausts at the tier-apply post-guard")
+        XCTAssertTrue(checkpoint.completedStages.contains(
+            BASConsolidationCheckpoint.Stage.tierApply),
+            "③ tier-apply ran")
+        XCTAssertFalse(checkpoint.appliedMutations.isEmpty,
+            "③ demoted the old atoms — a REAL store mutation")
+        XCTAssertFalse(checkpoint.completedStages.contains(
+            BASConsolidationCheckpoint.Stage.quarantineWrite),
+            "the window exhausted BEFORE ④⑤ — a genuine mid-pipeline stop")
+        XCTAssertTrue(checkpoint.quarantinedAtomIDs.isEmpty,
+            "⑤ was skipped by the exhausted window")
+        // THE invariant — the anchor fires outside the window budget:
+        XCTAssertTrue(checkpoint.completedStages.contains(
+            BASConsolidationCheckpoint.Stage.ledgerMark),
+            "the tamper-evidence anchor must fire on a mutating partial pass")
+        XCTAssertNotEqual(checkpoint.preChainHash, checkpoint.postChainHash,
+            "mutation ⟹ chain moves — even when the window exhausted mid-pipeline")
+    }
+
     // MARK: - 5. Unjoined candidates recorded, never acted on
 
     func testUnjoinedCandidatesAreRecordedNotActedOn() async throws {
@@ -243,6 +349,26 @@ final class BASMemorySleepConsolidationPassTests: XCTestCase {
         XCTAssertEqual(decoded.preChainHash, checkpoint.preChainHash)
         XCTAssertEqual(decoded.completedStages, checkpoint.completedStages)
         XCTAssertEqual(decoded.dryRun, true)
+        XCTAssertEqual(decoded.recommendedTierMoves, checkpoint.recommendedTierMoves,
+            "new field round-trips")
+    }
+
+    // audit memory-b F7 — byte-stability: a checkpoint LOGGED before recommendedTierMoves
+    // existed omits the key and must still decode (to [:]), not throw.
+    func testCheckpointDecodesLegacyLogMissingRecommendedTierMoves() async throws {
+        let fx = try await makeSeededFixture()
+        let pass = makePass(tracker: fx.tracker, applier: fx.applier, store: fx.store)
+        let checkpoint = await pass.run(BASSleepConsolidationRequest(
+            atomTiers: fx.atomTiers, now: referenceNow,
+            maintenanceClass: .standard, windowMs: 60_000, dryRun: true))
+        var obj = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(checkpoint)) as! [String: Any]
+        obj.removeValue(forKey: "recommendedTierMoves")   // checkpoint logged before the field
+        let legacy = try JSONSerialization.data(withJSONObject: obj)
+        let decoded = try JSONDecoder().decode(BASConsolidationCheckpoint.self, from: legacy)
+        XCTAssertTrue(decoded.recommendedTierMoves.isEmpty,
+            "absent key ⇒ [:] (byte-stable; pre-field checkpoints still decode)")
+        XCTAssertEqual(decoded.dryRun, true, "the rest of the legacy checkpoint decodes intact")
     }
 }
 

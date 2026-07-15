@@ -38,7 +38,6 @@ import CryptoKit
 ///    restart in this milestone (documented M92 scope). The test
 ///    pins the "does not survive" expectation so a future M92 that
 ///    changes the contract can update the test deliberately.
-#if !os(iOS)  // ch 1022 source-gate
 final class BASSovereignLedgerSQLiteStorageTests: XCTestCase {
 
     // MARK: - Fixtures
@@ -47,7 +46,7 @@ final class BASSovereignLedgerSQLiteStorageTests: XCTestCase {
     /// test runs don't stomp on each other.
     private func tmpPath(_ label: String = #function) -> String {
         let id = UUID().uuidString
-        return "/tmp/bas-sovereign-ledger-\(label.replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))-\(id).sqlite"
+        return NSTemporaryDirectory() + "bas-sovereign-ledger-\(label.replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))-\(id).sqlite"
     }
 
     private func removeFile(_ path: String) {
@@ -132,6 +131,60 @@ final class BASSovereignLedgerSQLiteStorageTests: XCTestCase {
             makeEntry(auditID: "a-4", turn: "turn-4"))
         let finalCount = await ledger2.count()
         XCTAssertEqual(finalCount, 4)
+        try await ledger2.verifyChainIntegrity()
+    }
+
+    // MARK: - 2b. deep-audit HIGH: injective ref-array serialization (no comma-join quarantine)
+
+    /// Pure codec round-trip: comma-bearing, empty-string, and control refs must survive encode→decode
+    /// EXACTLY. On the unfixed comma-join, ["a,b"]→["a","b"] and ["x","","y"]→["x","y"] (RED).
+    func testRefListCodecIsInjectiveForCommasAndEmpties() {
+        let cases: [[String]] = [
+            ["a,b"], ["x", "", "y"], [""], [], ["R1", "R2"],
+            ["a,b", "", "c\u{1F}d"], [",", ",,", "a,,b"],
+        ]
+        for xs in cases {
+            let round = BASSovereignLedgerSQLiteStorage.decodeRefList(
+                BASSovereignLedgerSQLiteStorage.encodeRefList(xs))
+            XCTAssertEqual(round, xs, "ref list \(xs) must round-trip exactly")
+        }
+        // Legacy (sentinel-less) rows still load; empty-preserving split recovers legacy empties.
+        XCTAssertEqual(BASSovereignLedgerSQLiteStorage.decodeRefList("a,b"), ["a", "b"])
+        XCTAssertEqual(BASSovereignLedgerSQLiteStorage.decodeRefList("x,,y"), ["x", "", "y"])
+        XCTAssertEqual(BASSovereignLedgerSQLiteStorage.decodeRefList(""), [])
+    }
+
+    /// End-to-end: an entry whose SIGNED refs carry a comma or empty element must NOT quarantine the
+    /// chain on cold-start reload. On the unfixed code, reload mis-splits the arrays → auditChainFull
+    /// mismatch → integrityQuarantined → verifyChainIntegrity / the post-reload append throw (RED).
+    func testCommaBearingRefsDoNotQuarantineChainOnReload() async throws {
+        let path = tmpPath()
+        defer { removeFile(path) }
+        let seed = "deepaudit-comma-refs"
+        func key() -> SymmetricKey { SymmetricKey(data: SHA256.hash(data: Data(seed.utf8))) }
+        func entry(_ id: String, ruleIDs: [String] = ["BR-1"], signalRefs: [String] = ["sig"]) -> BASSovereignAuditEntry {
+            BASSovereignAuditEntry(
+                auditID: id, sessionID: "s", turnID: "t-\(id)", verdictRef: "v",
+                ruleIDs: ruleIDs, signalRefs: signalRefs, actionRefs: [],
+                snapshotRef: "snap", actor: .system, signature: "",
+                appendedAt: Date(timeIntervalSince1970: 1_700_000_000))
+        }
+        do {
+            let storage = try BASSovereignLedgerSQLiteStorage(path: path)
+            let ledger = BASSovereignAuditLedger(signingSecret: key(), storage: storage)
+            _ = try await ledger.append(entry("c-1", signalRefs: ["a,b"]))      // in-band comma
+            _ = try await ledger.append(entry("c-2", ruleIDs: ["x", "", "y"]))  // empty element
+            _ = try await ledger.append(entry("c-3", signalRefs: [""]))          // single empty
+            _ = try await ledger.append(entry("c-4", ruleIDs: ["R1", "R2"]))     // comma-free control
+            try await ledger.verifyChainIntegrity()
+        }
+        // Cold-start reload — must not quarantine.
+        let storage2 = try BASSovereignLedgerSQLiteStorage(path: path)
+        let ledger2 = BASSovereignAuditLedger(signingSecret: key(), storage: storage2)
+        let reloadedCount = await ledger2.count()
+        XCTAssertEqual(reloadedCount, 4, "4 entries reconstructed from SQLite")
+        try await ledger2.verifyChainIntegrity()             // unfixed: throws (quarantine)
+        _ = try await ledger2.append(entry("c-5"))           // unfixed: throws (quarantined)
         try await ledger2.verifyChainIntegrity()
     }
 
@@ -377,4 +430,3 @@ final class BASSovereignLedgerSQLiteStorageTests: XCTestCase {
         XCTAssertTrue(segments.isEmpty)
     }
 }
-#endif

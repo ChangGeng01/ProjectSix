@@ -12,6 +12,38 @@
 #include <stddef.h>
 #include <string.h>
 
+/// Pure pressure arithmetic (audit M-e #2). Platform-independent so
+/// the ratio is deterministically unit-testable with synthetic page
+/// counts (no host_statistics64 needed)。
+///
+/// The OLD formula `used = total - free` counted `inactive` pages as
+/// "used". On Darwin `inactive` is RECLAIMABLE cache (file-backed /
+/// aged-out anonymous pages the kernel evicts on demand); a healthy
+/// device with a large file cache therefore read ~100% used and
+/// `isUnderPressure()` was effectively pinned true。 Genuine resident
+/// pressure is `active + wired`; available headroom is `free +
+/// inactive`。 Clamped so no kernel quirk can escape 0-100。
+int32_t bas_memory_pressure_percent_from(
+    int64_t free_pages,
+    int64_t active_pages,
+    int64_t inactive_pages,
+    int64_t wired_pages,
+    int32_t *out_pct
+) {
+    if (out_pct == NULL) { return -1; }
+    int64_t total_pages =
+        free_pages + active_pages + inactive_pages + wired_pages;
+    if (total_pages <= 0) {
+        *out_pct = -1;
+        return -1;
+    }
+    int64_t used_pages = active_pages + wired_pages;
+    if (used_pages < 0) { used_pages = 0; }
+    if (used_pages > total_pages) { used_pages = total_pages; }
+    *out_pct = (int32_t)((used_pages * 100) / total_pages);
+    return 0;
+}
+
 #if defined(__APPLE__) && (defined(__IPHONE_OS_VERSION_MIN_REQUIRED) \
     || defined(__MAC_OS_X_VERSION_MIN_REQUIRED))
 
@@ -73,8 +105,8 @@ int32_t bas_memory_vm_stats(
     return 0;
 }
 
-/// Estimate memory pressure as a 0-100 percent。 Pressure is
-/// approximated as 100 * (1 - free_pages / total_pages)。
+/// Estimate memory pressure as a 0-100 percent。 Reads the live VM
+/// counters then delegates to `bas_memory_pressure_percent_from`。
 int32_t bas_memory_pressure_percent(int32_t *out_pct) {
     if (out_pct == NULL) { return -1; }
     int64_t free_p = 0, active = 0, inactive = 0, wired = 0;
@@ -85,14 +117,8 @@ int32_t bas_memory_pressure_percent(int32_t *out_pct) {
         *out_pct = -1;
         return -1;
     }
-    int64_t total_pages = free_p + active + inactive + wired;
-    if (total_pages <= 0) {
-        *out_pct = -1;
-        return -1;
-    }
-    int64_t used_pages = total_pages - free_p;
-    *out_pct = (int32_t)((used_pages * 100) / total_pages);
-    return 0;
+    return bas_memory_pressure_percent_from(
+        free_p, active, inactive, wired, out_pct);
 }
 
 #else

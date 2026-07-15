@@ -39,6 +39,12 @@ public final class BASCoreAIMambaSession: @unchecked Sendable {
     private let convName: String
     private let ssmName: String
     private var convAll: NDArray
+    #if DEBUG
+    // audit x-concurrency §三① — enforces the `@unchecked Sendable` single-serialized-driver
+    // contract at runtime (DEBUG only): a concurrent driver corrupts the in-place state.
+    // Zero-cost in release; the utility is unit-tested in BASSingleDriverTripwireTests.
+    private let driverTripwire = BASSingleDriverTripwire(label: "BASCoreAIMambaSession")
+    #endif
     private var ssmAll: NDArray
     private let convShape: [Int]
     private let ssmShape: [Int]
@@ -86,6 +92,10 @@ public final class BASCoreAIMambaSession: @unchecked Sendable {
     /// One decode step: feed `token`, advance both recurrent states, return the argmax of the logits.
     @discardableResult
     public func step(token: Int) async throws -> Int {
+        #if DEBUG
+        driverTripwire.enter()   // audit x-concurrency §三①
+        defer { driverTripwire.exit() }
+        #endif
         let inputID = NDArray(scalars: [Int32(token)], shape: [1, 1])
         return try await runStep(inputID: inputID, conv: &convAll, ssm: &ssmAll)
     }

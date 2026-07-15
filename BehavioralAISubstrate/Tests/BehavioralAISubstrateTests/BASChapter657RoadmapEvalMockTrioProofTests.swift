@@ -14,21 +14,26 @@ final class BASChapter657RoadmapEvalMockTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASRoadmapPhaseStatusConformsToCodable() {
-        assertCodable(BASRoadmapPhaseStatus.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(BASRoadmapPhaseStatus.shipped)
+        assertCodableRoundTrips(
+            BASRoadmapPhaseStatus.partiallyShipped(percent: 0))
     }
 
     func testBASAutoEvalBaselineModeConformsToCodable() {
-        assertCodable(BASAutoEvalBaselineMode.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASAutoEvalBaselineMode.latestForBuildChapter)
+        assertCodableRoundTrips(
+            BASAutoEvalBaselineMode.explicitRunID(""))
     }
 
     func testBASFoundationModelsMockErrorConformsToCodable() {
-        assertCodable(BASFoundationModelsMockError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASFoundationModelsMockError.scriptExhausted)
+        assertCodableRoundTrips(
+            BASFoundationModelsMockError.scripted(reason: ""))
     }
 }

@@ -26,6 +26,12 @@ GATES=(
     "scripts/check_substrate_residuals.sh"
 )
 
+# audit tools-scripts LOW: a fixed /tmp/gate.out is shared across invocations — two concurrent runs
+# (e.g. a pre-commit hook + a manual run) clobber each other's captured output, producing a garbled
+# RESULT line or a false pass/fail. Allocate a per-run private temp file, cleaned up on exit.
+gate_out="$(mktemp "${TMPDIR:-/tmp}/gate.XXXXXX")"
+trap 'rm -f "$gate_out"' EXIT
+
 failed=0
 echo "=== Substrate CI gates ==="
 for gate in "${GATES[@]}"; do
@@ -34,18 +40,17 @@ for gate in "${GATES[@]}"; do
         failed=$((failed + 1))
         continue
     fi
-    if bash "$gate" > /tmp/gate.out 2>&1; then
+    if bash "$gate" > "$gate_out" 2>&1; then
         # Show just the RESULT line
-        result_line=$(grep "^RESULT" /tmp/gate.out | tail -1)
+        result_line=$(grep "^RESULT" "$gate_out" | tail -1)
         echo "✓ $gate"
         echo "    ${result_line}"
     else
         echo "✗ FAILED: $gate"
-        tail -10 /tmp/gate.out | sed 's/^/    /'
+        tail -10 "$gate_out" | sed 's/^/    /'
         failed=$((failed + 1))
     fi
 done
-rm -f /tmp/gate.out
 
 echo ""
 if (( failed > 0 )); then

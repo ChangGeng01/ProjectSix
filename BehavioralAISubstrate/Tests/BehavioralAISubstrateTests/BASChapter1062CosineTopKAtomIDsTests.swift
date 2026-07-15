@@ -54,6 +54,35 @@ final class BASChapter1062CosineTopKAtomIDsTests: XCTestCase {
         XCTAssertEqual(top[2].score, 0.5, accuracy: 1e-5)
     }
 
+    /// audit M-l MED-4 — at an EXACT score tie the K-th-boundary MEMBERSHIP is
+    /// now decided by content-derived atom_id (ASC), NOT by rowid. The old sync
+    /// path returned rowids then resolved them in K separate FFI calls (the
+    /// TOCTOU window where a concurrent write's rowid reuse could remap a rowid
+    /// to a different atom); the atomic variant reads atom_id directly in one
+    /// Mutex-held scan, so membership at a tie is deterministic + insertion-
+    /// order-independent.
+    func testTieBreakMembershipIsDeterministicByAtomID() async throws {
+        let url = makeTempDBURL(); defer { cleanup(url) }
+        let store = try BASRoutedVectorIndexStorage(databaseURL: url)
+        let dim = 4
+        let emb: [Float] = [1, 0, 0, 0]   // identical ⇒ all three tie on score
+        // insert in NON-sorted atom_id order (rowids 1,2,3 = zed, alpha, mid):
+        for aid in ["id-zed", "id-alpha", "id-mid"] {
+            _ = try await store.upsert(BASVectorIndexEntry(
+                atomID: aid,
+                normalizedEmbedding: BASEmbedding(
+                    vector: emb, dimension: dim, providerVersion: "p"),
+                domain: "tie", metadata: [:]))
+        }
+        let top = try store.cosineTopKAtomIDsSync(
+            forDomain: "tie", query: [1, 0, 0, 0], k: 2)
+        XCTAssertEqual(top.count, 2)
+        // all tie ⇒ the two SMALLEST atom_ids win, in ASC order; id-zed is
+        // evicted at the k-boundary REGARDLESS of insertion / rowid order.
+        XCTAssertEqual(top.map(\.atomID), ["id-alpha", "id-mid"],
+            "tie-break membership + order is content-derived atom_id ASC, not rowid")
+    }
+
     /// Score parity with the async `cosineTopK` path (same ranking) — the sync accessor only adds
     /// the atom_id resolution; the scores come from the same FFI.
     func testSyncMatchesAsyncScores() async throws {

@@ -72,6 +72,7 @@
 
 import Foundation
 import SQLite3
+import BASRuntimeCore
 
 /// SQLite-backed `BASMemoryAtomStore`. Atoms persist across process
 /// restarts in the configured database file. The actor's isolation
@@ -141,6 +142,13 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         self.onSilentFailure = handler
     }
 
+    /// audit x-sov #5/#6 — the error (if any) from applying file Data
+    /// Protection to the DB + `-wal`/`-shm` at open. `onSilentFailure` isn't
+    /// wired until AFTER construction, so the init-time protection outcome is
+    /// SURFACED here (never swallowed) for a host to inspect. nil ⇒ protection
+    /// applied cleanly (or the kill-switch is off).
+    public private(set) var fileProtectionError: Error?
+
     // MARK: - Lifecycle
 
     /// Open or create the SQLite-backed store at `databaseURL`.
@@ -180,6 +188,15 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         // (the offline distillation pipeline reads while the
         // runtime writes).
         try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete zeroes freed pages
+        // at delete time — default-on, BAS_SECURE_DELETE=0 kill-switch.
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            try Self.runExec(db: handle, sql: sdSQL)
+        }
+        // memory-a F4 residual: one-time legacy freelist purge (secure_delete only
+        // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
+        // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
         try Self.runExec(db: handle, sql: "PRAGMA foreign_keys=ON;")
@@ -217,10 +234,39 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
                 }
             }
         }
+
+        // audit x-sov #5 — pin file Data Protection on the memory-atom DB (the
+        // highest-sensitivity on-disk point) + its -wal/-shm sidecars, matching
+        // the session-KV snapshot's protection (缝2) and killing the same-repo
+        // double standard. Applied AFTER the WAL pragma + seed write so the
+        // sidecars exist. The outcome is surfaced (x-sov #6: not swallowed).
+        self.fileProtectionError =
+            BASSQLiteFileProtection.apply(toDatabaseAt: databaseURL.path)
     }
 
     deinit {
         if let db { sqlite3_close_v2(db) }
+    }
+
+    /// audit x-test-integrity F7 — the per-connection pragmas
+    /// (synchronous / foreign_keys / wal_autocheckpoint) are NOT cross-connection
+    /// observable, so a durability gate must read them from THIS store's OWN
+    /// connection rather than re-issue them on a fresh handle (which verifies its
+    /// own copy — a tautology that stays green even if init drops the pragma).
+    /// Test seam.
+    public func _connectionPragmasForTesting()
+        -> (synchronous: Int, foreignKeys: Int, walAutocheckpoint: Int) {
+        guard let db else { return (-1, -1, -1) }
+        return (Self._pragmaIntForTesting(db, "synchronous"),
+                Self._pragmaIntForTesting(db, "foreign_keys"),
+                Self._pragmaIntForTesting(db, "wal_autocheckpoint"))
+    }
+    private static func _pragmaIntForTesting(_ db: OpaquePointer, _ name: String) -> Int {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA \(name);", -1, &stmt, nil) == SQLITE_OK,
+              let s = stmt else { return -1 }
+        defer { sqlite3_finalize(s) }
+        return sqlite3_step(s) == SQLITE_ROW ? Int(sqlite3_column_int64(s, 0)) : -1
     }
 
     /// 先稳 P2 — run `PRAGMA integrity_check` and throw if the result is not "ok" (proactive corruption
@@ -302,6 +348,12 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         guard let existing else { return nil }
         do {
             try Self.deleteAtom(db: db, atomID: id)
+            // audit F6 (2026-07-12): secure_delete=ON zeroes the freed MAIN-DB page, but the
+            // atom's payload plaintext also lives as the original INSERT frame in the -wal
+            // file. remove() is the explicit forget/purge path (NOT the hot tiering-evict
+            // loop), so truncate the WAL now — a blocked checkpoint that leaves frames THROWS
+            // rather than reporting a clean forget while plaintext lingers.
+            try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
             return existing
         } catch {
             onSilentFailure?(error)
@@ -355,8 +407,12 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
     @discardableResult
     public func admit(_ atom: BASGovernedMemory) async throws -> Bool {
         guard let db else { return false }
-        let existed = (try? Self.fetchAtom(
-            db: db, atomID: atom.id.uuidString)) != nil
+        // audit memory-a F7: `try?` swallowed fetch errors, so a decode-corrupt existing row read
+        // as "did not exist" → this admit reported wasNew=true for a row it actually overwrote (and
+        // masked the corruption). admit already throws, so surface the StorageError, mirroring the
+        // *OrThrow siblings in this file.
+        let existed = try Self.fetchAtom(
+            db: db, atomID: atom.id.uuidString) != nil
         try Self.upsertAtom(db: db, atom: atom)
         return !existed
     }

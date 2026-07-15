@@ -49,6 +49,16 @@ public actor BASAuditObservationProjectionsBundleObserver
 
     public init() {}
 
+    /// Test-only stagger hook (audit hostkit-rest MED-5 teeth). When set, each
+    /// `recordEmission` awaits this before appending — letting a test force a
+    /// per-observation delay so the ordering contract can be exercised
+    /// deterministically. `nil` in production ⇒ zero behavior change (no await,
+    /// byte-equal). Never wired by any production caller.
+    public nonisolated(unsafe) static var
+        _recordStaggerForTesting:
+        (@Sendable (BASAuditObservationProjectionsBundleObservation)
+            async -> Void)?
+
     // MARK: - Recording
 
     /// Record an already-built observation。 Callers
@@ -58,7 +68,10 @@ public actor BASAuditObservationProjectionsBundleObserver
     public func recordEmission(
         _ observation:
             BASAuditObservationProjectionsBundleObservation
-    ) {
+    ) async {
+        if let stagger = Self._recordStaggerForTesting {
+            await stagger(observation)
+        }
         records.append(observation)
     }
 

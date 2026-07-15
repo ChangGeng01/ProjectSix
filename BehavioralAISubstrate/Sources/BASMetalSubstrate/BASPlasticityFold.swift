@@ -1,3 +1,5 @@
+// ⚖️ P4 遗留清算判决 (RSI 章程 2026-07-07):生产入口默认 nil(审计读者2实锤)——
+// 学习基元标本,非在役环路。引用它作"已有自学习"= 叙事漂移;激活走 ADR-014 全阶梯。
 // MARK: - BASPlasticityFold — chapter 四百五十四 / M1193
 // 系统熵 reduction
 //
@@ -500,7 +502,49 @@ public actor BASPlasticityFold {
     /// Parallelism:O(preDim × postDim) threads each
     /// doing O(1) work。 Significantly faster than CPU
     /// for weight matrices >= ~64×64 on Apple Silicon。
+    // audit x-concurrency MED-9 — FIFO async mutex so applyGPU calls never overlap at the GPU
+    // await. Both `applyGPU` and `selectiveScanGPU` (BASMambaSSMState) read a mutable state
+    // baseline BEFORE their single `await`, then overwrite it after — so two concurrent calls on
+    // the SAME actor both captured the SAME pre-await baseline and the second silently clobbered
+    // the first's committed update (a lost update; the counter still double-incremented). The lock
+    // hands off in arrival order; each call reads a FRESH baseline only once it holds the lock.
+    private var applyBusy = false
+    private var applyWaiters: [CheckedContinuation<Void, Never>] = []
+
+    /// Run `op` under the per-actor apply lock — at most one op airborne across its await.
+    func _serializeApply<T>(_ op: () async throws -> T) async rethrows -> T {
+        if applyBusy {
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                applyWaiters.append(c)
+            }   // resumed via hand-off ⇒ we now hold the lock (applyBusy stays true)
+        } else {
+            applyBusy = true
+        }
+        defer {
+            if applyWaiters.isEmpty {
+                applyBusy = false
+            } else {
+                applyWaiters.removeFirst().resume()   // hand the lock to the next waiter
+            }
+        }
+        return try await op()
+    }
+
     public func applyGPU(
+        pre: [Float],
+        post: [Float],
+        outcome: Float = 0,
+        timingDelta: Float = 0
+    ) async throws -> BASPlasticityUpdate {
+        // audit x-concurrency MED-9: serialize so a concurrent call reads a FRESH `weights`
+        // baseline (not the stale pre-await value the previous call is about to overwrite).
+        try await _serializeApply {
+            try await self._applyGPULocked(
+                pre: pre, post: post, outcome: outcome, timingDelta: timingDelta)
+        }
+    }
+
+    private func _applyGPULocked(
         pre: [Float],
         post: [Float],
         outcome: Float = 0,
@@ -655,12 +699,24 @@ public actor BASPlasticityFold {
         encoder.dispatchThreads(
             gridSize, threadsPerThreadgroup: tgSize)
         encoder.endEncoding()
-        cmdBuf.commit()
-        _ = await cmdBuf.completed()
-        if let err = cmdBuf.error {
-            throw BASPlasticityError.gpuDispatchFailure(
-                reason: "command buffer error:" +
-                " \(err.localizedDescription)")
+        // H3 (mega-audit, 2026-07-08): register the completion handler
+        // BEFORE commit — the library's own MPSGraphMatMul fix (ch1034)
+        // records `commit(); await completed()` deterministically hanging
+        // on iPhone Air for tiny dispatches while the Mac stays falsely
+        // green。 Same canonical bridge as BASMetalKernelLibraryLoader。
+        try await withCheckedThrowingContinuation {
+            (cont: CheckedContinuation<Void, Error>) in
+            cmdBuf.addCompletedHandler { buffer in
+                if let err = buffer.error {
+                    cont.resume(throwing:
+                        BASPlasticityError.gpuDispatchFailure(
+                            reason: "command buffer error:" +
+                            " \(err.localizedDescription)"))
+                } else {
+                    cont.resume()
+                }
+            }
+            cmdBuf.commit()
         }
         // Read back updated weights + delta
         let updatedWeights = Array(

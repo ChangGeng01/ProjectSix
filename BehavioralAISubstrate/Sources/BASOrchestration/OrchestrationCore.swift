@@ -364,6 +364,9 @@ public enum BASEntryIntentBridgeBuilder {
         case BASEntryIntentKind.predictiveIntervention.rawValue:
             .predictiveIntervention
         default:
+            // audit orchestration LOW-3: an unrecognized boundary raw value collapses to the most
+            // CONSERVATIVE kind — `.capture` (a passive record), never an action-bearing kind like
+            // `.present` / `.predictiveIntervention`. Deliberate fail-safe, not an accidental default.
             .capture
         }
     }

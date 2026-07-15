@@ -121,6 +121,33 @@ final class BASWorldPriorVaultTests: XCTestCase {
         }
     }
 
+    // audit policy-obs-misc LOW-8: a bridge whose sourceDomain has no horizon must be rejected,
+    // not half-registered (findable by id but absent from any horizon's bridgesOutbound = unroutable).
+    func testBridgeWithUnregisteredSourceDomainRejected() async throws {
+        let vault = BASWorldPriorVault()
+        let t = Self.sampleTemplate(id: "t1", domain: .body)
+        try await vault.registerHorizon(
+            BASWorldPriorHorizon(domain: .body, templates: [t]))
+        // sourceDomain = .money has NO registered horizon, though the template pairings are valid.
+        let bridge = BASWorldPriorDomainBridge(
+            id: "b-nodomain",
+            sourceDomain: .money,
+            targetDomain: .body,
+            analogy: "no source horizon",
+            templatePairings: [.init(sourceTemplateID: "t1", targetTemplateID: "t1")])
+        do {
+            try await vault.registerBridge(bridge)
+            XCTFail("expected bridgeReferencesUnknownDomain")
+        } catch BASWorldPriorVault.VaultError
+            .bridgeReferencesUnknownDomain(let bid, let dom)
+        {
+            XCTAssertEqual(bid, "b-nodomain")
+            XCTAssertEqual(dom, "money")
+        }
+        let found = await vault.bridge(id: "b-nodomain")
+        XCTAssertNil(found, "a rejected bridge must not land in bridgesByID (no half-registration)")
+    }
+
     func testHorizonBridgeValidationIsAtomic() async throws {
         // If a horizon's bridgesOutbound reference an unknown template,
         // the entire registration must fail — the horizon's templates

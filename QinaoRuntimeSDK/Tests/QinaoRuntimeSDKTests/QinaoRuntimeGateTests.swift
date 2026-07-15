@@ -117,6 +117,15 @@ final class QinaoRuntimeGateTests: XCTestCase {
             toolExecutor: executor,
             now: now)
 
+        // deep-audit P0-4: register the anchor `validProof` mints against, so the happy-path proofs
+        // verify under the new registration check (a proof for an unregistered anchor is refused).
+        _ = try? await snapshotManager.register(
+            anchor: BASSovereignSnapshotManager.SnapshotAnchor(
+                anchorID: "anchor-host.v1",
+                safeSnapshotRef: "snap.host.v1",
+                integrityHash: Self.sha256Hex(Data("host.v1".utf8))),
+            sealedPayload: Data("host.v1".utf8))
+
         return Fixture(
             runtime: runtime,
             recorder: recorder,
@@ -126,12 +135,21 @@ final class QinaoRuntimeGateTests: XCTestCase {
             versionTree: versionTree)
     }
 
+    // deep-audit P0-1: the standard payload the canonical-digest intents bind (execute() now
+    // recomputes the digest from the presented tool+payload, so intent and execute must agree).
+    private static let gatePayload = Data("meet".utf8)
+
     private func intent(
-        digest: String = "intent.abc",
+        digest: String? = nil,
         sessionID: String = "sess.1"
     ) -> QinaoRiskGate.ActionIntent {
-        QinaoRiskGate.ActionIntent(
-            digest: digest,
+        // Default: a canonical digest binding tool+payload+session+host (the form execute enforces).
+        // An explicit `digest:` (mismatch tests) overrides it to exercise the rejection path.
+        let d = digest ?? QinaoRiskGate.ActionIntent.canonicalDigest(
+            toolName: "calendar.add_event", payload: Self.gatePayload,
+            sessionID: sessionID, hostVersionID: "host.v1")
+        return QinaoRiskGate.ActionIntent(
+            digest: d,
             toolName: "calendar.add_event",
             sessionID: sessionID,
             hostVersionID: "host.v1",
@@ -144,18 +162,19 @@ final class QinaoRuntimeGateTests: XCTestCase {
             .joined()
     }
 
+    /// integration S3: proofs are minted by the control plane (HMAC-signed).
     private func validProof(
         for intent: QinaoRiskGate.ActionIntent,
-        at now: Date = Date(),
+        sovereign: QinaoSovereignControlPlane,
         ttl: TimeInterval = 10
-    ) -> QinaoRuntime.SnapshotContinuityProof {
-        QinaoRuntime.SnapshotContinuityProof(
-            proofID: "proof-\(UUID().uuidString)",
-            sessionID: intent.sessionID,
+    ) async -> QinaoRuntime.SnapshotContinuityProof {
+        await sovereign.issueSnapshotContinuityProof(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: intent.digest,
+                sessionID: intent.sessionID,
+                hostVersionID: intent.hostVersionID),
             anchorID: "anchor-host.v1",
-            intentDigest: intent.digest,
-            issuedAt: now,
-            expiresAt: now.addingTimeInterval(ttl))
+            ttlSeconds: ttl)
     }
 
     // MARK: - Happy path
@@ -173,19 +192,155 @@ final class QinaoRuntimeGateTests: XCTestCase {
                 digest: it.digest,
                 sessionID: it.sessionID,
                 hostVersionID: it.hostVersionID))
-        let proof = validProof(for: it)
+        let proof = await validProof(for: it, sovereign: sovereign)
         let sigs = QinaoRuntime.Signatures(
             permit: permit, warrant: warrant, snapshotProof: proof)
 
         let result = try await runtime.execute(
             toolName: "calendar.add_event",
-            payload: Data("meet".utf8),
+            payload: Self.gatePayload,
             intent: it,
             signatures: sigs)
 
         XCTAssertEqual(String(data: result, encoding: .utf8), "ok")
         let count = await recorder.callCount
         XCTAssertEqual(count, 1)
+    }
+
+    // MARK: - deep-audit P0-1: permit binds tool AND payload
+
+    /// A fully-valid bundle minted for payload A cannot be reused to execute a DIFFERENT payload B.
+    /// The permit signs the canonical digest of (tool, payload, session, host); presenting payload B
+    /// recomputes a different digest and fails the gate. Pre-fix the payload was never in the signed
+    /// material, so B would have executed under A's approval.
+    func testPermitCannotBeReusedForADifferentPayload() async throws {
+        let fx = await makeRuntime()
+        let it = intent()   // binds Self.gatePayload
+        let permit = try await fx.risk.requestActionPermit(for: it)
+        let warrant = try await fx.sovereign.issueWarrant(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID))
+        let proof = await validProof(for: it, sovereign: fx.sovereign)
+        let sigs = QinaoRuntime.Signatures(permit: permit, warrant: warrant, snapshotProof: proof)
+
+        await XCTAssertThrowsErrorAsync(
+            try await fx.runtime.execute(
+                toolName: "calendar.add_event",
+                payload: Data("A DIFFERENT PAYLOAD".utf8),   // ≠ the bound gatePayload
+                intent: it, signatures: sigs)
+        ) { error in
+            guard case QinaoRuntime.RuntimeError.digestMismatch = error else {
+                return XCTFail("a swapped payload must be refused at the canonical binding, got \(error)")
+            }
+        }
+        let count = await fx.recorder.callCount
+        XCTAssertEqual(count, 0, "the tool must not run with a payload the permit never bound")
+    }
+
+    // MARK: - deep-audit P0-2: single-use bundle (no replay within TTL)
+
+    /// A fully-valid, unexpired (permit, warrant, proof) bundle fires the tool exactly ONCE.
+    /// A second execute() with the SAME bundle throws tokenAlreadyConsumed and does NOT re-run
+    /// the tool — proving the side effect cannot be replayed within the TTL. Pre-fix (stateless
+    /// validation, no consume) the second call would run the tool a second time.
+    func testSameBundleCannotBeReplayedWithinTTL() async throws {
+        let fx = await makeRuntime()
+        let runtime = fx.runtime
+        let recorder = fx.recorder
+        let it = intent()
+        let permit = try await fx.risk.requestActionPermit(for: it)
+        let warrant = try await fx.sovereign.issueWarrant(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID))
+        let proof = await validProof(for: it, sovereign: fx.sovereign)
+        let sigs = QinaoRuntime.Signatures(
+            permit: permit, warrant: warrant, snapshotProof: proof)
+
+        _ = try await runtime.execute(
+            toolName: "calendar.add_event", payload: Self.gatePayload, intent: it, signatures: sigs)
+
+        do {
+            _ = try await runtime.execute(
+                toolName: "calendar.add_event", payload: Self.gatePayload,
+                intent: it, signatures: sigs)
+            XCTFail("a consumed bundle must not execute again")
+        } catch QinaoRuntime.RuntimeError.tokenAlreadyConsumed {
+            // expected
+        }
+        let count = await recorder.callCount
+        XCTAssertEqual(count, 1, "the tool must have run exactly once despite the replay attempt")
+    }
+
+    // MARK: - deep-audit P0-4: proof must prove a LIVE anchor
+
+    /// A structurally valid, correctly-signed, unexpired proof whose anchorID is NOT registered
+    /// must be refused — the proof previously "verified" as a signed string that proved no live
+    /// snapshot chain. execute() throws missingSnapshotProof for it.
+    func testProofForUnregisteredAnchorIsRefused() async throws {
+        let fx = await makeRuntime()
+        let it = intent()
+        let permit = try await fx.risk.requestActionPermit(for: it)
+        let warrant = try await fx.sovereign.issueWarrant(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID))
+        // Mint a proof for an anchor that was never registered.
+        let orphanProof = await fx.sovereign.issueSnapshotContinuityProof(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID),
+            anchorID: "anchor.NEVER-REGISTERED", ttlSeconds: 10)
+
+        let valid = await fx.sovereign.isSnapshotProofValid(
+            orphanProof,
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID))
+        XCTAssertFalse(valid, "a proof for an unregistered anchor must not verify")
+
+        await XCTAssertThrowsErrorAsync(
+            try await fx.runtime.execute(
+                toolName: "calendar.add_event", payload: Self.gatePayload, intent: it,
+                signatures: .init(permit: permit, warrant: warrant, snapshotProof: orphanProof))
+        ) { error in
+            guard case QinaoRuntime.RuntimeError.missingSnapshotProof = error else {
+                return XCTFail("expected missingSnapshotProof, got \(error)")
+            }
+        }
+    }
+
+    // MARK: - audit F1: tool-swap rejection (valid signatures, wrong tool)
+
+    /// A caller with FULLY VALID signatures for intent A (tool "calendar.add_event") passes a
+    /// DIFFERENT toolName. execute() must bind the executed tool to the signed intent.toolName
+    /// and refuse — before the fix, toolName was a dead field and B would have run under A's
+    /// approval (confused deputy / approval reuse).
+    func testMismatchedToolNameIsRejectedEvenWithValidSignatures() async throws {
+        let fx = await makeRuntime()
+        let runtime = fx.runtime
+        let recorder = fx.recorder
+        let sovereign = fx.sovereign
+        let risk = fx.risk
+        let it = intent()  // toolName == "calendar.add_event"
+        let permit = try await risk.requestActionPermit(for: it)
+        let warrant = try await sovereign.issueWarrant(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: it.digest, sessionID: it.sessionID, hostVersionID: it.hostVersionID))
+        let proof = await validProof(for: it, sovereign: sovereign)
+        let sigs = QinaoRuntime.Signatures(
+            permit: permit, warrant: warrant, snapshotProof: proof)
+
+        await XCTAssertThrowsErrorAsync(
+            try await runtime.execute(
+                toolName: "mail.send_all",  // ← swapped tool, same (valid) signatures
+                payload: Self.gatePayload,
+                intent: it,
+                signatures: sigs)
+        ) { error in
+            guard case QinaoRuntime.RuntimeError.toolMismatch(let expected, let got) = error
+            else { return XCTFail("expected toolMismatch, got \(error)") }
+            XCTAssertEqual(expected, "calendar.add_event")
+            XCTAssertEqual(got, "mail.send_all")
+        }
+        let count = await recorder.callCount
+        XCTAssertEqual(count, 0, "the swapped tool must NOT execute")
     }
 
     // MARK: - Digest mismatch (each arm in isolation)
@@ -204,12 +359,12 @@ final class QinaoRuntimeGateTests: XCTestCase {
                 digest: it.digest,
                 sessionID: it.sessionID,
                 hostVersionID: it.hostVersionID))
-        let proof = validProof(for: it)
+        let proof = await validProof(for: it, sovereign: sovereign)
 
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
                 toolName: "calendar.add_event",
-                payload: Data(),
+                payload: Self.gatePayload,
                 intent: it,
                 signatures: .init(
                     permit: wrongPermit,
@@ -221,8 +376,13 @@ final class QinaoRuntimeGateTests: XCTestCase {
             else {
                 return XCTFail("expected digestMismatch, got \(error)")
             }
-            XCTAssertEqual(expected, "intent.real")
+            // deep-audit P0-1: the wrong permit is now rejected at the canonical tool+payload
+            // binding check (which fires first). `got` is the wrong permit's digest; `expected` is
+            // the SDK-canonical bound digest for the presented tool+payload.
             XCTAssertEqual(got, "intent.other")
+            XCTAssertEqual(expected, QinaoRiskGate.ActionIntent.canonicalDigest(
+                toolName: "calendar.add_event", payload: Self.gatePayload,
+                sessionID: it.sessionID, hostVersionID: "host.v1"))
         }
         let count = await recorder.callCount
         XCTAssertEqual(count, 0)
@@ -241,12 +401,12 @@ final class QinaoRuntimeGateTests: XCTestCase {
                 digest: "intent.other",
                 sessionID: it.sessionID,
                 hostVersionID: it.hostVersionID))
-        let proof = validProof(for: it)
+        let proof = await validProof(for: it, sovereign: sovereign)
 
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
                 toolName: "calendar.add_event",
-                payload: Data(),
+                payload: Self.gatePayload,
                 intent: it,
                 signatures: .init(
                     permit: permit,
@@ -273,13 +433,13 @@ final class QinaoRuntimeGateTests: XCTestCase {
                 digest: it.digest,
                 sessionID: it.sessionID,
                 hostVersionID: it.hostVersionID))
-        let wrongProof = validProof(
-            for: intent(digest: "intent.other"))
+        let wrongProof = await validProof(
+            for: intent(digest: "intent.other"), sovereign: sovereign)
 
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
                 toolName: "calendar.add_event",
-                payload: Data(),
+                payload: Self.gatePayload,
                 intent: it,
                 signatures: .init(
                     permit: permit,
@@ -320,12 +480,12 @@ final class QinaoRuntimeGateTests: XCTestCase {
         // Advance past permit TTL (10s); warrant TTL is also 10s —
         // the runtime checks permit first, so that's what we observe.
         clock.t = frozen.addingTimeInterval(11)
-        let proof = validProof(for: it, at: clock.t, ttl: 60)
+        let proof = await validProof(for: it, sovereign: sovereign, ttl: 60)
 
         await XCTAssertThrowsErrorAsync(
             try await runtime.execute(
                 toolName: "calendar.add_event",
-                payload: Data(),
+                payload: Self.gatePayload,
                 intent: it,
                 signatures: .init(
                     permit: permit,
@@ -371,7 +531,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
                 digest: it.digest,
                 sessionID: it.sessionID,
                 hostVersionID: it.hostVersionID))
-        let proof = validProof(for: it)
+        let proof = await validProof(for: it, sovereign: fx.sovereign)
 
         _ = try await fx.sovereign.haltSession(
             sessionID: sessionID,
@@ -380,7 +540,7 @@ final class QinaoRuntimeGateTests: XCTestCase {
         await XCTAssertThrowsErrorAsync(
             try await fx.runtime.execute(
                 toolName: "calendar.add_event",
-                payload: Data(),
+                payload: Self.gatePayload,
                 intent: it,
                 signatures: .init(
                     permit: permit,
@@ -450,5 +610,59 @@ func XCTAssertThrowsErrorAsync<T>(
             file: file, line: line)
     } catch {
         errorHandler(error)
+    }
+}
+
+/// deep-audit P0-3 (2026-07-13) — durability pin for the LAST-await halt re-check.
+///
+/// execute() checks `sovereign.isSessionHalted` at the TOP (first of four suspension points) and
+/// AGAIN right before the external effect, after the bundle is atomically consumed. The second
+/// re-check is the load-bearing one: a `markSessionHalted` landing during the intervening
+/// permit/warrant/proof awaits would otherwise be missed and the executor would still fire. The
+/// existing halt tests halt BEFORE execute (caught by the FIRST check), so they don't exercise the
+/// re-check — deleting it reds nothing. A deterministic behavioural test would need a production
+/// test-seam; instead this source-pins that the re-check exists AT the last-await position (after
+/// the bundle consume, before the executor). Removing it reds this.
+final class QinaoRuntimeHaltReCheckPinTests: XCTestCase {
+    func testExecuteReChecksHaltAfterBundleConsumeBeforeEffect() throws {
+        let runtimeSrc = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // QinaoRuntimeSDKTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // QinaoRuntimeSDK
+            .appendingPathComponent("Sources/QinaoRuntime/QinaoRuntime.swift")
+        let text = try String(contentsOf: runtimeSrc, encoding: .utf8)
+
+        // Isolate the execute(...) body: from its signature to the next `public func` after it,
+        // so counts are scoped to execute.
+        guard let execStart = text.range(of: "func execute(") else {
+            return XCTFail("execute() not found")
+        }
+        let after = String(text[execStart.upperBound...])
+        let execBody: String
+        if let nextFunc = after.range(of: "\n    public func ") {
+            execBody = String(after[..<nextFunc.lowerBound])
+        } else {
+            execBody = after
+        }
+
+        // Non-comment lines only.
+        let code = execBody.split(separator: "\n", omittingEmptySubsequences: false)
+            .map(String.init)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+
+        let haltChecks = code.components(separatedBy: "sovereign.isSessionHalted").count - 1
+        XCTAssertGreaterThanOrEqual(haltChecks, 2,
+            "execute() must re-check halt (top + last-await) — found \(haltChecks) isSessionHalted checks")
+
+        // The re-check must come AFTER the atomic bundle consume (so a halted turn's bundle is
+        // already burned) and BEFORE the executor call.
+        guard let consumeIdx = code.range(of: "consumedBundles[bundleKey] =")?.upperBound,
+              let executorIdx = code.range(of: "toolExecutor(")?.lowerBound else {
+            return XCTFail("bundle-consume or executor call not found in execute()")
+        }
+        let tail = String(code[consumeIdx..<executorIdx])
+        XCTAssertTrue(tail.contains("sovereign.isSessionHalted"),
+            "P0-3: the halt re-check must sit AFTER the bundle consume and BEFORE the executor")
     }
 }

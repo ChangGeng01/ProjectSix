@@ -12,7 +12,6 @@ import XCTest
 @testable import BASMemory
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainHealthSnapshotProbeWireInTests:
     XCTestCase
 {
@@ -219,4 +218,3 @@ final class BASCognitiveBrainHealthSnapshotProbeWireInTests:
             snap.cSystemProbes?.residentMemoryBytes)
     }
 }
-#endif

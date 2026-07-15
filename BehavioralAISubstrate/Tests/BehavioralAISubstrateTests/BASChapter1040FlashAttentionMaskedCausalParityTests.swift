@@ -52,7 +52,6 @@ import XCTest
 import Metal
 #endif
 
-#if !os(iOS)  // ch 1022 source-gate: Mac dev-box GPU parity
 final class BASChapter1040FlashAttentionMaskedCausalParityTests:
     XCTestCase
 {
@@ -237,6 +236,45 @@ final class BASChapter1040FlashAttentionMaskedCausalParityTests:
         }
     }
 
+    /// H2(大审计立即层,2026-07-08)——行首 tile 全 mask 的 NaN 中毒回归。
+    /// B_C=32:N=40 且每行 key 0..31 全排除 ⇒ 第一个 KV tile 全 -INF ⇒
+    /// 旧内核 `alpha=exp(-INF-(-INF))=NaN` 污染 l_i,整行静默输出 0;
+    /// 正确答案是对 key 32..39 的注意力(CPU 参照)。守卫修后必须 parity。
+    func testLeadingFullyMaskedTileDoesNotPoisonRow() async throws {
+        let dispatcher = try makeDispatcherOrSkip()
+        let (M, N, D, Dv) = (3, 40, 8, 8)
+        let (q, k, v) = makeInputs(M: M, N: N, D: D, Dv: Dv)
+
+        // 每行排除前 32 个 key(恰好第一个完整 tile),保留 32..39。
+        var mask = [UInt8](repeating: 0, count: M * N)
+        for i in 0..<M {
+            for j in 0..<32 { mask[i * N + j] = 1 }
+        }
+
+        let gpu = try await dispatcher.dispatch(
+            q: q, qRows: M, qCols: D,
+            k: k, kRows: N,
+            v: v, vCols: Dv,
+            mask: mask)
+        let cpu = cpuMaskedAttention(
+            q: q, M: M, D: D, k: k, N: N, v: v, Dv: Dv,
+            mask: mask)
+
+        XCTAssertEqual(gpu.count, cpu.count)
+        // 先证输出非零(旧内核在此全 0)再证逐格 parity。
+        let gpuMagnitude = gpu.reduce(Float(0)) { $0 + abs($1) }
+        XCTAssertGreaterThan(
+            gpuMagnitude, 0,
+            "行首全 mask tile 后整行输出 0 —— NaN 中毒(H2)")
+        for idx in 0..<cpu.count {
+            XCTAssertEqual(
+                gpu[idx], cpu[idx],
+                accuracy: Self.parityTolerance,
+                "leading-masked-tile cell \(idx) diverges: " +
+                "gpu=\(gpu[idx]) cpu=\(cpu[idx])")
+        }
+    }
+
     /// All-zero mask ⇒ masked path MUST equal the unmasked path
     /// (the mask excludes nothing)。 Cross-checks the masked
     /// kernel against the ALREADY-GATED unmasked kernel,not just
@@ -396,4 +434,3 @@ final class BASChapter1040FlashAttentionMaskedCausalParityTests:
         XCTAssertTrue(postCausal, "causal pipeline memoized")
     }
 }
-#endif

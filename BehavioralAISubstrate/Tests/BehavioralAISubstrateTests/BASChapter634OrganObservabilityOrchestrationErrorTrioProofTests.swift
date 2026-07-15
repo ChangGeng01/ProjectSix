@@ -46,24 +46,29 @@ final class BASChapter634OrganObservabilityOrchestrationErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASToolDispatchErrorConformsToCodable() {
-        assertCodable(BASToolDispatchError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASToolDispatchError.noHandlerRegistered(toolName: ""))
+        assertCodableRoundTrips(
+            BASToolDispatchError.timeoutExceeded(
+                toolName: "", deadlineMs: 0))
     }
 
     func testBASUpdateTicketLifecycleSQLiteStorageSQLiteErrorConformsToCodable() {
-        assertCodable(
-            BASUpdateTicketLifecycleSQLiteStorage
-                .SQLiteError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASUpdateTicketLifecycleSQLiteStorage.SQLiteError
+                .openFailed(reason: ""))
+        assertCodableRoundTrips(
+            BASUpdateTicketLifecycleSQLiteStorage.SQLiteError
+                .prepareFailed(sql: "", reason: ""))
     }
 
     func testBASWorldAwareRiskBridgeBridgeErrorConformsToCodable() {
-        assertCodable(
-            BASWorldAwareRiskBridge.BridgeError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASWorldAwareRiskBridge.BridgeError
+                .unknownTemplate(""))
     }
 }

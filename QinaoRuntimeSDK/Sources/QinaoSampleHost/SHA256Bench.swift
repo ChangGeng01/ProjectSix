@@ -18,9 +18,9 @@ import BASObservability
 /// Inherits the M340 scope statement. Numbers measure pure
 /// in-process SHA-256 over a fixed input — no I/O, no actor
 /// hops. Sub-µs floor reference for cryptographic primitives.
-public struct SHA256Bench {
+package struct SHA256Bench {
 
-    public static let scopeStatement: String =
+    package static let scopeStatement: String =
         "[scope] regression alarm, not an SLA. measures " +
         "pure in-process SHA-256 hasher (M341 pure-Swift " +
         "implementation) — no I/O, no actor hops. " +
@@ -30,7 +30,7 @@ public struct SHA256Bench {
     /// Representative input — the L13 canonical encoding
     /// (chapter 八十一.3 verified against Python hashlib).
     /// 446 bytes UTF-8.
-    public static let canonicalInput =
+    package static let canonicalInput =
         "candidateRegistered|startShadowTrial=" +
         "shadowTrialing;candidateRegistered|" +
         "withdraw=withdrawn;promoted|retract=retracted;" +
@@ -44,12 +44,12 @@ public struct SHA256Bench {
         "trialFinalized|withdraw=withdrawn;withdrawn|" +
         "<terminal>"
 
-    public struct Outcome: Sendable, Equatable {
-        public let hashCount: Int
-        public let inputBytes: Int
-        public let elapsedSeconds: Double
-        public let outcome: BASBenchWarmupOutcome
-        public init(
+    package struct Outcome: Sendable, Equatable {
+        package let hashCount: Int
+        package let inputBytes: Int
+        package let elapsedSeconds: Double
+        package let outcome: BASBenchWarmupOutcome
+        package init(
             hashCount: Int,
             inputBytes: Int,
             elapsedSeconds: Double,
@@ -65,7 +65,7 @@ public struct SHA256Bench {
     /// Compute SHA-256 over the canonical input N times.
     /// Reports per-hash latency in milliseconds (consistent
     /// with all other bench modes for suite uniformity).
-    public static func run(
+    package static func run(
         hashCount: Int = 100_000
     ) -> Outcome {
         var samplesMs: [Double] = []

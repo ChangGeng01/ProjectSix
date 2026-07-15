@@ -40,19 +40,26 @@ sweep.
   NSXPCConnection`; `Unable to send to server; failed after N attempts`;
   `addPersistentStoreWithType … NSCocoaErrorDomain Code=134060`. ~80-125 such
   noise lines appear in a full sweep.
-- **Most visible symptom:** `BASProductionAdoptionSmokeTests.testCanonicalAudit
-  ComplianceHostAdoption` fails in-sweep with `XCTAssertEqual failed: ("…") is not
-  equal to ("…") — Audit scenario requires SQL + Rust atomIDs to match for
-  cross-store join verification`. When the CoreData/NSXPC store fails under the
-  sandboxed XPC environment, the SQL-side atomID diverges from the Rust side → the
-  cross-store join assertion mismatches.
-- **Proof it's a flake (verified ch1044, twice):** `swift test --filter
-  BASProductionAdoptionSmokeTests` → **3/0, passes** in isolation. Both this
-  session's full sweeps that hit it also passed it isolated; the only difference
-  is the presence of the NSXPC noise lines (machine/sandbox load).
-- **Not a regression.** ⚠️ **This is the flake that, earlier in ch1042, was
-  misread as a regression and triggered a needless revert+reapply of a correct
-  commit.** If you see the atomID cross-store mismatch: re-run isolated FIRST.
+  Those `134060` / NSXPCConnection LOG lines are a genuine sandbox/XPC artifact and
+  are safe to ignore.
+- **⚠️ CORRECTION (2026-07-11 deep-audit — this entry was a stale lying contract):**
+  the `BASProductionAdoptionSmokeTests.testCanonicalAuditComplianceHostAdoption`
+  atomID cross-store parity mismatch that historically co-occurred with this noise
+  was **never caused by CoreData/NSXPC** — that test uses `BASSQLBrainHistoryStore`
+  (SQLite) + `BASRustBrainHistoryStore` (Rust) and touches **no** CoreData (grep:
+  0 CoreData/NSXPC refs). The real root cause was an **unstable sort**: under load
+  both stores rounded `retrievedAt` to the same millisecond and `sorted(by:)` is not
+  stable, so the two stores' recentRecords order (hence the joined atomID) diverged.
+  **FIXED in commit `2c50050a5` (2026-06-11)** via a `(retrievedAt DESC, turnRef DESC)`
+  tiebreaker threaded identically into **both** stores, pinned by
+  `testRecentRecordsTiebreaksDeterministicallyUnderTimestampTie`. At HEAD the
+  atomID-parity assertion is **deterministically green.**
+- **Therefore a failure of the atomID cross-store parity assertion at HEAD is a REAL
+  regression (turnRef threading broken) — do NOT wave it off as infra noise.** Only
+  the raw `134060` / NSXPCConnection LOG lines are the ignorable flake. (This corrects
+  the entry that, in ch1042, misread this symptom as a flake and triggered a needless
+  revert+reapply of a correct commit — the exact misdiagnosis this stale text would
+  have caused an auditor to repeat.)
 
 ## Flake 3 — wall-clock perf benchmark
 - **Signature:** `BASChapter905StorePerfBenchmarkTests.testBenchmarkVaultSave100`

@@ -25,6 +25,19 @@ extension BASEBrainRuntimeCoordinator {
         let evolutionSeals: [BASEvolutionSeal]
     }
 
+    /// audit M-k F4: a per-turn-unique, DETERMINISTIC token for evolution-artifact IDs. Two distinct
+    /// turns in the same wall-clock SECOND must not collide (the old `Int(timeIntervalSince1970)`
+    /// did), and a replay of the same turn must reproduce the same token. There is no per-turn ID
+    /// field on the request/frames to reuse, so hash the turn's full distinguishing inputs
+    /// (full-precision timestamp + input + host) — a 12-hex-char prefix is ample to separate turns.
+    static func evolutionTurnToken(_ request: BASEBrainTurnRequest) -> String {
+        var hasher = SHA256()
+        hasher.update(data: Data(String(request.recordedAt.timeIntervalSince1970).utf8))
+        hasher.update(data: Data(request.userInput.utf8))
+        hasher.update(data: Data(request.hostID.utf8))
+        return hasher.finalize().prefix(6).map { String(format: "%02x", $0) }.joined()
+    }
+
     func buildEvolutionGovernanceArtifacts(
         request: BASEBrainTurnRequest,
         contextFrame: BASContextFrame,
@@ -40,7 +53,13 @@ extension BASEBrainRuntimeCoordinator {
                     || $0.resolvedHostChangeCandidate != nil
                     || $0.ruleCandidateRef?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
             })
-        let timestampToken = Int(request.recordedAt.timeIntervalSince1970)
+        // audit M-k F4: was Int(request.recordedAt.timeIntervalSince1970) = WHOLE-SECOND
+        // granularity, so two turns in the same wall-clock second reused exp./trial./retract.
+        // <sec>.<index> keys → a retraction could target the WRONG turn's candidate. Derive a
+        // per-turn-UNIQUE yet DETERMINISTIC token from the turn's full distinguishing inputs
+        // (full-precision timestamp + input + host), so same-second turns get distinct IDs while a
+        // replay of the same turn reproduces the same ID.
+        let turnToken = Self.evolutionTurnToken(request)
         let trialScope = thoughtFrame.stopReason?.rawValue ?? output.mode.rawValue
         let lowOrMediumRisk = riskCard.riskLevel == .low || riskCard.riskLevel == .medium
         let isProtectiveMode = output.mode == .delay || output.mode == .block || output.mode == .replace
@@ -83,7 +102,7 @@ extension BASEBrainRuntimeCoordinator {
                 return .success
             }()
 
-            let candidateID = "exp.\(timestampToken).\(index)"
+            let candidateID = "exp.\(turnToken).\(index)"
             experienceCandidates.append(
                 BASExperienceCandidate(
                     candidateID: candidateID,
@@ -101,7 +120,7 @@ extension BASEBrainRuntimeCoordinator {
             let needsTrial = requiresGovernedTrial && candidateType != .success
 
             if needsTrial {
-                let trialID = "trial.\(timestampToken).\(index)"
+                let trialID = "trial.\(turnToken).\(index)"
                 let trialScopeMode: String = {
                     if resolvedHostChangeCandidate != nil {
                         return "host_preview:\(output.mode.rawValue)"
@@ -168,7 +187,7 @@ extension BASEBrainRuntimeCoordinator {
             if resolvedHostChangeCandidate != nil
                 || ticket.ruleCandidateRef?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
                 || needsTrial {
-                let deltaID = "delta.\(timestampToken).\(index)"
+                let deltaID = "delta.\(turnToken).\(index)"
                 let rollbackRef = resolvedHostChangeCandidate?.rollbackRef
                     ?? (ticket.ruleCandidateRef.map { "rollback.\($0)" })
                 versionDeltas.append(
@@ -187,7 +206,7 @@ extension BASEBrainRuntimeCoordinator {
 
             if needsTrial || ticket.conflictFlag {
                 let trialState = shadowTrialRecords.last?.completionState
-                let orderID = "retract.\(timestampToken).\(index)"
+                let orderID = "retract.\(turnToken).\(index)"
                 retractionOrders.append(
                     BASRetractionOrder(
                         orderID: orderID,
@@ -210,7 +229,7 @@ extension BASEBrainRuntimeCoordinator {
                 governanceRefs.append(orderID)
             }
 
-            let sealID = "seal.\(timestampToken).\(index)"
+            let sealID = "seal.\(turnToken).\(index)"
             let latestTrialState = shadowTrialRecords.last?.completionState
             evolutionSeals.append(
                 BASEvolutionSeal(
@@ -299,7 +318,7 @@ extension BASEBrainRuntimeCoordinator {
         if lowOrMediumRisk && hasConflictPressure == false && hasReusablePath {
             workflowCandidates.append(
                 BASWorkflowCandidate(
-                    workflowID: "workflow.\(timestampToken).0",
+                    workflowID: "workflow.\(turnToken).0",
                     taskDomain: output.mode.rawValue,
                     steps: output.alternativeActions.isEmpty ? ["observe", output.mode.rawValue, "review"] : output.alternativeActions,
                     observedGain: 0.74,
@@ -313,7 +332,7 @@ extension BASEBrainRuntimeCoordinator {
         if (isProtectiveMode && hasAmbientGuardSignals) || (riskCard.riskLevel >= .high && hasGuardSignals) {
             guardTemplateCandidates.append(
                 BASGuardTemplateCandidate(
-                    templateID: "guard.\(timestampToken).0",
+                    templateID: "guard.\(turnToken).0",
                     sceneType: contextFrame.sceneType.rawValue,
                     boundaryScriptRef: decomposeFrame.boundaryTouches.isEmpty ? nil : "boundary.\(contextFrame.sceneType.rawValue)",
                     delayPacketRef: output.mode == .delay ? "delay.\(trialScope)" : nil,
@@ -327,7 +346,7 @@ extension BASEBrainRuntimeCoordinator {
         if hasConflictPressure || pendingRetractionCount > 0 || pendingShadowTrialCount > 0 {
             biasRecords.append(
                 BASBiasRecord(
-                    biasID: "bias.\(timestampToken).0",
+                    biasID: "bias.\(turnToken).0",
                     biasType: hasConflictPressure ? "review_conflict" : "guard_drift_watch",
                     sourceRefs: governedTickets.map(\.ticketID),
                     severity: hasConflictPressure ? 0.72 : 0.54,
@@ -340,7 +359,7 @@ extension BASEBrainRuntimeCoordinator {
         if riskCard.riskLevel >= .high || ((isProtectiveMode && hasAmbientGuardSignals) && hasRiskPatternSignals) {
             riskPatternCandidates.append(
                 BASRiskPatternCandidate(
-                    patternID: "risk.\(timestampToken).0",
+                    patternID: "risk.\(turnToken).0",
                     sourceRefs: governedTickets.map(\.ticketID),
                     riskDomain: contextFrame.sceneType.rawValue,
                     triggerSignals: Array((contextFrame.manipulationHints + output.explanationCodes).prefix(4)),
@@ -355,7 +374,7 @@ extension BASEBrainRuntimeCoordinator {
         if gateClean && candidateRefs.isEmpty == false {
             learningExportBundles.append(
                 BASLearningExportBundle(
-                    bundleID: "export.\(timestampToken).0",
+                    bundleID: "export.\(turnToken).0",
                     candidateRefs: candidateRefs,
                     scrubbed: true,
                     privacySafe: true,

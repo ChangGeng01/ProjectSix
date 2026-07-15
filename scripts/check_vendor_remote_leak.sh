@@ -96,6 +96,18 @@ fi
 #   .package(url: "https://github.com/apple/swift-docc-plugin"…)
 # inside an `if Context.environment[…] == "1"` block. Anything else
 # is a leak.
+# Explicit allowlist (mega-audit x-sov #3, 2026-07-08): the LiteRT-LM prebuilt
+# xcframeworks are CHECKSUM-PINNED binaryTargets (content-addressed — the "secondary
+# dep swap" risk this gate defends against does not apply) and the LiteRTLM product is
+# a live, unconditional dependency of the DeviceTestApp app target (BASLiteRTE4BProbe
+# on-phone study), with no local xcframework copy to vendor. They are therefore an
+# ACCEPTED remote per this script's own option (b), not a leak. Any OTHER url outside
+# an env guard is still a failure.
+ALLOWLISTED_URLS=(
+    "https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.13.0/CLiteRTLM.xcframework.zip"
+    "https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.13.0/CLiteRTLM_mac.xcframework.zip"
+)
+
 new_url_leaks=()
 while IFS= read -r match; do
     file="${match%%:*}"
@@ -108,6 +120,16 @@ while IFS= read -r match; do
     if echo "$head_chunk" \
         | grep -qE 'Context\.environment\[[^]]+\][[:space:]]*=='
     then
+        continue
+    fi
+    # Accept explicitly-allowlisted checksummed binaryTarget urls.
+    url_on_line="$(sed -n "${line_no}p" "$file" 2>/dev/null \
+        | grep -oE 'https?://[^"]+' | head -n1)"
+    is_allowlisted=0
+    for allowed in "${ALLOWLISTED_URLS[@]}"; do
+        if [ "$url_on_line" = "$allowed" ]; then is_allowlisted=1; break; fi
+    done
+    if [ "$is_allowlisted" -eq 1 ]; then
         continue
     fi
     new_url_leaks+=("$file:$line_no")

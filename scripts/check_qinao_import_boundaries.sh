@@ -62,6 +62,8 @@ while IFS= read -r line; do
   # line: <path>:<lineno>:<text>
   [[ -z "$line" ]] && continue
   text="${line#*:*:}"
+  text="${text%%//*}"                       # audit fix: tolerate a trailing inline comment
+  text="${text%"${text##*[![:space:]]}"}"   # rstrip so the ^import X$ anchor still matches
   if [[ ! "$text" =~ $ALLOWED_SOURCE_IMPORT_REGEX ]]; then
     echo "UNKNOWN import in Qinao source: $line" >&2
     violations=$((violations + 1))
@@ -81,6 +83,8 @@ if [[ -d "$TESTS_DIR" ]]; then
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     text="${line#*:*:}"
+  text="${text%%//*}"                       # audit fix: tolerate a trailing inline comment
+  text="${text%"${text##*[![:space:]]}"}"   # rstrip so the ^import X$ anchor still matches
     if [[ ! "$text" =~ $ALLOWED_TEST_IMPORT_REGEX ]]; then
       echo "UNKNOWN import in Qinao test: $line" >&2
       violations=$((violations + 1))

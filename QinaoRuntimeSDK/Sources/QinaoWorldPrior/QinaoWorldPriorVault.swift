@@ -59,6 +59,13 @@ public actor QinaoWorldPriorVault {
         case bridgeReferencesUnknownTemplate(
             bridgeID: String,
             templateID: String)
+        /// A bridge references a source DOMAIN with no registered horizon
+        /// (mirrors BASWorldPriorVault.VaultError.bridgeReferencesUnknownDomain,
+        /// added by the substrate's policy-obs-misc LOW-8 audit fix 87ddf1e89).
+        /// First-class, parallel to bridgeReferencesUnknownTemplate above.
+        case bridgeReferencesUnknownDomain(
+            bridgeID: String,
+            domain: String)
         /// The substrate surfaced an error that does not correspond
         /// to any of the enumerated cases above. Carries a stable
         /// reason string for debugging but should never be hit on
@@ -369,6 +376,11 @@ public actor QinaoWorldPriorVault {
             return .bridgeReferencesUnknownTemplate(
                 bridgeID: bridgeID,
                 templateID: templateID)
+        case .bridgeReferencesUnknownDomain(
+            let bridgeID, let domain):
+            return .bridgeReferencesUnknownDomain(
+                bridgeID: bridgeID,
+                domain: domain)
         }
     }
 }

@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import BASMemory
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASMemory Projection Core")
 struct BASProjectionCoreTests {
     @Test("projection compiler maps host-like records candidates and events into governed projection")
@@ -199,4 +198,3 @@ struct BASProjectionCoreTests {
         #expect((hostProjection.candidates.first?.sourceTrustScore ?? 0) > 0.75)
     }
 }
-#endif

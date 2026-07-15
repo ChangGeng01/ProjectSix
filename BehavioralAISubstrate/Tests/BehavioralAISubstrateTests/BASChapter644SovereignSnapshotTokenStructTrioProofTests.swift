@@ -34,32 +34,44 @@
 //   - ADR-016 advances M1953 → M1954
 
 import XCTest
+import Foundation
 @testable import BASSovereign
+@testable import BASRuntimeCore
 
 final class BASChapter644SovereignSnapshotTokenStructTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASSovereignSnapshotManagerSnapshotAnchorConformsToCodable() {
-        assertCodable(
-            BASSovereignSnapshotManager
-                .SnapshotAnchor.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignSnapshotManager.SnapshotAnchor(
+                anchorID: "",
+                safeSnapshotRef: "",
+                integrityHash: ""))
     }
 
     func testBASSovereignSnapshotManagerRegisteredSnapshotConformsToCodable() {
-        assertCodable(
-            BASSovereignSnapshotManager
-                .RegisteredSnapshot.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignSnapshotManager.RegisteredSnapshot(
+                anchor: BASSovereignSnapshotManager.SnapshotAnchor(
+                    anchorID: "",
+                    safeSnapshotRef: "",
+                    integrityHash: ""),
+                payloadHash: "",
+                registeredAt: Date(timeIntervalSince1970: 0)))
     }
 
     func testBASSovereignTokenAuthorityCommitIntentConformsToCodable() {
-        assertCodable(
-            BASSovereignTokenAuthority.CommitIntent.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignTokenAuthority.CommitIntent(
+                sessionID: "",
+                turnID: "",
+                scope: .toolRead,
+                allowedTargets: [],
+                actionDigest: "",
+                snapshotRef: ""))
     }
 }

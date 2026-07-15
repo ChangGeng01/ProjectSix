@@ -154,6 +154,13 @@ public actor BASMambaInferenceLatencyTracker {
     public static let p50: Double = 0.50
     public static let p99: Double = 0.99
 
+    /// deep-audit MED: per-band retention cap. `record()` is called on every Mamba inference
+    /// (thousands per long session) and appended without bound — the "< 10K per band" comment below
+    /// was aspirational, not enforced, so `samplesByBand` grew unboundedly (memory leak). Trim to the
+    /// most-recent `maxSamplesPerBand` after each append (mirrors BASShadowTrialObservation). `totalCalls`
+    /// remains the true monotonic counter.
+    public static let maxSamplesPerBand = 10_000
+
     /// Per-band samples。Sorted on demand for percentiles
     /// (cheap at typical sample counts < 10K per band)。
     private var samplesByBand:
@@ -173,6 +180,9 @@ public actor BASMambaInferenceLatencyTracker {
         var samples = samplesByBand[thermalBand]
             ?? []
         samples.append(latencyMs)
+        if samples.count > Self.maxSamplesPerBand {
+            samples.removeFirst(samples.count - Self.maxSamplesPerBand)
+        }
         samplesByBand[thermalBand] = samples
         totalCalls += 1
     }

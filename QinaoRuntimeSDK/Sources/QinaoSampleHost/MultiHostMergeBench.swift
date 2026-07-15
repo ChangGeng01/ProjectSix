@@ -23,18 +23,18 @@ import BASSovereign
 /// frames-in-consensus / dedup count / mergeIsSymmetric /
 /// mergeWallClockSeconds. Caller may eyeball the wall-clock
 /// growth across the 4 sizes to verify near-O(n log n) shape.
-public struct MultiHostMergeBench {
+package struct MultiHostMergeBench {
 
-    public static let scopeStatement: String =
+    package static let scopeStatement: String =
         "[scope] regression alarm, not an SLA. measures " +
         "in-process FragmentMerger only — no network, no " +
         "ledger I/O, no actor hops across runtime layers. " +
         "do not quote these numbers as customer-facing latency."
 
-    public struct Outcome: Sendable, Equatable {
-        public let framesPerHost: Int
-        public let metric: BASMultiHostConvergenceMetric
-        public init(
+    package struct Outcome: Sendable, Equatable {
+        package let framesPerHost: Int
+        package let metric: BASMultiHostConvergenceMetric
+        package init(
             framesPerHost: Int,
             metric: BASMultiHostConvergenceMetric
         ) {
@@ -46,7 +46,7 @@ public struct MultiHostMergeBench {
     /// Run the bench for one frame-count: build two synthetic
     /// host fragments of `framesPerHost` frames each (disjoint
     /// hostIDs so no overlap), then measure via M342.
-    public static func run(
+    package static func run(
         framesPerHost: Int
     ) -> Outcome {
         let hostA = "bench-host-A"

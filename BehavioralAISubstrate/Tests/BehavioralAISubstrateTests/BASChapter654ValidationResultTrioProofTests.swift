@@ -14,21 +14,30 @@ final class BASChapter654ValidationResultTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASMambaCheckpointValidationResultConformsToCodable() {
-        assertCodable(BASMambaCheckpointValidationResult.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASMambaCheckpointValidationResult.valid)
+        assertCodableRoundTrips(
+            BASMambaCheckpointValidationResult.invalid(
+                reason: .emptyCheckpointID))
     }
 
     func testBASCoreMLConversionValidationResultConformsToCodable() {
-        assertCodable(BASCoreMLConversionValidationResult.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASCoreMLConversionValidationResult.valid)
+        assertCodableRoundTrips(
+            BASCoreMLConversionValidationResult.invalid(
+                reason: .emptyMLXWeightsPath))
     }
 
     func testBASMambaTrainingValidationResultConformsToCodable() {
-        assertCodable(BASMambaTrainingValidationResult.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASMambaTrainingValidationResult.valid)
+        assertCodableRoundTrips(
+            BASMambaTrainingValidationResult.invalid(
+                reason: .emptySessionID))
     }
 }

@@ -129,8 +129,12 @@ impl FieldKind {
             // threshold = more cautious)
             FieldKind::RiskThresholds
                 => MergeStrategy::NumericMin,
-            // Memory permissions: conservative — restrictive
-            // settings win (take the more restrictive set)
+            // Memory permissions: conservative — NEVER auto-merge on
+            // conflict; escalate to host review (FailOnConflict). This
+            // does NOT compute a "restrictive settings win" merge — a
+            // conflict is surfaced, not silently resolved to the
+            // stricter set. (blindspot MED id24: comment corrected to
+            // match the strategy + its pinned test.)
             FieldKind::MemoryPermissions
                 => MergeStrategy::FailOnConflict,
             // Update policy: review-required wins,allow-flags

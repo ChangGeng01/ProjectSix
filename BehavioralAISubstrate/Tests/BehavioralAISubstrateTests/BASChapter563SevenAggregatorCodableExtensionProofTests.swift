@@ -37,51 +37,48 @@ final class BASChapter563SevenAggregatorCodableExtensionProofTests:
     XCTestCase
 {
 
-    // MARK: - Compile-time conformance helper
+    // MARK: - 7 conformance PROOFs
 
-    /// Generic conformance check — compiles only when
-    /// `T: Codable`。 If any aggregator loses Codable,
-    /// this test fails to compile loudly。
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
-    // MARK: - 7 compile-time conformance PROOFs
-
+    // #18: real round-trip — these 6 aggregators are composed
+    // of deeply-nested projection types and only expose a
+    // `.compute(...)` factory whose inputs (BASActionPermit,
+    // BASBudgetFrame, ...) cannot be confidently constructed
+    // here, so use the honest compile-time-only fallback (no
+    // fake x==x assertion). LateClusterD is exercised for a
+    // genuine populated round-trip below via its tractable
+    // `.compute(sessionID:confidenceFloor:quarantineRecords:)`.
     func testCthulhuPentaConformsToCodable() {
-        assertCodable(
+        assertConformsToCodableAtCompileTime(
             BASTurnAuditProjectionsCthulhuPenta.self)
     }
 
     func testKunlunHexaConformsToCodable() {
-        assertCodable(
+        assertConformsToCodableAtCompileTime(
             BASTurnAuditProjectionsKunlunHexa.self)
     }
 
     func testKunlunHexaTwoConformsToCodable() {
-        assertCodable(
+        assertConformsToCodableAtCompileTime(
             BASTurnAuditProjectionsKunlunHexaTwo.self)
     }
 
     func testLateClusterBConformsToCodable() {
-        assertCodable(
+        assertConformsToCodableAtCompileTime(
             BASTurnAuditProjectionsLateClusterB.self)
     }
 
     func testLateClusterCConformsToCodable() {
-        assertCodable(
+        assertConformsToCodableAtCompileTime(
             BASTurnAuditProjectionsLateClusterC.self)
     }
 
     func testLateClusterDConformsToCodable() {
-        assertCodable(
+        assertConformsToCodableAtCompileTime(
             BASTurnAuditProjectionsLateClusterD.self)
     }
 
     func testKunlunSealRiverConformsToCodable() {
-        assertCodable(
+        assertConformsToCodableAtCompileTime(
             BASTurnAuditProjectionsKunlunSealRiver.self)
     }
 

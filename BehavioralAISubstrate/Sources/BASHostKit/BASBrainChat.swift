@@ -66,6 +66,28 @@ public struct BASBrainChatRequest: Sendable, Equatable {
         BASEBrainTurnRequest(userInput: message, deviceState: deviceState,
                              hostID: hostID, recordedAt: recordedAt)
     }
+
+    /// As `toTurnRequest()` but CARRIES the request's `effort` (e.g. the surprise-gated `governed.applied` after
+    /// `withEffort`) onto `BASEBrainTurnRequest.effortPlan`, so `runTurn` sizes the deliberation pass budget by
+    /// it (a low tier spends fewer refinement passes). A host wiring the effort loop calls THIS in its executor
+    /// (`coord.runTurn(req.toTurnRequest(carryingEffort: true))`); the no-arg overload stays byte-equal (effort
+    /// dropped) for hosts that have not adopted effort sizing.
+    public func toTurnRequest(carryingEffort: Bool) -> BASEBrainTurnRequest {
+        BASEBrainTurnRequest(userInput: message, deviceState: deviceState, hostID: hostID,
+                             recordedAt: recordedAt,
+                             effortPlan: carryingEffort ? .granted(effort) : nil)
+    }
+
+    /// Immutable copy with a different effort level. Carries the GOVERNED (surprise-gated) effort on the request
+    /// handed to the executor, for an executor that reads `request.effort` directly. NOTE: the default
+    /// `toTurnRequest()` mapping does NOT copy effort onto `BASEBrainTurnRequest`, so the standard
+    /// `coord.runTurn(req.toTurnRequest())` path is unaffected until a host wires effort consumption. (Immutability:
+    /// a new request, never a mutation of the caller's.)
+    public func withEffort(_ level: BASEffortLevel) -> BASBrainChatRequest {
+        BASBrainChatRequest(hostID: hostID, message: message, effort: level, transcript: transcript,
+                            activeAgents: activeAgents, memoryScope: memoryScope, toolScope: toolScope,
+                            deviceState: deviceState, recordedAt: recordedAt)
+    }
 }
 
 /// §11 response shape — the curated developer view of a turn.
@@ -113,6 +135,24 @@ public struct BASBrainChatResponse: Sendable, Equatable {
             updateTickets: result.updateTickets,
             transcriptLines: view.lines)
     }
+
+    /// As `from(result:request:processTraces:)` but with a PRECOMPUTED effort receipt — the surprise-gated plan
+    /// the chat facade resolved before running the executor. Used by `chat(_:)` when a surprise probe is wired;
+    /// the no-receipt overload keeps the simple lease rule for the default (byte-equal) path.
+    public static func from(result: BASEBrainTurnResult,
+                            request: BASBrainChatRequest,
+                            processTraces: [BASProcessTrace],
+                            effortReceipt: BASEffortPlan) -> BASBrainChatResponse {
+        let view = BASTranscriptView.render(traces: processTraces, mode: request.transcript)
+        return BASBrainChatResponse(
+            surface: result.actionPermit.mode,
+            effortReceipt: effortReceipt,
+            processTraceRef: processTraces.first?.traceID,
+            actionPermit: result.actionPermit,
+            sovereignVerdict: result.sovereignVerdict,
+            updateTickets: result.updateTickets,
+            transcriptLines: view.lines)
+    }
 }
 
 /// The governed top-level entry. Composes a host-injected turn executor + optional trace provider.
@@ -122,20 +162,75 @@ public struct BASBrainChat {
 
     private let executor: TurnExecutor
     private let traceProvider: TraceProvider
+    /// Opt-in per-session surprise probe (ADR-014 byte-equal-off). `nil` ⇒ the effort receipt uses the simple
+    /// lease rule, the executor receives the request unchanged — byte-identical to the pre-integration facade.
+    /// Set ⇒ each turn's effort is SURPRISE-GATED: ε (semantic prediction error over the message) × stakes within
+    /// the device's thermal headroom → the governed effort. That governed level is RETURNED as the receipt and
+    /// SET on the request handed to the executor. HOW IT SIZES IN-REPO COMPUTE: the default `toTurnRequest()`
+    /// does NOT carry effort (byte-equal), but a host executor that wants effort sizing calls
+    /// `coord.runTurn(req.toTurnRequest(carryingEffort: true))` — `runTurn` then FLOORS its deliberation pass
+    /// budget by the tier (`BASEffortBudgetConsumer.flooredMaxLoops`, a low tier ⇒ fewer refinement passes ⇒
+    /// avoided compute; opt-in, never raises the routed ceiling). Until the host adopts that one-line executor
+    /// change, the governed level changes the RECEIPT only, not compute. The probe accumulates ε across turns on
+    /// this instance (one per session; drive turns sequentially — see `BASTurnSurpriseProbe`).
+    private let surpriseProbe: BASTurnSurpriseProbe?
 
     /// - executor: runs the host's real pipeline for a chat request (e.g. `coord.runTurn(req.toTurnRequest())`).
     /// - traceProvider: maps the result to the governed-call ProcessTraces the host collected this
     ///   turn (default none — processTraceRef/transcript stay empty until the host wires it).
+    /// - surpriseProbe: opt-in; wiring it turns on the surprise-gated effort loop for every chat turn.
     public init(executor: @escaping TurnExecutor,
-                traceProvider: @escaping TraceProvider = { _ in [] }) {
+                traceProvider: @escaping TraceProvider = { _ in [] },
+                surpriseProbe: BASTurnSurpriseProbe? = nil) {
         self.executor = executor
         self.traceProvider = traceProvider
+        self.surpriseProbe = surpriseProbe
     }
 
     public func chat(_ request: BASBrainChatRequest) async throws -> BASBrainChatResponse {
-        let result = try await executor(request)
+        guard let probe = surpriseProbe else {
+            // Default path — byte-equal with the pre-integration facade (no probe, simple lease receipt).
+            let result = try await executor(request)
+            return BASBrainChatResponse.from(result: result, request: request,
+                                             processTraces: traceProvider(result))
+        }
+        // SURPRISE-GATED path: resolve the governed effort from THIS turn and SET it on the request handed to the
+        // executor (for an executor that reads `request.effort`; see `withEffort` / the class caveat — the default
+        // `toTurnRequest()` path does not carry effort, so the in-repo runTurn pipeline is unaffected today). The
+        // receipt is the governed plan itself, so it always EQUALS the effort the executor was given (audit
+        // 2026-06-29 fix). We deliberately do NOT re-floor on `runLease == nil`: a nil lease means "no lease
+        // REQUIRED" for the ordinary interactive run modes (.engage/.reflect/…), not "lease DENIED" — flooring it
+        // to `.guarded` mis-reported the receipt on every normal turn and discarded the governed thermal/auto
+        // provenance. Thermal headroom (already a hard cap inside the plan) is the real budget constraint here;
+        // genuine lease arbitration on a DENIAL is the L1/executor's concern, not a nil-misread at this seam.
+        let governed = await Self.governedPlan(request, probe: probe)
+        let result = try await executor(request.withEffort(governed.applied))
         return BASBrainChatResponse.from(result: result, request: request,
-                                         processTraces: traceProvider(result))
+                                         processTraces: traceProvider(result), effortReceipt: governed)
+    }
+
+    /// Resolve the surprise-gated effort for a turn (before the lease is known): ε (the probe's prediction error
+    /// over the message embedding) → surprise, × stakes (`BASStakesEstimator`), capped by the device's thermal
+    /// headroom (`request.deviceState.thermalLevel`). `request.effort` is the requested level — `.auto` ⇒ fully
+    /// system-chosen, an explicit level is honored and only thermal-downgraded.
+    public static func governedPlan(_ request: BASBrainChatRequest, probe: BASTurnSurpriseProbe) async -> BASEffortPlan {
+        await governedPlan(message: request.message, thermalLevel: request.deviceState.thermalLevel,
+                           requested: request.effort, probe: probe)
+    }
+
+    /// P1(a) 全面优化 — the primitives overload for hosts that drive `brain.process()` directly (the
+    /// endurance runner / device hosts) without a `BASBrainChatRequest`: ε (probe) × stakes (lexicon) ×
+    /// thermal headroom → the governed effort plan to carry on `BASEBrainTurnRequest.effortPlan`.
+    public static func governedPlan(
+        message: String, thermalLevel: BASThermalLevel, requested: BASEffortLevel = .auto,
+        probe: BASTurnSurpriseProbe
+    ) async -> BASEffortPlan {
+        let mse = await probe.observe(turn: message)
+        let surprise = mse.map { BASEffortSignals.surprise(fromMSE: $0) } ?? BASEffortGovernor.unknownSurprise
+        let stakes = BASStakesEstimator.estimate(message)
+        let headroom = BASEffortSignals.headroom(for: thermalLevel)
+        return BASEffortAllocator.resolve(
+            requested: requested, surprise: surprise, stakes: stakes, headroom: headroom)
     }
 
     /// The effort receipt rule (pure, testable): the requested effort is applied when the turn was

@@ -88,6 +88,26 @@ public protocol BASSovereignLedgerStorage {
     /// Called from inside the actor on rotation or when segments
     /// change state.
     func persistSegment(_ segment: BASSovereignLedgerSegment) throws
+
+    /// audit F3 (2026-07-12): persist a freshly-appended entry AND its owning segment
+    /// ATOMICALLY — either both rows commit or neither does. `append()` mutates memory then
+    /// mirrors to disk; before this, the two writes were independent autocommits, so a
+    /// transient failure on the segment write after the entry committed left a DURABLE orphan
+    /// entry whose segment count is under-recorded, and the next cold-start
+    /// `segmentTotal != entries.count` cross-check permanently quarantines the whole ledger.
+    ///
+    /// deep-audit P2-15 (2026-07-13): this is a REQUIRED method with NO protocol-extension
+    /// default — atomicity is a forcing function, not an opt-in. Previously a default provided
+    /// the legacy non-atomic two-write sequence, so a host storage that simply forgot to
+    /// override it silently inherited the orphan-quarantine hazard the F3 method exists to
+    /// close. Every conformer must now CONSCIOUSLY decide: a store with real durability MUST
+    /// wrap both writes in one transaction (see `BASSovereignLedgerSQLiteStorage`); a store
+    /// that persists nothing (null) implements a no-op; a store that legitimately keeps the
+    /// two-write sequence must write it out explicitly, acknowledging the non-atomicity.
+    func persistAppendedEntryAndSegment(
+        _ appended: BASSovereignAuditLedger.AppendedEntry,
+        _ segment: BASSovereignLedgerSegment
+    ) throws
 }
 
 // MARK: - Default null storage (pre-M91 in-memory-only behaviour)
@@ -111,6 +131,14 @@ public struct BASSovereignLedgerNullStorage: BASSovereignLedgerStorage {
     ) throws {}
 
     public func persistSegment(
+        _ segment: BASSovereignLedgerSegment
+    ) throws {}
+
+    /// deep-audit P2-15 (2026-07-13): null storage persists nothing, so the F3 atomic
+    /// entry+segment write is trivially satisfied by a no-op — there is no disk state that
+    /// could be left half-written. Written out explicitly now that there is no protocol default.
+    public func persistAppendedEntryAndSegment(
+        _ appended: BASSovereignAuditLedger.AppendedEntry,
         _ segment: BASSovereignLedgerSegment
     ) throws {}
 }
@@ -157,6 +185,12 @@ public final class BASSovereignLedgerSQLiteStorage:
         case stepFailed(sql: String, message: String)
         case schemaVersionMismatch(found: Int, expected: Int)
         case corruptedRow(table: String, reason: String)
+        /// deep-audit P2-14(c) (2026-07-13): an append whose `audit_id` violates the PRIMARY KEY
+        /// is a REPLAY, not a generic step failure — surfaced distinguishably so a downstream
+        /// ingest gate can return a typed replay reason even on the concurrent append path (where
+        /// two requests both pass the sequential in-memory `hasEntry` pre-check, then the second
+        /// hits the DB uniqueness constraint).
+        case duplicateAuditID(auditID: String)
     }
 
     /// chapter 九百九十四.5 META-REVIEW Round-10 CRITICAL-1 fix:
@@ -215,6 +249,14 @@ public final class BASSovereignLedgerSQLiteStorage:
             try Self.runExec(
                 db: handle,
                 sql: "PRAGMA journal_mode=WAL;")
+            // #16 删除教义 (mega-audit, 2026-07-08): secure_delete default-on (kill-switch BAS_SECURE_DELETE=0).
+            if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+                try Self.runExec(db: handle, sql: sdSQL)
+            }
+            // memory-a F4 residual: one-time legacy freelist purge (secure_delete only
+            // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
+            // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
+            BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
             try Self.runExec(
                 db: handle,
                 sql: "PRAGMA foreign_keys=ON;")
@@ -355,9 +397,28 @@ public final class BASSovereignLedgerSQLiteStorage:
         entries: [BASSovereignAuditLedger.AppendedEntry],
         segments: [BASSovereignLedgerSegment]
     ) {
-        let entries = try loadEntries()
-        let segments = try loadSegments()
-        return (entries, segments)
+        // deep-audit P2-16 (2026-07-13): entries and segments must be read as ONE consistent
+        // snapshot. Read separately (no enclosing transaction), a concurrent writer in another
+        // process could land a new entry+segment BETWEEN the two queries, so rehydrate would see
+        // entries.count and segments that disagree and wrongly quarantine. WAL mode (set at open)
+        // makes a plain `BEGIN` a repeatable-read snapshot for the transaction's lifetime; wrap
+        // both reads in it. On any failure the read txn is ended before rethrowing.
+        guard let db else {
+            let entries = try loadEntries()
+            let segments = try loadSegments()
+            return (entries, segments)
+        }
+        try Self.runExec(db: db, sql: "BEGIN;")
+        do {
+            let entries = try loadEntries()
+            let segments = try loadSegments()
+            try Self.runExec(db: db, sql: "COMMIT;")
+            return (entries, segments)
+        } catch {
+            // End the read transaction; a failed ROLLBACK must not mask the original error.
+            try? Self.runExec(db: db, sql: "ROLLBACK;")
+            throw error
+        }
     }
 
     public func persistAppended(
@@ -396,9 +457,9 @@ public final class BASSovereignLedgerSQLiteStorage:
         Self.bindText(stmt, 2, e.sessionID)
         Self.bindText(stmt, 3, e.turnID)
         Self.bindText(stmt, 4, e.verdictRef)
-        Self.bindText(stmt, 5, e.ruleIDs.joined(separator: ","))
-        Self.bindText(stmt, 6, e.signalRefs.joined(separator: ","))
-        Self.bindText(stmt, 7, e.actionRefs.joined(separator: ","))
+        Self.bindText(stmt, 5, Self.encodeRefList(e.ruleIDs))
+        Self.bindText(stmt, 6, Self.encodeRefList(e.signalRefs))
+        Self.bindText(stmt, 7, Self.encodeRefList(e.actionRefs))
         Self.bindText(stmt, 8, e.snapshotRef)
         Self.bindText(stmt, 9, e.actor.rawValue)
         Self.bindText(stmt, 10, e.signature)
@@ -410,10 +471,43 @@ public final class BASSovereignLedgerSQLiteStorage:
         // ch 994.5 CRITICAL-1 fix:bind entry.schemaVersion
         Self.bindText(stmt, 14, e.schemaVersion)
 
-        guard sqlite3_step(stmt) == SQLITE_DONE else {
+        let stepRC = sqlite3_step(stmt)
+        guard stepRC == SQLITE_DONE else {
+            // P2-14(c): a PRIMARY KEY (audit_id) collision is a REPLAY — throw it distinguishably.
+            if stepRC == SQLITE_CONSTRAINT {
+                throw StorageError.duplicateAuditID(auditID: e.auditID)
+            }
             throw StorageError.stepFailed(
                 sql: sql,
                 message: String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    /// audit F3 (2026-07-12): the ATOMIC entry+segment write. Both INSERTs run inside one
+    /// `BEGIN IMMEDIATE … COMMIT`; any failure ROLLBACKs so disk never holds an orphan entry
+    /// without its segment count. Reuses the exact BEGIN/COMMIT/ROLLBACK discipline the
+    /// migration path already proved. persistAppended/persistSegment remain for rotation and
+    /// other single-row writes.
+    public func persistAppendedEntryAndSegment(
+        _ appended: BASSovereignAuditLedger.AppendedEntry,
+        _ segment: BASSovereignLedgerSegment
+    ) throws {
+        guard db != nil else { return }
+        try Self.runExec(db: db!, sql: "BEGIN IMMEDIATE;")
+        do {
+            try persistAppended(appended)
+            try persistSegment(segment)
+            try Self.runExec(db: db!, sql: "COMMIT;")
+        } catch {
+            do {
+                try Self.runExec(db: db!, sql: "ROLLBACK;")
+            } catch let rollbackError {
+                FileHandle.standardError.write(Data(
+                    ("[BASSovereignLedgerSQLiteStorage] audit F3: ROLLBACK after atomic "
+                     + "append failed itself: \(rollbackError) (original: \(error)); DB may "
+                     + "be in an indeterminate state\n").utf8))
+            }
+            throw error
         }
     }
 
@@ -516,16 +610,21 @@ public final class BASSovereignLedgerSQLiteStorage:
         defer { sqlite3_finalize(stmt) }
 
         var entries: [BASSovereignAuditLedger.AppendedEntry] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        // audit F4 (2026-07-12): capture the step rc so a BUSY/IOERR/CORRUPT is NOT read as
+        // end-of-data. A truncated/errored read that returns a short-or-empty entry list would
+        // otherwise slip past the reload cross-check and fork the audit chain (fail-open) —
+        // integrity > availability: throw, so loadState() throws and rehydrate() fails closed.
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             let auditID = Self.readText(stmt, 0)
             let sessionID = Self.readText(stmt, 1)
             let turnID = Self.readText(stmt, 2)
             let verdictRef = Self.readText(stmt, 3)
-            let ruleIDs = Self.splitCommaJoined(
+            let ruleIDs = Self.decodeRefList(
                 Self.readText(stmt, 4))
-            let signalRefs = Self.splitCommaJoined(
+            let signalRefs = Self.decodeRefList(
                 Self.readText(stmt, 5))
-            let actionRefs = Self.splitCommaJoined(
+            let actionRefs = Self.decodeRefList(
                 Self.readText(stmt, 6))
             let snapshotRef = Self.readText(stmt, 7)
             let actorRaw = Self.readText(stmt, 8)
@@ -560,6 +659,11 @@ public final class BASSovereignLedgerSQLiteStorage:
                 entry: entry,
                 priorHash: priorHash,
                 selfHash: selfHash))
+            rc = sqlite3_step(stmt)
+        }
+        guard rc == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return entries
     }
@@ -587,7 +691,9 @@ public final class BASSovereignLedgerSQLiteStorage:
         defer { sqlite3_finalize(stmt) }
 
         var segments: [BASSovereignLedgerSegment] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        // audit F4: fail-closed on read errors (see loadEntries).
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             let segID = Self.readText(stmt, 0)
             let segIdx = Int(sqlite3_column_int64(stmt, 1))
             let sessionID = Self.readText(stmt, 2)
@@ -628,6 +734,11 @@ public final class BASSovereignLedgerSQLiteStorage:
                 closedAt: closedAt,
                 closedBy: closedBy,
                 closingRotationID: closingRotationID))
+            rc = sqlite3_step(stmt)
+        }
+        guard rc == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return segments
     }
@@ -813,7 +924,48 @@ public final class BASSovereignLedgerSQLiteStorage:
         return String(cString: raw)
     }
 
-    private static func splitCommaJoined(_ s: String) -> [String] {
-        s.isEmpty ? [] : s.split(separator: ",").map(String.init)
+    // deep-audit HIGH (CH_1044_DEEP A4 / rs-integrity-canonical): ruleIDs/signalRefs/actionRefs are part
+    // of the SIGNED 1.2.0 injective canonical (basSovereignAuditCanonicalBytes keeps [] vs [""] and
+    // ["a,b"] vs ["a","b"] distinct). The old serialization `joined(separator: ",")` + `split(separator:
+    // ",")` (which drops empty subsequences AND treats an in-band comma as a delimiter) was LOSSY: a
+    // legal comma-bearing or empty-string ref round-tripped to a DIFFERENT array, so on cold-start
+    // reload auditChainFull recomputed the canonical over the mis-split arrays → selfHash/signature
+    // mismatch → the whole benign chain is permanently integrity-quarantined (every later append throws).
+    // MCP audit entries legitimately carry commas (BASMCPInvocationAuditBridge U+001F-joined IDs).
+    // Fix: store INJECTIVELY as a sentinel + per-element "<utf8ByteCount>:<element>" (netstring), so the
+    // reloaded arrays byte-equal the signed originals for any content.
+    private static let refListSentinel = "\u{01}nl1\u{1F}"
+
+    /// Injective serialization of a ref array (netstring: sentinel + "<utf8ByteCount>:<bytes>" per element).
+    static func encodeRefList(_ xs: [String]) -> String {
+        var out = refListSentinel
+        for x in xs { out += "\(x.utf8.count):\(x)" }
+        return out
+    }
+
+    /// Inverse of `encodeRefList`. A stored value WITHOUT the sentinel is a legacy comma-joined row: it is
+    /// re-split KEEPING empty subsequences (which exactly recovers pre-existing empty-element rows; comma-
+    /// free rows are unaffected; comma-bearing legacy rows remain irrecoverable — they already quarantined
+    /// on reload before this fix, so this is strictly better).
+    static func decodeRefList(_ s: String) -> [String] {
+        guard s.hasPrefix(refListSentinel) else {
+            return s.isEmpty ? []
+                : s.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+        }
+        let bytes = Array(s.utf8)
+        var i = refListSentinel.utf8.count
+        var result: [String] = []
+        while i < bytes.count {
+            var j = i
+            while j < bytes.count, bytes[j] != UInt8(ascii: ":") { j += 1 }
+            guard j < bytes.count,
+                  let n = Int(String(decoding: bytes[i..<j], as: UTF8.self)), n >= 0
+            else { break }
+            let start = j + 1, end = start + n
+            guard end <= bytes.count else { break }
+            result.append(String(decoding: bytes[start..<end], as: UTF8.self))
+            i = end
+        }
+        return result
     }
 }

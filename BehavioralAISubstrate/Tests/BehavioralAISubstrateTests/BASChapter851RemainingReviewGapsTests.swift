@@ -43,8 +43,46 @@ final class BASChapter851RemainingReviewGapsTests: XCTestCase {
         // so subsequent tests in other classes see the normal path。
         #if DEBUG
         BASAutoRouteRanker._setForceFallbackForTesting(false)
+        BASAutoRouteRanker._setInjectRawIndicesForTesting(nil)
         #endif
         super.tearDown()
+    }
+
+    // MARK: - audit orchestration MED-2: corrupt FFI return fails SAFE, not process-abort
+
+    /// The pure validator rejects every non-permutation. Reversal (drop any guard clause) reds.
+    func testValidatedPermutationRejectsNonPermutations() {
+        typealias R = BASAutoRouteRanker
+        XCTAssertEqual(R.validatedPermutation([2, 0, 1], count: 3), [2, 0, 1],
+            "a genuine permutation passes through unchanged")
+        XCTAssertEqual(R.validatedPermutation([], count: 0), [], "empty is a valid 0-permutation")
+        XCTAssertNil(R.validatedPermutation([0, 1], count: 3), "short return (length drift) rejected")
+        XCTAssertNil(R.validatedPermutation([0, 1, 2, 3], count: 3), "over-long return rejected")
+        XCTAssertNil(R.validatedPermutation([0, 3, 1], count: 3), "out-of-range index (3 >= 3) rejected")
+        XCTAssertNil(R.validatedPermutation([-1, 0, 1], count: 3), "negative index rejected")
+        XCTAssertNil(R.validatedPermutation([0, 0, 1], count: 3), "duplicate index rejected")
+    }
+
+    /// A corrupt kernel return (injected) makes the wrapper return nil → each call site's Swift
+    /// `.sorted` fallback, NOT a process-aborting precondition. Reversal (wrapper returns the raw
+    /// array without validatedPermutation) reds this: the bad array leaks out instead of nil.
+    func testWrapperFallsBackSafelyOnCorruptKernelReturn() {
+        #if DEBUG
+        // n = 3, but the "kernel" returns an out-of-bounds index and a duplicate.
+        BASAutoRouteRanker._setInjectRawIndicesForTesting([0, 5, 0])
+        let result = BASAutoRouteRanker.dreamLoopDominanceOrderDouble(scores: [0.1, 0.9, 0.5])
+        XCTAssertNil(result,
+            "a corrupt kernel return must yield nil (→ Swift fallback), never an OOB index array "
+            + "that a call-site precondition would abort the process on")
+        let snap = BASAutoRouteRanker.dominanceOrderTelemetrySnapshot()
+        XCTAssertEqual(snap.f64FallbackCount, 1, "the safe-fallback path increments the counter")
+
+        // A VALID injected permutation still passes through (the validator is not over-eager).
+        BASAutoRouteRanker.resetDominanceOrderTelemetry()
+        BASAutoRouteRanker._setInjectRawIndicesForTesting([2, 0, 1])
+        XCTAssertEqual(BASAutoRouteRanker.dreamLoopDominanceOrderDouble(scores: [0.1, 0.9, 0.5]),
+            [2, 0, 1], "a valid injected permutation is returned unchanged")
+        #endif
     }
 
     // MARK: - 1. CRITICAL-1: Fallback path coverage on Apple

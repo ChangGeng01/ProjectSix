@@ -29,6 +29,12 @@ public final class BASCoreAIHybridDecodeSession: @unchecked Sendable {
     private let maxSeq: Int             // MLA fixed-buffer capacity = mla_kv.shape[1]
     private var written: Int            // valid MLA slots so far (init = prompt length); guards the silent-cap corruption
     private var state0: NDArray
+    #if DEBUG
+    // audit x-concurrency §三① — enforces the `@unchecked Sendable` single-serialized-driver
+    // contract at runtime (DEBUG only): a concurrent driver corrupts the in-place state.
+    // Zero-cost in release; the utility is unit-tested in BASSingleDriverTripwireTests.
+    private let driverTripwire = BASSingleDriverTripwire(label: "BASCoreAIHybridDecodeSession")
+    #endif
     private var state1: NDArray
     private var state2: NDArray
     private var state3: NDArray
@@ -68,6 +74,10 @@ public final class BASCoreAIHybridDecodeSession: @unchecked Sendable {
     /// FAIL-LOUD on MLA-buffer overflow: at fill == MAX_SEQ the one-hot write matches NO slot and the token would be
     /// silently dropped (output corrupts with no NaN) — instead throw `.overflow` so the caller applies a defined policy.
     public func step(token: Int) async throws -> Int {
+        #if DEBUG
+        driverTripwire.enter()   // audit x-concurrency §三①
+        defer { driverTripwire.exit() }
+        #endif
         guard written < maxSeq else {
             throw DecodeError.overflow("MLA fixed-buffer full: written=\(written) == MAX_SEQ=\(maxSeq); re-prefill or evict a window before decoding further")
         }

@@ -35,6 +35,11 @@ public enum QinaoAgentLeaseInvalidReason:
     case loopsExhausted(used: Int, max: Int)
     case targetOutsideScope(QinaoSeatDomain)
     case revoked
+    /// deep-audit P1-8 (2026-07-13): the presenting seat is not the seat the lease was
+    /// issued to. A lease is a capability bound to one agent; presenting another agent's
+    /// leaseRef to spend its budget/scope must fail closed. `QinaoAgentLease.agent` carried
+    /// this binding since 六十四.3 but nothing compared it — this reason wires the check.
+    case leaseAgentMismatch(issuedTo: QinaoSeat, presentedBy: QinaoSeat)
 }
 
 /// Typed validity report — empty `reasons` means valid.
@@ -111,15 +116,23 @@ public actor QinaoAgentLeaseEnforcer {
         return ref
     }
 
-    /// Increment writes-used for a lease. Caller invokes on
-    /// each successful proposal accept.
+    /// Increment writes-used for a lease.
+    ///
+    /// deep-audit P1-8 (2026-07-13): DORMANT. No production or dispatch path calls this yet —
+    /// the seat-fabric propose→commit lane (dispatchProposals) is test-only scaffolding and
+    /// does not consume lease budget. This is the intended trigger point ("on each accepted
+    /// write") for when that lane is wired into the sovereign spine; until then writesUsed
+    /// stays 0 and the writesExhausted invariant never fires in practice. The prior comment
+    /// ("Caller invokes on each successful proposal accept") described a caller that does not
+    /// exist — the repo treats such doc-lies as first-class defects.
     public func recordWrite(leaseRef: String) {
         guard var entry = entries[leaseRef] else { return }
         entry.usage.writesUsed += 1
         entries[leaseRef] = entry
     }
 
-    /// Increment loops-used.
+    /// Increment loops-used. DORMANT — same as `recordWrite`: no caller consumes loop budget
+    /// until the seat-fabric commit lane is wired (deep-audit P1-8).
     public func recordLoop(leaseRef: String) {
         guard var entry = entries[leaseRef] else { return }
         entry.usage.loopsUsed += 1
@@ -133,10 +146,16 @@ public actor QinaoAgentLeaseEnforcer {
         entries[leaseRef] = entry
     }
 
-    /// Check a lease's validity against optional target
+    /// Check a lease's validity against an optional presenting `agent` and optional target
     /// domain. Returns typed report; empty reasons = valid.
+    ///
+    /// deep-audit P1-8 (2026-07-13): when `agent` is supplied and does not match the seat the
+    /// lease was issued to, the check fails closed with `.leaseAgentMismatch` — a seat cannot
+    /// spend another agent's lease. `agent` is optional so pre-existing callers that only test
+    /// the time/write/loop/scope invariants keep their exact semantics.
     public func validity(
         leaseRef: String,
+        agent: QinaoSeat? = nil,
         target: QinaoSeatDomain? = nil
     ) -> QinaoAgentLeaseValidityReport {
         guard let entry = entries[leaseRef] else {
@@ -145,6 +164,12 @@ public actor QinaoAgentLeaseEnforcer {
                 reasons: [.unknownLease])
         }
         var reasons: [QinaoAgentLeaseInvalidReason] = []
+        if let agent, entry.lease.agent != agent {
+            reasons.append(
+                .leaseAgentMismatch(
+                    issuedTo: entry.lease.agent,
+                    presentedBy: agent))
+        }
         if entry.usage.revoked {
             reasons.append(.revoked)
         }
@@ -186,10 +211,11 @@ public actor QinaoAgentLeaseEnforcer {
     /// Convenience boolean.
     public func isValid(
         leaseRef: String,
+        agent: QinaoSeat? = nil,
         target: QinaoSeatDomain? = nil
     ) -> Bool {
         validity(
-            leaseRef: leaseRef, target: target
+            leaseRef: leaseRef, agent: agent, target: target
         ).isValid
     }
 

@@ -135,6 +135,13 @@ public struct BASSovereignKeychainBinding: Sendable {
             // Not present — add fresh.
             var addQuery = query
             addQuery[kSecValueData as String] = seed
+            // MED-5 (mega-audit 2026-07-07): the Ed25519 signing seed is the audit
+            // ledger's root credential ("can forge any entry"). Default generic-password
+            // accessibility (WhenUnlocked) MIGRATES via encrypted device backup to a new
+            // machine — breaking the per-device signing identity the docstring promises.
+            // Pin to ThisDeviceOnly so the seed never leaves this device via backup.
+            addQuery[kSecAttrAccessible as String] =
+                kSecAttrAccessibleWhenUnlockedThisDeviceOnly
             let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
             guard addStatus == errSecSuccess else {
                 throw KeychainError.osStatus(

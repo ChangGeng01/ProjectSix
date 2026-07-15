@@ -36,10 +36,11 @@ extension BASEBrainRuntimeCoordinator {
         // determinism risk vs V1 Swift `.sorted` over Doubles)。
         // Switched to `dreamLoopDominanceOrderDouble` which
         // preserves full Double precision through the Rust kernel。
-        // OOB guard upgraded to precondition() per review M1 —
-        // Rust kernel cannot return OOB by construction,so a
-        // bad index means the kernel is corrupted (fail loud
-        // rather than silently shortening the result)。
+        // audit orchestration MED-2: the OOB guard now lives in the FFI wrapper
+        // (dreamLoopDominanceOrderDouble → validatedPermutation): a corrupt / short /
+        // duplicate kernel return yields nil, routing HERE to the Swift `.sorted`
+        // fallback (fail-SAFE) rather than aborting the whole process with a call-site
+        // precondition (the old fail-loud). A validated permutation indexes safely below.
         let dominanceOrder: [String] = {
             let scores: [Double] = thoughtFrame.candidates.map {
                 candidateDominanceScore($0)
@@ -47,13 +48,9 @@ extension BASEBrainRuntimeCoordinator {
             if let indices = BASAutoRouteRanker
                 .dreamLoopDominanceOrderDouble(scores: scores) {
                 return indices.map { idx -> String in
-                    let i = Int(idx)
-                    precondition(i >= 0
-                        && i < thoughtFrame.candidates.count,
-                        "Rust dominance_order_f64 returned " +
-                        "out-of-bounds index \(i) for n=" +
-                        "\(thoughtFrame.candidates.count)")
-                    return thoughtFrame.candidates[i].candidateID
+                    // audit orchestration MED-2: wrapper-validated permutation ⇒ index in range;
+                    // a corrupt FFI return fell back to the Swift `.sorted` path (nil wrapper).
+                    return thoughtFrame.candidates[Int(idx)].candidateID
                 }
             }
             // Swift legacy fallback (V1 implementation,kept active
@@ -65,12 +62,21 @@ extension BASEBrainRuntimeCoordinator {
                 }
                 .map(\.candidateID)
         }()
+        // blindspot LOW id8: this HostKit frontier builder is a DEAD
+        // duplicate (production uses BASNeuralMaterializationCompiler /
+        // EBrainNeuralMaterializationCore.buildCandidateFrontier). It
+        // still carried the pre-consolidation raw 0.6/0.7 reversibility
+        // thresholds; re-threaded onto the BASReversibilityBands SSOT so
+        // the dead copy can't become a stale-band landmine if revived.
+        // (See spawned task: consider deleting this dead duplicate.)
         let reversiblePaths = thoughtFrame.candidates
-            .filter { $0.reversibility >= 0.6 }
+            .filter { BASReversibilityBands
+                .isReversiblePath(reversibility: $0.reversibility) }
             .map(\.candidateID)
         let guardPaths = thoughtFrame.candidates
             .filter { candidate in
-                candidate.reversibility >= 0.7
+                BASReversibilityBands
+                    .isGuardPath(reversibility: candidate.reversibility)
                     || containsGuardLexicon(candidate.title)
                     || containsGuardLexicon(candidate.actionSummary)
             }
@@ -144,7 +150,8 @@ extension BASEBrainRuntimeCoordinator {
         actionPermit: BASActionPermit
     ) -> [BASRiskPermitBinding] {
         let critiqueLookup = Dictionary(grouping: thoughtFrame.critiques, by: \.candidateID)
-        let forecastLookup = Dictionary(uniqueKeysWithValues: thoughtFrame.forecasts.map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let forecastLookup = Dictionary(thoughtFrame.forecasts.map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
 
         return thoughtFrame.candidates.map { candidate in
             let critiques = critiqueLookup[candidate.candidateID] ?? []

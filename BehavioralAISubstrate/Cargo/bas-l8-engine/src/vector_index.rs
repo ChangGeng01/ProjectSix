@@ -236,6 +236,81 @@ pub fn cosine_topk_for_domain_with_skipped(
     Ok((top, skipped))
 }
 
+/// audit M-l MED-4 (x-concurrency) — ATOMIC top-k that returns
+/// `(atom_id, score)` directly。 The base `cosine_topk_for_domain`
+/// returns transient ROWIDS which the Swift caller then resolved to
+/// atom_ids in K SEPARATE FFI calls;the Mutex only made each single
+/// call atomic, so a concurrent remove/upsert between the top-k call
+/// and a rowid→atom_id resolution let SQLite ROWID REUSE remap a rowid
+/// to a DIFFERENT atom (wrong recall) or drop it (silent miss)。 This
+/// variant reads `atom_id` in the SAME scan — no rowid round-trip, so
+/// there is no reuse window at all — and the whole op runs under ONE
+/// `with_conn` Mutex hold at the FFI boundary。
+///
+/// Ordering is TOTAL and content-derived: `(score DESC, atom_id ASC)`。
+/// That also fixes the deferred K-th-boundary MEMBERSHIP determinism —
+/// at an exact score tie the base variant's membership was rowid-decided
+/// (rowids are reassigned on every in-memory ADR-037 rebuild); atom_id
+/// is content-derived and stable across rebuilds。
+pub fn cosine_topk_atom_ids_for_domain(
+    conn: &Connection,
+    domain: &str,
+    query: &[f32],
+    k: usize,
+) -> rusqlite::Result<Vec<(String, f32)>> {
+    let mut stmt = conn.prepare(
+        "SELECT atom_id, embedding_blob FROM vector_index
+         WHERE domain = ?"
+    )?;
+    let mut rows = stmt.query(params![domain])?;
+    // Total order: higher score first; at an exact tie, smaller atom_id
+    // first (content-derived ⇒ deterministic membership + order)。
+    let better_first = |a: &(String, f32), b: &(String, f32)|
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.0.cmp(&b.0));
+    let mut top: Vec<(String, f32)> = Vec::with_capacity(k);
+    while let Some(row) = rows.next()? {
+        let atom_id: String = row.get(0)?;
+        let blob: Vec<u8> = row.get(1)?;
+        let dim = blob.len() / 4;
+        if dim != query.len() {
+            continue;  // dim mismatch — same skip policy as the base variant
+        }
+        let mut score: f32 = 0.0;
+        for i in 0..dim {
+            let start = i * 4;
+            let v = f32::from_le_bytes([
+                blob[start], blob[start + 1],
+                blob[start + 2], blob[start + 3]]);
+            score += v * query[i];
+        }
+        if !score.is_finite() {
+            continue;  // corrupted bytes — skip, don't pollute top-k
+        }
+        if top.len() < k {
+            top.push((atom_id, score));
+            top.sort_unstable_by(&better_first);
+        } else {
+            // `top` is sorted best-first, so `last` is the current worst。
+            let worst = top.last().unwrap();
+            let cand_wins = match score.partial_cmp(&worst.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+            {
+                std::cmp::Ordering::Greater => true,
+                std::cmp::Ordering::Less => false,
+                std::cmp::Ordering::Equal => atom_id < worst.0,
+            };
+            if cand_wins {
+                top.pop();
+                top.push((atom_id, score));
+                top.sort_unstable_by(&better_first);
+            }
+        }
+    }
+    Ok(top)
+}
+
 pub fn count_entries_for_provider(
     conn: &Connection,
     provider_version: &str,
@@ -655,6 +730,99 @@ bas_l8_vector_index_cosine_topk_for_domain(
     n as i32
 }
 
+/// audit M-l MED-4 — ATOMIC `(atom_id, score)` top-k in ONE FFI call。
+/// Fixes the multi-call TOCTOU: the base variant returns transient rowids
+/// that the caller resolved separately, so a concurrent write between the
+/// top-k and a rowid→atom_id resolution let SQLite ROWID REUSE remap the
+/// rowid to a DIFFERENT atom。 Here the whole read runs under ONE
+/// `with_conn` Mutex hold and `atom_id` is read in the SAME scan (no rowid
+/// round-trip)。
+///
+/// Writes the top-`n` scores into `out_scores` and the `n` atom_ids
+/// NEWLINE-joined UTF-8 into `out_ids_buf` (atom_ids are TEXT ids — never
+/// contain '\n')。 `*out_ids_needed` is ALWAYS set to the required ids byte
+/// length;when `out_ids_buf` is null or too small the ids are NOT written
+/// — the caller re-allocates to `*out_ids_needed` and calls again (each
+/// call's (scores, ids) are internally self-consistent because atom_id is
+/// read directly, so a retry is still a valid top-k)。 In practice atom_ids
+/// are bounded (UUID/hash), so a generously-sized buffer makes it one call。
+///
+/// Returns n (count written, ≤ k) or:
+///   -1 null engine · -2 SQLite error · -3 bad args/query · -4 k out of range
+#[no_mangle]
+pub unsafe extern "C" fn
+bas_l8_vector_index_cosine_topk_atom_ids_for_domain(
+    engine: *const L8Engine,
+    domain_utf8: *const c_char, domain_len: usize,
+    query_blob: *const u8, query_blob_len: usize,
+    k: usize,
+    out_scores: *mut f32,
+    out_ids_buf: *mut u8, out_ids_capacity: usize,
+    out_ids_needed: *mut i64,
+) -> i32 {
+    if engine.is_null() { return -1; }
+    if k == 0 || k > crate::MAX_HOTPATH_LIMIT { return -4; }
+    if out_scores.is_null() || out_ids_needed.is_null() {
+        return -3;
+    }
+    let domain = match crate::cstr_to_str(
+        domain_utf8, domain_len) {
+        Some(s) => s, None => return -3,
+    };
+    if query_blob.is_null() || query_blob_len == 0
+        || query_blob_len % 4 != 0
+    {
+        return -3;
+    }
+    if query_blob_len > MAX_EMBEDDING_BYTES {
+        return -3;
+    }
+    let q_dim = query_blob_len / 4;
+    let mut query: Vec<f32> = Vec::with_capacity(q_dim);
+    let q_slice = unsafe {
+        core::slice::from_raw_parts(query_blob, query_blob_len)
+    };
+    for i in 0..q_dim {
+        let start = i * 4;
+        query.push(f32::from_le_bytes([
+            q_slice[start], q_slice[start + 1],
+            q_slice[start + 2], q_slice[start + 3]]));
+    }
+    if !query.iter().all(|f| f.is_finite()) {
+        return -3;
+    }
+    let engine_ref = unsafe { &*engine };
+    let topk: Result<Vec<(String, f32)>, rusqlite::Error> =
+        engine_ref.with_conn(|conn| {
+            cosine_topk_atom_ids_for_domain(conn, domain, &query, k)
+        });
+    let topk = match topk {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let n = topk.len();
+    let scores_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_scores, n)
+    };
+    for (i, (_id, sc)) in topk.iter().enumerate() {
+        scores_slice[i] = *sc;
+    }
+    // atom_ids joined by '\n' (ids never contain a newline)。
+    let joined: String = topk.iter()
+        .map(|(id, _)| id.as_str())
+        .collect::<Vec<&str>>()
+        .join("\n");
+    let needed = joined.len();
+    unsafe { *out_ids_needed = needed as i64; }
+    if !out_ids_buf.is_null() && out_ids_capacity >= needed {
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                joined.as_ptr(), out_ids_buf, needed);
+        }
+    }
+    n as i32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -803,6 +971,62 @@ mod tests {
             assert!(
                 top[2].1.abs() < 1e-5,
                 "3rd score expected ~0.0, got {}", top[2].1);
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // audit M-l MED-4 — the atomic (atom_id, score) variant returns
+    // atom_ids DIRECTLY (no rowid round-trip ⇒ no rowid-reuse TOCTOU).
+    #[test]
+    fn cosine_topk_atom_ids_returns_ordered_atom_ids() {
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_vector_index_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            let e1 = pack_f32_le(&[1.0, 0.0, 0.0, 0.0]);
+            let e2 = pack_f32_le(&[0.5, 0.0, 0.0, 0.0]);
+            let e3 = pack_f32_le(&[0.0, 1.0, 0.0, 0.0]);
+            upsert_entry(conn, "atom-alpha", 4, "p", &e1,
+                "dom", "{}").unwrap();
+            upsert_entry(conn, "atom-beta", 4, "p", &e2,
+                "dom", "{}").unwrap();
+            upsert_entry(conn, "atom-gamma", 4, "p", &e3,
+                "dom", "{}").unwrap();
+            let query: Vec<f32> = vec![1.0, 0.0, 0.0, 0.0];
+            let top = cosine_topk_atom_ids_for_domain(
+                conn, "dom", &query, 3).unwrap();
+            assert_eq!(top.len(), 3);
+            assert_eq!(top[0].0, "atom-alpha");   // score 1.0
+            assert_eq!(top[1].0, "atom-beta");    // score 0.5
+            assert_eq!(top[2].0, "atom-gamma");   // score 0.0
+            assert!((top[0].1 - 1.0).abs() < 1e-5);
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // audit M-l MED-4 — deterministic K-th-boundary MEMBERSHIP at an exact
+    // score tie: decided by content-derived atom_id (ASC), NOT by rowid
+    // (which the in-memory engine reassigns on every rebuild). Insertion
+    // order C,A,B must NOT affect the result.
+    #[test]
+    fn cosine_topk_atom_ids_tiebreak_deterministic_by_atom_id() {
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_vector_index_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            let e = pack_f32_le(&[1.0, 0.0, 0.0, 0.0]);  // all identical ⇒ same score
+            upsert_entry(conn, "id-C", 4, "p", &e, "dom", "{}").unwrap();
+            upsert_entry(conn, "id-A", 4, "p", &e, "dom", "{}").unwrap();
+            upsert_entry(conn, "id-B", 4, "p", &e, "dom", "{}").unwrap();
+            let query: Vec<f32> = vec![1.0, 0.0, 0.0, 0.0];
+            let top = cosine_topk_atom_ids_for_domain(
+                conn, "dom", &query, 2).unwrap();
+            assert_eq!(top.len(), 2);
+            // all tie ⇒ the two SMALLEST atom_ids win, in ASC order:
+            assert_eq!(top[0].0, "id-A");
+            assert_eq!(top[1].0, "id-B");   // id-C evicted at the k-boundary
         });
         unsafe { bas_l8_engine_close(engine); }
     }

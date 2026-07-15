@@ -95,7 +95,9 @@ package struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint,
         let resolvedRequestID = nextRequestID()
 
         return AsyncThrowingStream { continuation in
-            Task {
+            // audit F9 (2026-07-12): capture the pump Task + cancel on stream termination so a
+            // consumer break propagates down to the inner streamDraft (the guarded GPU decode).
+            let task = Task {
                 do {
                     let adapter: any BASOrganAdapter
                     if let override = adapterOverride {
@@ -131,6 +133,7 @@ package struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint,
                     let stream = streamingAdapter
                         .streamDraft(request)
                     for try await chunk in stream {
+                        try Task.checkCancellation()
                         continuation.yield(
                             QinaoLoop.OrganResponseChunk(
                                 bodyDelta: chunk.bodyDelta,
@@ -168,6 +171,7 @@ package struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint,
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 

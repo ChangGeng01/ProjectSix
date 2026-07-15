@@ -22,6 +22,21 @@ import XCTest
 
 final class BASSQLiteVectorIndexStorageTests: XCTestCase {
 
+    /// deep-audit LOW: an UNTRUSTED `dimension` read from the DB must be overflow-guarded before
+    /// `dimension * floatByteSize`, else a corrupt/tampered value TRAPS (crash). safeEmbeddingByteSize
+    /// throws instead. Unfixed (raw multiply): the negative case returns a bogus value (no throw → red)
+    /// and the overflow case traps (crash) — never the clean thrown error this asserts.
+    func testSafeEmbeddingByteSizeThrowsInsteadOfTrappingOnCorruptDimension() {
+        XCTAssertEqual(
+            try BASSQLiteVectorIndexStorage.safeEmbeddingByteSize(dimension: 4, atomID: "a"), 16)
+        XCTAssertThrowsError(
+            try BASSQLiteVectorIndexStorage.safeEmbeddingByteSize(dimension: -1, atomID: "a"),
+            "a negative persisted dimension must throw, not return a bogus size")
+        XCTAssertThrowsError(
+            try BASSQLiteVectorIndexStorage.safeEmbeddingByteSize(dimension: Int.max / 2, atomID: "a"),
+            "an overflowing persisted dimension must throw, not TRAP")
+    }
+
     private var tempURL: URL?
 
     override func setUpWithError() throws {

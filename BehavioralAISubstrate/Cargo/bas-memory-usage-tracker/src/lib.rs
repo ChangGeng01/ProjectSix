@@ -150,7 +150,15 @@ impl Tracker {
         } else {
             r.values().filter(|x| x.atom_id == atom_id).collect()
         };
-        matches.sort_by_key(|x| x.retrieved_at_ms);
+        // deep-audit MED: sort_by_key is stable but preserves the RANDOM HashMap iteration order among
+        // records sharing a retrieved_at_ms (ms resolution ⇒ same-ms ties are common). Add the record_id
+        // tiebreak so query_json is deterministic — matching record_lineage_json (below) + the SQL
+        // turn_ref / Swift atomID tiebreaks.
+        matches.sort_by(|a, b| {
+            a.retrieved_at_ms
+                .cmp(&b.retrieved_at_ms)
+                .then(a.record_id.cmp(&b.record_id))
+        });
         let mut out = Vec::new();
         out.push(b'[');
         for (i, rec) in matches.iter().enumerate() {
@@ -1528,5 +1536,46 @@ mod tests {
         }
         bas_rust_tracker_free_buffer(buf, len);
         bas_rust_tracker_close(t);
+    }
+
+    #[test]
+    fn query_same_ms_is_record_id_sorted_deterministic() {
+        // deep-audit MED: records sharing a retrieved_at_ms must come back in record_id order
+        // (deterministic), NOT the random HashMap iteration order the stable sort_by_key preserved.
+        // Insert 12 records at the SAME ms in REVERSE id order; expect ascending output. On the unfixed
+        // code the order is random ⇒ ~0 chance of being sorted ⇒ reliably red.
+        let t = bas_rust_tracker_init();
+        let n = 12;
+        for i in (0..n).rev() {
+            let rid = cstring(&format!("r{:02}", i));
+            let aid = cstring("a1");
+            let sref = cstring("s1");
+            let tref = cstring("t1");
+            let mode = cstring("allow");
+            let hflag = cstring("unknown");
+            bas_rust_tracker_append(
+                t, rid.as_ptr(), aid.as_ptr(), 1000,
+                sref.as_ptr(), tref.as_ptr(), mode.as_ptr(), hflag.as_ptr());
+        }
+        let all = cstring("");
+        let mut buf: *mut c_uchar = ptr::null_mut();
+        let mut len: usize = 0;
+        assert_eq!(bas_rust_tracker_query(t, all.as_ptr(), &mut buf, &mut len), 0);
+        let ids: Vec<String> = unsafe {
+            let txt = std::str::from_utf8(std::slice::from_raw_parts(buf, len)).unwrap();
+            txt.match_indices("\"recordID\":\"")
+                .map(|(idx, m)| {
+                    let start = idx + m.len();
+                    let end = start + txt[start..].find('"').unwrap();
+                    txt[start..end].to_string()
+                })
+                .collect()
+        };
+        bas_rust_tracker_free_buffer(buf, len);
+        bas_rust_tracker_close(t);
+        let mut expected: Vec<String> = (0..n).map(|i| format!("r{:02}", i)).collect();
+        expected.sort();
+        assert_eq!(ids, expected,
+            "same-ms records must be record_id-sorted (deterministic), not HashMap order");
     }
 }

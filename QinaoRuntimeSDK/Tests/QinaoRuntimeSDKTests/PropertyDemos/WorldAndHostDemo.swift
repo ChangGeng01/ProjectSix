@@ -72,7 +72,8 @@ final class WorldAndHostDemo: XCTestCase {
             sensitivity: .medium,
             confidence: 0.82,
             preferredTier: .warm)
-        let admitted = try await fx.memory.admit(request)
+        // deep-audit P1-7: governed (frontstage-eligible) memory requires promotion authority.
+        let admitted = try await fx.memory.admit(request, under: p1_7PermissiveConstitution())
 
         // Before forget — frontstage recall returns the memory.
         let frontstageBefore = await fx.memory.recallFrontstage()
@@ -96,18 +97,20 @@ final class WorldAndHostDemo: XCTestCase {
     func testSensitivityCascadeForgetIsTyped() async throws {
         let fx = PropertyDemoFixture.makeRuntime()
 
+        // deep-audit P1-7: governed (frontstage-eligible) memory requires promotion authority.
+        let gov = p1_7PermissiveConstitution()
         _ = try await fx.memory.admit(.init(
             kind: .episodic, content: "low",
             scope: .user, sensitivity: .low,
-            confidence: 0.8))
+            confidence: 0.8), under: gov)
         _ = try await fx.memory.admit(.init(
             kind: .episodic, content: "high-1",
             scope: .user, sensitivity: .high,
-            confidence: 0.8))
+            confidence: 0.8), under: gov)
         _ = try await fx.memory.admit(.init(
             kind: .episodic, content: "high-2",
             scope: .user, sensitivity: .high,
-            confidence: 0.8))
+            confidence: 0.8), under: gov)
 
         let removed = await fx.memory.forget(sensitivity: .high)
         XCTAssertEqual(removed.count, 2)

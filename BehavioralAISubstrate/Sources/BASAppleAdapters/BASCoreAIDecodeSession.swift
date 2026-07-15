@@ -61,6 +61,13 @@ public final class BASCoreAIDecodeSession: @unchecked Sendable {
     private let kvShape: [Int]
     private let kvCount: Int
 
+    #if DEBUG
+    // audit x-concurrency §三① — enforces the `@unchecked Sendable` "single serialized driver"
+    // contract at runtime (DEBUG only). A concurrent `step` (which corrupts the in-place fused KV)
+    // fires this loudly instead of silently mangling state. Zero-cost in release.
+    private let driverTripwire = BASSingleDriverTripwire(label: "BASCoreAIDecodeSession")
+    #endif
+
     /// Number of COMMITTED tokens; the next committed slot. KV at logical positions `0..<draftPos`
     /// holds the committed sequence; the last committed token's K/V is at position `draftPos - 1`.
     public private(set) var draftPos: Int = 0
@@ -117,6 +124,12 @@ public final class BASCoreAIDecodeSession: @unchecked Sendable {
     /// (one-hot) and returns the argmax over the output logits (the prediction of the NEXT token).
     @discardableResult
     public func step(token: Int, pos: Int) async throws -> Int {
+        #if DEBUG
+        // audit x-concurrency §三① — trips if a second driver enters `step` before this one returns
+        // (the exclusive-KV contract violation). The bracket spans the `await run` suspension.
+        driverTripwire.enter()
+        defer { driverTripwire.exit() }
+        #endif
         guard pos < maxSeq else { throw DecodeError.windowOverflow(pos: pos, maxSeq: maxSeq) }
         // The device artifacts are fp16-compute (weights fp16 / int8-dequant-to-fp16): float inputs, the KV
         // state, and the logits output are ALL Float16 — feeding Float32 fails run() with a scalar-type mismatch.

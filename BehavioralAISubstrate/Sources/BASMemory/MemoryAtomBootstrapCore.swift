@@ -612,8 +612,14 @@ public struct BASMemoryGovernance: Sendable {
             return false
         }
 
-        let writeScope = constitution.consentLattice.memoryWriteScope
-        if writeScope == "disabled" || writeScope == "none" {
+        // deep-audit L-5 (2026-07-13): this gate became load-bearing this session (wired via
+        // QinaoMemory.admit(_:under:)). The exact case-sensitive check diverged from the
+        // substrate's canonical scope reader (projectedHostProfile lowercases + .contains),
+        // so "Disabled"/"NONE"/"cold_disabled" would silently ADMIT here while reading as OFF
+        // canonically — a consent gate failing open on non-canonical spelling. Normalize
+        // identically: lowercase + substring, matching the single-source reader.
+        let writeScope = constitution.consentLattice.memoryWriteScope.lowercased()
+        if writeScope.contains("disabled") || writeScope.contains("none") {
             return false
         }
 

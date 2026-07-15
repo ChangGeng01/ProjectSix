@@ -35,7 +35,7 @@ extension MLXOrganAdapter {
     /// so it runs ONLY when the host elected it AND the request is already greedy. Pure + host-testable. Mirrors
     /// `shouldUsePromptLookup`.
     public nonisolated static func shouldUseSaguaro(elect: Bool, request: BASOrganRequest) -> Bool {
-        elect && request.preset.temperature == 0
+        elect && BASDecodeLanePolicy.isGreedyByteSafe(temperature: request.preset.temperature)
     }
 
     /// Generate the same prompt under Saguaro (spec, K) and the null/K=0 baseline (pure target greedy), in ONE
@@ -51,11 +51,7 @@ extension MLXOrganAdapter {
             throw BASOrganError.providerUnavailable(
                 reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before saguaroAB"))
         }
-        var messages: [Chat.Message] = []
-        let instructions = Self.systemInstructions(for: request)
-        if !instructions.isEmpty { messages.append(.system(instructions)) }
-        messages.append(.user(Self.prompt(for: request)))
-        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
+        let input = try await _buildLMInput(for: request, container: mainContainer)
         let params = self._greedyParameters(
             for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let maxTokens = params.maxTokens ?? 256   // params.maxTokens is already guard-applied + descriptor-clamped   // loop needs a definite cap
@@ -111,11 +107,7 @@ extension MLXOrganAdapter {
             throw BASOrganError.providerUnavailable(
                 reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before saguaroTargetForwardsMs"))
         }
-        var messages: [Chat.Message] = []
-        let instructions = Self.systemInstructions(for: request)
-        if !instructions.isEmpty { messages.append(.system(instructions)) }
-        messages.append(.user(Self.prompt(for: request)))
-        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
+        let input = try await _buildLMInput(for: request, container: mainContainer)
         let params = self._greedyParameters(
             for: request.preset, maxOutputTokens: request.maxOutputTokens)
 
@@ -164,11 +156,7 @@ extension MLXOrganAdapter {
             throw BASOrganError.providerUnavailable(
                 reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before respondCoreAIMambaSaguaro"))
         }
-        var messages: [Chat.Message] = []
-        let instructions = Self.systemInstructions(for: request)
-        if !instructions.isEmpty { messages.append(.system(instructions)) }
-        messages.append(.user(Self.prompt(for: request)))
-        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
+        let input = try await _buildLMInput(for: request, container: mainContainer)
         let params = self._greedyParameters(
             for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let maxTokens = params.maxTokens ?? 256   // params.maxTokens is already guard-applied + descriptor-clamped
@@ -188,18 +176,7 @@ extension MLXOrganAdapter {
         }
         let body = Self.applyMarkerPostprocessing(rawBody)
 
-        return BASOrganDraft(
-            requestID: request.requestID,
-            providerID: descriptor.providerID,
-            role: request.role,
-            body: body,
-            inputTokensEstimated: BASOrganDeterministicAdapter
-                .estimateTokens(from: [request.instruction] + request.context),
-            outputTokensEstimated: BASOrganDeterministicAdapter.estimateTokens(from: [body]),
-            producedAt: Date(),
-            traceID: BASOrganDeterministicAdapter.digest(
-                for: request, providerID: descriptor.providerID),
-            completionMetrics: nil)
+        return _buildDraft(body: body, request: request)
         #else
         throw BASOrganError.providerUnavailable(
             reason: MLXOrganAdapter.frameworkUnavailableReason

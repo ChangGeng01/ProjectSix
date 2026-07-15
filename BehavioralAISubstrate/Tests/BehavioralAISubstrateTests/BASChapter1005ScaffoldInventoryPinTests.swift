@@ -31,10 +31,7 @@ final class BASChapter1005ScaffoldInventoryPinTests: XCTestCase {
     // MARK: - Project root resolution
 
     private static var projectRoot: String {
-        ProcessInfo.processInfo.environment[
-            "BAS_PROJECT_ROOT"] ??
-        "/Users/changgeng/Project/Project06/Project06/" +
-        "BehavioralAISubstrate"
+        BASSourceTreeAudit.repoRoot
     }
 
     private static func readFile(_ relPath: String) throws

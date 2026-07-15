@@ -38,24 +38,33 @@ final class BASChapter627CrossModuleErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASAppleCurrentBrainBootstrapHostResolutionErrorConformsToCodable() {
-        assertCodable(
-            BASAppleCurrentBrainBootstrapHostResolutionError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASAppleCurrentBrainBootstrapHostResolutionError
+                .unsupportedModeID(""))
+        assertCodableRoundTrips(
+            BASAppleCurrentBrainBootstrapHostResolutionError
+                .incompleteTaskGraphHint)
     }
 
     func testLedgerErrorConformsToCodable() {
-        assertCodable(
-            BASSovereignAuditLedger.LedgerError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignAuditLedger.LedgerError.invalidEntry(""))
+        assertCodableRoundTrips(
+            BASSovereignAuditLedger.LedgerError.missingSigningSecret)
+        assertCodableRoundTrips(
+            BASSovereignAuditLedger.LedgerError
+                .chainIntegrityBroken(lastVerifiedAuditID: nil))
     }
 
     func testKeychainErrorConformsToCodable() {
-        assertCodable(
-            BASSovereignKeychainBinding.KeychainError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignKeychainBinding.KeychainError.platformUnavailable)
+        assertCodableRoundTrips(
+            BASSovereignKeychainBinding.KeychainError
+                .osStatus(code: 0, reasonCode: ""))
     }
 }

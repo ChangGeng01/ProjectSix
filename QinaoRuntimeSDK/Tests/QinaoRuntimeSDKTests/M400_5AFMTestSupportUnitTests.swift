@@ -11,7 +11,7 @@ import XCTest
 /// This file pins:
 ///
 ///   1. Errors containing `ModelManagerError Code=1026` → XCTSkip
-///   2. Errors containing `FoundationModels.LanguageModelSession.GenerationError` → XCTSkip
+///   2. A bare `GenerationError` (no 1026) → NO skip; it propagates (narrowed 2026-07-14)
 ///   3. Other `Error` shapes → no skip (caller must `throw error`)
 ///   4. Empty `Error` description → no skip
 ///   5. Compound errors (containing both patterns) → XCTSkip
@@ -44,19 +44,31 @@ final class M400_5AFMTestSupportUnitTests: XCTestCase {
         }
     }
 
-    // MARK: - 2. GenerationError → XCTSkip
+    // MARK: - 2. A bare GenerationError must PROPAGATE, not skip
 
-    func testGenerationErrorTriggersXCTSkip() throws {
+    /// INVERTED 2026-07-14 (skip triage). This test used to assert that ANY error
+    /// mentioning `FoundationModels.LanguageModelSession.GenerationError` produced an
+    /// XCTSkip — pinning the defect as a requirement. That substring is the BASE type of
+    /// the whole generation API, so it swallowed guardrailViolation /
+    /// exceededContextWindowSize / decodingFailure / rateLimited as "degraded host".
+    ///
+    /// It cost nothing to remove: the real foreground-cache-cold error NESTS
+    /// `ModelManagerError Code=1026` inside its wrapper, so every genuine occurrence still
+    /// matches the 1026 arm. The broad arm only ever produced FALSE skips. And under the
+    /// adapter's new 27 floor the framework throws LanguageModelError /
+    /// SystemLanguageModel.Error, never GenerationError — so it is dead by construction.
+    func testBareGenerationErrorPropagatesAndDoesNotSkip() throws {
         let err = SyntheticAFMError(
             description:
                 "Error Domain=FoundationModels.LanguageModelSession" +
                 ".GenerationError Code=-1 \"(null)\"")
-        do {
-            try skipIfAFMDegraded(err)
-            XCTFail("expected XCTSkip")
-        } catch is XCTSkip {
-            return
-        }
+        // Must NOT throw: a generation error with no 1026 is a RESULT the caller has to
+        // face, not an environment problem to skip.
+        XCTAssertNoThrow(
+            try skipIfAFMDegraded(err),
+            "a bare GenerationError (no 1026) must PROPAGATE to the caller — skipping it "
+            + "hides real results like guardrailViolation behind an unverified "
+            + "'degraded host' claim")
     }
 
     // MARK: - 3. Unrelated error → no skip

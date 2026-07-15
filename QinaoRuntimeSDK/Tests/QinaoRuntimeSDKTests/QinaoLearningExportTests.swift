@@ -153,6 +153,75 @@ final class QinaoLearningExportTests: XCTestCase {
         XCTAssertEqual(bundle.entries.count, 2)
     }
 
+    // MARK: - deep-audit P1-13 (2026-07-13): Stage C skips A/B-rejected candidates.
+
+    /// Thread-safe approver call counter for the skip tooth.
+    private actor ApproverCallCounter {
+        private(set) var calls = 0
+        func bump() { calls += 1 }
+    }
+
+    /// Stage C must NOT call the sovereign approver for candidates already doomed by Stage A
+    /// (PII) or Stage B (privacy boundary) — the shipped bridge mints a warrant per call, and a
+    /// host may install a side-effectful approver (e.g. a user-consent prompt). With BOTH
+    /// candidates rejected at Stage B, the approver must be called ZERO times. Reversal: without
+    /// the skip, Stage C calls the approver for every candidate → count 2 → RED.
+    func testStageCSkipsCandidatesAlreadyRejectedByAB() async {
+        let counter = ApproverCallCounter()
+        let approver: @Sendable (QinaoMemory.LearningExportCandidate) async throws -> String? = {
+            c in
+            await counter.bump()
+            return "warrant-\(c.sourceMemoryID.uuidString)"
+        }
+        // Boundary rejects .medium → both candidates doomed at Stage B, before Stage C.
+        let exporter = QinaoLearningExporter(
+            privateBoundary: [.medium],
+            approver: approver,
+            now: { Date(timeIntervalSince1970: 1_700_000_000) })
+        let a = makeCandidate(sensitivity: .medium)
+        let b = makeCandidate(sensitivity: .medium)
+        do {
+            _ = try await exporter.export(candidates: [a, b])
+            XCTFail("both candidates are privacy-rejected; export must throw")
+        } catch QinaoMemory.LearningExportError.rejected(let rejections) {
+            XCTAssertEqual(rejections.count, 2, "both rejected at Stage B (privacy boundary)")
+        } catch {
+            XCTFail("unexpected: \(error)")
+        }
+        let calls = await counter.calls
+        XCTAssertEqual(calls, 0,
+            "Stage C must skip the approver for A/B-rejected candidates — no wasted warrant "
+            + "mints / side-effectful consent prompts on candidates that can't ship")
+    }
+
+    /// Mixed: one PII-doomed (Stage A) candidate + one clean. The approver fires ONCE (only the
+    /// clean one), and the export still throws because the doomed one keeps its rejection.
+    func testStageCCallsApproverOnlyForABCleanCandidates() async {
+        let counter = ApproverCallCounter()
+        let approver: @Sendable (QinaoMemory.LearningExportCandidate) async throws -> String? = {
+            c in
+            await counter.bump()
+            return "warrant-\(c.sourceMemoryID.uuidString)"
+        }
+        let exporter = QinaoLearningExporter(
+            approver: approver,
+            now: { Date(timeIntervalSince1970: 1_700_000_000) })
+        // An email address trips the Stage-A PII scrub; the other candidate is clean.
+        let doomed = makeCandidate(skeleton: "contact me at alice@example.com about {plan}")
+        let clean = makeCandidate()
+        do {
+            _ = try await exporter.export(candidates: [doomed, clean])
+            XCTFail("the PII candidate must doom the bundle")
+        } catch QinaoMemory.LearningExportError.rejected {
+            // expected — Stage A rejected the doomed candidate.
+        } catch {
+            XCTFail("unexpected: \(error)")
+        }
+        let calls = await counter.calls
+        XCTAssertEqual(calls, 1,
+            "the approver must fire only for the A/B-clean candidate, not the PII-doomed one")
+    }
+
     // MARK: - sovereignSafe gate
 
     func testSovereignGateRejectsNilApproval() async {

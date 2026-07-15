@@ -513,4 +513,45 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
         XCTAssertEqual(loop.iterateCalls, 1,
             "flag on + budget=4 but service requests stepIndex=1 → 1 pass")
     }
+
+    // MARK: - 效率战役 effort-loop FACE activation (2026-07-11, operator: 移动端极高效)
+
+    /// The ε→effort→tier loop was BUILT (governedPlan → effortPlan → RunTurn effort floor) but the
+    /// production host FACE never threaded `effortPlan` — every host turn spent the FULL
+    /// deliberation budget regardless of surprise×stakes×headroom. The face now carries it
+    /// (default nil ⇒ byte-parity). Teeth ride the real-engine fixture above: a `.fast` effort
+    /// floor collapses the loop to 1 pass, so its frame equals the loop-OFF frame (the avoided
+    /// compute is REAL); a nil plan keeps the multi-pass refinement (≠ off).
+    func testFaceThreadedEffortFloorCollapsesRealLoop() throws {
+        let configuration = BASHostConfiguration.fixtureGeneric
+        let runtime = BASHostRuntime(configuration: configuration)
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .reflective,
+            surface: .application,
+            prompt: "Push into an irreversible high-stakes move now.",
+            riskLevel: .high)
+        let seed = try runtime.startSession(request)
+        let currentBrain = seed.currentBrain
+        let projection = BASBrainProjection(records: [], candidates: [], recentEvents: [])
+        let device = BASCoordinatorTestStubs.nominalDeviceState
+
+        let off = runtime.buildEBrainTurn(
+            request: request, currentBrain: currentBrain, projection: projection,
+            deviceStateOverride: device, deliberationLoopEnabled: false)
+        let fastEffort = runtime.buildEBrainTurn(
+            request: request, currentBrain: currentBrain, projection: projection,
+            deviceStateOverride: device, deliberationLoopEnabled: true,
+            effortPlan: BASEffortPlan(requested: .fast, applied: .fast, overrideReason: nil))
+        let fullEffort = runtime.buildEBrainTurn(
+            request: request, currentBrain: currentBrain, projection: projection,
+            deviceStateOverride: device, deliberationLoopEnabled: true)
+
+        XCTAssertEqual(fastEffort.thoughtFrame.candidates, off.thoughtFrame.candidates,
+            ".fast effort floors the loop to 1 pass — no refinement bias ⇒ frame equals loop-OFF "
+            + "(the avoided compute is real, not cosmetic)")
+        XCTAssertNotEqual(fullEffort.thoughtFrame.candidates, off.thoughtFrame.candidates,
+            "nil effortPlan ⇒ passthrough — the multi-pass refinement still fires (byte-parity of "
+            + "the pre-effort pipeline)")
+    }
 }

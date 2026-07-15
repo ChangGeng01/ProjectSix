@@ -18,9 +18,13 @@
 //   - `layer_norm_affine_backward`   — gradient incl。 γ, β
 //
 // All kernels operate row-by-row;each threadgroup handles one
-// row of the (N, D) input tensor。 Caller dispatches with
-// gridSize = MTLSize(width: 1, height: N, depth: 1) and
+// row of the (N, D) input tensor。 audit metal #5: the `row` param is
+// a scalar `[[threadgroup_position_in_grid]]`, so it reads the X
+// (width) component — dispatch N threadgroups along WIDTH:
+// gridSize = MTLSize(width: N, height: 1, depth: 1) and
 // threadgroupSize sized to D (clamped to maxTotalThreadsPerThreadgroup)。
+// (The old recipe said width:1,height:N — with a scalar `row` that
+// makes every threadgroup read row 0.)
 
 #include <metal_stdlib>
 using namespace metal;

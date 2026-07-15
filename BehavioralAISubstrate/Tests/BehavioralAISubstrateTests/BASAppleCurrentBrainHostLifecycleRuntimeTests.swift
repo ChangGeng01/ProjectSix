@@ -6,7 +6,6 @@ import Testing
 @testable import BASPolicy
 @testable import BASRuntimeCore
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Current Brain Host Lifecycle Runtime")
 struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
     @Model
@@ -343,4 +342,3 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
         #expect(built.4 == 1)
     }
 }
-#endif

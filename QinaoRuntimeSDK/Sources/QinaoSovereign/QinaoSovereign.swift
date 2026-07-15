@@ -43,6 +43,28 @@ import BASOrchestration
 /// `execute(intent:)` call that arrives without all three.
 public actor QinaoSovereignControlPlane {
 
+    /// deep-audit P1-6 (2026-07-13): HKDF-SHA256 domain-separated key derivation. The token HMAC
+    /// keys (permit / warrant / proof) MUST NOT equal the raw ledger secret — the single-secret
+    /// fallback (`tokenSigningKey ?? ledgerSigningSecret`) otherwise shares ONE key across the
+    /// ledger and every token kind, so a tag minted in one domain could be replayed in another.
+    /// The ledger key stays the raw secret (unchanged ⇒ persisted ledgers still verify); each token
+    /// domain gets a cryptographically separated key derived from the same secret with a distinct
+    /// `info` label. Deterministic ⇒ cross-process gates that share the secret derive the same key.
+    public static func deriveDomainKey(_ secret: Data, domain: String) -> SymmetricKey {
+        HKDF<SHA256>.deriveKey(
+            inputKeyMaterial: SymmetricKey(data: secret),
+            info: Data(domain.utf8),
+            outputByteCount: 32)
+    }
+
+    /// deep-audit P0-4: is `anchorID` currently registered with the snapshot manager? The snapshot-
+    /// continuity-proof verify (in the QinaoRuntime module) consults this so a proof for an
+    /// unregistered/deregistered anchor fails closed. `package` so the proof extension reaches it
+    /// without widening public surface (mirrors `tokenTagKey`).
+    package func isAnchorRegistered(_ anchorID: String) async -> Bool {
+        await coordinator.isAnchorRegistered(anchorID)
+    }
+
     // MARK: - Errors
 
     public enum SovereignError: Error, Equatable, Sendable {
@@ -90,17 +112,45 @@ public actor QinaoSovereignControlPlane {
         }
     }
 
-    /// Opaque warrant token the runtime attaches to side-effect
-    /// calls. Hosts treat this as a blob; only the control plane
-    /// can mint and verify it. Warrant verification is deferred to
-    /// `BASSovereign.BASSovereignTokenAuthority` under the hood;
-    /// the façade never exposes the signing key.
+    /// Warrant token the runtime attaches to side-effect calls.
+    ///
+    /// SECURITY SCOPE (integration S3, 2026-07-12 — discharges audit F2 for the warrant):
+    /// the warrant is now HMAC-SHA256 signed at mint. `issueWarrant` computes `signature`
+    /// over an injective length-prefixed encoding of (warrantID, sessionID, intentDigest,
+    /// issuedAt, expiresAt) with the control plane's `tokenTagKey` (wired from
+    /// `Configuration.tokenSigningKey`, falling back to `ledgerSigningSecret`);
+    /// `isWarrantValid` recomputes and compares before the field-binding + TTL checks.
+    /// A warrant constructed or decoded outside the control plane fails verification —
+    /// forgery requires the key, not just the type. The RISK permit lane is likewise
+    /// signed as of integration permit-signing (same day): QinaoRiskGate holds its own
+    /// injected `permitTagKey` (no sovereign import), domain-labelled so permit tags
+    /// never collide with warrant/proof tags under a shared key.
     public struct Warrant: Sendable, Equatable, Codable {
         public let warrantID: String
         public let sessionID: String
         public let intentDigest: String
+        /// deep-audit P1-6(b) (2026-07-13): the host version the warrant was minted under.
+        /// Bound into the signature and re-checked at verify, so a warrant minted for host N
+        /// cannot be replayed for the same session+digest under host N+1 within the TTL
+        /// (rollback / cross-host replay).
+        public let hostVersionID: String
         public let issuedAt: Date
         public let expiresAt: Date
+        /// HMAC-SHA256 tag binding all six fields (hex). Minted only by `issueWarrant`.
+        public let signature: String
+
+        public init(
+            warrantID: String, sessionID: String, intentDigest: String,
+            hostVersionID: String, issuedAt: Date, expiresAt: Date, signature: String
+        ) {
+            self.warrantID = warrantID
+            self.sessionID = sessionID
+            self.intentDigest = intentDigest
+            self.hostVersionID = hostVersionID
+            self.issuedAt = issuedAt
+            self.expiresAt = expiresAt
+            self.signature = signature
+        }
     }
 
     /// Intent the runtime wants the control plane to authorize.
@@ -413,12 +463,18 @@ public actor QinaoSovereignControlPlane {
             self.hostRemovalBypassed = hostRemovalBypassed
             self.unauthorizedSelfMutation = unauthorizedSelfMutation
             self.memoryOrHostWriteBypass = memoryOrHostWriteBypass
-            func clamp(_ v: Double) -> Double { min(max(v, 0), 1) }
-            self.irreversibilityScore = clamp(irreversibilityScore)
-            self.manipulationStrength = clamp(manipulationStrength)
-            self.uncertaintyScore = clamp(uncertaintyScore)
-            self.gsiScore = clamp(gsiScore)
-            self.hostGateValue = clamp(hostGateValue)
+            // deep-audit P0-5 (2026-07-13): NaN fails closed per field (see QinaoRisk). Risk
+            // scores (higher=more dangerous) → 1.0; hostGateValue (default 1 = authorized) →
+            // 0.0 so an unknown gate reads as NOT authorized.
+            func clamp(_ v: Double, nan: Double) -> Double {
+                guard !v.isNaN else { return nan }
+                return min(max(v, 0), 1)
+            }
+            self.irreversibilityScore = clamp(irreversibilityScore, nan: 1)
+            self.manipulationStrength = clamp(manipulationStrength, nan: 1)
+            self.uncertaintyScore = clamp(uncertaintyScore, nan: 1)
+            self.gsiScore = clamp(gsiScore, nan: 1)
+            self.hostGateValue = clamp(hostGateValue, nan: 0)
             self.quarantineCount = max(0, quarantineCount)
             self.mode = mode
             self.brake = brake
@@ -484,6 +540,56 @@ public actor QinaoSovereignControlPlane {
     /// reaching back through intermediates.
     package let auditLedger: BASSovereignAuditLedger
     package let warrantTTL: TimeInterval
+
+    /// integration S3 — HMAC-SHA256 key for warrant + snapshot-proof tags. `package` so
+    /// the QinaoRuntime module's snapshot-proof issuance extension can reach it; never
+    /// exposed publicly.
+    package let tokenTagKey: SymmetricKey
+
+    /// integration S3 — injective token tag: each field is length-prefixed
+    /// (`<utf8len>:<field>`) then concatenated, so no field content can masquerade as a
+    /// boundary; the HMAC of the canonical string is hex-encoded. Dates enter via the
+    /// bit pattern of `timeIntervalSince1970` (lossless, locale-free).
+    package static func tokenCanonicalBytes(fields: [String]) -> Data {
+        Data(fields.map { "\($0.utf8.count):\($0)" }.joined().utf8)
+    }
+
+    package static func tokenTag(
+        key: SymmetricKey, fields: [String]
+    ) -> String {
+        Data(HMAC<SHA256>.authenticationCode(
+            for: tokenCanonicalBytes(fields: fields), using: key))
+            .map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// deep-audit MEDIUM-1 (2026-07-13): CONSTANT-TIME verification of a hex token tag
+    /// against the fields it should sign. Replaces a hex `String ==` (byte-by-byte MAC
+    /// timing oracle) — same accept/reject set, no side channel. nil/malformed hex fails.
+    package static func tokenTagValid(
+        key: SymmetricKey, fields: [String], hexTag: String
+    ) -> Bool {
+        guard let raw = hexToBytes(hexTag) else { return false }
+        return HMAC<SHA256>.isValidAuthenticationCode(
+            raw, authenticating: tokenCanonicalBytes(fields: fields), using: key)
+    }
+
+    package static func hexToBytes(_ hex: String) -> Data? {
+        guard hex.count % 2 == 0 else { return nil }
+        var out = Data(capacity: hex.count / 2)
+        var idx = hex.startIndex
+        while idx < hex.endIndex {
+            let next = hex.index(idx, offsetBy: 2)
+            guard let b = UInt8(hex[idx..<next], radix: 16) else { return nil }
+            out.append(b)
+            idx = next
+        }
+        return out
+    }
+
+    /// Canonical lossless textual form of a Date for token tags.
+    package static func tagDate(_ d: Date) -> String {
+        "t\(String(d.timeIntervalSince1970.bitPattern, radix: 16))"
+    }
     package let now: @Sendable () -> Date
     package var haltedSessions: Set<String> = []
     package var haltReasons: [String: String] = [:]
@@ -545,13 +651,18 @@ public actor QinaoSovereignControlPlane {
                 .defaultRenderFrameCapacity,
         processedTurnCapacity: Int =
             QinaoSovereignControlPlane
-                .defaultProcessedTurnCapacity
+                .defaultProcessedTurnCapacity,
+        // integration S3: HMAC key for warrant / snapshot-proof tags. Random default is
+        // sound for direct (test) construction — mint and verify happen on the same
+        // instance; bootstrap passes a host-stable key so tokens survive re-bootstrap.
+        tokenTagKey: SymmetricKey = SymmetricKey(size: .bits256)
     ) {
         self.coordinator = coordinator
         self.tokenAuthority = tokenAuthority
         self.turnVerifier = turnVerifier
         self.auditLedger = auditLedger
         self.warrantTTL = warrantTTLSeconds
+        self.tokenTagKey = tokenTagKey
         self.now = now
         // Clamp to ≥ 1; a zero/negative cap would make the
         // storage write-only.
@@ -608,7 +719,9 @@ public actor QinaoSovereignControlPlane {
     /// regular `Sendable`; the previous `@unchecked Sendable`
     /// was concurrency-checker bypass for no actual reason.
     public struct SubstrateHandle: Sendable {
-        internal let snapshotManager: BASSovereignSnapshotManager
+        // deep-audit P0-4: `package` (was internal) so same-package hosts/tests can seed snapshot
+        // anchors through the assembled host — the proof verify now requires a registered anchor.
+        package let snapshotManager: BASSovereignSnapshotManager
         internal let hostVersionTree: BASSovereignHostVersionTree
     }
 
@@ -678,7 +791,16 @@ public actor QinaoSovereignControlPlane {
             turnVerifier: verifier,
             auditLedger: ledger,
             warrantTTLSeconds: configuration.warrantTTLSeconds,
-            now: configuration.now)
+            now: configuration.now,
+            // integration S3: the previously-dead tokenSigningKey now keys the
+            // warrant/snapshot-proof HMAC tags; ledgerSigningSecret is the fallback so a
+            // single-secret host still gets signed tokens.
+            // deep-audit P1-6: HKDF-derive the warrant/proof key with its own domain label so it
+            // is cryptographically separated from the ledger key AND the permit key, even when a
+            // single-secret host falls back to the ledger secret.
+            tokenTagKey: QinaoSovereignControlPlane.deriveDomainKey(
+                configuration.tokenSigningKey ?? configuration.ledgerSigningSecret,
+                domain: "qinao.token.v1"))
         let handle = SubstrateHandle(
             snapshotManager: snapshotManager,
             hostVersionTree: versionTree)
@@ -813,6 +935,11 @@ public actor QinaoSovereignControlPlane {
 
     public func clearHalt(sessionID: String) {
         haltedSessions.remove(sessionID)
+        // audit F14 (2026-07-12): also drop the reason so haltReason's documented "nil when
+        // not halted" contract holds and a later halt in the same session can't inherit a
+        // stale attribution. (Production halts route through markSessionHalted which overwrites
+        // the reason, so this is contract/state hygiene, not a live-attribution bug.)
+        haltReasons.removeValue(forKey: sessionID)
     }
 
     /// Lightweight "mark this session halted" that does NOT produce
@@ -1013,21 +1140,49 @@ public actor QinaoSovereignControlPlane {
                 sessionID: intent.sessionID)
         }
         let issuedAt = now()
+        let warrantID = "wa-\(UUID().uuidString)"
+        let expiresAt = issuedAt.addingTimeInterval(warrantTTL)
+        // integration S3 (audit F2 discharge): HMAC-sign the fields at mint.
+        // P1-6(b): hostVersionID is now part of the signed material (host-version binding).
+        let signature = Self.tokenTag(
+            key: tokenTagKey,
+            fields: [
+                warrantID, intent.sessionID, intent.digest, intent.hostVersionID,
+                Self.tagDate(issuedAt), Self.tagDate(expiresAt),
+            ])
         return Warrant(
-            warrantID: "wa-\(UUID().uuidString)",
+            warrantID: warrantID,
             sessionID: intent.sessionID,
             intentDigest: intent.digest,
+            hostVersionID: intent.hostVersionID,
             issuedAt: issuedAt,
-            expiresAt: issuedAt.addingTimeInterval(warrantTTL))
+            expiresAt: expiresAt,
+            signature: signature)
     }
 
-    /// Verify a warrant is live for a given intent.
+    /// Verify a warrant is live for a given intent. integration S3 (audit F2 discharge):
+    /// the HMAC signature is verified FIRST — a warrant not minted by this control
+    /// plane's key fails closed regardless of its field values — then the field binding
+    /// (sessionID + intentDigest) and TTL.
     public func isWarrantValid(
         _ warrant: Warrant,
         for intent: Intent
     ) -> Bool {
+        // deep-audit MEDIUM-1: constant-time MAC verify (was hex String ==).
+        // P1-6(b): hostVersionID is part of the verified material AND re-checked against the
+        // presented intent — a warrant minted under another host version fails both the MAC
+        // (its tag was over a different hostVersionID) and the explicit binding below.
+        guard Self.tokenTagValid(
+            key: tokenTagKey,
+            fields: [
+                warrant.warrantID, warrant.sessionID, warrant.intentDigest, warrant.hostVersionID,
+                Self.tagDate(warrant.issuedAt), Self.tagDate(warrant.expiresAt),
+            ],
+            hexTag: warrant.signature)
+        else { return false }
         guard warrant.sessionID == intent.sessionID else { return false }
         guard warrant.intentDigest == intent.digest else { return false }
+        guard warrant.hostVersionID == intent.hostVersionID else { return false }
         guard warrant.expiresAt > now() else { return false }
         return true
     }
@@ -1563,6 +1718,14 @@ public actor QinaoSovereignControlPlane {
     /// implicated by a break at a given ID. In practice hosts
     /// will pass the currently-live sessions or the complete
     /// session set known to their scheduler.
+    ///
+    /// deep-audit sweep 2026-07-13: HOST-SITUATIONAL capability — no in-repo caller. This
+    /// chain-break recovery surface (with `ChainBreakRecoveryPolicy`) is offered to hosts that
+    /// run a scheduler which knows its live session set; the SDK's own runtime never invokes it
+    /// (the live integrity path is fail-closed reads + `isIntegrityQuarantined`). The
+    /// forward-conditional "In practice hosts will pass…" doc above describes that host
+    /// integration point, not a live SDK path. Legitimately host-situational (not the dormant
+    /// loaded-gun anti-pattern); flagged here so the absence of an in-repo caller is explicit.
     public func autoHealChainIntegrity(
         policy: ChainBreakRecoveryPolicy,
         affectedSessionIDs: [String]

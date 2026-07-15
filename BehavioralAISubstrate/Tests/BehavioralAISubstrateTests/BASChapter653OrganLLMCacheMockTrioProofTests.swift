@@ -13,21 +13,25 @@ final class BASChapter653OrganLLMCacheMockTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASLLMModelRouterErrorConformsToCodable() {
-        assertCodable(BASLLMModelRouterError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASLLMModelRouterError
+                .noAdapterRegisteredForClass(.small))
     }
 
     func testBASLLMPromptCacheOutcomeConformsToCodable() {
-        assertCodable(BASLLMPromptCacheOutcome.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(BASLLMPromptCacheOutcome.miss)
+        assertCodableRoundTrips(
+            BASLLMPromptCacheOutcome.partial(prefixHash: 0))
     }
 
     func testBASFoundationModelsMockResponseConformsToCodable() {
-        assertCodable(BASFoundationModelsMockResponse.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASFoundationModelsMockResponse.text(body: ""))
+        assertCodableRoundTrips(
+            BASFoundationModelsMockResponse.error(reason: ""))
     }
 }

@@ -43,7 +43,12 @@ extension AppleFoundationOrganAdapter: BASStreamingOrganAdapter {
         _ request: BASOrganRequest
     ) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            // audit H18: cancel the PRODUCER task on stream termination. The docstring above says
+            // "just cancel the enclosing task" — but cancelling the CONSUMER task only exits the
+            // consumer's for-await; the producer Task here is unstructured, so without
+            // onTermination it kept pumping FoundationModels to completion. This makes the
+            // documented cancellation actually true on the producer side too.
+            let task = Task {
                 guard
                     descriptor.supportedRoles.contains(request.role)
                 else {
@@ -54,12 +59,31 @@ extension AppleFoundationOrganAdapter: BASStreamingOrganAdapter {
                 }
 
                 #if canImport(FoundationModels)
-                if #available(iOS 26, macOS 26, visionOS 26, *) {
+                if #available(iOS 27, macOS 27, visionOS 27, *) {
                     do {
                         try await self.streamViaFoundation(
                             request: request,
                             continuation: continuation)
                         continuation.finish()
+                    } catch is CancellationError {
+                        // Never mapped: the endpoint cancels this pump when the consumer
+                        // breaks. Mapping it would let a router re-run the whole
+                        // generation after the caller already walked away.
+                        continuation.finish(throwing: CancellationError())
+                    } catch let sys as SystemLanguageModel.Error {
+                        // The assets/cold-cache class lives in a DIFFERENT enum from
+                        // LanguageModelError and is the most common real AFM failure —
+                        // omitting it would leave the streaming contract a half-truth.
+                        continuation.finish(
+                            throwing: AppleFoundationOrganAdapter.organError(for: sys))
+                    } catch let afm as LanguageModelError {
+                        // Same contract as draft(): `session.streamResponse` throws the
+                        // identical raw set, so leaving this arm untranslated would make
+                        // the draft-path mapping a half-truth. organError(for:) returns nil
+                        // for the SAFETY-REFUSAL class, which is finished RAW so no router
+                        // can launder it onto a second model.
+                        continuation.finish(
+                            throwing: AppleFoundationOrganAdapter.organError(for: afm) ?? afm)
                     } catch {
                         continuation.finish(throwing: error)
                     }
@@ -78,11 +102,12 @@ extension AppleFoundationOrganAdapter: BASStreamingOrganAdapter {
                             "unavailable in this build"))
                 #endif
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 
     #if canImport(FoundationModels)
-    @available(iOS 26, macOS 26, visionOS 26, *)
+    @available(iOS 27, macOS 27, visionOS 27, *)
     private nonisolated func streamViaFoundation(
         request: BASOrganRequest,
         continuation: AsyncThrowingStream<

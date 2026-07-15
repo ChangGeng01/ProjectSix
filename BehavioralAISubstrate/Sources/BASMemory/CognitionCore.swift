@@ -865,12 +865,9 @@ public enum BASDecisionBrainCompiler {
             if let indices = BASAutoRouteRanker
                 .dreamLoopDominanceOrderDouble(scores: scoreValues) {
                 return indices.map { idx -> CompilerItem in
-                    let i = Int(idx)
-                    precondition(i >= 0 && i < allItems.count,
-                        "Rust dominance_order_f64 returned " +
-                        "out-of-bounds index \(i) for n=" +
-                        "\(allItems.count)")
-                    return allItems[i]
+                    // audit orchestration MED-2: wrapper-validated permutation ⇒ index in range;
+                    // a corrupt FFI return fell back to the Swift `.sorted` path (nil wrapper).
+                    return allItems[Int(idx)]
                 }
             }
             // Swift legacy fallback (V1 implementation,kept active

@@ -113,7 +113,9 @@ extension QinaoMemory {
             self.sourceMemoryID = sourceMemoryID
             self.generalizedSkeleton = generalizedSkeleton
             self.domain = domain
-            self.confidence = min(max(confidence, 0), 1)
+            // deep-audit P0-5 (2026-07-13): a NaN confidence must fail closed to 0.0 (least
+            // trusted) rather than pass through as NaN and defeat every downstream floor check.
+            self.confidence = confidence.isNaN ? 0 : min(max(confidence, 0), 1)
             self.sensitivity = sensitivity
         }
     }
@@ -274,11 +276,20 @@ public actor QinaoLearningExporter {
         }
 
         // Stage C: sovereignSafe — runs last so AB rejections don't
-        // burn warrant TTL on candidates that can't ship anyway. We
-        // collect one approval per candidate (in input order) and
-        // verify *all* are present before minting.
+        // burn warrant TTL on candidates that can't ship anyway.
+        //
+        // deep-audit P1-13 (2026-07-13): the comment above described a SKIP that the code
+        // never implemented — Stage C used to call `approver` for EVERY candidate, including
+        // ones already rejected by Stage A (PII) or Stage B (privacy boundary). The shipped
+        // bridge mints a warrant per approver call, and a host may install a side-effectful
+        // approver (e.g. a user-consent prompt), which must not fire for candidates that can't
+        // ship. We now skip any candidate already rejected by A/B. The 'all rejections in one
+        // shot' contract is preserved: A/B rejections still surface below, and when there are
+        // NO A/B rejections the skip set is empty so Stage C behaves exactly as before.
+        let abRejectedSourceIDs = Set(rejections.map { $0.sourceMemoryID })
         var approvals: [String] = []
         for candidate in candidates {
+            if abRejectedSourceIDs.contains(candidate.sourceMemoryID) { continue }
             if let token = try await approver(candidate),
                 !token.isEmpty
             {
@@ -301,20 +312,27 @@ public actor QinaoLearningExporter {
         // token — the concatenated-and-hashed form — so a downstream
         // consumer that wants to re-verify individual approvals can
         // ask the issuer for each one independently.
+        //
+        // audit F7 (2026-07-12): contentHash stays the DEDUP key over (skeleton, domain) —
+        // source-ID-free by design — but framed with the injective length-prefix encoder so
+        // a "|" inside a skeleton can't collide with a field boundary. The bundleDigest now
+        // binds the FULL entry INCLUDING confidence (canonical encode of skeleton, domain,
+        // confidence), so a transmitted confidence flip (0.1→0.9) changes the digest — before
+        // this it left the digest byte-identical.
         let entries = candidates.map { c in
             QinaoMemory.LearningExportEntry(
                 contentHash: Self.hash(
-                    c.generalizedSkeleton + "|" + c.domain),
+                    Self.canonicalJoin([c.generalizedSkeleton, c.domain])),
                 generalizedSkeleton: c.generalizedSkeleton,
                 domain: c.domain,
                 confidence: c.confidence)
         }
         let producedAt = now()
-        let approvalToken = Self.hash(approvals.joined(separator: "|"))
-        let digest = Self.hash(
-            entries.map { $0.contentHash }.joined(separator: "|")
-                + "|\(producedAt.timeIntervalSince1970)"
-                + "|\(approvalToken)")
+        let approvalToken = Self.hash(Self.canonicalJoin(approvals))
+        let digest = Self.hash(Self.canonicalJoin(
+            entries.map { Self.canonicalJoin([
+                $0.generalizedSkeleton, $0.domain, Self.canonicalConfidence($0.confidence)]) }
+            + ["\(producedAt.timeIntervalSince1970)", approvalToken]))
 
         return QinaoMemory.LearningExportBundle(
             entries: entries,
@@ -345,5 +363,23 @@ public actor QinaoLearningExporter {
     private static func hash(_ s: String) -> String {
         let digest = SHA256.hash(data: Data(s.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// audit F7: INJECTIVE join. Each field is prefixed with its UTF-8 BYTE length and a
+    /// colon (`<len>:<bytes>`), then concatenated — so no field's content (including any "|"
+    /// or ":" or embedded delimiter) can be mistaken for a boundary. `["a|b","c"]` and
+    /// `["a","b|c"]` now hash differently, closing the collision the raw "|"-join allowed.
+    ///
+    /// deep-audit P1-13 (2026-07-13): widened to `public` so the SDK's warrant bridge
+    /// (`QinaoSovereignLearningExportBridge.candidateIntentDigest`) can reuse the SAME
+    /// injective encoding instead of its own raw "|"-join (which had the collision this closes).
+    public static func canonicalJoin(_ fields: [String]) -> String {
+        fields.map { "\($0.utf8.count):\($0)" }.joined()
+    }
+
+    /// Canonical, lossless textual form of a confidence so the digest is deterministic across
+    /// platforms (bitPattern hex avoids locale/precision drift).
+    static func canonicalConfidence(_ x: Double) -> String {
+        "cf\(String(x.bitPattern, radix: 16))"
     }
 }

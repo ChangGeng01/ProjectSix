@@ -35,18 +35,21 @@ final class BASChapter620HostKitPostMeshSweepProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testHostStorageWireErrorConformsToCodable() {
-        assertCodable(BASHostStorageWireError.self)
+        // #18: real round-trip (non-CaseIterable enum, both cases)
+        assertCodableRoundTrips(
+            BASHostStorageWireError.missingSQLiteURL(component: ""))
+        assertCodableRoundTrips(
+            BASHostStorageWireError
+                .storageInitFailed(component: "", message: ""))
     }
 
     func testShadowPermitUpgradeDecisionConformsToCodable() {
-        assertCodable(
-            BASShadowPermitUpgradeDecision.self)
+        // #18: real round-trip. Only .noChange is round-tripped: the
+        // .escalate case's associated BASActionPermitMode lives in
+        // BASPolicy (not imported here), so the noChange case is the
+        // representative one exercisable from BASHostKit alone.
+        assertCodableRoundTrips(
+            BASShadowPermitUpgradeDecision.noChange)
     }
 }

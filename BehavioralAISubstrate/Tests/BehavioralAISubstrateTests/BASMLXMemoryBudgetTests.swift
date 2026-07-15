@@ -111,13 +111,13 @@ final class BASMLXMemoryBudgetTests: XCTestCase {
     func testWouldExceedActiveHardCapRefusesE4BAdmitsSurvivors() {
         // Under the measured iPhone Air cap (~3376 MB): E4B refused, the measured survivors admitted.
         XCTAssertTrue(
-            BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e4b.it.4bit"),
+            BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e4b.it.4bit", capBytes: BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes),
             "E4B (4314+128 MB) crosses the ~3376 MB cap -> refuse (it jetsam'd twice at load)")
         XCTAssertFalse(
-            BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e2b.it.4bit"),
+            BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e2b.it.4bit", capBytes: BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes),
             "E2B (3114+128 MB) fits under the cap -> admit (survived with 261 MB headroom)")
         XCTAssertFalse(
-            BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.llama3_2.3b.it.4bit"),
+            BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.llama3_2.3b.it.4bit", capBytes: BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes),
             "Llama-3B (2969+128 MB) fits -> admit (sustained 38.3 tok/s over 10h)")
         XCTAssertFalse(
             BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.unknown.model"),
@@ -132,10 +132,14 @@ final class BASMLXMemoryBudgetTests: XCTestCase {
     }
 
     func testRecommendedDefaultIsE2BOnConstrainedIPhoneAirElseE4B() {
+        // tests-arch ④ device-robust (2026-07-11): pin the CONSTRAINED-cap logic with an EXPLICIT
+        // cap. The no-arg default now resolves to the entitlement-aware LIVE cap (缝7), so on the
+        // real entitled iPhone Air (~6.29 GB) recommendedDefault() correctly returns E4B — the
+        // "constrained ⇒ E2B" premise only holds against the measured constrained cap this asserts.
         XCTAssertEqual(
-            MLXModelCatalog.recommendedDefault(),
+            MLXModelCatalog.recommendedDefault(forActiveHardCapBytes: BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes),
             MLXModelCatalog.gemma4_E2B_4bit,
-            "at the measured iPhone Air cap, the recommended default is E2B (E4B jetsams)")
+            "at the measured (constrained) iPhone Air cap, the recommended default is E2B (E4B jetsams)")
         XCTAssertEqual(
             MLXModelCatalog.recommendedDefault(forActiveHardCapBytes: 8_000 * mib),
             MLXModelCatalog.gemma4_E4B_4bit,

@@ -88,11 +88,24 @@ pub fn batch_score_top_k(
             benefits[i], costs[i]);
         (i as i32, s)
     }).collect();
-    // Sort descending by score;stable to keep
-    // earlier indices on ties
+    // Sort descending by score;stable to keep earlier indices on
+    // ties. NaN sorts to the END (mirrors dominance_order_indices_f64).
+    // blindspot MED id22: the old `unwrap_or(Ordering::Equal)` made a
+    // NaN score compare-equal to everything — an invalid weak ordering
+    // that let a NaN composite land anywhere in top-K (incl. the top).
     scores.sort_by(|a, b| {
-        b.1.partial_cmp(&a.1)
-            .unwrap_or(std::cmp::Ordering::Equal)
+        match b.1.partial_cmp(&a.1) {
+            Some(o) => o,
+            None => {
+                if a.1.is_nan() && !b.1.is_nan() {
+                    std::cmp::Ordering::Greater
+                } else if !a.1.is_nan() && b.1.is_nan() {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            }
+        }
     });
     let limit = k.min(scores.len());
     scores.into_iter().take(limit)
@@ -583,6 +596,28 @@ mod tests {
             &q, &cands, &benefits, &costs, 3);
         assert_eq!(top[0], 5,
             "index 5 should top the list");
+    }
+
+    #[test]
+    fn batch_top_k_sinks_nan_composite() {
+        // blindspot MED id22: a NaN composite score (here via a NaN
+        // benefit on candidate 0) must sink to the END and NOT appear
+        // in the top-K. Index 5 is the finite winner.
+        let q: Vec<f32> = vec![1.0, 0.0, 0.0];
+        let mut cands = make_candidates(10, 3);
+        cands[5] = vec![1.0, 0.0, 0.0];  // finite winner
+        let mut benefits = vec![0.5; 10];
+        benefits[5] = 0.9;
+        benefits[0] = f64::NAN;          // candidate 0 → NaN composite
+        let costs = vec![0.1; 10];
+        let top = batch_score_top_k(
+            &q, &cands, &benefits, &costs, 3);
+        assert!(!top.contains(&0),
+            "NaN-scored candidate must not appear in top-K; got {:?}",
+            top);
+        assert_eq!(top[0], 5,
+            "the finite highest-composite candidate must lead; got {:?}",
+            top);
     }
 
     #[test]

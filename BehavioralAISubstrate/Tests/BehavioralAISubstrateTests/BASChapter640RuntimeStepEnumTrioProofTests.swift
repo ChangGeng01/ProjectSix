@@ -44,23 +44,21 @@ final class BASChapter640RuntimeStepEnumTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASEventReplayRangeConformsToCodable() {
-        assertCodable(BASEventReplayRange.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASEventReplayRange.singleSession(sessionID: ""))
     }
 
     func testBASToolCallingPlanStepConformsToCodable() {
-        assertCodable(BASToolCallingPlanStep.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASToolCallingPlanStep.failed(reason: ""))
     }
 
     func testBASShadowTrialCoordinatorFinalizeOutcomeConformsToCodable() {
-        assertCodable(
-            BASShadowTrialCoordinator
-                .FinalizeOutcome.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASShadowTrialCoordinator.FinalizeOutcome.passed)
     }
 }

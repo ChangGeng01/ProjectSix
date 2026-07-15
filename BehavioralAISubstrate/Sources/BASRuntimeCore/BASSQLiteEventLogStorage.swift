@@ -110,8 +110,17 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     /// the payload_format column。
     public static let schemaVersion: Int = 2
 
+    // deep-audit runtimecore-b LOW #8 (2026-07-13): the three `nonisolated(unsafe) static var`
+    // flags below are SET-ONCE CONFIGURATION — a host sets them BEFORE the first store opens, and
+    // they are not mutated at runtime thereafter. Each is snapshotted into instance state at init
+    // (append() reads the instance copies, not these globals), so the only-dangerous combination
+    // (a torn binary-payload + integrity-chain pairing) is structurally impossible. The remaining
+    // exposure is a purely formal data race on set-before-init config; a lock on this per-open read
+    // path would add overhead for no real safety, so the contract is documented rather than locked.
+    // If a host ever needs to flip these at runtime, that use is unsupported without adding a lock.
+
     /// 先稳 P2 — OPT-IN (default off): run `PRAGMA integrity_check` at open + throw if corrupt. Off by
-    /// default (full-DB scan ⇒ boot latency). Static so a host can enable it before init.
+    /// default (full-DB scan ⇒ boot latency). SET-ONCE before first init (see note above).
     public nonisolated(unsafe) static var runIntegrityCheckOnOpen: Bool = false
 
     /// chapter 七百三十二 第三刀 — opt-in feature flag controlling
@@ -181,6 +190,15 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         // append. Mirrors BASSovereignLedgerStorage.
         try Self.runExec(db: handle, sql: "PRAGMA busy_timeout=5000;")
         try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete zeroes freed pages
+        // at delete time — default-on, BAS_SECURE_DELETE=0 kill-switch.
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            try Self.runExec(db: handle, sql: sdSQL)
+        }
+        // memory-a F4 residual: one-time legacy freelist purge (secure_delete only
+        // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
+        // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
         // M891 fix (post-deep-audit):tighter auto-checkpoint to
@@ -269,6 +287,14 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         // max+1 per session) ⇒ byte-equal with the in-memory store + the parity suites. On any error the
         // txn is rolled back so a failed append never leaves a half-open transaction (which would make the
         // NEXT append's BEGIN IMMEDIATE fail). Mirrors BASSQLiteAtomLifecycleStore's txn idiom.
+        //
+        // audit runtimecore-b #8: snapshot the process-global feature flags ONCE per append. insertEntry
+        // reads (useBinaryPayload && !rowIntegrityChainEnabled) and the chain-row decision below reads
+        // rowIntegrityChainEnabled AGAIN — a concurrent flip between the two reads could write a BINARY
+        // payload row (chain-off path) AND a chain row (chain-on path), which the binary path is meant to
+        // exclude. Threading one snapshot makes a single append internally consistent.
+        let useBinarySnapshot = Self.useBinaryPayload
+        let chainOn = Self.rowIntegrityChainEnabled
         try Self.runExec(db: db, sql: "BEGIN IMMEDIATE;")
         do {
             // Idempotent retry: if event_id exists, return its sequenceNumber + wasNew=false.
@@ -302,9 +328,16 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 actions: entry.actions,
                 confidence: entry.confidence,
                 payloadJson: entry.payloadJson)
-            try Self.insertEntry(db: db, entry: stamped)
-            // ADR-040 — when enabled, record this row's chained hash in the SAME txn (atomic with the event row).
-            if Self.rowIntegrityChainEnabled {
+            try Self.insertEntry(
+                db: db, entry: stamped,
+                useBinaryPayload: useBinarySnapshot, chainEnabled: chainOn)
+            // audit runtimecore-b MED-2: advance the never-pruned seq high-water
+            // mark in the SAME txn, so a later full prune can't reset the sequence.
+            try Self.bumpSequenceHighWaterMark(
+                db: db, sessionID: entry.sessionID, seq: assigned)
+            // ADR-040 — when enabled, record this row's chained hash in the SAME txn (atomic with the event
+            // row). Uses the per-append snapshot (audit runtimecore-b #8), NOT a fresh flag read.
+            if chainOn {
                 try self.appendIntegrityRow(db: db, entry: stamped)
             }
             try Self.runExec(db: db, sql: "COMMIT;")
@@ -617,8 +650,12 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 code: -1,
                 message: "db handle nil after init")
         }
-        return try Self.pruneBefore(
-            db: db, cutoff: cutoff)
+        let pruned = try Self.pruneBefore(db: db, cutoff: cutoff)
+        // deep-audit P2-18 (2026-07-13): a retention prune's deleted event payloads live on as the
+        // original INSERT frames in the -wal until a checkpoint truncates it. Truncate now (post-
+        // COMMIT, non-hot retention path) so a forensic reader of the sidecar can't recover them.
+        try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
+        return pruned
     }
 
     fileprivate static func pruneBefore(
@@ -713,6 +750,21 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             CREATE INDEX IF NOT EXISTS
                 event_log_kind_idx
                 ON event_log(kind);
+            """)
+        // audit runtimecore-b MED-2: a per-session monotonic sequence high-water
+        // mark that SURVIVES pruning. `nextSequenceNumber` derived the next seq
+        // from SURVIVING rows only, so a whole-session prune reset it to 0 —
+        // colliding with already-exported (session_id, seq) keys downstream. This
+        // table is NEVER pruned (pruneBefore only deletes event_log + the
+        // integrity sidecar), so the seq stays monotone for the DB's lifetime.
+        // Migration note: existing sessions seed the hwm on their next append; a
+        // session pruned-to-empty BEFORE this upgrade can still reset once (its
+        // pre-upgrade max is unrecoverable) — the fix prevents all FUTURE resets.
+        try runExec(db: db, sql: """
+            CREATE TABLE IF NOT EXISTS event_log_seq_hwm (
+                session_id TEXT PRIMARY KEY NOT NULL,
+                max_seq INTEGER NOT NULL
+            );
             """)
         // chapter 七百三十二 第一刀 — lazy ALTER TABLE migration
         // for v2 columns。 PRAGMA-checked first so we don't try
@@ -815,9 +867,18 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
 
     // MARK: - CRUD primitives
 
+    /// audit runtimecore-b #8 — pure decision: write a binary payload ONLY when the binary format is
+    /// on AND the integrity chain is off (a chained row forces the faithful JSON path so the hash
+    /// domain is unambiguous). Internal for testability.
+    static func shouldWriteBinaryPayload(useBinaryPayload: Bool, chainEnabled: Bool) -> Bool {
+        useBinaryPayload && !chainEnabled
+    }
+
     fileprivate static func insertEntry(
         db: OpaquePointer,
-        entry: BASEventLogEntry
+        entry: BASEventLogEntry,
+        useBinaryPayload: Bool,
+        chainEnabled: Bool
     ) throws {
         // chapter 七百三十二 第三刀 — dual-format insert。 Selects
         // JSON v1 (legacy) or binary v2 path based on the
@@ -848,7 +909,9 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         // (computed over the in-memory entry at append) matches the re-decoded entry at verify. JSON stores the
         // full entry verbatim, so its decode→encode round-trip is exact. (Belt-and-suspenders even though the
         // v2 envelope below is now faithful too — this keeps the canonical hash domain unambiguous.)
-        let useBinary = useBinaryPayload && !rowIntegrityChainEnabled
+        // audit runtimecore-b #8: use the per-append snapshot params, not a fresh static-flag read.
+        let useBinary = shouldWriteBinaryPayload(
+            useBinaryPayload: useBinaryPayload, chainEnabled: chainEnabled)
         var payloadJson: String = ""
         var payloadBlob: Data? = nil
         var format: Int32 = 1
@@ -943,6 +1006,11 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         // action code can't corrupt the list, unlike the legacy comma-joined memoryRefs.)
         let actionsJson = (try? JSONEncoder().encode(entry.actions))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        // audit runtimecore-b MED-5: JSON-encode memoryRefs too — the legacy
+        // comma-join corrupted any ref CONTAINING a comma on round-trip (split
+        // into wrong pieces). Same delimiter-safe pattern as actions.
+        let memoryRefsJson = (try? JSONEncoder().encode(entry.memoryRefs))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         let payloadEnvelope: [String: String] = [
             "riskBand":       entry.riskBand.rawValue,
             "source":         entry.source ?? "",
@@ -950,7 +1018,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             "intent":         entry.intent ?? "",
             "emotion":        entry.emotion ?? "",
             "project":        entry.project ?? "",
-            "memoryRefs":     entry.memoryRefs.joined(separator: ","),
+            "memoryRefs":     memoryRefsJson,
             "stateBeforeID":  entry.stateBeforeID ?? "",
             "stateAfterID":   entry.stateAfterID ?? "",
             "confidence":     String(entry.confidence),
@@ -976,6 +1044,22 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         return try? BASEventLogBinaryCodec.encode(
             binaryEntry)
     }
+
+    /// audit runtimecore-b MED-5: decode the v2 payload envelope, THROWING on a
+    /// corrupt payload instead of silently returning nil (which stripped EVERY
+    /// field to its default — corruption read as an empty-but-valid entry).
+    /// Internal for @testable exercise of the corrupt path.
+    static func decodePayloadEnvelope(_ payloadJson: String) throws -> [String: String] {
+        guard let data = payloadJson.data(using: .utf8) else {
+            throw StorageError.decodeFailed(
+                eventID: "envelope", message: "payload envelope not UTF-8")
+        }
+        return try JSONDecoder().decode([String: String].self, from: data)
+    }
+
+    /// Surfaced when a v2 binary payload envelope fails to decode (was a silent
+    /// all-default entry — the corrupt==empty fail-open). nil ⇒ unobserved.
+    nonisolated(unsafe) static var _onBinaryDecodeFailure: (@Sendable (Error) -> Void)?
 
     /// chapter 七百三十二 第二刀 — inverse of encodeEntryAsBinary。
     /// Decodes a v=2 binary blob back to BASEventLogEntry。
@@ -1006,38 +1090,47 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         var payloadJson: String? = nil
         var confidence: Double = 0
         var actions: [String] = []
-        if let payloadStr = binary.payloadJson,
-           let payloadData = payloadStr.data(using: .utf8),
-           let env = try? JSONDecoder().decode(
-            [String: String].self, from: payloadData)
-        {
-            if let rb = env["riskBand"],
-               let parsed = BASEventLogRiskBand(rawValue: rb)
-            { riskBand = parsed }
-            source         = env["source"].flatMap {
-                $0.isEmpty ? nil : $0 }
-            rawInputDigest = env["rawInputDigest"].flatMap {
-                $0.isEmpty ? nil : $0 }
-            intent         = env["intent"].flatMap {
-                $0.isEmpty ? nil : $0 }
-            emotion        = env["emotion"].flatMap {
-                $0.isEmpty ? nil : $0 }
-            project        = env["project"].flatMap {
-                $0.isEmpty ? nil : $0 }
-            if let refs = env["memoryRefs"],
-               !refs.isEmpty
-            {
-                memoryRefs = refs.split(separator: ",")
-                    .map { String($0) }
-            }
-            // ADR-040 durability fix — recover the formerly-dropped fields (faithful round-trip).
-            stateBeforeID = env["stateBeforeID"].flatMap { $0.isEmpty ? nil : $0 }
-            stateAfterID  = env["stateAfterID"].flatMap { $0.isEmpty ? nil : $0 }
-            payloadJson   = env["payloadJson"].flatMap { $0.isEmpty ? nil : $0 }
-            if let c = env["confidence"].flatMap({ Double($0) }) { confidence = c }
-            if let a = env["actions"], let aData = a.data(using: .utf8),
-               let parsed = try? JSONDecoder().decode([String].self, from: aData) {
-                actions = parsed
+        // audit runtimecore-b MED-5: decode the envelope with do/catch — a
+        // CORRUPT payload used to `try?` to nil and silently leave EVERY field at
+        // its default (corruption read as an empty-but-valid entry). Now the
+        // failure is SURFACED via _onBinaryDecodeFailure instead of swallowed.
+        if let payloadStr = binary.payloadJson {
+            do {
+                let env = try decodePayloadEnvelope(payloadStr)
+                if let rb = env["riskBand"],
+                   let parsed = BASEventLogRiskBand(rawValue: rb)
+                { riskBand = parsed }
+                source         = env["source"].flatMap {
+                    $0.isEmpty ? nil : $0 }
+                rawInputDigest = env["rawInputDigest"].flatMap {
+                    $0.isEmpty ? nil : $0 }
+                intent         = env["intent"].flatMap {
+                    $0.isEmpty ? nil : $0 }
+                emotion        = env["emotion"].flatMap {
+                    $0.isEmpty ? nil : $0 }
+                project        = env["project"].flatMap {
+                    $0.isEmpty ? nil : $0 }
+                if let refs = env["memoryRefs"], !refs.isEmpty {
+                    // audit runtimecore-b MED-5: JSON array (delimiter-safe);
+                    // fall back to the legacy comma-split for pre-fix rows.
+                    if let d = refs.data(using: .utf8),
+                       let parsed = try? JSONDecoder().decode([String].self, from: d) {
+                        memoryRefs = parsed
+                    } else {
+                        memoryRefs = refs.split(separator: ",").map { String($0) }
+                    }
+                }
+                // ADR-040 durability fix — recover the formerly-dropped fields (faithful round-trip).
+                stateBeforeID = env["stateBeforeID"].flatMap { $0.isEmpty ? nil : $0 }
+                stateAfterID  = env["stateAfterID"].flatMap { $0.isEmpty ? nil : $0 }
+                payloadJson   = env["payloadJson"].flatMap { $0.isEmpty ? nil : $0 }
+                if let c = env["confidence"].flatMap({ Double($0) }) { confidence = c }
+                if let a = env["actions"], let aData = a.data(using: .utf8),
+                   let parsed = try? JSONDecoder().decode([String].self, from: aData) {
+                    actions = parsed
+                }
+            } catch {
+                _onBinaryDecodeFailure?(error)
             }
         }
         let kindParsed: BASEventLogKind =
@@ -1137,9 +1230,17 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         db: OpaquePointer,
         sessionID: String
     ) throws -> Int64 {
+        // audit runtimecore-b MED-2: the next seq is the max of the SURVIVING
+        // rows' max AND the never-pruned high-water mark — so a whole-session
+        // prune can never reset the sequence and collide with exported keys.
         let sql = """
-            SELECT COALESCE(MAX(sequence_number), -1) FROM
-            event_log WHERE session_id = ?
+            SELECT MAX(v) FROM (
+                SELECT COALESCE(MAX(sequence_number), -1) AS v
+                    FROM event_log WHERE session_id = ?
+                UNION ALL
+                SELECT COALESCE(MAX(max_seq), -1) AS v
+                    FROM event_log_seq_hwm WHERE session_id = ?
+            )
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
@@ -1152,6 +1253,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         }
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, sessionID)
+        bindText(stmt, 2, sessionID)
         guard sqlite3_step(stmt) == SQLITE_ROW else {
             throw StorageError.stepFailed(
                 sql: sql,
@@ -1159,6 +1261,30 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         }
         let max = sqlite3_column_int64(stmt, 0)
         return max + 1
+    }
+
+    /// audit runtimecore-b MED-2: bump the per-session sequence high-water mark
+    /// (called INSIDE the append txn, atomic with the row insert). Monotone —
+    /// `MAX(existing, new)` — and never decremented, so pruning can't reset it.
+    fileprivate static func bumpSequenceHighWaterMark(
+        db: OpaquePointer, sessionID: String, seq: Int64
+    ) throws {
+        let sql = """
+            INSERT INTO event_log_seq_hwm (session_id, max_seq) VALUES (?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET max_seq = MAX(max_seq, excluded.max_seq)
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw StorageError.prepareFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, sessionID)
+        sqlite3_bind_int64(stmt, 2, seq)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
     }
 
     fileprivate static func fetchEventsForSession(

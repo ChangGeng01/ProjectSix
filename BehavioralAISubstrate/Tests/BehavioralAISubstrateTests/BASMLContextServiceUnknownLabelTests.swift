@@ -15,7 +15,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASRuntimeCore
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASMLContextServiceUnknownLabelTests:
     XCTestCase
 {
@@ -63,45 +62,63 @@ final class BASMLContextServiceUnknownLabelTests:
         }
     }
 
-    // MARK: - Mock adapter exercises the fallback
+    // MARK: - Prod mapLabel: the unknown-label branch (REAL)
 
-    /// Mock adapter that returns a label outside the
-    /// 7-class set。 Used to exercise the unknown-label
-    /// path without needing to deliberately corrupt the
-    /// real .mlmodel file。
-    private final class MockUnknownLabelAdapter:
-        BASContextServicing, @unchecked Sendable
-    {
-        let unknownLabel: String
+    // NOTE (2026-07-10 test↔prod re-verify): this file previously
+    // defined a `MockUnknownLabelAdapter` that (a) was never
+    // instantiated by ANY test — dead code — and (b) even if used,
+    // conformed to the wrong seam (BASContextServicing, not the ML
+    // adapter) and FABRICATED the hint string directly instead of
+    // routing through prod. So the audit-hint branch it claimed to pin
+    // had ZERO coverage. Replaced with tests that call the real prod
+    // `BASMLContextService.mapLabel` (now internal static) — the exact
+    // function whose `default:` case builds the hint.
 
-        init(unknownLabel: String) {
-            self.unknownLabel = unknownLabel
-        }
-
-        func analyzeContext(
-            userInput: String,
-            hostContext: BASHostProfile,
-            budget: BASBudgetFrame
-        ) -> BASContextFrame {
-            // Simulate what BASMLContextService would
-            // emit if the adapter returned the unknown
-            // label。 Direct construction here to keep
-            // this test self-contained。
-            let hintPrefix = BASMLContextService
-                .Placeholders
+    func testUnknownLabelMapsToChatWithRealAuditHint() {
+        // The prod branch under test: an ML label outside the 7-class
+        // set must fall back to .chat AND surface a typed audit hint —
+        // NOT silently degrade (the old "deferred" TODO).
+        let (taskType, hint) =
+            BASMLContextService.mapLabel("nonsense_label_v999")
+        XCTAssertEqual(taskType, .chat,
+            "unknown label must fall back to .chat")
+        XCTAssertEqual(
+            hint,
+            BASMLContextService.Placeholders
                 .classifierUnknownLabelHintPrefix
-            return BASContextFrame(
-                utterance: userInput,
-                taskType: .chat,
-                emotionalLoad: 0.0,
-                timePressure: 0.0,
-                relationPattern: "neutral",
-                ambiguityScore: 1.0,
-                consequenceLevel: 0.0,
-                manipulationHints: [
-                    hintPrefix + unknownLabel
-                ],
-                hostRelevance: 0.5)
+                + "nonsense_label_v999",
+            "unknown label must emit the typed audit hint from prod")
+    }
+
+    func testEmptyLabelAlsoSurfacesAuditHint() {
+        // Degenerate empty label is still "unknown" — must hint, not
+        // silently pass as a valid class.
+        let (taskType, hint) = BASMLContextService.mapLabel("")
+        XCTAssertEqual(taskType, .chat)
+        XCTAssertEqual(
+            hint,
+            BASMLContextService.Placeholders
+                .classifierUnknownLabelHintPrefix)
+    }
+
+    func testAllSevenValidLabelsMapWithNoHint() {
+        // The 7 pinned classes map to their typed taskType with NO
+        // audit hint. Drives the real prod switch, not the model.
+        let expected: [(String, BASContextTaskType)] = [
+            ("chat", .chat),
+            ("task", .task),
+            ("choice", .choice),
+            ("conflict", .conflict),
+            ("highPressure", .highPressure),
+            ("manipulationRisk", .manipulationRisk),
+            ("highConsequence", .highConsequence),
+        ]
+        for (label, type) in expected {
+            let (mapped, hint) = BASMLContextService.mapLabel(label)
+            XCTAssertEqual(mapped, type,
+                "valid label '\(label)' must map to \(type)")
+            XCTAssertNil(hint,
+                "valid label '\(label)' must NOT emit an audit hint")
         }
     }
 
@@ -124,4 +141,3 @@ final class BASMLContextServiceUnknownLabelTests:
             "Hint suffix must equal the label name")
     }
 }
-#endif

@@ -57,8 +57,8 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
 
     // MARK: - .inMemoryDefault → in-memory store
 
-    func testLegacyInMemoryProducesInMemoryStore() throws {
-        let store = try BASHostStorageWireBuilder.makeAtomStore(
+    func testLegacyInMemoryProducesInMemoryStore() async throws {
+        let store = try await BASHostStorageWireBuilder.makeAtomStore(
             options: .legacyInMemory)
         XCTAssertTrue(
             store is BASInMemoryMemoryAtomStore,
@@ -66,13 +66,13 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
             "store, even if URLs were provided")
     }
 
-    func testLegacyInMemoryIgnoresProvidedURL() throws {
+    func testLegacyInMemoryIgnoresProvidedURL() async throws {
         let url = tempRoot.appendingPathComponent(
             "should-not-be-created.sqlite")
         let options = BASHostStorageOptions(
             preference: .inMemoryDefault,
             atomStoreURL: url)
-        let store = try BASHostStorageWireBuilder.makeAtomStore(
+        let store = try await BASHostStorageWireBuilder.makeAtomStore(
             options: options)
         XCTAssertTrue(
             store is BASInMemoryMemoryAtomStore,
@@ -87,13 +87,13 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
 
     // MARK: - .sqliteWhenURLProvided
 
-    func testSQLiteWhenURLProvidedWithURLProducesSQLite() throws {
+    func testSQLiteWhenURLProvidedWithURLProducesSQLite() async throws {
         let url = tempRoot.appendingPathComponent(
             "atoms.sqlite")
         let options = BASHostStorageOptions(
             preference: .sqliteWhenURLProvided,
             atomStoreURL: url)
-        let store = try BASHostStorageWireBuilder.makeAtomStore(
+        let store = try await BASHostStorageWireBuilder.makeAtomStore(
             options: options)
         XCTAssertTrue(
             store is BASSQLiteMemoryAtomStore,
@@ -105,12 +105,12 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
     }
 
     func testSQLiteWhenURLProvidedWithoutURLFallsBackToInMemory()
-        throws
+        async throws
     {
         let options = BASHostStorageOptions(
             preference: .sqliteWhenURLProvided,
             atomStoreURL: nil)
-        let store = try BASHostStorageWireBuilder.makeAtomStore(
+        let store = try await BASHostStorageWireBuilder.makeAtomStore(
             options: options)
         XCTAssertTrue(
             store is BASInMemoryMemoryAtomStore,
@@ -118,11 +118,11 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
             "to in-memory (graceful degradation, not throw)")
     }
 
-    func testSQLiteWhenURLProvidedWithUnifiedRoot() throws {
+    func testSQLiteWhenURLProvidedWithUnifiedRoot() async throws {
         let options = BASHostStorageOptions(
             preference: .sqliteWhenURLProvided,
             unifiedRoot: BASHostStorageRoot(rootURL: tempRoot))
-        let store = try BASHostStorageWireBuilder.makeAtomStore(
+        let store = try await BASHostStorageWireBuilder.makeAtomStore(
             options: options)
         XCTAssertTrue(
             store is BASSQLiteMemoryAtomStore,
@@ -138,37 +138,36 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
 
     // MARK: - .sqliteRequired
 
-    func testSQLiteRequiredWithURLProducesSQLite() throws {
+    func testSQLiteRequiredWithURLProducesSQLite() async throws {
         let url = tempRoot.appendingPathComponent(
             "required.sqlite")
         let options = BASHostStorageOptions(
             preference: .sqliteRequired,
             atomStoreURL: url)
-        let store = try BASHostStorageWireBuilder.makeAtomStore(
+        let store = try await BASHostStorageWireBuilder.makeAtomStore(
             options: options)
         XCTAssertTrue(store is BASSQLiteMemoryAtomStore)
     }
 
-    func testSQLiteRequiredWithoutURLThrowsMissingURL() {
+    func testSQLiteRequiredWithoutURLThrowsMissingURL() async {
         let options = BASHostStorageOptions(
             preference: .sqliteRequired,
             atomStoreURL: nil)
-        XCTAssertThrowsError(
-            try BASHostStorageWireBuilder.makeAtomStore(
+        // audit M-l MED-8 — makeAtomStore is now async; XCTAssertThrowsError
+        // takes a non-async autoclosure, so assert the throw via do/catch.
+        do {
+            _ = try await BASHostStorageWireBuilder.makeAtomStore(
                 options: options)
-        ) { error in
-            guard let wireError =
-                error as? BASHostStorageWireError
-            else {
-                XCTFail("expected BASHostStorageWireError, got " +
-                    "\(type(of: error))")
-                return
-            }
+            XCTFail("expected BASHostStorageWireError, got success")
+        } catch let wireError as BASHostStorageWireError {
             XCTAssertEqual(
                 wireError,
                 .missingSQLiteURL(component: "atom-store"),
                 "fail-fast: .sqliteRequired with no URL must " +
                 "throw .missingSQLiteURL — caller misconfigured")
+        } catch {
+            XCTFail("expected BASHostStorageWireError, got " +
+                "\(type(of: error))")
         }
     }
 
@@ -178,7 +177,7 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
     {
         let atom1 = sampleAtom(content: "seed-a")
         let atom2 = sampleAtom(content: "seed-b")
-        let store = try BASHostStorageWireBuilder.makeAtomStore(
+        let store = try await BASHostStorageWireBuilder.makeAtomStore(
             options: .legacyInMemory,
             initial: [atom1, atom2])
         let recovered1 = await store.atom(
@@ -200,7 +199,7 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
         let options = BASHostStorageOptions(
             preference: .sqliteRequired,
             atomStoreURL: url)
-        let store = try BASHostStorageWireBuilder.makeAtomStore(
+        let store = try await BASHostStorageWireBuilder.makeAtomStore(
             options: options,
             initial: [atom])
         let recovered = await store.atom(forID: atom.id.uuidString)
@@ -208,6 +207,32 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
             recovered?.content, "sqlite-seed",
             "initial: parameter must be passed through to " +
             "SQLite store init")
+    }
+
+    /// audit M-l MED-8 — the EVENT-SOURCED seed path used a fire-and-forget
+    /// `Task.detached`, so makeAtomStore returned the store BEFORE seeding
+    /// finished and an immediate reader raced the seed (saw it empty). The
+    /// seed now runs inline (awaited): the store is fully seeded on return.
+    /// (The SQLite / in-memory branches always seeded synchronously — only
+    /// this async event-sourced branch was fire-and-forget.)
+    func testEventSourcedInitialAtomsSeededBeforeReturn() async throws {
+        let atom1 = sampleAtom(content: "es-seed-a")
+        let atom2 = sampleAtom(content: "es-seed-b")
+        let options = BASHostStorageOptions(
+            useEventSourcedAtomStore: true)
+        let store = try await BASHostStorageWireBuilder.makeAtomStore(
+            options: options,
+            initial: [atom1, atom2])
+        // The FIRST read after return must already see BOTH atoms — with
+        // the old detached seed this raced and could observe nil.
+        let r1 = await store.atom(forID: atom1.id.uuidString)
+        let r2 = await store.atom(forID: atom2.id.uuidString)
+        XCTAssertNotNil(
+            r1,
+            "event-sourced store must be fully seeded on return (no detached race)")
+        XCTAssertEqual(r1?.content, "es-seed-a")
+        XCTAssertNotNil(r2)
+        XCTAssertEqual(r2?.content, "es-seed-b")
     }
 
     // MARK: - Reason codes
@@ -650,7 +675,7 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
             preference: .sqliteRequired,
             atomStoreURL: url)
         do {
-            let store1 = try BASHostStorageWireBuilder
+            let store1 = try await BASHostStorageWireBuilder
                 .makeAtomStore(
                     options: options,
                     initial: [atom])
@@ -660,7 +685,7 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
 
         // Build 2: same wire builder, no initial atoms — store
         // must reload the persisted atom from SQLite.
-        let store2 = try BASHostStorageWireBuilder.makeAtomStore(
+        let store2 = try await BASHostStorageWireBuilder.makeAtomStore(
             options: options)
         let reloaded = await store2.atom(forID: atomID)
         XCTAssertEqual(
@@ -669,4 +694,62 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
             "atom content must round-trip without re-passing " +
             "initial: parameter to second wire builder")
     }
+
+    // MARK: - Seed-failure → observability sink (blindspot MED id30)
+
+    func testSeedEventSourcedRecordsAdmitFailures() async {
+        // Drive the shared seed helper through a store whose event log
+        // ALWAYS throws on append (so every admit throws). Each failure
+        // must be recorded to the failure log. Before extraction this
+        // path had no direct coverage — a revert to silent-swallow
+        // stayed green behind the PROOF-test mocks.
+        let log = BASHostStorageInitialAtomAdmitFailureLog()
+        let store = BASEventSourcedMemoryAtomStore(
+            eventLog: ThrowingEventLog(),
+            sessionID: "id30-test")
+        await BASHostStorageWireBuilder.seedEventSourced(
+            store: store,
+            initial: [sampleAtom(content: "a"),
+                      sampleAtom(content: "b")],
+            failureLog: log)
+        let count = await log.recordedCount
+        XCTAssertEqual(count, 2,
+            "both admit failures must be recorded to the sink")
+    }
+
+    func testSeedEventSourcedNilLogSilentlySwallows() async {
+        // With failureLog == nil the M1517 silent-swallow behavior is
+        // preserved: admit failures do not propagate / crash.
+        let store = BASEventSourcedMemoryAtomStore(
+            eventLog: ThrowingEventLog(),
+            sessionID: "id30-nil")
+        await BASHostStorageWireBuilder.seedEventSourced(
+            store: store,
+            initial: [sampleAtom(content: "a")],
+            failureLog: nil)
+        // Reaching here without throwing == silent-swallow preserved.
+    }
+}
+
+/// Event log whose append always throws — used to force
+/// `BASEventSourcedMemoryAtomStore.admit` to throw so the seed
+/// helper's failure → sink wiring is exercised. (blindspot MED id30)
+private actor ThrowingEventLog: BASEventLogStorage {
+    struct BoomError: Error {}
+    @discardableResult
+    func append(
+        _ entry: BASEventLogEntry
+    ) async throws -> (wasNew: Bool, assignedSequenceNumber: Int64) {
+        throw BoomError()
+    }
+    func events(
+        forSession sessionID: String
+    ) async -> [BASEventLogEntry] { [] }
+    func events(
+        sinceTimestampMs since: Int64, limit: Int
+    ) async -> [BASEventLogEntry] { [] }
+    var totalCount: Int { get async { 0 } }
+    func pruneEventsBefore(
+        timestampMs cutoff: Int64
+    ) async throws -> Int { 0 }
 }

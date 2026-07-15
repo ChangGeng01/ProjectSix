@@ -63,9 +63,12 @@ pub const GENESIS_HASH: [u8; 32] = [0; 32];
 
 // MARK: - L14 Sovereign seal_entry (chapter 七百四十一 第一刀 / M2376)
 //
-// Higher-level wrapper matching the Swift BASSovereignAuditLedger
-// .canonicalBytes(for: priorHash:) + chain semantics。 Each L14
-// audit entry carries:
+// audit rust LOW: higher-level wrapper matching the Swift BASSovereignAuditLedger
+// CHAIN semantics (append-only prior-hash linkage) — NOT its
+// `.canonicalBytes(for: priorHash:)` wire shape. This is a SELF-CONTAINED Rust
+// encoder (see the doc-comment on `sovereign_canonical_bytes` below); the live
+// seal routes through the Swift/FFI path, so byte-identity is not claimed here.
+// Each L14 audit entry carries:
 //
 //   - prior_hash:  32-byte hash of the previous entry
 //   - audit_id:    UTF-8 unique entry ID
@@ -74,7 +77,8 @@ pub const GENESIS_HASH: [u8; 32] = [0; 32];
 //   - timestamp_ms: i64 wall clock (UNIX epoch ms)
 //   - payload:     opaque per-entry bytes (the audit body)
 //
-// Canonical-bytes format (matches the Swift L14 wire shape):
+// Canonical-bytes format (a SELF-CONTAINED Rust layout — NOT the Swift L14
+// wire shape; Swift's canonicalBytes uses a different field encoding):
 //
 //   prior_hash (32 bytes) ||
 //   u32_be(audit_id_len) || audit_id_bytes ||
@@ -86,8 +90,10 @@ pub const GENESIS_HASH: [u8; 32] = [0; 32];
 // The seal hash = SHA256(canonical_bytes)。
 
 /// Build canonical bytes for an L14 sovereign audit entry。
-/// Mirrors Swift BASSovereignAuditLedger.canonicalBytes(for:
-/// priorHash:) verbatim。
+/// audit rust LOW: this is a SELF-CONTAINED Rust canonicalization — it is NOT byte-identical to
+/// the Swift `BASSovereignAuditLedger.canonicalBytes(for:priorHash:)` (the old "mirrors … verbatim"
+/// claim was false). The live seal path routes through the Swift/FFI implementation; this function
+/// is an independent encoder, not a byte-for-byte port.
 pub fn sovereign_canonical_bytes(
     prior_hash32: &[u8; 32],
     audit_id: &[u8],

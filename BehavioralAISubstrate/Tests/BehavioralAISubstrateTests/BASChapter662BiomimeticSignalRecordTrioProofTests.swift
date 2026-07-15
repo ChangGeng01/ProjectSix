@@ -6,17 +6,29 @@ import XCTest
 @testable import BASOrgan
 
 final class BASChapter662BiomimeticSignalRecordTrioProofTests: XCTestCase {
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(String(describing: type),
-                       String(describing: type))
-    }
+
     func testBASBiomimeticTurnSignalConformsToCodable() {
-        assertCodable(BASBiomimeticTurnSignal.self)
+        // #18: real round-trip (all-optional/default init)
+        assertCodableRoundTrips(
+            BASBiomimeticTurnSignal())
     }
+
     func testBASBiomimeticTurnObservationConformsToCodable() {
-        assertCodable(BASBiomimeticTurnObservation.self)
+        // #18: real round-trip (all-optional/default init)
+        assertCodableRoundTrips(
+            BASBiomimeticTurnObservation())
     }
+
     func testBASFoundationModelsMockCallRecordConformsToCodable() {
-        assertCodable(BASFoundationModelsMockCallRecord.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASFoundationModelsMockCallRecord(
+                request: BASOrganRequest(
+                    requestID: "",
+                    role: .scout,
+                    preset: .scout,
+                    instruction: ""),
+                respondedWith: .text(body: ""),
+                calledAtMs: 0))
     }
 }

@@ -181,8 +181,14 @@ public enum BASForbiddenCandidateZoneGate {
         // Candidate IS quarantined AND action IS gateable.
         // Check release conditions.
         let requiredConditions = Set(zone.releaseConditions)
-        let allMet = requiredConditions.isSubset(of:
-            satisfiedReleaseConditions)
+        // audit orchestration MED-3: FAIL-CLOSED on empty release conditions. `Set().isSubset(of:)`
+        // is `true` for ANY set, so an empty releaseConditions used to auto-RELEASE a quarantined
+        // candidate (denied:false) regardless of what the caller satisfied — the exact isolation
+        // escape M457 exists to close (a forbidden candidate could be queued for distillation via
+        // approveForDistillationWithForbiddenZoneGate). A quarantined candidate with NO defined exit
+        // stays quarantined until L14 sovereign reveal supplies explicit, non-empty conditions.
+        let allMet = !requiredConditions.isEmpty
+            && requiredConditions.isSubset(of: satisfiedReleaseConditions)
         if allMet {
             return BASForbiddenCandidateZoneGateDecision(
                 denied: false,
@@ -194,17 +200,21 @@ public enum BASForbiddenCandidateZoneGate {
                 releaseConditionsMet: true)
         }
 
-        // Otherwise: DENIED. List pending conditions.
-        let pendingConditions = requiredConditions
-            .subtracting(satisfiedReleaseConditions)
-            .sorted()
-        let pendingJoined = pendingConditions.joined(separator: ",")
+        // Otherwise: DENIED. audit orchestration MED-3: a distinct reason when there are NO
+        // release conditions at all (fail-closed) vs specific pending ones (No-silent-gate).
+        let reason: String
+        if requiredConditions.isEmpty {
+            reason = "lifecycle.zoneGate:denied:\(action.rawValue):no-release-conditions"
+        } else {
+            let pendingJoined = requiredConditions
+                .subtracting(satisfiedReleaseConditions)
+                .sorted()
+                .joined(separator: ",")
+            reason = "lifecycle.zoneGate:denied:\(action.rawValue):pending:" + pendingJoined
+        }
         return BASForbiddenCandidateZoneGateDecision(
             denied: true,
-            reasonCodes: [
-                "lifecycle.zoneGate:denied:\(action.rawValue):pending:" +
-                pendingJoined,
-            ],
+            reasonCodes: [reason],
             wasQuarantined: true,
             releaseConditionsMet: false)
     }

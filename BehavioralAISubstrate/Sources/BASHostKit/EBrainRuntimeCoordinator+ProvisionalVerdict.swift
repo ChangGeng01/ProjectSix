@@ -141,6 +141,10 @@ extension BASEBrainRuntimeCoordinator {
             || actionPermit.mode == .delay
             || actionPermit.mode == .replace
             || actionPermit.mode == .block
+            // audit hostkit-spine F8: the docstring promises this proxy NEVER under-states the need
+            // for a protected lane, but a high-risk card (whose production conflictFlag would demand
+            // one) was missing. Add it so the conservative "or higher, never under" contract holds.
+            || riskCard.riskLevel >= .high
 
         // Reuse Phase A's render-independent decision core with EMPTY refs —
         // the forecast cares about the LEVEL, not post-render ref IDs, and

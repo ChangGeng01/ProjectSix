@@ -18,7 +18,6 @@ import XCTest
 final class ProtectNotTakeOverDemo: XCTestCase {
 
     private let intent = PropertyDemoFixture.intent(
-        digest: "intent.protect",
         sessionID: "sess.protect")
 
     // MARK: - Four-way assessment, stable reason codes
@@ -98,14 +97,17 @@ final class ProtectNotTakeOverDemo: XCTestCase {
             mode: .block,
             reasonCodes: realPermit.reasonCodes,
             issuedAt: realPermit.issuedAt,
-            expiresAt: realPermit.expiresAt)
+            expiresAt: realPermit.expiresAt,
+            // permit-signing: the forger keeps the REAL signature — the mode flip alone
+            // must break the tag (and the mode check would catch it regardless).
+            signature: realPermit.signature)
 
         let warrant = try await fx.sovereign.issueWarrant(
             for: .init(
                 digest: intent.digest,
                 sessionID: intent.sessionID,
                 hostVersionID: intent.hostVersionID))
-        let proof = PropertyDemoFixture.validProof(for: intent)
+        let proof = await PropertyDemoFixture.validProof(for: intent, sovereign: fx.sovereign)
 
         do {
             _ = try await fx.runtime.execute(

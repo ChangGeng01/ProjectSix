@@ -100,4 +100,18 @@ final class BASSQLiteEventLogDualWriteInvariantTests: XCTestCase {
             XCTAssertEqual(e.timestampMs, 1_700_000_000_000 + seq)
         }
     }
+
+    // audit runtimecore-b #8: the binary-vs-JSON decision is `useBinaryPayload && !chainEnabled` — a
+    // chained row FORCES the faithful JSON path (so its integrity hash domain is unambiguous). append
+    // now snapshots both flags once and threads this pure decision, so a concurrent flip can't produce
+    // a binary row that ALSO gets a chain row. Pin the decision truth table.
+    func testShouldWriteBinaryPayloadDecision() {
+        typealias S = BASSQLiteEventLogStorage
+        XCTAssertTrue(S.shouldWriteBinaryPayload(useBinaryPayload: true, chainEnabled: false),
+            "binary on + chain off ⇒ binary")
+        XCTAssertFalse(S.shouldWriteBinaryPayload(useBinaryPayload: true, chainEnabled: true),
+            "chain on FORCES JSON even when binary is on (unambiguous hash domain)")
+        XCTAssertFalse(S.shouldWriteBinaryPayload(useBinaryPayload: false, chainEnabled: false))
+        XCTAssertFalse(S.shouldWriteBinaryPayload(useBinaryPayload: false, chainEnabled: true))
+    }
 }

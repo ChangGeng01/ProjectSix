@@ -631,6 +631,101 @@ final class BASShadowTrialCoordinatorTests: XCTestCase {
             "L13.retraction_order_queued",
         ])
     }
+
+    // MARK: - resumeTrial (cross-process resume, The Ledger increment 3)
+
+    /// The gap resumeTrial fills: a fresh coordinator (a new process) cannot finalize a trial it
+    /// never saw, because trial state is in-memory only and never rehydrated from the ledger.
+    func testFinalizeWithoutResumeThrowsUnknownTrial() async throws {
+        let coordinator = makeCoordinator(ledger: BASInMemoryShadowTrialLedger())
+        do {
+            _ = try await coordinator.finalize(
+                trialID: "trial-never-opened-here", outcome: .passed,
+                promotionRecommendation: nil, sessionID: "s", turnID: "t")
+            XCTFail("finalize on an unknown trial must throw")
+        } catch let error as BASShadowTrialCoordinator.TrialError {
+            guard case .unknownTrial = error else { return XCTFail("wrong error: \(error)") }
+        }
+    }
+
+    /// The real cross-process flow: coordinator A opens a trial and shares a ledger; a SEPARATE
+    /// coordinator B (fresh in-memory state) resumes that trial from the persisted record and
+    /// finalizes it through the public API. Proves the seam lets observe()/finalize() drive a
+    /// trial opened by a dead process — and that finalize still appends exactly the terminal
+    /// events (no re-open).
+    func testResumeTrialThenFinalizePassesAndSeals() async throws {
+        let ledger = BASInMemoryShadowTrialLedger()
+        let candidate = makeCandidate()
+
+        // Process A: open.
+        let coordA = makeCoordinator(ledger: ledger, trialIDs: ["t-1"], auditIDs: ["a-open"])
+        let opened = try await coordA.submit(
+            candidate: candidate, sessionID: "s", turnID: "t", trialScope: "scope.growth")
+        let openedCount = await ledger.count()
+        XCTAssertEqual(openedCount, 1)
+
+        // Process B: fresh coordinator, SAME ledger. It knows nothing until it resumes.
+        let coordB = makeCoordinator(
+            ledger: ledger, sealIDs: ["seal-1"], auditIDs: ["a-final", "a-seal"])
+        try await coordB.resumeTrial(candidate: candidate, record: opened)
+
+        let done = try await coordB.finalize(
+            trialID: "t-1", outcome: .passed, promotionRecommendation: "adopt",
+            sessionID: "s", turnID: "t2")
+        XCTAssertEqual(done.completionState, "passed")
+
+        // The promotion verdict fires over the resumed history + fresh seal → allowed.
+        let verdict = await coordB.promotionVerdict(for: candidate.candidateID)
+        XCTAssertTrue(verdict.allowsPromotion, "resumed+passed trial must allow promotion: \(verdict.reasonCodes)")
+        XCTAssertTrue(verdict.reasonCodes.isEmpty)
+
+        // Exactly the terminal events were appended (open + passed + seal = 3); resume added none.
+        let kinds = await ledger.all().map(\.eventKind)
+        XCTAssertEqual(kinds, ["shadow_trial_opened", "shadow_trial_passed", "evolution_seal_issued"])
+    }
+
+    /// resumeTrial fails closed: mismatched candidate/record, an already-terminal record, and a
+    /// double-resume of a live trial are all rejected — no silent state corruption.
+    func testResumeTrialGuardsFailClosed() async throws {
+        let ledger = BASInMemoryShadowTrialLedger()
+        let candidate = makeCandidate()
+        let coord = makeCoordinator(ledger: ledger, trialIDs: ["t-1"], auditIDs: ["a-1"])
+        let record = try await coord.submit(
+            candidate: candidate, sessionID: "s", turnID: "t", trialScope: "scope")
+
+        // (a) candidate/record mismatch.
+        let other = makeCandidate(id: "candidate.other.v1")
+        let fresh1 = makeCoordinator(ledger: BASInMemoryShadowTrialLedger())
+        do {
+            try await fresh1.resumeTrial(candidate: other, record: record)
+            XCTFail("mismatched candidate must throw")
+        } catch let e as BASShadowTrialCoordinator.TrialError {
+            guard case .invalidInput = e else { return XCTFail("wrong error: \(e)") }
+        }
+
+        // (b) already-terminal record cannot be resumed for further finalize.
+        var terminal = record
+        terminal.completionState = "passed"
+        let fresh2 = makeCoordinator(ledger: BASInMemoryShadowTrialLedger())
+        do {
+            try await fresh2.resumeTrial(candidate: candidate, record: terminal)
+            XCTFail("terminal record must throw")
+        } catch let e as BASShadowTrialCoordinator.TrialError {
+            guard case .trialAlreadyFinalized = e else { return XCTFail("wrong error: \(e)") }
+        }
+
+        // (c) double-resume of a live trial on the SAME coordinator is rejected.
+        do {
+            try await coord.resumeTrial(candidate: candidate, record: record)
+            XCTFail("double-resume of a resident trial must throw")
+        } catch let e as BASShadowTrialCoordinator.TrialError {
+            // resident trial ⇒ duplicateTrial (or activeTrial); either is a fail-closed rejection.
+            switch e {
+            case .duplicateTrial, .candidateAlreadyHasActiveTrial: break
+            default: XCTFail("wrong error: \(e)")
+            }
+        }
+    }
 }
 
 // MARK: - Utilities

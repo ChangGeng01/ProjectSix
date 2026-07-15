@@ -142,6 +142,19 @@ public final class BASRiskObservationsSQLiteStorage: @unchecked
                 .sqliteOpenFailed(code: openRC, message: msg)
         }
         self.db = opened
+        // audit M-c (损坏=空): surface a structurally-corrupt store at OPEN — the read paths
+        // returned `[]` on any error, mistaking corruption for "no observations" (a risk gate
+        // reading empty is fail-open). Default-on, fail-closed. Runs BEFORE the best-effort
+        // secure_delete pragma — a corrupt file must block open, not silently proceed.
+        try BASSQLiteIntegrity.assertOK(db: opened, store: "risk-observations")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete zeroes freed pages at delete
+        // time so purged risk observations aren't forensically recoverable. Default-on;
+        // kill-switch BAS_SECURE_DELETE=0. Best-effort — a failure here must not block open.
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            sqlite3_exec(opened, sdSQL, nil, nil, nil)
+        }
+        // memory-a F4 residual: one-time legacy freelist purge (see BASSQLiteSecureDelete). Outside txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: opened)
         try applySchema()
     }
 
@@ -249,7 +262,8 @@ public final class BASRiskObservationsSQLiteStorage: @unchecked
         Self.bindText(stmt, 1, sessionID)
 
         var rows: [BASRiskObservationRecord] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             let eventID = Self.readText(stmt, 0)
             let sessID = Self.readText(stmt, 1)
             let turnID = Self.readText(stmt, 2)
@@ -279,6 +293,13 @@ public final class BASRiskObservationsSQLiteStorage: @unchecked
                 salience: salience,
                 confidence: confidence,
                 payloadJSON: payloadJSON))
+            rc = sqlite3_step(stmt)
+        }
+        // audit policy-obs-misc LOW-2: a non-DONE terminal (BUSY/CORRUPT) is NOT a clean end-of-rows —
+        // surface it instead of returning a silently-truncated partial result.
+        guard rc == SQLITE_DONE else {
+            throw BASRiskObservationsSQLiteStorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return rows
     }
@@ -309,8 +330,11 @@ public final class BASRiskObservationsSQLiteStorage: @unchecked
         Self.bindText(stmt, 1, band)
         sqlite3_bind_int64(stmt, 2, sinceMs)
 
+        // audit policy-obs-misc LOW-2: a COUNT(*) query always yields exactly one ROW — a non-ROW
+        // terminal is a BUSY/CORRUPT error, NOT a legitimate count of 0. Surface it, don't fabricate 0.
         guard sqlite3_step(stmt) == SQLITE_ROW else {
-            return 0
+            throw BASRiskObservationsSQLiteStorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return Int(sqlite3_column_int64(stmt, 0))
     }

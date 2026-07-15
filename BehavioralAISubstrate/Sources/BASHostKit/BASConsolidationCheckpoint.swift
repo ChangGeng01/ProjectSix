@@ -69,6 +69,15 @@ public struct BASConsolidationCheckpoint:
     /// rejected (atom absent at apply time)。
     public let rejectedMutations: [String: BASMemoryTier]
 
+    /// The importance scorer's tier-move VERDICT (atomID → recommended tier),
+    /// recorded on BOTH dry-run and applied passes (audit memory-b F7 / hostkit-rest
+    /// MED-4). Before this, a dry-run's `appliedMutations`/`rejectedMutations` were
+    /// both empty (nothing is written on a dry-run), so the checkpoint carried
+    /// STRUCTURALLY-ZERO information about what the pass observed — the whole point of
+    /// a dry-run (see what WOULD move) was lost. This surfaces the scorer's actual
+    /// recommendation so an observation reflects the real universe without writing.
+    public let recommendedTierMoves: [String: BASMemoryTier]
+
     /// Rust forget verdict (tracker atomIDs,score-ascending
     /// candidates below the retain threshold)。 Recorded even on
     /// dry-run — Rust decides,Swift executes (ch881)。
@@ -126,6 +135,7 @@ public struct BASConsolidationCheckpoint:
         postChainHash: String,
         appliedMutations: [String: BASMemoryTier],
         rejectedMutations: [String: BASMemoryTier],
+        recommendedTierMoves: [String: BASMemoryTier] = [:],
         forgetCandidateAtomIDs: [String],
         quarantinedAtomIDs: [String],
         unjoinedForgetCandidateAtomIDs: [String],
@@ -145,6 +155,7 @@ public struct BASConsolidationCheckpoint:
         self.postChainHash = postChainHash
         self.appliedMutations = appliedMutations
         self.rejectedMutations = rejectedMutations
+        self.recommendedTierMoves = recommendedTierMoves
         self.forgetCandidateAtomIDs = forgetCandidateAtomIDs
         self.quarantinedAtomIDs = quarantinedAtomIDs
         self.unjoinedForgetCandidateAtomIDs =
@@ -160,6 +171,44 @@ public struct BASConsolidationCheckpoint:
         self.deviceStateSummary = deviceStateSummary
         self.startedAt = startedAt
         self.finishedAt = finishedAt
+    }
+
+    // audit memory-b F7 — byte-stable decode: a checkpoint LOGGED before
+    // `recommendedTierMoves` existed omits the key; it decodes to `[:]` rather than
+    // failing (the synthesized Decodable would throw on the missing key). `encode`
+    // stays synthesized, so new checkpoints round-trip the field.
+    private enum CodingKeys: String, CodingKey {
+        case preChainHash, postChainHash, appliedMutations, rejectedMutations
+        case recommendedTierMoves, forgetCandidateAtomIDs, quarantinedAtomIDs
+        case unjoinedForgetCandidateAtomIDs, quarantineRecords, rustImportanceScoreCount
+        case maintenanceClass, windowMs, dryRun, completedStages, partialCompletion
+        case failureReasons, deviceStateSummary, startedAt, finishedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        preChainHash = try c.decode(String.self, forKey: .preChainHash)
+        postChainHash = try c.decode(String.self, forKey: .postChainHash)
+        appliedMutations = try c.decode([String: BASMemoryTier].self, forKey: .appliedMutations)
+        rejectedMutations = try c.decode([String: BASMemoryTier].self, forKey: .rejectedMutations)
+        recommendedTierMoves = try c.decodeIfPresent(
+            [String: BASMemoryTier].self, forKey: .recommendedTierMoves) ?? [:]
+        forgetCandidateAtomIDs = try c.decode([String].self, forKey: .forgetCandidateAtomIDs)
+        quarantinedAtomIDs = try c.decode([String].self, forKey: .quarantinedAtomIDs)
+        unjoinedForgetCandidateAtomIDs = try c.decode(
+            [String].self, forKey: .unjoinedForgetCandidateAtomIDs)
+        quarantineRecords = try c.decode(
+            [BASMemoryQuarantineRecord].self, forKey: .quarantineRecords)
+        rustImportanceScoreCount = try c.decode(Int.self, forKey: .rustImportanceScoreCount)
+        maintenanceClass = try c.decode(String.self, forKey: .maintenanceClass)
+        windowMs = try c.decode(Int.self, forKey: .windowMs)
+        dryRun = try c.decode(Bool.self, forKey: .dryRun)
+        completedStages = try c.decode([String].self, forKey: .completedStages)
+        partialCompletion = try c.decode(Bool.self, forKey: .partialCompletion)
+        failureReasons = try c.decode([String].self, forKey: .failureReasons)
+        deviceStateSummary = try c.decode(String.self, forKey: .deviceStateSummary)
+        startedAt = try c.decode(Date.self, forKey: .startedAt)
+        finishedAt = try c.decode(Date.self, forKey: .finishedAt)
     }
 
     /// True iff the pass changed anything at all (tier moves or

@@ -36,6 +36,30 @@ final class BASChapter748DreamLoopTests: XCTestCase {
         #endif
     }
 
+    /// deep-audit MED: a candidate row whose length != query.count makes the flattened buffer
+    /// != n*dim, so the Rust kernel's from_raw_parts(ptr, n*dim) reads PAST the Swift buffer (OOB).
+    /// The per-row guard must reject ragged/empty shapes with nil. On the unfixed code the guard is
+    /// absent → the FFI reads out of bounds (returns garbage non-nil, or crashes) — never a clean nil.
+    func testRaggedCandidateRowsReturnNilNotOOBRead() {
+        #if os(iOS) || os(macOS)
+        // short row (2 < query 3): flat.count = 2+3 = 5 < n*dim = 6
+        XCTAssertNil(BASAutoRouteRanker.dreamLoopBatchScore(
+            query: [1, 2, 3], candidates: [[1, 2], [3, 4, 5]],
+            benefits: [0.5, 0.5], costs: [0.1, 0.1], topK: 1))
+        // long row (4 > query 3)
+        XCTAssertNil(BASAutoRouteRanker.dreamLoopBatchScore(
+            query: [1, 2, 3], candidates: [[1, 2, 3, 4]],
+            benefits: [0.5], costs: [0.1], topK: 1))
+        // empty query
+        XCTAssertNil(BASAutoRouteRanker.dreamLoopBatchScore(
+            query: [], candidates: [[]], benefits: [0.5], costs: [0.1], topK: 1))
+        // CONTROL: well-formed uniform rows still score (guard must not over-reject)
+        XCTAssertEqual(BASAutoRouteRanker.dreamLoopBatchScore(
+            query: [1, 0], candidates: [[1, 0], [0, 1]],
+            benefits: [0.5, 0.5], costs: [0.1, 0.1], topK: 2)?.count, 2)
+        #endif
+    }
+
     func testBenefitCostFlipsRanking() {
         #if os(iOS) || os(macOS)
         // Both candidates have same cosine (1.0);benefit

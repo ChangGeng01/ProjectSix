@@ -163,6 +163,36 @@ public actor BASHardwareAwareScheduler {
                     .cpuNoKernelRegistered)
         }
 
+        // Step 4 (documented in the header + BASStageAcceleratorHint
+        // .latencyBudgetMs): if NO accelerator candidate can meet the
+        // caller's latency budget at this thermal, downgrade to CPU
+        // with the .cpuLatencyBudgetMiss rationale.
+        // blindspot MED id29: this step was documented but never
+        // implemented — hint.latencyBudgetMs was ignored and the
+        // .cpuLatencyBudgetMiss rationale (a defined case) never
+        // emitted. CPU is the designated fallback; the rationale tells
+        // the caller the budget could not be met by any accelerator.
+        let accelerators = candidates.filter { $0 != .cpuBytes }
+        if !accelerators.isEmpty
+            && !accelerators.contains(where: { backing in
+                achievableLatencyMs(
+                    backing: backing,
+                    capability: capability,
+                    thermal: thermal) <= hint.latencyBudgetMs
+            })
+        {
+            return BASStageAcceleratorAssignment(
+                selectedBackingKind: .cpuBytes,
+                selectedKernelKey: nil,
+                costScore: scoreCPU(
+                    hint: hint,
+                    capability: capability,
+                    thermal: thermal,
+                    opSupported: opSupported),
+                thermalSnapshot: thermal,
+                assignmentRationale: .cpuLatencyBudgetMiss)
+        }
+
         // Score each candidate, pick lowest cost。
         var bestBacking: BASTensorBackingKind = .cpuBytes
         var bestCost: Double = .infinity
@@ -279,6 +309,31 @@ public actor BASHardwareAwareScheduler {
     }
 
     // MARK: - Helpers
+
+    /// The achievable latency (ms) of a backing at this thermal —
+    /// `baseLatency × thermalDerate`. The per-backing base-latency
+    /// multipliers MUST stay in sync with `score()` / `scoreCPU`
+    /// (mlxArray ×1, mlMultiArray ×0.8, metalBuffer ×1.5, cpu ×5).
+    /// Used only by the step-4 latency-budget gate (blindspot MED id29).
+    private func achievableLatencyMs(
+        backing: BASTensorBackingKind,
+        capability: BASANECapability,
+        thermal: BASCapabilityThermalSnapshot
+    ) -> Double {
+        let derate = thermalDerate(thermal)
+        let baseLatency: Double
+        switch backing {
+        case .mlxArray:
+            baseLatency = capability.estimatedLatencyMs
+        case .mlMultiArray:
+            baseLatency = capability.estimatedLatencyMs * 0.8
+        case .metalBuffer:
+            baseLatency = capability.estimatedLatencyMs * 1.5
+        case .cpuBytes:
+            baseLatency = capability.estimatedLatencyMs * 5.0
+        }
+        return baseLatency * derate
+    }
 
     private func thermalDerate(
         _ thermal: BASCapabilityThermalSnapshot

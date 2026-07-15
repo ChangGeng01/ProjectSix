@@ -86,14 +86,23 @@ public struct BASMPSGraphCacheKey:
     /// inside MPSGraph)。
     public let inputShapes: [[Int]]
 
+    /// audit M-l / metal #4: bit-pattern of a scalar constant BAKED INTO the compiled executable
+    /// (e.g. RMSNorm / LayerNorm `epsilon`, folded in as a `graph.constant`). op+dtype+shapes were
+    /// identical for two kernels differing ONLY in epsilon, so the second reused the first's baked
+    /// epsilon → wrong numerics. `nil` for ops that bake no such constant (byte-equal — the key
+    /// partitions exactly as before for every non-norm op).
+    public let epsilonBits: UInt32?
+
     public init(
         operation: BASNeuralOp,
         dataType: BASTensorDataType,
-        inputShapes: [[Int]]
+        inputShapes: [[Int]],
+        epsilonBits: UInt32? = nil
     ) {
         self.operation = operation
         self.dataType = dataType
         self.inputShapes = inputShapes
+        self.epsilonBits = epsilonBits
     }
 }
 

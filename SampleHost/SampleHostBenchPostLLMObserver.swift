@@ -192,7 +192,8 @@ extension SampleHostModel {
             ) {
                 try runtime.startSession(observeRequest)
             }.value
-        guard let observed = observedResult?.eBrainTurn else {
+        // context-IR: the observer reads only the permit — the slim response suffices
+        guard let observed = observedResult?.turnResponse else {
             return .skipped
         }
 

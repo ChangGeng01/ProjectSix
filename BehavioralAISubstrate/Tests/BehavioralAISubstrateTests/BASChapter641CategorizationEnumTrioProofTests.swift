@@ -44,26 +44,23 @@ final class BASChapter641CategorizationEnumTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
+    // #18 测试诚实 (2026-07-08): real encode→decode→re-encode round-trips replace the old
+    // XCTAssertEqual(describing, describing) tautology. CaseIterable enums round-trip every
+    // case; the non-CaseIterable Strategy round-trips a representative case.
+
+    func testBASSovereignIntegritySentinelArtifactKindRoundTrips() {
+        assertCodableRoundTripsAllCases(
+            BASSovereignIntegritySentinel.ArtifactKind.self)
     }
 
-    func testBASSovereignIntegritySentinelArtifactKindConformsToCodable() {
-        assertCodable(
-            BASSovereignIntegritySentinel
-                .ArtifactKind.self)
+    func testBASSovereignContaminationGuardArtifactKindRoundTrips() {
+        assertCodableRoundTripsAllCases(
+            BASSovereignContaminationGuard.ArtifactKind.self)
     }
 
-    func testBASSovereignContaminationGuardArtifactKindConformsToCodable() {
-        assertCodable(
-            BASSovereignContaminationGuard
-                .ArtifactKind.self)
-    }
-
-    func testBASRoutingOrganAdapterStrategyConformsToCodable() {
-        assertCodable(
-            BASRoutingOrganAdapter.Strategy.self)
+    func testBASRoutingOrganAdapterStrategyRoundTrips() {
+        assertCodableRoundTrips(BASRoutingOrganAdapter.Strategy.primaryWithFallback)
+        assertCodableRoundTrips(BASRoutingOrganAdapter.Strategy.primaryOnly)
+        assertCodableRoundTrips(BASRoutingOrganAdapter.Strategy.secondaryOnly)
     }
 }

@@ -38,23 +38,25 @@ final class BASChapter622CrossModuleTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASPromptStateValueConformsToCodable() {
-        assertCodable(BASPromptStateValue.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(BASPromptStateValue.string(""))
+        assertCodableRoundTrips(BASPromptStateValue.integer(0))
+        assertCodableRoundTrips(BASPromptStateValue.boolean(false))
     }
 
     func testBASTurnRuntimePlanLedgerCoherenceConformsToCodable() {
-        assertCodable(
-            BASTurnRuntimePlanLedgerCoherence.self)
+        // #18: real round-trip — minimal instance (empty plan + empty ledger)
+        let instance = BASTurnRuntimePlanLedgerCoherence(
+            plan: BASTurnRuntimeStagePlan(),
+            ledger: BASTurnRuntimeStageLedger())
+        assertCodableRoundTrips(instance)
     }
 
     func testBASTurnRuntimePlanLedgerCoherenceIssueConformsToCodable() {
-        assertCodable(
-            BASTurnRuntimePlanLedgerCoherenceIssue.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASTurnRuntimePlanLedgerCoherenceIssue
+                .planStagesNotInLedger([]))
     }
 }

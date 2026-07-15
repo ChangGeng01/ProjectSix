@@ -138,6 +138,53 @@ public struct BASTensorDescriptor:
         self.rankTag = rankTag
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case shape, strides, dataType, backingKind, rankTag
+    }
+
+    /// audit M-l / metal #3: synthesized `Codable` let a CRAFTED descriptor through with a
+    /// zero / negative / overflowing shape — the doc contract "all entries must be > 0" and
+    /// "strides.count == shape.count" were never enforced on decode. A bad shape then either traps
+    /// (`shape[0]` on a rank kernel assumes) or yields a wrong / negative / overflowed `byteCount`,
+    /// which downstream kernels use to size a GPU buffer copy → heap out-of-bounds read. Validate at
+    /// this untrusted decode boundary and THROW `DecodingError` (external data must fail gracefully,
+    /// never trap).
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let shape = try c.decode([Int].self, forKey: .shape)
+        let strides = try c.decode([Int].self, forKey: .strides)
+        let dataType = try c.decode(BASTensorDataType.self, forKey: .dataType)
+        let backingKind = try c.decode(BASTensorBackingKind.self, forKey: .backingKind)
+        let rankTag = try c.decode(String.self, forKey: .rankTag)
+
+        func corrupt(_ why: String) -> DecodingError {
+            DecodingError.dataCorrupted(.init(
+                codingPath: decoder.codingPath, debugDescription: "BASTensorDescriptor: " + why))
+        }
+        for (i, dim) in shape.enumerated() where dim <= 0 {
+            throw corrupt("shape[\(i)] must be > 0, got \(dim)")
+        }
+        guard strides.count == shape.count else {
+            throw corrupt("strides.count (\(strides.count)) must equal shape.count (\(shape.count))")
+        }
+        // Overflow-guard the element / byte counts a crafted huge shape could blow up (`byteCount`
+        // is computed with `*` and would trap on overflow before any consumer check could catch it).
+        var elements = 1
+        for dim in shape {
+            let (product, overflow) = elements.multipliedReportingOverflow(by: dim)
+            if overflow { throw corrupt("shape product overflows Int") }
+            elements = product
+        }
+        if elements.multipliedReportingOverflow(by: dataType.byteWidth).overflow {
+            throw corrupt("byteCount overflows Int")
+        }
+        self.shape = shape
+        self.strides = strides
+        self.dataType = dataType
+        self.backingKind = backingKind
+        self.rankTag = rankTag
+    }
+
     /// Total element count = product of shape entries。
     /// Defined as 1 for rank-0 scalars。
     public var elementCount: Int {

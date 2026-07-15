@@ -170,6 +170,21 @@ final class BASRetractionFurnaceTests: XCTestCase {
         XCTAssertNil(e?.failureReason)
     }
 
+    func testMarkCompletedFromQueuedIsNoOp() {
+        // blindspot MED id32: completion means EXECUTED, so it must
+        // follow markInFlight. Completing straight from .queued (never
+        // in-flight) violates the queued → inFlight → completed
+        // lifecycle and must be a no-op.
+        let f = BASRetractionFurnace(furnaceID: "f")
+            .enqueue(makeEntry(orderID: "o1"))
+            .markCompleted(orderID: "o1", at: t2)
+        let e = f.entry(orderID: "o1")
+        XCTAssertEqual(e?.state, .queued,
+            "markCompleted from .queued must be a no-op (needs .inFlight)")
+        XCTAssertNil(e?.finishedAt,
+            "a queued entry that was never in-flight has no finishedAt")
+    }
+
     // MARK: - 7. Terminal re-entry refused
 
     func testMarkCompletedFromTerminalIsNoOp() {

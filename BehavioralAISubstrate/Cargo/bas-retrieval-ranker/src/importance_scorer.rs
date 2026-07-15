@@ -231,10 +231,22 @@ fn score_one(
         * (helped + epsilon)
         * (tier_decay + epsilon);
     let raw = product.powf(0.25);
-    let total = clamp(raw, 0.0, 1.0);
+    let geometric_total = clamp(raw, 0.0, 1.0);
 
-    let recommended = recommended_tier(
-        current_tier, total, tunables);
+    // audit blindspot-③ HIGH: mirror of the Swift BASMemoryImportanceScorer fix. A brand-new atom has
+    // NO usage records, so recency/frequency are 0 and the geometric mean collapses to ~0.001
+    // (near-MIN) despite the +ε — a fresh atom was recommended for DEMOTION on arrival, before it
+    // could ever be used. With zero usage the importance is UNKNOWN, so a no-history atom STAYS in its
+    // current tier and reports a neutral 0.5 total. Kept byte-identical to the Swift side (the
+    // BASChapter723 byte-parity suite pins Swift == Rust — re-greens once the SHA-pinned
+    // BASRustMemoryTracker.xcframework is rebuilt from this source).
+    let has_history = !records.is_empty();
+    let total = if has_history { geometric_total } else { 0.5 };
+    let recommended = if has_history {
+        recommended_tier(current_tier, geometric_total, tunables)
+    } else {
+        current_tier
+    };
 
     ImportanceScore {
         atom_id: atom_id.to_string(),
@@ -533,6 +545,23 @@ mod tests {
         assert_eq!(beta.frequency_component, 0.0);
         // helped defaults to 0.5 for empty records
         assert_eq!(beta.helped_component, 0.5);
+    }
+
+    #[test]
+    fn no_history_atom_stays_not_demoted() {
+        // audit blindspot-③ HIGH: a WARM atom with NO usage records must NOT be demoted to Cold on
+        // arrival (Cold would stay Cold regardless, so a Warm atom is the discriminating case). Its
+        // importance is unknown ⇒ it stays Warm and reports a neutral 0.5 total. Reversal (geometric
+        // mean ~0.007 → demote) reds: recommended_tier would be Cold and total ~0.0077.
+        let recs: Vec<UsageRecord> = vec![];
+        let tiers = vec![("fresh".to_string(), Tier::Warm)];
+        let scores = score_all(&tiers, &recs, 5000, &Tunables::default());
+        let fresh = &scores[0];
+        assert_eq!(fresh.record_count, 0);
+        assert_eq!(fresh.total_score, 0.5,
+            "a no-history atom must score neutral, not near-min");
+        assert_eq!(fresh.recommended_tier, Tier::Warm,
+            "a no-history warm atom must STAY warm, not be demoted to cold on arrival");
     }
 
     #[test]

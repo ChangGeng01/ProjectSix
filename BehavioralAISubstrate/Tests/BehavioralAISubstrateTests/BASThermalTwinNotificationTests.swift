@@ -75,21 +75,27 @@ final class BASThermalTwinNotificationTests: XCTestCase {
         }
     }
 
-    /// Skip the rest of a test when the OS notification stack
-    /// fails to deliver within the timeout. Pre-existing system
-    /// flake — not a substrate regression.
-    private func skipIfStackFlaky(
-        _ received: BASThermalTwin.Reading?
+    /// The reading MUST arrive — was `skipIfStackFlaky`, which skipped whenever it was nil
+    /// while claiming "Pre-existing system flake — not a substrate regression".
+    ///
+    /// That claim was FALSE and the skip hid a real defect. These tests post onto a PRIVATE,
+    /// in-process NotificationCenter — no XPC, no OS stack — and normally complete in ~86ms,
+    /// so a >2s timeout is a HANG, not slowness. The hang was a race in the production API:
+    /// `startObservingSystemNotifications` spawned a Task and returned BEFORE the observer
+    /// attached, so a post in that window was lost (reproduced ~1 run in 3). Fixed at the
+    /// source — the observer now registers synchronously — and measured 6/6 clean at ~86ms.
+    ///
+    /// A missing reading now means the twin genuinely failed to observe or sample: FAIL.
+    private func requireReading(
+        _ received: BASThermalTwin.Reading?,
+        file: StaticString = #filePath, line: UInt = #line
     ) throws {
-        if received == nil {
-            throw XCTSkip(
-                "OS NotificationCenter did not deliver the sample " +
-                "within the timeout (observed on macOS — likely " +
-                "AddressBook XPC — AND on iOS device runs per the " +
-                "ch1044 device audit); treated as an environmental " +
-                "flake, not a substrate regression. M216 thermal-twin " +
-                "notification test skipped")
-        }
+        _ = try XCTUnwrap(
+            received,
+            "the twin did not auto-sample within the timeout. The observer attaches "
+            + "synchronously now, so this is a real failure to observe/sample — not an "
+            + "OS flake.",
+            file: file, line: line)
     }
 
     // MARK: - 1. Posting a notification triggers sample()
@@ -121,7 +127,7 @@ final class BASThermalTwinNotificationTests: XCTestCase {
             var iter = stream.makeAsyncIterator()
             return await iter.next()
         }
-        try skipIfStackFlaky(received)
+        try requireReading(received)
         XCTAssertEqual(received?.osState, .fair)
 
         await twin.stopObservingSystemNotifications()
@@ -154,7 +160,7 @@ final class BASThermalTwinNotificationTests: XCTestCase {
             var iter = stream.makeAsyncIterator()
             return await iter.next()
         }
-        try skipIfStackFlaky(received)
+        try requireReading(received)
         XCTAssertEqual(
             received?.osState, .serious,
             "subscriber must receive the post-notification " +
@@ -189,7 +195,7 @@ final class BASThermalTwinNotificationTests: XCTestCase {
             var iter = stream.makeAsyncIterator()
             return await iter.next()
         }
-        try skipIfStackFlaky(first)
+        try requireReading(first)
         XCTAssertEqual(
             first?.osState, .fair,
             "first post must yield .fair reading")
@@ -258,7 +264,7 @@ final class BASThermalTwinNotificationTests: XCTestCase {
             var iter = stream.makeAsyncIterator()
             return await iter.next()
         }
-        try skipIfStackFlaky(received)
+        try requireReading(received)
         XCTAssertEqual(
             received?.osState, .serious,
             "first reading on subscriber stream MUST be from " +

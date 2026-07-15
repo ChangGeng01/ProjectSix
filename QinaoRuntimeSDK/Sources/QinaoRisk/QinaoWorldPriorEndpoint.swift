@@ -5,7 +5,10 @@ import Foundation
 /// decision. Analogous to `QinaoOrganEndpoint` in `QinaoLoop`: the
 /// public surface is a single protocol over Qinao-local value types;
 /// the adapter that wraps the substrate's world-prior vault stays
-/// internal so `BAS*` symbols never leak through the SDK.
+/// internal so `BASWorldPrior*` symbols never leak through THIS
+/// module's surface. (charter audit 2026-07-12: scoped to this module —
+/// the SDK as a whole deliberately exposes substrate VALUE TYPES on
+/// other surfaces, e.g. QinaoLifecycle/TurnInputs; see Package.swift header.)
 ///
 /// ## Contract
 ///

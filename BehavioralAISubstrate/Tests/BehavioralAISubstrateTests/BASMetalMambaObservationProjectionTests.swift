@@ -9,7 +9,6 @@ import Foundation
 @testable import BASHostKit
 import BASMetalSubstrate
 
-#if !os(iOS) // ch1022 source-gate parity
 final class BASMetalMambaObservationProjectionTests: XCTestCase {
 
     private final class ObsBox: @unchecked Sendable {
@@ -90,4 +89,3 @@ final class BASMetalMambaObservationProjectionTests: XCTestCase {
         XCTAssertTrue([.gpuOK, .cpuOnly].contains(result?.verdict))
     }
 }
-#endif

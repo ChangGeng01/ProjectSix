@@ -21,7 +21,6 @@ import XCTest
 @testable import BASMetalSubstrate
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASFivePilotFailureResilienceTests: XCTestCase {
 
     // MARK: - Rust core unavailable (V1 mode → no Rust handle)
@@ -203,4 +202,3 @@ final class BASFivePilotFailureResilienceTests: XCTestCase {
             " storage when all external pilots degrade")
     }
 }
-#endif

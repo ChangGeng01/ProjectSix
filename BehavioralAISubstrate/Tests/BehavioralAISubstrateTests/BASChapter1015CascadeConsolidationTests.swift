@@ -121,10 +121,7 @@ final class BASChapter1015CascadeConsolidationTests: XCTestCase {
 
     func test_InspectorHeader_Lists5Categories() throws {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let path = "\(projectRoot)/Sources/BASHostKit/" +
             "BASAgentFabricHostOutcomeInspector.swift"
         let content = try String(
@@ -145,10 +142,7 @@ final class BASChapter1015CascadeConsolidationTests: XCTestCase {
 
     func test_AuditBridgeHeaders_ReflectUnitSeparator() throws {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let paths = [
             "Sources/BASOrchestration/" +
                 "BASSovereignWarrantAuditBridge.swift",
@@ -175,10 +169,7 @@ final class BASChapter1015CascadeConsolidationTests: XCTestCase {
 
     func test_Pipeline_UnreachableElseDeleted() throws {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let path = "\(projectRoot)/Sources/BASHostKit/" +
             "BASAgentFabricHostPipeline.swift"
         let content = try String(
@@ -200,10 +191,7 @@ final class BASChapter1015CascadeConsolidationTests: XCTestCase {
 
     func test_PrivateConfidenceBandDuplicates_Deleted() throws {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let paths = [
             "Sources/BASMemory/" +
                 "BASAgentObservationAuditEmitter.swift",
@@ -235,10 +223,7 @@ final class BASChapter1015CascadeConsolidationTests: XCTestCase {
     /// consolidation。
     func test_Ch1015_IsConsolidationChapter() throws {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let path = "\(projectRoot)/" +
             "Docs/SCAFFOLD_VS_WIRED.md"
         let content = try String(

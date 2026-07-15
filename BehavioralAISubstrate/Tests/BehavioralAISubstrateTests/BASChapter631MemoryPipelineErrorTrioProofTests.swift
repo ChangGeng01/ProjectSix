@@ -34,24 +34,32 @@ final class BASChapter631MemoryPipelineErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASSQLiteVectorIndexStorageErrorConformsToCodable() {
-        assertCodable(
-            BASSQLiteVectorIndexStorage.StorageError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSQLiteVectorIndexStorage.StorageError
+                .openFailed(code: 0, message: ""))
+        assertCodableRoundTrips(
+            BASSQLiteVectorIndexStorage.StorageError
+                .dimensionMismatch(atomID: "", expected: 0, got: 0))
     }
 
     func testBASMemoryUsageTrackerErrorConformsToCodable() {
-        assertCodable(
-            BASMemoryUsageTracker.TrackerError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASMemoryUsageTracker.TrackerError
+                .openFailed(code: 0, message: ""))
+        assertCodableRoundTrips(
+            BASMemoryUsageTracker.TrackerError.unknownRecord(id: ""))
     }
 
     func testBASHostCandidatePipelineErrorConformsToCodable() {
-        assertCodable(
-            BASHostCandidatePipeline.PipelineError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASHostCandidatePipeline.PipelineError
+                .duplicateCandidate(id: ""))
+        assertCodableRoundTrips(
+            BASHostCandidatePipeline.PipelineError
+                .candidateAlreadyDecided(id: "", state: ""))
     }
 }

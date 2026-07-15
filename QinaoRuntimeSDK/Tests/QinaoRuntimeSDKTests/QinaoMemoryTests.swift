@@ -44,11 +44,31 @@ final class QinaoMemoryTests: XCTestCase {
             preferredTier: preferredTier)
     }
 
+    /// deep-audit P1-7 (2026-07-13): the blind `admit(_:)` now HOLDS as `.candidate`
+    /// (a constitution-less host has no promotion authority — see
+    /// QinaoMemoryConstitutionGateTests.testBlindAdmitHoldsAsCandidate…). This façade
+    /// suite pins recall/tier/cascade behaviour, which requires GOVERNED memory, so it
+    /// admits through a permissive constitution — the real path a host with promotion
+    /// authority uses. The governance-authority semantics themselves live in the gate suite.
+    private static let permissive: BASHostConstitution = {
+        var c = BASHostConstitution(hostID: "facade-host", activeVersion: "v1")
+        c.consentLattice.memoryWriteScope = "all"
+        c.consentLattice.memoryPromotionScope = "auto"
+        return c
+    }()
+
+    @discardableResult
+    private func admitGoverned(
+        _ m: QinaoMemory, _ req: QinaoMemory.AdmitRequest
+    ) async throws -> BASGovernedMemory {
+        try await m.admit(req, under: Self.permissive)
+    }
+
     // MARK: - Admission
 
     func testAdmitPromotesCandidateAboveConfidenceFloor() async throws {
         let memory = makeMemory(minimumConfidence: 0.6)
-        let governed = try await memory.admit(
+        let governed = try await admitGoverned(memory,
             admitRequest(confidence: 0.75))
         XCTAssertEqual(governed.governanceStatus, .governed)
         XCTAssertEqual(governed.content, "default content")
@@ -59,7 +79,7 @@ final class QinaoMemoryTests: XCTestCase {
     func testAdmitRejectsCandidateBelowConfidenceFloor() async throws {
         let memory = makeMemory(minimumConfidence: 0.6)
         do {
-            _ = try await memory.admit(admitRequest(confidence: 0.4))
+            _ = try await admitGoverned(memory,admitRequest(confidence: 0.4))
             XCTFail("admit should reject below-floor candidate")
         } catch QinaoMemory.MemoryError.rejectedByGovernance(let reason) {
             XCTAssertEqual(reason, "confidence-below-floor")
@@ -73,11 +93,11 @@ final class QinaoMemoryTests: XCTestCase {
 
     func testRecallHonoursScopeFilter() async throws {
         let memory = makeMemory()
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "a", scope: .session))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "b", scope: .user))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "c", scope: .device))
         let sessionOnly = await memory.recall(scope: .session)
         XCTAssertEqual(sessionOnly.map(\.content), ["a"])
@@ -85,11 +105,11 @@ final class QinaoMemoryTests: XCTestCase {
 
     func testRecallHonoursTierFilter() async throws {
         let memory = makeMemory()
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "hot", preferredTier: .hot))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "warm", preferredTier: .warm))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "cold", preferredTier: .cold))
         let hotOnly = await memory.recall(tiers: [.hot])
         XCTAssertEqual(hotOnly.map(\.content), ["hot"])
@@ -99,17 +119,17 @@ final class QinaoMemoryTests: XCTestCase {
 
     func testRecallOrdersByTierThenConfidence() async throws {
         let memory = makeMemory()
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(
                 content: "warm-lo",
                 confidence: 0.7,
                 preferredTier: .warm))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(
                 content: "hot-lo",
                 confidence: 0.65,
                 preferredTier: .hot))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(
                 content: "hot-hi",
                 confidence: 0.95,
@@ -126,11 +146,11 @@ final class QinaoMemoryTests: XCTestCase {
 
     func testFrontstageRecallDropsColdTier() async throws {
         let memory = makeMemory()
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "hot-trace", preferredTier: .hot))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "warm-thread", preferredTier: .warm))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "cold-prior", preferredTier: .cold))
 
         let front = await memory.recallFrontstage()
@@ -144,11 +164,11 @@ final class QinaoMemoryTests: XCTestCase {
 
     func testForgetByScopeRemovesAllMatches() async throws {
         let memory = makeMemory()
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "a", scope: .session))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "b", scope: .session))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "keep", scope: .user))
 
         let removed = await memory.forget(scope: .session)
@@ -159,11 +179,11 @@ final class QinaoMemoryTests: XCTestCase {
 
     func testForgetBySensitivityRemovesAllMatches() async throws {
         let memory = makeMemory()
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "low-1", sensitivity: .low))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "high-1", sensitivity: .high))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(content: "high-2", sensitivity: .high))
 
         let removed = await memory.forget(sensitivity: .high)
@@ -174,8 +194,8 @@ final class QinaoMemoryTests: XCTestCase {
 
     func testForgetByIDRemovesExactlyOne() async throws {
         let memory = makeMemory()
-        let a = try await memory.admit(admitRequest(content: "a"))
-        _ = try await memory.admit(admitRequest(content: "b"))
+        let a = try await admitGoverned(memory,admitRequest(content: "a"))
+        _ = try await admitGoverned(memory,admitRequest(content: "b"))
 
         let removed = try await memory.forget(id: a.id)
         XCTAssertEqual(removed.content, "a")
@@ -196,11 +216,11 @@ final class QinaoMemoryTests: XCTestCase {
 
     func testForgetAllWipesEveryTier() async throws {
         let memory = makeMemory()
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(preferredTier: .hot))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(preferredTier: .warm))
-        _ = try await memory.admit(
+        _ = try await admitGoverned(memory,
             admitRequest(preferredTier: .cold))
 
         let removed = await memory.forgetAll()
@@ -246,7 +266,7 @@ final class QinaoMemoryTests: XCTestCase {
     func testForgetByIDProducesReceiptWithRemovedIDAndCacheRefs() async throws {
         let sequence = CascadeIDSequence()
         let memory = makeMemoryWithDeterministicCascadeIDs(sequence: sequence)
-        let governed = try await memory.admit(admitRequest(content: "bye"))
+        let governed = try await admitGoverned(memory,admitRequest(content: "bye"))
 
         _ = try await memory.forget(id: governed.id)
 
@@ -295,9 +315,9 @@ final class QinaoMemoryTests: XCTestCase {
     func testForgetBySensitivityReceiptCapturesEveryRemovedID() async throws {
         let sequence = CascadeIDSequence()
         let memory = makeMemoryWithDeterministicCascadeIDs(sequence: sequence)
-        _ = try await memory.admit(admitRequest(content: "low", sensitivity: .low))
-        let h1 = try await memory.admit(admitRequest(content: "h1", sensitivity: .high))
-        let h2 = try await memory.admit(admitRequest(content: "h2", sensitivity: .high))
+        _ = try await admitGoverned(memory,admitRequest(content: "low", sensitivity: .low))
+        let h1 = try await admitGoverned(memory,admitRequest(content: "h1", sensitivity: .high))
+        let h2 = try await admitGoverned(memory,admitRequest(content: "h2", sensitivity: .high))
 
         _ = await memory.forget(sensitivity: .high)
 
@@ -323,8 +343,8 @@ final class QinaoMemoryTests: XCTestCase {
     func testForgetAllReceiptShapeWithEmptyRoots() async throws {
         let sequence = CascadeIDSequence()
         let memory = makeMemoryWithDeterministicCascadeIDs(sequence: sequence)
-        _ = try await memory.admit(admitRequest(content: "a"))
-        _ = try await memory.admit(admitRequest(content: "b"))
+        _ = try await admitGoverned(memory,admitRequest(content: "a"))
+        _ = try await admitGoverned(memory,admitRequest(content: "b"))
 
         _ = await memory.forgetAll()
 
@@ -343,8 +363,8 @@ final class QinaoMemoryTests: XCTestCase {
     func testCascadeLedgerAccumulatesAcrossCalls() async throws {
         let sequence = CascadeIDSequence()
         let memory = makeMemoryWithDeterministicCascadeIDs(sequence: sequence)
-        let a = try await memory.admit(admitRequest(content: "a", scope: .session))
-        _ = try await memory.admit(admitRequest(content: "b", scope: .user))
+        let a = try await admitGoverned(memory,admitRequest(content: "a", scope: .session))
+        _ = try await admitGoverned(memory,admitRequest(content: "b", scope: .user))
 
         _ = try await memory.forget(id: a.id)              // cid-000
         _ = await memory.forget(scope: .user)              // cid-001
@@ -367,9 +387,9 @@ final class QinaoMemoryTests: XCTestCase {
     func testRecentCascadeReceiptsReturnsTailSlice() async throws {
         let sequence = CascadeIDSequence()
         let memory = makeMemoryWithDeterministicCascadeIDs(sequence: sequence)
-        _ = try await memory.admit(admitRequest(content: "a"))
-        _ = try await memory.admit(admitRequest(content: "b"))
-        _ = try await memory.admit(admitRequest(content: "c"))
+        _ = try await admitGoverned(memory,admitRequest(content: "a"))
+        _ = try await admitGoverned(memory,admitRequest(content: "b"))
+        _ = try await admitGoverned(memory,admitRequest(content: "c"))
 
         _ = await memory.forget(scope: .user)              // cid-000 empty
         _ = await memory.forget(scope: .session)           // cid-001 completed

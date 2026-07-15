@@ -50,10 +50,11 @@ final class BASUpdateTicketLifecycleSQLiteConcurrencyTests: XCTestCase {
             try await group.waitForAll()
         }
 
-        // Each save replaces the whole table, so the final state is exactly one
-        // complete, decodable entry (the last writer) — never a half-written mix.
+        // audit M-c: `save` is now a per-row guarded MERGE (no more DELETE-all), so all 40
+        // distinct tickets persist — never a half-written mix. The test's real purpose (the
+        // concurrent BEGIN…COMMIT transactions don't race/throw) is unchanged.
         let final = try await storage.load()
-        XCTAssertEqual(final.count, 1)
-        XCTAssertTrue(final.keys.first?.hasPrefix("t") ?? false)
+        XCTAssertEqual(final.count, 40)
+        XCTAssertTrue(final.keys.allSatisfy { $0.hasPrefix("t") })
     }
 }

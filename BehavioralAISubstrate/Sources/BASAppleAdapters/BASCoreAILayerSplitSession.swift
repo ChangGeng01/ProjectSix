@@ -40,6 +40,12 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
     private let stateNames: [String]            // each function's KV state name ("kv0", "kv1", …)
     private let outputNames: [String]           // "hidden" for non-last, "logits" for the last
     private var kvs: [NDArray]                   // one fused KV per function (fp16)
+    #if DEBUG
+    // audit x-concurrency §三① — enforces the `@unchecked Sendable` single-serialized-driver
+    // contract at runtime (DEBUG only): a concurrent driver corrupts the in-place state.
+    // Zero-cost in release; the utility is unit-tested in BASSingleDriverTripwireTests.
+    private let driverTripwire = BASSingleDriverTripwire(label: "BASCoreAILayerSplitSession")
+    #endif
     private let maxSeq: Int
     private let headDim: Int
     private let neg: Float
@@ -116,6 +122,10 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
     /// piped function→function; the last function yields fp32 logits → argmax.
     @discardableResult
     public func step(token: Int, pos: Int) async throws -> Int {
+        #if DEBUG
+        driverTripwire.enter()   // audit x-concurrency §三①
+        defer { driverTripwire.exit() }
+        #endif
         guard pos < maxSeq else { throw DecodeError.windowOverflow(pos: pos, maxSeq: maxSeq) }
         let base = pos * headDim
         let cos = NDArray(scalars: cosTable[base..<base + headDim].map { Float16($0) }, shape: [headDim])
@@ -140,7 +150,7 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
                 kv: &kvs[i])
             i += 1
         }
-        return Self.argmaxF32(carry)   // last carry == fp32 logits
+        return Self.argmaxF16(carry)   // last carry == fp16 logits (the .half() graph; matches every other CoreAI session)
     }
 
     private func runStage(_ i: Int, inputs: [String: NDArray], kv: inout NDArray) async throws -> NDArray {
@@ -158,14 +168,17 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
         return nd
     }
 
-    private static func argmaxF32(_ a: NDArray) -> Int {
+    private static func argmaxF16(_ a: NDArray) -> Int {
         let count = a.shape.reduce(1, *)
         var best = 0
         var bestV = -Float.greatestFiniteMagnitude
-        a.view(as: Float.self).withUnsafePointer { pointer, _, _ in   // logits are fp32
+        // logits are fp16 — the device .aimodel is a `.half()` graph (lm_head fp16). The prior `Float.self` read
+        // crashed `NDArray+MutableView:172 "Type Float does not match scalar type Float16"`. Matches BASCoreAIDecodeSession.
+        a.view(as: Float16.self).withUnsafePointer { pointer, _, _ in
             var k = 0
             while k < count {
-                if pointer[k] > bestV { bestV = pointer[k]; best = k }
+                let v = Float(pointer[k])
+                if v > bestV { bestV = v; best = k }
                 k += 1
             }
         }

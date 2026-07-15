@@ -24,20 +24,20 @@ import BASObservability
 /// `BASBenchWarmupOutcome` (M361) with cold/warm split. Cold
 /// samples (typically the first one) capture allocator/JIT
 /// warmup; warm samples reflect steady-state.
-public struct LifecycleBench {
+package struct LifecycleBench {
 
-    public static let scopeStatement: String =
+    package static let scopeStatement: String =
         "[scope] regression alarm, not an SLA. measures " +
         "pure in-process value-type L13 lifecycle " +
         "traversal — no audit ledger I/O, no AFM " +
         "inference, no actor hops. sub-µs floor reference. " +
         "do not quote these numbers as customer-facing latency."
 
-    public struct Outcome: Sendable, Equatable {
-        public let traversalCount: Int
-        public let elapsedSeconds: Double
-        public let outcome: BASBenchWarmupOutcome
-        public init(
+    package struct Outcome: Sendable, Equatable {
+        package let traversalCount: Int
+        package let elapsedSeconds: Double
+        package let outcome: BASBenchWarmupOutcome
+        package init(
             traversalCount: Int,
             elapsedSeconds: Double,
             outcome: BASBenchWarmupOutcome
@@ -54,7 +54,7 @@ public struct LifecycleBench {
     /// Reports per-traversal latency in milliseconds (consistent
     /// with all other bench modes for suite uniformity; sub-µs
     /// values appear as e.g. 0.0040 ms).
-    public static func run(
+    package static func run(
         traversalCount: Int = 100_000
     ) -> Outcome {
         var samplesMs: [Double] = []

@@ -47,6 +47,34 @@ pub enum Verdict {
     FailClosed,
 }
 
+impl Verdict {
+    /// Severity rank (0 = softest … 5 = hardest)。 Higher = more
+    /// restrictive。 Made explicit (not a derived Ord over
+    /// declaration order) so a future reorder of the enum cannot
+    /// silently change the severity contract。 (blindspot-② HIGH)
+    pub fn severity_rank(self) -> u8 {
+        match self {
+            Verdict::Allow => 0,
+            Verdict::AllowWithGuard => 1,
+            Verdict::Defer => 2,
+            Verdict::Refuse => 3,
+            Verdict::Quarantine => 4,
+            Verdict::FailClosed => 5,
+        }
+    }
+
+    /// The more-severe (higher-rank) of `self` and `other`。 Used to
+    /// apply a climate/thermal FLOOR without ever DOWNGRADING a
+    /// stricter sovereign verdict。
+    pub fn max_severity(self, other: Verdict) -> Verdict {
+        if other.severity_rank() > self.severity_rank() {
+            other
+        } else {
+            self
+        }
+    }
+}
+
 /// Risk climate buckets。
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash,
     Serialize, Deserialize)]

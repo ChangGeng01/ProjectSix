@@ -27,17 +27,22 @@ final class BASChapter576OrchestrationCodablePostArcProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testNeuralCoreFrameConformsToCodable() {
-        assertCodable(BASNeuralCoreFrame.self)
+        // #18: real round-trip
+        let organMap = BASNeuralOrganMap(
+            morph: .scout,
+            activeOrgans: [],
+            routingPolicy: .scoutProbe)
+        let frame = BASNeuralCoreFrame(organMap: organMap)
+        assertCodableRoundTrips(frame)
     }
 
     func testProductRedLineLinterViolationConformsToCodable() {
-        assertCodable(BASProductRedLineLinter.Violation.self)
+        // #18: real round-trip
+        let violation = BASProductRedLineLinter.Violation(
+            redLine: .noAnthropomorphism,
+            offendingInput: "",
+            matchedSubstring: "")
+        assertCodableRoundTrips(violation)
     }
 }

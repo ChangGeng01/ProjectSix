@@ -120,8 +120,10 @@ public enum BASAgentLeaseManager {
         baseBudget: BASAgentLeaseBaseBudget = .default,
         turnStartMs: Int64
     ) -> [BASAgentLease] {
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let specByID = Dictionary(
-            uniqueKeysWithValues: registry.map { ($0.agentID, $0) })
+            registry.map { ($0.agentID, $0) },
+            uniquingKeysWith: { first, _ in first })
         var leases: [BASAgentLease] = []
         for (i, agentID) in plan.activeAgentIDs.enumerated() {
             guard let spec = specByID[agentID] else { continue }

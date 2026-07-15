@@ -28,6 +28,17 @@ import QinaoLoop
 /// 掌权". The neural layer produces intents; the brain produces
 /// permits and warrants; the runtime is the only surface that
 /// actually calls the world.
+///
+/// SECURITY SCOPE (integration S3 + permit-signing, 2026-07-12 — audit F2 DISCHARGED):
+/// all three tokens are now HMAC-SHA256 signed at mint and verified signature-first —
+/// warrant (`issueWarrant`/`isWarrantValid`), snapshot proof
+/// (`issueSnapshotContinuityProof`/`isSnapshotProofValid`, which also closed the pre-S3
+/// gap where proof expiry and sessionID were unchecked), and the risk permit
+/// (`requestActionPermit`/`isPermitValid`; QinaoRisk stays sovereign-free — its
+/// `permitTagKey` is plain CryptoKit injected by the composition layer, with a
+/// "qinao.permit.v1" domain label so tags never collide across token kinds under a
+/// shared key). Forging any token now requires the corresponding key, not just the
+/// type. Cross-process adoption requires only sharing the keys across the boundary.
 public actor QinaoRuntime {
 
     public enum RuntimeError: Error, Equatable, Sendable {
@@ -35,9 +46,15 @@ public actor QinaoRuntime {
         case missingWarrant
         case missingSnapshotProof
         case digestMismatch(expected: String, got: String)
+        /// audit F1 (2026-07-12): the executed tool name does not match the tool the signed
+        /// intent authorized — a swapped-tool attempt (approval for A reused for B).
+        case toolMismatch(expected: String, got: String)
         case permitExpired
         case warrantExpired
         case sessionHalted(id: String)
+        /// deep-audit P0-2: the (permit, warrant, proof) bundle was already consumed — a signed
+        /// bundle is single-use even within its TTL, so a replay cannot re-fire the side effect.
+        case tokenAlreadyConsumed
         case toolExecutionFailed(reason: String)
     }
 
@@ -58,29 +75,45 @@ public actor QinaoRuntime {
         }
     }
 
-    /// Opaque proof that the current session's snapshot chain is
-    /// intact. Produced by the control plane, consumed by the gate.
+    /// Proof that the current session's snapshot chain is intact.
+    ///
+    /// integration S3 (2026-07-12, audit F2 discharge): the proof now has a REAL issuance
+    /// path — `QinaoSovereignControlPlane.issueSnapshotContinuityProof` HMAC-signs all six
+    /// identity fields; `isSnapshotProofValid` verifies signature + session binding +
+    /// expiry (the pre-S3 gate checked only `intentDigest` — expiry and sessionID were
+    /// silently unvalidated). The public init remains for Codable/testing, but an
+    /// unsigned or hand-built proof fails verification: forgery needs the key.
     public struct SnapshotContinuityProof: Sendable, Equatable, Codable {
         public let proofID: String
         public let sessionID: String
         public let anchorID: String
         public let intentDigest: String
+        /// deep-audit P1-6(b) (2026-07-13): host-version binding — see Warrant.hostVersionID.
+        /// A proof minted under host N cannot be replayed under host N+1 within the TTL.
+        public let hostVersionID: String
         public let issuedAt: Date
         public let expiresAt: Date
+        /// HMAC-SHA256 tag over the seven fields (hex). Minted only by
+        /// `issueSnapshotContinuityProof`.
+        public let signature: String
         public init(
             proofID: String,
             sessionID: String,
             anchorID: String,
             intentDigest: String,
+            hostVersionID: String,
             issuedAt: Date,
-            expiresAt: Date
+            expiresAt: Date,
+            signature: String
         ) {
             self.proofID = proofID
             self.sessionID = sessionID
             self.anchorID = anchorID
             self.intentDigest = intentDigest
+            self.hostVersionID = hostVersionID
             self.issuedAt = issuedAt
             self.expiresAt = expiresAt
+            self.signature = signature
         }
     }
 
@@ -109,6 +142,11 @@ public actor QinaoRuntime {
     public nonisolated let lifecycle: QinaoLifecycle?
 
     private let toolExecutor: ToolExecutor
+    /// deep-audit P0-2: the actor-held single-use set for `execute()` bundles — maps a
+    /// (permitID, warrantID, proofID) bundle key to the permit's expiry, so replays of the same
+    /// signed bundle within TTL are rejected. Actor isolation makes the claim atomic (no await
+    /// between the duplicate check and the insert), closing the reentrancy window before the effect.
+    private var consumedBundles: [String: Date] = [:]
     /// `package` (M171) so phase extension files in this same
     /// SPM package can stamp `emittedAt` consistently.
     package let now: @Sendable () -> Date
@@ -144,6 +182,29 @@ public actor QinaoRuntime {
         intent: QinaoRiskGate.ActionIntent,
         signatures: Signatures
     ) async throws -> Data {
+        // audit F1 (2026-07-12): bind the EXECUTED tool to the SIGNED intent. The intent
+        // carries toolName but execute() never read it, so a caller with valid signatures for
+        // intent A could pass toolName B and have B executed (approval-for-A reused for B).
+        // The host owns the digest formula and the executor, but this closes the confused-
+        // deputy gap at zero cost and makes the binding explicit rather than dead.
+        guard toolName == intent.toolName else {
+            throw RuntimeError.toolMismatch(
+                expected: intent.toolName, got: toolName)
+        }
+        // deep-audit P0-1: bind the PERMIT to the presented tool AND payload. The permit signs only
+        // `intent.digest`, and toolName/payload were never in that signed material — so a holder of
+        // valid signatures for one action's digest could pass a different tool or payload. Recompute
+        // the SDK-canonical digest from the PRESENTED (toolName, payload, session, host) and require
+        // the signed permit.digest to equal it: any tool/payload swap changes the recomputed digest
+        // and fails here. (F1's `toolName == intent.toolName` compared against the caller-supplied,
+        // UNSIGNED intent — this closes that confused-deputy gap against signed material.)
+        let boundDigest = QinaoRiskGate.ActionIntent.canonicalDigest(
+            toolName: toolName, payload: payload,
+            sessionID: intent.sessionID, hostVersionID: intent.hostVersionID)
+        guard signatures.permit.digest == boundDigest else {
+            throw RuntimeError.digestMismatch(
+                expected: boundDigest, got: signatures.permit.digest)
+        }
         guard signatures.permit.digest == intent.digest else {
             throw RuntimeError.digestMismatch(
                 expected: intent.digest,
@@ -183,6 +244,36 @@ public actor QinaoRuntime {
         let warrantOK = await sovereign.isWarrantValid(
             signatures.warrant, for: sovereignIntent)
         guard warrantOK else { throw RuntimeError.missingWarrant }
+
+        // integration S3 (audit F2 discharge): FULL proof verification — signature +
+        // session binding + expiry. The pre-S3 gate compared only intentDigest, so an
+        // expired or cross-session or hand-built proof passed silently.
+        let proofOK = await sovereign.isSnapshotProofValid(
+            signatures.snapshotProof, for: sovereignIntent)
+        guard proofOK else { throw RuntimeError.missingSnapshotProof }
+
+        // deep-audit P0-2: CONSUME the bundle atomically before the side effect. The claim (check +
+        // insert) runs with no await in between, so actor isolation guarantees at-most-once even
+        // under concurrent re-entry with the same signed bundle. Burn-on-attempt: the claim is NOT
+        // released if the executor throws (a partial side effect may already have landed), so a
+        // failed call cannot be retried with the same bundle — the host must re-mint.
+        let bundleKey = signatures.permit.permitID + "\u{1F}"
+            + signatures.warrant.warrantID + "\u{1F}" + signatures.snapshotProof.proofID
+        consumedBundles = consumedBundles.filter { $0.value > present }   // bound: drop expired
+        guard consumedBundles[bundleKey] == nil else {
+            throw RuntimeError.tokenAlreadyConsumed
+        }
+        consumedBundles[bundleKey] = signatures.permit.expiresAt
+
+        // deep-audit P0-3: re-check halt as the LAST await before the effect. The halt check at the
+        // top is the first of four suspension points; a markSessionHalted landing during the
+        // intervening permit/warrant/proof awaits would otherwise be missed and the executor would
+        // still fire. Re-checking here shrinks the TOCTOU window to the (unavoidable) gap between
+        // this await returning and the external executor call. The bundle is already consumed, so a
+        // halted turn's bundle is burned — the host must re-mint after unhalt (fail-closed).
+        if await sovereign.isSessionHalted(intent.sessionID) {
+            throw RuntimeError.sessionHalted(id: intent.sessionID)
+        }
 
         do {
             return try await toolExecutor(toolName, payload)
@@ -347,6 +438,17 @@ public actor QinaoRuntime {
         // validation throws first.
         let rawSessionID = inputs.observations.sessionID
         let rawTurnID = inputs.observations.turnID
+
+        // integration S1 (2026-07-12) — the runtime's own memory participates in the turn.
+        // When the caller supplies no L8 bundle, derive one from `self.memory`'s frontstage
+        // recall (shadow copy — caller's inputs are never mutated; an explicitly supplied
+        // bundle always wins). Empty memory derives nil, so hosts that admitted nothing keep
+        // today's exact semantics (L8 layer skips). This closes turn-path finding C: `memory`
+        // was a stored-but-unused seam while L8 consumed only caller-supplied bundles.
+        var inputs = inputs
+        if inputs.memoryBundle == nil {
+            inputs.memoryBundle = await memory.frontstageBundle()
+        }
 
         do {
             return try await sendSessionBody(

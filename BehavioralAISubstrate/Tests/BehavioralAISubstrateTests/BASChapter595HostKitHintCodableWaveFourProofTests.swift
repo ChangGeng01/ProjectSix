@@ -27,17 +27,13 @@ final class BASChapter595HostKitHintCodableWaveFourProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testChengluHintSetConformsToCodable() {
-        assertCodable(BASChengluHintSet.self)
+        // #18: real round-trip (all-nil aggregate = the empty set)
+        assertCodableRoundTrips(BASChengluHintSet.empty)
     }
 
     func testTrainingDataExportFilterConformsToCodable() {
-        assertCodable(BASTrainingDataExportFilter.self)
+        // #18: real round-trip (all-default filter = export everything)
+        assertCodableRoundTrips(BASTrainingDataExportFilter.all)
     }
 }

@@ -73,9 +73,15 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
         let risk: QinaoRiskGate
     }
 
+    /// The anchor every proof in this suite is minted against. deep-audit P0-4
+    /// made a REGISTERED anchor a precondition of proof validity, so the fixture
+    /// must seed it — an unregistered anchor now fails closed with
+    /// `missingSnapshotProof`.
+    private static let gateAnchorID = "anchor-host.v1"
+
     private func makeGateFixture(
         now: @escaping @Sendable () -> Date = { Date() }
-    ) async -> GateFixture {
+    ) async throws -> GateFixture {
         let recorder = ToolRecorder()
 
         let snapshotManager = BASSovereignSnapshotManager(now: now)
@@ -100,6 +106,17 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
             warrantTTLSeconds: 30,
             now: now)
         let risk = QinaoRiskGate(permitTTLSeconds: 30, now: now)
+
+        // deep-audit P0-4: seed the snapshot anchor the suite's proofs are bound
+        // to. Proof verify consults the snapshot manager, so without this every
+        // proof is refused as unregistered.
+        let anchorPayload = Data("gate-chain-anchor".utf8)
+        _ = try await snapshotManager.register(
+            anchor: BASSovereignSnapshotManager.SnapshotAnchor(
+                anchorID: Self.gateAnchorID,
+                safeSnapshotRef: "snap-\(Self.gateAnchorID)",
+                integrityHash: BASSovereignSnapshotManager.hash(anchorPayload)),
+            sealedPayload: anchorPayload)
 
         let constitution = BASHostConstitution(
             hostID: "host", activeVersion: "host.v1")
@@ -151,18 +168,19 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
 
     /// Construct a SnapshotContinuityProof bound to a specific
     /// intent digest. Same shape used by `QinaoRuntimeGateTests`.
+    /// integration S3: proofs are minted by the control plane (HMAC-signed).
     private func proof(
         for intent: QinaoRiskGate.ActionIntent,
-        now: Date,
+        sovereign: QinaoSovereignControlPlane,
         ttl: TimeInterval = 30
-    ) -> QinaoRuntime.SnapshotContinuityProof {
-        QinaoRuntime.SnapshotContinuityProof(
-            proofID: "proof-\(UUID().uuidString)",
-            sessionID: intent.sessionID,
-            anchorID: "anchor-host.v1",
-            intentDigest: intent.digest,
-            issuedAt: now,
-            expiresAt: now.addingTimeInterval(ttl))
+    ) async -> QinaoRuntime.SnapshotContinuityProof {
+        await sovereign.issueSnapshotContinuityProof(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: intent.digest,
+                sessionID: intent.sessionID,
+                hostVersionID: intent.hostVersionID),
+            anchorID: Self.gateAnchorID,
+            ttlSeconds: ttl)
     }
 
     // MARK: - Happy path: real LLM body → intent → all 3 sigs → execute
@@ -174,7 +192,7 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
 
         let nowDate = Date()
         let now: @Sendable () -> Date = { nowDate }
-        let fx = await makeGateFixture(now: now)
+        let fx = try await makeGateFixture(now: now)
 
         // Step 1: REAL Apple FoundationModels produces a draft body
         // — the loop's normal generation path. This is the "neural
@@ -213,20 +231,18 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
                 .isEmpty)
 
         // Step 2: host translates the LLM body into a tool intent
-        // (here: calendar.add_event payload). The intent's digest
-        // is SHA256 of (toolName || body || sessionID) — opaque to
-        // the gate but deterministic for downstream audit.
+        // (here: calendar.add_event payload). deep-audit P0-1: the digest is
+        // the SDK-canonical binding over (toolName, payload, session, host) —
+        // the exact value `execute()` recomputes from what is PRESENTED and
+        // requires the signed permit to carry.
         let toolName = "calendar.add_event"
         let intentSessionID = "sess.gate.real.1"
         let payloadString = draft.body
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let payload = Data(payloadString.utf8)
-        let digest = Self.sha256Hex(
-            of: toolName + "|" + payloadString + "|"
-                + intentSessionID)
         let intent = QinaoRiskGate.ActionIntent(
-            digest: digest,
             toolName: toolName,
+            payload: payload,
             sessionID: intentSessionID,
             hostVersionID: "host.v1",
             summary: "add a calendar event derived from LLM draft")
@@ -239,7 +255,7 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
                 digest: intent.digest,
                 sessionID: intent.sessionID,
                 hostVersionID: intent.hostVersionID))
-        let snapshotProof = proof(for: intent, now: nowDate)
+        let snapshotProof = await proof(for: intent, sovereign: fx.sovereign)
 
         XCTAssertEqual(permit.digest, intent.digest)
         XCTAssertEqual(warrant.intentDigest, intent.digest)
@@ -289,7 +305,7 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
 
         let nowDate = Date()
         let now: @Sendable () -> Date = { nowDate }
-        let fx = await makeGateFixture(now: now)
+        let fx = try await makeGateFixture(now: now)
 
         let endpoint = await QinaoLoop
             .makeAppleFoundationEndpoint()
@@ -316,9 +332,14 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
 
         let toolName = "calendar.add_event"
         let payload = Data(draft.body.utf8)
+        // The intent must be WELL-FORMED (canonically bound to the presented
+        // tool+payload) so `execute()` clears the P0-1 tool/payload binding
+        // guard and reaches the WARRANT-stage digest check — the misbinding
+        // this test exists to pin. An opaque digest here would trip the earlier
+        // guard and pass for the wrong reason.
         let intent = QinaoRiskGate.ActionIntent(
-            digest: Self.sha256Hex(of: "real-intent"),
             toolName: toolName,
+            payload: payload,
             sessionID: "sess.gate.real.2",
             hostVersionID: "host.v1",
             summary: "real-LLM intent — well-formed")
@@ -332,7 +353,7 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
                 digest: Self.sha256Hex(of: "different-intent"),
                 sessionID: intent.sessionID,
                 hostVersionID: intent.hostVersionID))
-        let snapshotProof = proof(for: intent, now: nowDate)
+        let snapshotProof = await proof(for: intent, sovereign: fx.sovereign)
 
         do {
             _ = try await fx.runtime.execute(

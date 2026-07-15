@@ -10,6 +10,30 @@
 // Use this output to pick the .geluSIMDMinDim + .siluSIMDMinDim
 // crossovers in chapter 七百十一 第四刀 BASAutoRouteThresholds。
 
+// ## ARCHIVE MARKER (skip triage, 2026-07-14) — DO NOT DELETE THIS FILE
+//
+// The skip message is HONEST (zero XCTAssert; no asserted-bench replacement).
+// Two notes, both verified 2026-07-14:
+//
+//   - NOT an orphaned-FFI case. An automated triage flagged this file as the
+//     sole Swift caller of `bas_ranker_gelu_exact_simd` and
+//     `bas_ranker_silu_simd`; that is WRONG. BASChapter711ActivationABITests
+//     also calls both and RUNS (8 tests, zero skips), so the wrappers stay
+//     exercised. (Chapter 709 is the file with the real orphan — it has no ABI
+//     twin.) Recorded here so the claim is not "rediscovered" and acted on.
+//
+//   - ★ EVIDENCE GENERATOR FOR A LIVE PRODUCTION DECISION. Sources/
+//     BASRuntimeCore/BASAutoRouteRanker+Activations.swift:17-24 hard-codes
+//     routing prose measured by this now-skipped file ("gelu_exact: Rust scalar
+//     always (erf cost dominates; SIMD unrolling adds <1% benefit at any dim)",
+//     "silu: Rust scalar always (sigmoid bottleneck; SIMD parity within ±2%)").
+//     This is the only harness that can re-derive those constants — read
+//     "archive" as "dormant evidence generator", not "dead".
+//
+// Activation algorithms remain covered by the Rust unit tests
+// (src/activations.rs). Runs on this Mac today if the setUp override is removed
+// (pure CPU + Rust FFI, no gate).
+
 import XCTest
 import Foundation
 @testable import BASRuntimeCore

@@ -39,7 +39,7 @@
 // designated initializer。
 
 import Foundation
-import Crypto
+import CryptoKit
 import BASSovereign
 import BASRuntimeCore
 

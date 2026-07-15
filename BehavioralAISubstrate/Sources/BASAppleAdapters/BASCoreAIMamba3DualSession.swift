@@ -34,6 +34,12 @@ public final class BASCoreAIMamba3DualSession: @unchecked Sendable {
     private let ssmName: String
     private var angle: NDArray
     private var ssm: NDArray
+    #if DEBUG
+    // audit x-concurrency §三① — enforces the `@unchecked Sendable` single-serialized-driver
+    // contract at runtime (DEBUG only): a concurrent driver corrupts the in-place state.
+    // Zero-cost in release; the utility is unit-tested in BASSingleDriverTripwireTests.
+    private let driverTripwire = BASSingleDriverTripwire(label: "BASCoreAIMamba3DualSession")
+    #endif
     private let angleShape: [Int]
     private let ssmShape: [Int]
     private let vocab: Int
@@ -84,6 +90,10 @@ public final class BASCoreAIMamba3DualSession: @unchecked Sendable {
     /// Recurrent single-token decode (mode 1).
     @discardableResult
     public func decodeStep(token: Int) async throws -> Int {
+        #if DEBUG
+        driverTripwire.enter()   // audit x-concurrency §三①
+        defer { driverTripwire.exit() }
+        #endif
         let inputID = NDArray(scalars: [Int32(token)], shape: [1, 1])
         return try await runDecode(inputID: inputID, a: &angle, s: &ssm)
     }

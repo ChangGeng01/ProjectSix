@@ -17,6 +17,7 @@ enum BASHostRuntimeEBrainPromptAnalyzer {
     }
 
     static func manipulationHints(in text: String) -> [String] {
+        let words = wordSet(text)
         let normalized = text.lowercased()
         let rules: [(String, String)] = [
             ("now", "time_pressure"),
@@ -26,7 +27,26 @@ enum BASHostRuntimeEBrainPromptAnalyzer {
             ("everyone says", "social_pressure"),
             ("you always", "history_rewrite")
         ]
-        return rules.compactMap { normalized.contains($0.0) ? $0.1 : nil }
+        return rules.compactMap { cueMatches($0.0, words: words, normalized: normalized) ? $0.1 : nil }
+    }
+
+    /// The whole-word token set of `text` (lowercased, split on non-alphanumerics) — the boundary basis
+    /// for `cueMatches`.
+    static func wordSet(_ text: String) -> Set<String> { Set(tokenized(text)) }
+
+    /// deep-audit calibration (manipulation/urgency/routing cue precision): does `cue` occur in the text?
+    /// A SINGLE-word cue must match as a WHOLE WORD (so "now" can NOT fire inside know / known / knowledge
+    /// / acknowledge / snow / downtown, "must" inside mustard / muster, "plan" inside plant / planet /
+    /// explanation) — the class of `normalized.contains(shortWord)` bugs that spuriously escalated risk /
+    /// urgency / run-mode on benign text. A MULTI-word phrase cue keeps SUBSTRING matching (interior
+    /// spaces already make phrases boundary-safe, and over-detection is the fail-safe direction for a
+    /// safety path). Real cues still fire because natural phrasing (spaces + punctuation) tokenizes the
+    /// cue into a standalone word ("act now", "now!", "you must comply", "must-do").
+    static func cueMatches(_ cue: String, words: Set<String>, normalized: String) -> Bool {
+        let c = cue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard c.isEmpty == false else { return false }
+        if tokenized(c).count > 1 { return normalized.contains(c) }   // phrase → substring
+        return words.contains(c)                                       // single word → whole-word
     }
 
     static func containsReflectiveCue(_ text: String) -> Bool {

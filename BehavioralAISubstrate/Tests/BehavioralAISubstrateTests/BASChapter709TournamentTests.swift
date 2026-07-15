@@ -8,6 +8,26 @@
 // 七百九 第四刀 router stays CPU-only for these primitives at
 // reasonable per-row sizes。
 
+// ## ARCHIVE MARKER (skip triage, 2026-07-14) — DO NOT DELETE THIS FILE
+//
+// Verified before writing this marker:
+//   - the skip message is HONEST on both claims: zero XCTAssert in any test
+//     method, and no asserted bench supersedes the crossover measurement.
+//   - this file is the ONLY Swift caller repo-wide of the shipped C-ABI symbols
+//     `bas_ranker_softmax_simd` (lib.rs:374) and `bas_ranker_layer_norm_welford`
+//     (lib.rs:411). Unlike chapter 711 — whose symbols stay covered by the
+//     RUNNING BASChapter711ActivationABITests — chapter 709 has NO ABI twin, so
+//     this skip dropped both wrappers to zero Swift execution. That gap is now
+//     closed by BASChapter709FFISmokeTests; the symbols are no longer orphaned,
+//     but a dead-code sweep reading only THIS file would still mis-read them as
+//     unused.
+//
+// What is still lost while this stays skipped: the Swift-vs-Rust-scalar-vs-
+// Rust-SIMD crossover data for softmax + layer_norm. Production
+// BASAutoRouteRanker+Linalg.swift calls only `bas_ranker_softmax`, so no live
+// assertion depends on the numbers — this is the lowest-risk archive in the
+// cluster.
+
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
@@ -27,8 +47,11 @@ final class BASChapter709TournamentTests: XCTestCase {
         try await super.setUp()
         throw XCTSkip(
             "Chapter 八百七十九 archive skip — print-only" +
-            " tournament without asserted-bench replacement" +
-            " yet。 Keep file for live-data reference;skip" +
+            " tournament (zero XCTAssert)。 FFI-boundary coverage for its two" +
+            " otherwise-orphaned C-ABI symbols now lives in" +
+            " BASChapter709FFISmokeTests (asserted, runs every pass);" +
+            " the CROSSOVER MEASUREMENT still has no asserted replacement。" +
+            " Keep file for live-data reference;skip" +
             " test methods to save CI time。")
     }
 

@@ -32,27 +32,61 @@ final class QinaoSeatProposingProtocolTests: XCTestCase {
     }
 
     func test_validProposalAccepted() async {
+        // audit F12: a leaseRef now requires a wired enforcer to verify it (fail-closed).
+        // Issue a real lease + attach the enforcer so this is the genuinely-valid accept path.
+        let enforcer = QinaoAgentLeaseEnforcer()
+        let leaseRef = await enforcer.issue(QinaoAgentLease(
+            agent: .planner, maxMs: 60_000, maxLoops: 10, maxWrites: 10,
+            scope: [.candidateFrontier]))
         let proposal = QinaoAgentProposal(
             agent: .planner,
             delta: QinaoAgentDelta(
                 target: .candidateFrontier,
                 payload: "{}"),
-            leaseRef: "lease-ok")
+            leaseRef: leaseRef)
         let seat = MockProposingSeat(
             seat: .planner,
             proposals: [proposal])
 
-        let registry =
-            QinaoAgentProposalRegistry()
+        let registry = QinaoAgentProposalRegistry(leaseEnforcer: enforcer)
         await registry.register(seat)
         let board = await registry
             .dispatchProposals(snapshotID: "s1")
-        // No lease enforcer attached → registry doesn't
-        // check lease validity. Capability validation only
-        // (lease ref non-nil suffices for that path here).
         XCTAssertEqual(board.validProposals.count, 1)
         XCTAssertEqual(
             board.rejectedProposals.count, 0)
+    }
+
+    // MARK: - audit F12: fail-closed identity + lease binding
+
+    /// A leaseRef with NO enforcer wired is unverifiable → rejected (was fail-open: passed).
+    func test_leaseRefWithoutEnforcerIsRejected() async {
+        let proposal = QinaoAgentProposal(
+            agent: .planner,
+            delta: QinaoAgentDelta(target: .candidateFrontier, payload: "{}"),
+            leaseRef: "fabricated-lease")
+        let registry = QinaoAgentProposalRegistry()  // no enforcer
+        await registry.register(MockProposingSeat(seat: .planner, proposals: [proposal]))
+        let board = await registry.dispatchProposals(snapshotID: "s1")
+        XCTAssertEqual(board.validProposals.count, 0, "unverifiable lease must fail closed")
+        XCTAssertEqual(board.rejectedProposals.count, 1)
+        XCTAssertTrue(board.rejectedProposals[0].issues.contains(
+            .leaseUnverifiable(agent: .planner)))
+    }
+
+    /// A seat proposing under ANOTHER agent's identity → rejected (seat↔agent binding).
+    func test_seatImpersonatingAnotherAgentIsRejected() async {
+        // seat .scout emits a proposal claiming to be .planner
+        let proposal = QinaoAgentProposal(
+            agent: .planner,
+            delta: QinaoAgentDelta(target: .candidateFrontier, payload: "{}"),
+            leaseRef: nil)
+        let registry = QinaoAgentProposalRegistry()
+        await registry.register(MockProposingSeat(seat: .scout, proposals: [proposal]))
+        let board = await registry.dispatchProposals(snapshotID: "s1")
+        XCTAssertEqual(board.validProposals.count, 0, "seat impersonation must fail closed")
+        XCTAssertTrue(board.rejectedProposals[0].issues.contains(
+            .seatIdentityMismatch(claimed: .planner, actual: .scout)))
     }
 
     func test_invalidWriteDomainRejected() async {

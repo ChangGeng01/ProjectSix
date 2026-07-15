@@ -31,9 +31,9 @@ import BASSovereign
 /// no ledger machinery. Signing throughput on Apple Silicon is
 /// hardware-accelerated; numbers are useful for cross-revision
 /// comparison only.
-public struct Ed25519SignBench {
+package struct Ed25519SignBench {
 
-    public static let scopeStatement: String =
+    package static let scopeStatement: String =
         "[scope] regression alarm, not an SLA. measures " +
         "pure in-process Ed25519 signing via " +
         "Curve25519.Signing.PrivateKey.signature(for:) — no " +
@@ -42,12 +42,12 @@ public struct Ed25519SignBench {
         "outlier-rate investigation. do not quote these " +
         "numbers as customer-facing latency."
 
-    public struct Outcome: Sendable, Equatable {
-        public let signCount: Int
-        public let payloadBytes: Int
-        public let elapsedSeconds: Double
-        public let outcome: BASBenchWarmupOutcome
-        public init(
+    package struct Outcome: Sendable, Equatable {
+        package let signCount: Int
+        package let payloadBytes: Int
+        package let elapsedSeconds: Double
+        package let outcome: BASBenchWarmupOutcome
+        package init(
             signCount: Int,
             payloadBytes: Int,
             elapsedSeconds: Double,
@@ -64,7 +64,7 @@ public struct Ed25519SignBench {
     /// 446-byte L13 input. Reports per-signature latency in
     /// milliseconds with M361 cold/warm split (first sample is
     /// cold; rest are warm).
-    public static func run(
+    package static func run(
         signCount: Int = 10_000
     ) throws -> Outcome {
         let keyPair = try BASSovereignEd25519KeyPair

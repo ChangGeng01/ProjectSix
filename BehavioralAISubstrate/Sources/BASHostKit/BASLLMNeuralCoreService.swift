@@ -119,15 +119,71 @@ extension BASLLMNeuralCoreService {
     public static func makeDefault(
         adapter: any BASOrganAdapter,
         eventLog: any BASEventLogStorage,
-        contractInstall: BASLLMContractInstall? = .observeOnly(purpose: .decompose)
+        contractInstall: BASLLMContractInstall? = .observeOnly(purpose: .decompose),
+        // deep-audit L-1 (2026-07-13): the embedder is edge-injected since T4 (BASHostKit no
+        // longer constructs the concrete MiniLM). nil ⇒ the adjudicator wrap is INERT even
+        // under BAS_FACTUAL_ADJUDICATE=1 — pass one to opt in. The live adjudication path is
+        // the endpoint factories (QinaoMLX/QinaoAppleFoundation), which inject it there.
+        embeddingProvider: (any BASMemory.BASEmbeddingProvider)? = nil
     ) -> BASLLMNeuralCoreService {
         // ADR-031 §4 step 1 (opt-in / byte-equal-off): when an install is supplied, every LLM call
         // through this engine is contracted (fail-closed) + traced; nil → adapter used unwrapped,
         // identical to before (no behavior change).
-        let effectiveAdapter: any BASOrganAdapter = contractInstall?.wrap(adapter) ?? adapter
+        let contracted: any BASOrganAdapter = contractInstall?.wrap(adapter) ?? adapter
+        // observe→DISPOSE: opt-in (BAS_FACTUAL_ADJUDICATE) — wrap the live organ with the semantic
+        // factual-belief adjudicator, but ONLY when an embeddingProvider is supplied (see the
+        // L-1 note above). With the default nil provider this returns `contracted` unchanged.
+        let effectiveAdapter = Self.adjudicating(
+            contracted, embeddingProvider: embeddingProvider)
         return BASLLMNeuralCoreService(
             engine: BASLLMExtractionEngine(
                 adapter: effectiveAdapter,
                 eventLog: eventLog))
+    }
+
+    /// When `BAS_FACTUAL_ADJUDICATE=1`, wrap the live organ with the semantic adjudicator (bundled corpus +
+    /// on-device MiniLM). Default-OFF ⇒ returns `inner` byte-equal. FAIL-OPEN: missing provider/corpus ⇒
+    /// `inner` (the dispose path never breaks the live organ). Only injects a verdict on a covered, confident
+    /// factual-belief turn — otherwise the request passes through untouched.
+    ///
+    /// `public` so the real runtime / a live host can route its organ adapter through the wrap at the
+    /// adapter-registration seam (see `BASHostRuntime.adjudicatingOrgan(_:)`), not just the in-package
+    /// `makeDefault(...)` extraction path. The returned wrapper conforms to `BASStreamingOrganAdapter`, so the
+    /// chat loop's `as? BASStreamingOrganAdapter` probe resolves it and the verdict reaches `streamDraft`.
+    public static func adjudicating(
+        _ inner: any BASOrganAdapter,
+        enabled: Bool = BASFactualAdjudicatorWiring.isEnabled(),
+        gate: BASAdjudicationGate = BASAdjudicationGate.fromEnvironment(),
+        observer: BASAdjudicationObserver? = BASAdjudicationObservation.defaultObserverIfEnabled(),
+        nliProbe: BASNLIEntailmentProbe? = nil,
+        // charter audit 2026-07-12 T4 (LLM-outside cut): the embedder is INJECTED by the
+        // edge — like nliProbe always was — instead of BASHostKit constructing the
+        // concrete MiniLM (which welded the model-adapter module into the core umbrella).
+        // nil ⇒ inner unchanged (same FAIL-OPEN posture as a missing corpus). The LLM-side
+        // endpoint factories (QinaoAppleFoundation/QinaoMLX) pass BASMiniLMEmbeddingProvider().
+        embeddingProvider: (any BASMemory.BASEmbeddingProvider)? = nil
+    ) -> any BASOrganAdapter {
+        guard enabled else { return inner }
+        let facts = BASBundledFactCorpus.load()
+        guard !facts.isEmpty, let provider = embeddingProvider else { return inner }
+        let bank = BASEmbeddingFactBank(facts: facts, provider: provider)
+        // NEUROMODULATION: the gate (default `.always`, or `BAS_ADJ_GATE`-derived) decides per turn whether to
+        // pay the embed/retrieve — so the adjudicator is a tier engaged by stakes × headroom (NOT ε), not always-on.
+        // OBSERVE: the observer (default `BAS_ADJ_OBSERVE`-gated os_log, else nil) records the per-turn outcome
+        // so an operator can MEASURE skip/inject/abstain rates and tune the gate. Both default to byte-equal.
+        // NLI: an optional gaslight-reducer probe (default nil ⇒ alias-only). The device-only CoreAI verifier is
+        // supplied by the edge (host/endpoint) so the 82–313 MB asset never weighs down hosts that don't want
+        // the synonym tail — see `BASNLIEntailmentProbe`.
+        return BASSemanticAdjudicatingOrganAdapter(
+            wrapping: inner, bank: bank, enabled: true, gate: gate, observer: observer, nliProbe: nliProbe)
+    }
+
+    /// Pre-embed the adjudicator's fact bank (idempotent) so the FIRST live ON turn doesn't pay the corpus
+    /// load cost synchronously before the first token. NO-OP when `adapter` is not the adjudicator wrapper —
+    /// i.e. default-OFF, where `adjudicating(_:)` returned the bare organ and this downcast simply fails (so
+    /// the OFF path stays byte-equal: O(1) failed downcast, no embed, no allocation). Hosts call this once at
+    /// endpoint construction, right after `adjudicating(_:)`, before registering the organ.
+    public static func prewarmAdjudicator(_ adapter: any BASOrganAdapter) async {
+        await (adapter as? BASSemanticAdjudicatingOrganAdapter)?.warmUp()
     }
 }

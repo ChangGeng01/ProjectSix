@@ -42,7 +42,7 @@ extension MLXOrganAdapter {
     public nonisolated static func shouldUsePromptLookup(
         elect: Bool, request: BASOrganRequest
     ) -> Bool {
-        elect && request.preset.temperature == 0
+        elect && BASDecodeLanePolicy.isGreedyByteSafe(temperature: request.preset.temperature)
     }
 
     /// Generate the same prompt under prompt-lookup (spec) and the null-drafter baseline, in ONE container pass.
@@ -140,7 +140,87 @@ extension MLXOrganAdapter {
     /// under greedy, ~1.58x on repetitive output; every other case (not elected, or temp>0) fail-closes to
     /// `draft(_:)`, byte-equal. This is the production wire for `respondPromptLookup` (previously reachable only
     /// from probes); the eligibility decision stays host-side so this adapter keeps NO BASOrgan-policy coupling.
-    public func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
-        try await respondPromptLookup(for: request, electPromptLookup: electAccelerated)
+    /// CANONICAL accelerated draft entry (DecodePlan S5): the host passes the turn's PURPOSE and the single planner
+    /// (`BASDecodeLanePolicy.decodeStrategy`) picks the lane (Option-3 auto-select). Output is byte-identical
+    /// regardless of which lane runs — every lane emits the target's argmax (ADR-039) — so only latency/lane changes.
+    ///
+    /// `decodePlannerAutoSelect` is a runtime KILL-SWITCH: when OFF it means PURE PLAIN (no acceleration at all) —
+    /// the simplest safe revert — not the legacy prompt-lookup gate.
+    public func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft {
+        // audit H21: close the cross-entry decision table. `draft(_:)` routes a seat request
+        // (request.sessionID set) to the per-seat pool (draftMultiTurn) for KV/history reuse; this
+        // purpose overload did not, so the SAME seat request got stateful via one entry and
+        // stateless (conversation history LOST) via the other — byte-different output, no error.
+        // Every purpose-aware decorator (adjudicating / routing / gate / verifier / tool-planner)
+        // forwards a bare `request` here, so the moment a host sets request.sessionID this path
+        // silently bypassed the seat pool. Mirror draft(_:): seat routing wins before the planner.
+        if let sid = request.sessionID {
+            return try await draftMultiTurn(request, sessionID: sid)
+        }
+        return try await draft(request, purpose: purpose, sessionID: nil)
     }
+
+    /// CROSS-TURN variant (查缺补漏 T3): supply a stable conversation `sessionID` so the planner's `.suffixLookup`
+    /// lane seeds its drafter from the cross-turn corpus and folds this turn back in — the device-gated cross-turn
+    /// win (1.07–1.41×) is UNREACHABLE through the no-session entries (they run an empty store = plain prompt-lookup).
+    /// Byte-identical regardless (every lane emits the target's argmax, ADR-039). HOST CONTRACT (footgun): use ONE
+    /// stable sessionID per conversation and do NOT also re-send chat history in `request.context` (the re-rendered
+    /// prompt would re-contain prior turns → duplicate appends + premature FIFO eviction); `clearSession(sessionID:)`
+    /// resets the corpus. NOTE: exposed on the concrete adapter; protocol + wrapper propagation is the multi-turn-
+    /// caller follow-up (no current production caller is multi-turn, so the no-session entries remain the live path).
+    public func draft(
+        _ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose, sessionID: String?
+    ) async throws -> BASOrganDraft {
+        // gaps-reconciliation organ-eval LOW-2 (2026-07-11): role validation must precede the
+        // kill-switch AND live outside the #if — the old order let decodePlannerAutoSelect=false
+        // (and the no-MLXLLM build) route an unsupported-role request into _plainDraft, diverging
+        // from base draft(_:) (MLXOrganAdapter.swift:1179 checks the role first).
+        guard descriptor.supportedRoles.contains(request.role) else {
+            throw BASOrganError.unsupportedRole(request.role)
+        }
+        guard decodePlannerAutoSelect else {
+            return try await _plainDraft(request)
+        }
+        #if canImport(MLXLLM)
+        // 案5: ONE context per turn (thermal + memory headroom sampled once; BAS_DECODE_CTX=1
+        // prints the who-could-throttle line).
+        let ctx = MLXOrganAdapter._decodeContext(purpose: purpose, request: request)
+        let strategy = BASDecodeLanePolicy.decodeStrategy(
+            context: ctx,
+            capabilities: _decodeCapabilities(),
+            profiler: draftProfiler,
+            numDraftTokens: numDraftTokens)
+        // 可解释性①: THE turn line is emitted by _execute once the EXECUTED lane is known.
+        return try await _execute(strategy, for: request, purpose: purpose, sessionID: sessionID,
+                                  context: ctx)
+        #else
+        return try await _plainDraft(request)
+        #endif
+    }
+
+    /// COMPATIBILITY elect-Bool entry — RETAINED, not deleted (production uses `draft(_:purpose:)`; this stays a
+    /// thin shim for any remaining Bool callers). Shims to the purpose entry via the legacy eligibility mapping —
+    /// byte-equal because `promptLookupEligible(_purposeForElect(e)) == e`.
+    public func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
+        try await draft(request, purpose: Self._purposeForElect(electAccelerated))
+    }
+
+    /// Elect→purpose shim mapping (used by the retained compatibility elect entry). `true` → `.factual` (eligible), `false` →
+    /// `.scoutDefault` (not eligible), so it reproduces the legacy `promptLookupEligible` elect gate exactly.
+    static func _purposeForElect(_ elect: Bool) -> BASDecodeLanePolicy.Purpose {
+        elect ? .factual : .scoutDefault
+    }
+
+    #if canImport(MLXLLM)
+    /// The decode lanes physically available right now, for the planner (keeps the planner pure / MLX-free).
+    func _decodeCapabilities() -> BASDecodeCapabilities {
+        BASDecodeCapabilities(
+            draftModelLoaded: isSpeculationActive,                 // draftContainer loaded + mode != .off
+            saguaroAvailable: false,                               // no injected CoreAI speculator on this entry
+            modelFreeAvailable: _loadedContainerForStreaming() != nil,
+            // Offered only when a host opted in AND the main model is loaded; execution fail-closes to plain
+            // if the model is not Qwen3.5 (SpecError.notQwen35 → _plainDraft, never-silent).
+            mtpHeadLoaded: _resolveMTPWeightsURL() != nil && _loadedContainerForStreaming() != nil)
+    }
+    #endif
 }

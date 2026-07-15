@@ -11,7 +11,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASRustAtomFilterTests: XCTestCase {
 
     // MARK: - Direct tracker actor
@@ -181,4 +180,3 @@ final class BASRustAtomFilterTests: XCTestCase {
             "Same set of recordIDs from both paths")
     }
 }
-#endif

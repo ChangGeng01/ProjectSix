@@ -23,7 +23,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter870BrainMPSGraphAttentionParityTests:
     XCTestCase
 {
@@ -255,4 +254,3 @@ final class BASChapter870BrainMPSGraphAttentionParityTests:
         }
     }
 }
-#endif

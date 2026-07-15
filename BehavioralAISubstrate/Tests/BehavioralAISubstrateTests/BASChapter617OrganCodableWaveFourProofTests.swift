@@ -35,21 +35,34 @@ final class BASChapter617OrganCodableWaveFourProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASOrganDraftConformsToCodable() {
-        assertCodable(BASOrganDraft.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASOrganDraft(
+                requestID: "",
+                providerID: "",
+                role: .scout,
+                body: "",
+                inputTokensEstimated: 0,
+                outputTokensEstimated: 0,
+                producedAt: Date(timeIntervalSince1970: 0),
+                traceID: ""))
     }
 
     func testBASLLMExtractionResultConformsToCodable() {
-        assertCodable(BASLLMExtractionResult.self)
+        // #18: honest compile-time-only fallback — BASLLMExtractionResult
+        // requires deeply-nested BASLLMExtractionByproducts +
+        // BASLLMTaskPackage values that cannot be confidently
+        // minimally constructed here.
+        assertConformsToCodableAtCompileTime(
+            BASLLMExtractionResult.self)
     }
 
     func testBASLLMExtractionEngineErrorConformsToCodable() {
-        assertCodable(BASLLMExtractionEngineError.self)
+        // #18: real round-trip (non-CaseIterable enum, representative cases)
+        assertCodableRoundTrips(
+            BASLLMExtractionEngineError.retrievalFailed(reason: ""))
+        assertCodableRoundTrips(
+            BASLLMExtractionEngineError.adapterFailed(reason: ""))
     }
 }

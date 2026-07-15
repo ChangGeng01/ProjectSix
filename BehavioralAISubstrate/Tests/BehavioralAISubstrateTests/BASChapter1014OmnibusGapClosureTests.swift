@@ -374,10 +374,7 @@ final class BASChapter1014OmnibusGapClosureTests: XCTestCase {
         throws
     {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let path = "\(projectRoot)/Sources/BASOrchestration/" +
             "BASAgentFabricModeAuditEmitter.swift"
         let content = try String(

@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import BASAppleAdapters
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 struct BASApplePredictiveInterventionLifecycleTests {
     @Test("reconciler preserves the existing candidate when the visible semantics match")
     func reconcilerPreservesExistingCandidateWhenVisibleSemanticsMatch() {
@@ -114,4 +113,3 @@ struct BASApplePredictiveInterventionLifecycleTests {
         ])
     }
 }
-#endif

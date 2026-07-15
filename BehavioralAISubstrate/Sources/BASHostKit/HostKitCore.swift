@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 
 @_exported import BASAdmin
-@_exported import BASAppleAdapters
+@_exported import BASAppleLifecycleKit
 @_exported import BASEvaluation
 @_exported import BASMemory
 @_exported import BASObservability
@@ -733,7 +733,11 @@ public struct BASHostCurrentBrain: Codable, Equatable, Sendable {
 }
 
 public typealias BASHostConsoleSnapshot = BASConsoleSnapshot
-public typealias BASHostConsoleView = BASConsoleView
+// audit M-o MED-2 — `BASHostConsoleView = BASConsoleView` was RELOCATED to
+// the new BASAdminUI target (with the view itself). Keeping it here forced
+// SwiftUI into BASHostKit and thus every headless host. The re-export had
+// zero references; UI hosts now import BASAdminUI for BASConsoleView /
+// BASHostConsoleView directly.
 
 public struct BASHostSessionResult: Codable, Equatable, Sendable {
     public var requestKind: BASHostSessionKind

@@ -116,9 +116,52 @@ public struct BASMetalGPUProbeSummary: Sendable, Equatable {
     }
 }
 
+// MARK: In-flight budget
+
+/// audit devicetestapp MED-8 — a thread-safe bound on outstanding GPU command buffers.
+/// A Metal command queue blocks the makeCommandBuffer that would exceed its in-flight
+/// quota (default 64). On a GPU wedge the probe's timed-out-but-uncompleted buffers
+/// accumulate (each `.timedOut` leaves its buffer committed/in-flight), and ~21 min in
+/// the 65th makeCommandBuffer BLOCKS — the heartbeat freezes and adjudication goes blind
+/// exactly when it matters. This caps outstanding BELOW the quota so the probe emits a
+/// bounded `.timedOut` forever instead of ever reaching the blocking allocation.
+/// Pure + Mac-testable (no Metal); the wiring into runOnce is the device-verified part.
+public final class BASMetalProbeInFlightBudget: @unchecked Sendable {
+    private let lock = NSLock()
+    private let cap: Int
+    private var outstanding = 0
+
+    public init(cap: Int) { self.cap = max(1, cap) }
+
+    /// Reserve a slot. `false` ⇒ at capacity — the caller must NOT issue the command
+    /// buffer (return a bounded `.timedOut` instead of blocking).
+    public func tryAcquire() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard outstanding < cap else { return false }
+        outstanding += 1
+        return true
+    }
+
+    /// Release a slot — called from the command buffer's completion handler.
+    public func release() {
+        lock.lock(); defer { lock.unlock() }
+        if outstanding > 0 { outstanding -= 1 }
+    }
+
+    /// Current outstanding count (diagnostics/tests).
+    public var inFlight: Int {
+        lock.lock(); defer { lock.unlock() }
+        return outstanding
+    }
+}
+
 // MARK: Probe
 
 public enum BASMetalGPUProbe {
+
+    /// Outstanding-command-buffer cap, safely below Metal's default 64-buffer queue quota
+    /// so the probe never reaches the blocking makeCommandBuffer on a wedged queue.
+    static let inFlightCap = 60
 
     /// Inline MSL: a trivial element-wise increment — representative GPU COMPUTE work (like MLX's
     /// decode kernels), not a blit, so a compute-path GPU wedge is exercised. Deliberately tiny.
@@ -142,6 +185,8 @@ public enum BASMetalGPUProbe {
         let queue: MTLCommandQueue
         let pipeline: MTLComputePipelineState
         let buffer: MTLBuffer
+        /// audit devicetestapp MED-8 — one budget per queue, shared across probeOnce calls.
+        let budget: BASMetalProbeInFlightBudget
     }
 
     fileprivate static func makeRig() -> Rig? {
@@ -154,7 +199,8 @@ public enum BASMetalGPUProbe {
             let library = try device.makeLibrary(source: kernelSource, options: nil)
             guard let fn = library.makeFunction(name: "bas_probe_increment") else { return nil }
             let pipeline = try device.makeComputePipelineState(function: fn)
-            return Rig(device: device, queue: queue, pipeline: pipeline, buffer: buffer)
+            return Rig(device: device, queue: queue, pipeline: pipeline, buffer: buffer,
+                       budget: BASMetalProbeInFlightBudget(cap: inFlightCap))
         } catch {
             return nil
         }
@@ -164,9 +210,19 @@ public enum BASMetalGPUProbe {
     /// `.timedOut` instead of hanging this thread forever.
     fileprivate static func runOnce(_ rig: Rig, timeoutSec: Double) -> BASMetalGPUProbeOutcome {
         let start = DispatchTime.now()
+        // audit devicetestapp MED-8: reserve an in-flight slot BEFORE the (potentially
+        // blocking) makeCommandBuffer. At capacity ⇒ a wedge has accumulated the queue's
+        // whole quota of uncompleted buffers; emit a bounded .timedOut rather than block.
+        guard rig.budget.tryAcquire() else {
+            return BASMetalGPUProbeOutcome(
+                status: .timedOut, elapsedMs: 0,
+                detail: "in-flight command-buffer budget exhausted (cap \(inFlightCap)) — "
+                    + "refusing to block makeCommandBuffer on a wedged queue")
+        }
         guard let cb = rig.queue.makeCommandBuffer(),
               let enc = cb.makeComputeCommandEncoder()
         else {
+            rig.budget.release()   // never issued the buffer → free the reserved slot
             return BASMetalGPUProbeOutcome(status: .setupFailed, elapsedMs: 0,
                                            detail: "makeCommandBuffer/Encoder returned nil")
         }
@@ -180,7 +236,15 @@ public enum BASMetalGPUProbe {
         enc.endEncoding()
 
         let sem = DispatchSemaphore(value: 0)
-        cb.addCompletedHandler { _ in sem.signal() }
+        // deep-audit P2-24 (2026-07-13): capture only the Sendable pieces (`budget` is
+        // @unchecked Sendable — see the thread-safety rationale on Budget), not the whole
+        // non-Sendable `rig`. Behaviour-identical; silences the Sendable-capture warning that
+        // surfaced in every BASMetalSubstrate build (and would be a Swift-6-mode error).
+        let budget = rig.budget
+        // Release the in-flight slot when the buffer completes (even on error). A buffer
+        // that never completes (a true wedge) holds its slot forever — which is the point:
+        // outstanding saturates the cap and subsequent probes short-circuit to .timedOut.
+        cb.addCompletedHandler { _ in budget.release(); sem.signal() }
         cb.commit()
 
         let waitResult = sem.wait(timeout: .now() + timeoutSec)

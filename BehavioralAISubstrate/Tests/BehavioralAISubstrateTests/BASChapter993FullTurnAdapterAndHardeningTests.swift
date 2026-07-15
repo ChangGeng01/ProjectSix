@@ -101,6 +101,91 @@ final class BASChapter993FullTurnAdapterAndHardeningTests:
             result?.warrantAuditEntry?.entry.turnID, "t.1")
     }
 
+    // MARK: - A': hostkit-rest MED-1 — flush failure must not fork host from ledger
+
+    /// Event-log double whose `append` always throws — models the durable trace
+    /// store failing AFTER the warrant already committed to the sovereign ledger.
+    private struct ThrowingEventLog: BASEventLogStorage {
+        struct Boom: Error {}
+        func append(_ entry: BASEventLogEntry) async throws
+            -> (wasNew: Bool, assignedSequenceNumber: Int64) { throw Boom() }
+        func events(forSession sessionID: String) async -> [BASEventLogEntry] { [] }
+        func events(sinceTimestampMs since: Int64, limit: Int) async -> [BASEventLogEntry] { [] }
+        var totalCount: Int { get async { 0 } }
+        func pruneEventsBefore(timestampMs cutoff: Int64) async throws -> Int { 0 }
+    }
+
+    func testFullTurnAdapter_FlushFailure_DeliversTurnResultWithPartialCommit()
+        async throws
+    {
+        let fabric = makeFabric()
+        let coordinator = makeCoordinator(fabric: fabric)
+        let ledger = makeAuditLedger()
+        let chain = BASSovereignWarrantChain(
+            hostRootWarrantID: "host-w-1",
+            perAgentWarrantID: "agent-w-1",
+            expiresAtNanos: 1_000_000_000_000,
+            externalAgentID: "ext.alpha")
+        let warrantResult = BASSovereignWarrantValidator.validate(
+            chain: chain, forExternalAgentID: "ext.alpha", nowNanos: 500_000_000_000)
+        XCTAssertTrue(warrantResult.valid)
+
+        // A traceLog with ≥1 event for the turn so flush actually reaches the
+        // throwing eventLog append (an empty traceLog would flush 0 and never throw).
+        let traceLog = BASAgentTraceLog()
+        _ = await traceLog.append(BASAgentTraceEvent(
+            turnID: "t.1", createdAtNanos: 1,
+            kind: .mergeCompleted,
+            payloadJson: #"{"merge_id":"m1","accepted":1,"rejected":0}"#))
+        let bridge = BASAgentTraceLogEventLogBridge(
+            traceLog: traceLog, eventLog: ThrowingEventLog(), sessionID: "sess.1")
+
+        var inputs = makeLiveInputs()
+        inputs = BASAgentFabricLiveInputs(
+            frame: inputs.frame,
+            candidatePaths: inputs.candidatePaths,
+            acceptedCandidateID: inputs.acceptedCandidateID,
+            warrantValidation: (result: warrantResult, externalAgentID: "ext.alpha"))
+
+        // Must NOT throw despite the flush failing — the turn is delivered.
+        var result: BASAgentFabricFullTurnResult?
+        do {
+            result = try await BASAgentFabricFullTurnAdapter.run(
+                sessionID: "sess.1", turnID: "t.1", liveInputs: inputs,
+                coordinator: coordinator, warrantLedger: ledger, traceLogBridge: bridge)
+        } catch {
+            return XCTFail("run() threw on flush failure — turnResult lost, host forks from ledger: \(error)")
+        }
+
+        XCTAssertNotNil(result, "the bundle must still be delivered on flush failure")
+        XCTAssertNotNil(result?.turnResult, "turnResult must survive a flush failure")
+        XCTAssertNil(result?.flushedTraceEventCount, "a failed flush reports no count")
+        XCTAssertEqual(result?.partialCommit?.stage, "traceFlush",
+            "the flush failure must be surfaced as an explicit partial-commit marker")
+        // The warrant DID commit to the ledger — the host must have received the turn too (no fork).
+        let entries = await ledger.entries(forSession: "sess.1", turn: "t.1")
+        XCTAssertEqual(entries.count, 1,
+            "warrant committed to ledger AND turn delivered to host — the two views agree")
+        XCTAssertNotNil(result?.warrantAuditEntry)
+    }
+
+    func testFullTurnAdapter_FlushSuccess_NoPartialCommit() async throws {
+        // Companion: the success path is unchanged — non-throwing eventLog ⇒ partialCommit nil,
+        // flushedTraceEventCount == 1.
+        let coordinator = makeCoordinator(fabric: makeFabric())
+        let traceLog = BASAgentTraceLog()
+        _ = await traceLog.append(BASAgentTraceEvent(
+            turnID: "t.1", createdAtNanos: 1, kind: .mergeCompleted,
+            payloadJson: #"{"merge_id":"m1","accepted":1,"rejected":0}"#))
+        let bridge = BASAgentTraceLogEventLogBridge(
+            traceLog: traceLog, eventLog: BASInMemoryEventLogStorage(), sessionID: "sess.1")
+        let result = try await BASAgentFabricFullTurnAdapter.run(
+            sessionID: "sess.1", turnID: "t.1", liveInputs: makeLiveInputs(),
+            coordinator: coordinator, traceLogBridge: bridge)
+        XCTAssertNil(result?.partialCommit, "success path: no partial-commit marker")
+        XCTAssertEqual(result?.flushedTraceEventCount, 1, "success path: flush count reported")
+    }
+
     // MARK: - B: BASAgentFabricGate env-var probing
 
     func testGate_DefaultEnvironment_FabricDisabled() {

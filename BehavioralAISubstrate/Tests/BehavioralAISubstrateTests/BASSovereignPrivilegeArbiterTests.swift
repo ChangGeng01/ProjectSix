@@ -15,6 +15,20 @@ final class BASSovereignPrivilegeArbiterTests: XCTestCase {
         XCTAssertTrue(ok)
     }
 
+    /// deep-audit MED: explainDenial must AGREE with isAllowed on a nil-domain query. A domain-sealed
+    /// permission denies a nil-domain query (isAllowed==false, blindspot-HIGH fail-closed); explainDenial
+    /// must NAME that seal, not return nil ("allowed"). Unfixed: explainDenial skips the domain block when
+    /// featureDomain==nil → returns nil while isAllowed==false → RED.
+    func testExplainDenialAgreesWithIsAllowedForNilDomainSeal() async {
+        let arb = BASSovereignPrivilegeArbiter()
+        await arb.revoke(.toolWrite, session: "S1", featureDomain: "network", reasonCode: "seal-01")
+        let allowed = await arb.isAllowed(.toolWrite, session: "S1", turn: nil, featureDomain: nil)
+        let explain = await arb.explainDenial(.toolWrite, session: "S1", turn: nil, featureDomain: nil)
+        XCTAssertFalse(allowed, "nil-domain query is fail-closed against the domain seal")
+        XCTAssertNotNil(explain, "a domain-sealed denial must be explained, not reported allowed")
+        XCTAssertEqual(explain, "domain(network):seal-01")
+    }
+
     func testTurnRevocationBlocksCurrentTurnOnly() async {
         let arb = BASSovereignPrivilegeArbiter()
         await arb.revoke(.toolWrite, session: "S1", turn: "T1", reasonCode: "BR-003")
@@ -51,6 +65,30 @@ final class BASSovereignPrivilegeArbiterTests: XCTestCase {
 
         let other = await arb.isAllowed(.externalActuation, session: "S2", turn: "T1", featureDomain: "fs")
         XCTAssertTrue(other, "different domain must not inherit revocation")
+    }
+
+    func testDomainSealCannotBeBypassedByOmittingDomain() async {
+        // blindspot HIGH: a domain seal must not be dodgeable by simply
+        // not naming the domain in the query. The old code only checked
+        // domainRevocations[featureDomain], so a nil-domain query fell
+        // through to session/turn scope and returned true — silently
+        // bypassing the widest-scope seal ("no external actuation ...").
+        let arb = BASSovereignPrivilegeArbiter()
+        await arb.revoke(.externalActuation, session: "S1", featureDomain: "network", reasonCode: "BR-008")
+
+        // Query for the SAME permission omitting featureDomain entirely
+        // (and even for a different session/turn) must fail CLOSED.
+        let nilDomainSameSession = await arb.isAllowed(.externalActuation, session: "S1", turn: "T1")
+        let nilDomainOtherSession = await arb.isAllowed(.externalActuation, session: "S9", turn: "T7")
+        XCTAssertFalse(nilDomainSameSession,
+            "a domain-omitting query must not bypass the domain seal")
+        XCTAssertFalse(nilDomainOtherSession,
+            "the domain seal is cross-session; omitting the domain cannot dodge it")
+
+        // A DIFFERENT permission with no seal is still allowed — the
+        // backstop is permission-specific, not a blanket deny.
+        let unrelated = await arb.isAllowed(.toolWrite, session: "S1", turn: "T1")
+        XCTAssertTrue(unrelated, "unsealed permissions remain allowed")
     }
 
     func testApplyVerdictCopiesEveryRevokedPermission() async {

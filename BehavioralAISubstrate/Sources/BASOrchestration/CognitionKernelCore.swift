@@ -128,8 +128,10 @@ public enum BASCognitionKernel {
         var retained = initial.retainedBlocks
         var dropped = initial.droppedBlocks
         let preserved = Set(request.kernelPolicy.preservedBlockIDs)
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let dropOrderIndex = Dictionary(
-            uniqueKeysWithValues: request.kernelPolicy.dropOrderIDs.enumerated().map { ($0.element, $0.offset) }
+            request.kernelPolicy.dropOrderIDs.enumerated().map { ($0.element, $0.offset) },
+            uniquingKeysWith: { first, _ in first }
         )
 
         while renderedLength(of: retained, separator: request.compilationPolicy.blockSeparator) > request.compilationPolicy.targetCharacters {

@@ -357,16 +357,21 @@ extension SampleHostModel {
                         surface: .application,
                         prompt: prompt,
                         riskLevel: riskLevel)
-                    let result = try await Task.detached(
-                        priority: .userInitiated
-                    ) {
+                    // Cooperative-pool safe since the EBrainTurnResult CoW box: the turn result
+                    // is pointer-sized and the init ladder is flat, so startSession fits the
+                    // 512KB cooperative stack in debug (the 2026-07-11 SIGBUS root is fixed in
+                    // the library; the interim 8MB-Thread workaround was reverted deliberately
+                    // as the reversal proof).
+                    let result = try await Task.detached {
                         try runtime.startSession(request)
                     }.value
-                    if let turn = result.eBrainTurn {
-                        if let entry = turn.sovereignAuditEntry {
+                    // context-IR step 2: the production host consumes the slim
+                    // BASTurnResponse contract, not the 53-field record.
+                    if let response = result.turnResponse {
+                        if let entry = response.sovereignAuditEntry {
                             auditCount = entry.signalRefs.count
                         }
-                        permitMode = turn.actionPermit.mode.rawValue
+                        permitMode = response.actionPermit.mode.rawValue
                     }
                 } catch {
                     permitMode = "substrate-error"

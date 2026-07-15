@@ -25,13 +25,12 @@ final class BASChapter609OrganCodableWaveTwoProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testOrganCapacityConformsToCodable() {
-        assertCodable(BASOrganCapacity.self)
+        // #18: real round-trip
+        let value = BASOrganCapacity(
+            availableInputTokens: 0,
+            availableOutputTokens: 0,
+            underPressure: false)
+        assertCodableRoundTrips(value)
     }
 }

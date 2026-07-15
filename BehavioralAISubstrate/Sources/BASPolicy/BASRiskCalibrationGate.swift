@@ -159,12 +159,12 @@ public actor BASRiskCalibrationGate {
                     "bundle isWellFormed=false; check version, " +
                     "provenanceRef, and warrantRef")
         }
-        // Monotonic version check (string compare).
-        // Baseline counts as "lower than any non-baseline".
+        // Monotonic version check (numeric-aware — audit policy-obs-misc LOW-1: raw String `>`
+        // rejected a legitimate v9→v10 upgrade). Baseline counts as "lower than any non-baseline".
         let currentVersion = bundle.bundleVersion
         let proposedVersion = proposed.bundleVersion
         if currentVersion != BASRiskCalibrationBundle.baselineVersion {
-            guard proposedVersion > currentVersion else {
+            guard BASCalibrationVersionOrder.compare(proposedVersion, currentVersion) == .orderedDescending else {
                 throw ReplaceError.nonMonotonicVersion(
                     current: currentVersion,
                     proposed: proposedVersion)

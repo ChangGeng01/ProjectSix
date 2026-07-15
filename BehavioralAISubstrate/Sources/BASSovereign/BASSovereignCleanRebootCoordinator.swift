@@ -107,6 +107,13 @@ public actor BASSovereignCleanRebootCoordinator {
     // MARK: - Anchor binding
 
     /// Bind a registered snapshot anchor to a host version. The
+    /// deep-audit P0-4 (2026-07-13): read-only registration check, so a snapshot-continuity proof
+    /// can be validated against the LIVE anchor set (an anchor never registered — or deregistered
+    /// within the proof's TTL — must fail the proof closed, not just carry an unverifiable string).
+    public func isAnchorRegistered(_ anchorID: String) async -> Bool {
+        await snapshotManager.isRegistered(anchorID: anchorID)
+    }
+
     /// coordinator refuses bindings where the anchor isn't known to
     /// the snapshot manager or the version isn't known to the tree.
     public func bindAnchor(

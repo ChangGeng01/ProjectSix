@@ -159,9 +159,18 @@ final class BASChapter786ArcSealTests: XCTestCase {
         //   - Kept warm so watchOS / Linux paths work
         // If this assertion ever needs to flip false,a future
         // commit deleted a fallback path → ADR-014 violation。
-        XCTAssertTrue(true,
-            "「依旧 不删除 只 comment」 doctrine held: all V1 " +
-            "Swift fallback paths preserved, tested, and active " +
-            "on non-Apple platforms.")
+        //
+        // audit x-test-integrity F9: this was a permatrue XCTAssertTrue(true). It now REFERENCES a
+        // representative set of the *ViaSwift* fallback symbols as function values — if a future commit
+        // DELETES any of them, this file fails to COMPILE (the M824 compile-time-proof idiom), giving
+        // the "comment-not-delete" doctrine real teeth instead of a tautology.
+        let fallbackPaths: [Any] = [
+            BASRoutedPresenceFusion.fuseViaSwiftInline,
+            BASRedTeamBatchClassifier.classifyViaSwiftFallback,
+            BASRoutedWorldPriorAggregation.worstReversibilityViaSwiftInline,
+        ]
+        XCTAssertEqual(fallbackPaths.count, 3,
+            "「依旧 不删除 只 comment」 doctrine: the referenced V1 Swift fallback paths must all exist " +
+            "(deleting one breaks compilation, not just this assertion).")
     }
 }

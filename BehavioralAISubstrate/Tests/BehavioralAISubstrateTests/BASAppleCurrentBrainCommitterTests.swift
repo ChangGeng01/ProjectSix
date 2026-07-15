@@ -5,7 +5,6 @@ import Testing
 @testable import BASMemory
 @testable import BASPolicy
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Current Brain Committer")
 struct BASAppleCurrentBrainCommitterTests {
     @Model
@@ -174,4 +173,3 @@ struct BASAppleCurrentBrainCommitterTests {
         #expect(result.orderedCheckpoints.first?.sourceID == "notification")
     }
 }
-#endif

@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import BASMemory
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASMemory Persistence Core")
 struct BASMemoryPersistenceCoreTests {
     @Test("governed persistence fields canonicalize retrieval tags")
@@ -112,4 +111,3 @@ struct BASMemoryPersistenceCoreTests {
         #expect(ids == ["a-id", "z-id"])
     }
 }
-#endif

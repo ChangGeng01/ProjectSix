@@ -19,6 +19,42 @@ import BASWorldPrior
 // Extracted from the 6099-line monolith during the M71 cohesion split.
 
 extension BASEBrainRuntimeCoordinator {
+
+    /// deep-audit P2-17 (2026-07-13): the auditID derivation, EXTRACTED as a pure static function
+    /// so its uniqueness/determinism contract is directly unit-testable with `turnID` held constant
+    /// (the drivenTurn-based tests can't isolate the content digest because each turn runs at a
+    /// distinct wall-clock time, so turnID already differs).
+    ///
+    /// Contract: the trailing component is a DETERMINISTIC SHA-256 (8-byte, 16 hex) over the turn's
+    /// identifying fields — turnID (session + recordedAt), verdictID, level, snapshotRef, and the
+    /// commit/warrant/quarantine action refs. Two turns that differ in ANY of these get distinct
+    /// auditIDs even under a host-FROZEN clock where turnID alone would collide; byte-identical
+    /// inputs are the SAME turn and correctly map to the same auditID (idempotent — the
+    /// replay-determinism harness requires it, which is why this is a content digest, not a UUID).
+    ///
+    /// DECISION (P2-17 sub-part 2): NO monotonic per-turn sequence component is added. Genuinely
+    /// distinct turns differ in snapshotRef (from the thought fold) and/or actionRefs (their commit/
+    /// warrant/quarantine tokens are per-turn unique), so a same-tick collision requires
+    /// byte-identical content — which IS the same turn. Adding a sequence would break the
+    /// idempotent-replay determinism the harness pins for no real-world uniqueness gain.
+    static func deriveSovereignAuditID(
+        turnID: String,
+        verdictID: String,
+        verdictLevelRaw: String,
+        snapshotRef: String,
+        actionRefs: [String]
+    ) -> String {
+        let auditDiscriminator = [
+            turnID,
+            verdictID,
+            verdictLevelRaw,
+            snapshotRef,
+            actionRefs.joined(separator: ","),
+        ].joined(separator: "\u{1F}")
+        let auditDigest = SHA256.hash(data: Data(auditDiscriminator.utf8))
+            .prefix(8).map { String(format: "%02x", $0) }.joined()
+        return "audit.\(turnID).\(verdictLevelRaw).\(auditDigest)"
+    }
     func buildSovereignCommitTokens(
         sovereignVerdict: BASSovereignVerdict,
         runtimeTrace: BASRuntimeTrace,
@@ -97,6 +133,17 @@ extension BASEBrainRuntimeCoordinator {
             )
         }
 
+        // SOVEREIGNTY TODO — verified NON-GAP as of 2026-06-30 (4-tracer + 3-refuter trace
+        // `toolcall-sovereign-gate-trace`). The verdict ALSO revokes `.toolWrite` / `.externalActuation`
+        // (see EBrainRuntimeCoordinator+SovereignVerdict.swift:142), but there is DELIBERATELY no commit-scope
+        // for them here yet: the LLM tool-dispatch path (BASToolDispatcher, in BASOrgan) is currently dead in
+        // production — `toolPlanner` defaults nil and is never set, so the live turn only runs
+        // `materializeToolIntent` (RunTurn.swift), which DESCRIBES tool intent without ever dispatching. A
+        // whole-repo grep for `contains(.toolWrite)` matches only tests ⇒ the toolWrite revocation is write-only.
+        // When a live tool-execution path is wired, CLOSE the gap here: mint a `.toolWrite` scope guarded by
+        // `sovereignVerdict.revokedPermissions.contains(.toolWrite) == false` (mirroring the `.memoryWrite` branch
+        // above) and wrap the live dispatch in a `BASSovereignGatedTurn` so an ungated tool-call throws
+        // `noCommitTokenForScope`. Until then this is wiring debt, not an open breach.
         return tokens
     }
 
@@ -672,11 +719,27 @@ extension BASEBrainRuntimeCoordinator {
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
-        let auditID = "audit.\(runtimeTrace.sessionID).\(sovereignVerdict.verdictLevel.rawValue)"
         let actionRefs =
             sovereignCommitTokens.map(\.tokenID)
             + sovereignWarrants.map(\.warrantID)
             + quarantineRecords.map(\.quarantineID)
+        // deep-audit L-3 follow-on + P2-17 (2026-07-13): auditID must be unique per DISTINCT
+        // turn — but it must ALSO be a pure function of the turn, because the replay-
+        // determinism harness (BASCoordinatorTurnDeterminismTests /
+        // BASEBrainTurnResultReplayHarnessTests) requires the same turn to re-derive a
+        // byte-identical entry. A UUID/nonce would satisfy uniqueness but BREAK determinism
+        // (it did — 173 replay tests reddened). So the uniqueness component is a DETERMINISTIC
+        // SHA256 over the turn's identifying fields: turnID (session + recordedAt), verdictID,
+        // level, the commit/warrant/quarantine action refs, and the snapshot ref. Distinct
+        // turns differ in at least one → distinct digest, even under a host-frozen clock where
+        // turnID alone collided; identical inputs mean the SAME turn, which correctly maps to
+        // the same auditID (idempotent). turnID stays the grep-able prefix.
+        let auditID = Self.deriveSovereignAuditID(
+            turnID: turnID,
+            verdictID: sovereignVerdict.verdictID,
+            verdictLevelRaw: sovereignVerdict.verdictLevel.rawValue,
+            snapshotRef: snapshotRef,
+            actionRefs: actionRefs)
         // M299 — derive frontier summary from the candidate
         // observation bundle. `summarize()` is a pure value-type
         // transform; emits at most three status codes per turn
@@ -1728,17 +1791,22 @@ extension BASEBrainRuntimeCoordinator {
         return BASAutoRouteRanker.bytesToHexLower(Array(digest))
     }
 
-    func buildSovereignExecutionReceipts(
+    /// audit hostkit-spine F9 / operator decision 2B: these are COMMIT-TIME receipts — the commands
+    /// were actuated (status `.executed`) but this layer measures NO per-command timing. So `latencyMs`
+    /// is 0 (unmeasured sentinel, NOT a claimed 0ms) and `executedAt` is the real trace `recordedAt`
+    /// for all — the previous `(index+1)*12ms` latency + per-index timestamp stagger were FABRICATED
+    /// numbers presented as if measured. (Kept `.executed` + the schema; only the fake metrics dropped.)
+    static func buildSovereignExecutionReceipts(
         sovereignActuationCommands: [BASSovereignActuationCommand],
         runtimeTrace: BASRuntimeTrace
     ) -> [BASSovereignExecutionReceipt] {
-        sovereignActuationCommands.enumerated().map { index, command in
+        sovereignActuationCommands.map { command in
             BASSovereignExecutionReceipt(
                 commandID: command.commandID,
                 kind: command.kind,
                 status: .executed,
-                executedAt: runtimeTrace.recordedAt.addingTimeInterval(Double(index + 1) * 0.012),
-                latencyMs: (index + 1) * 12,
+                executedAt: runtimeTrace.recordedAt,
+                latencyMs: 0,
                 enforcedMode: command.forcedMode,
                 reasonCodes: command.reasonCodes
             )

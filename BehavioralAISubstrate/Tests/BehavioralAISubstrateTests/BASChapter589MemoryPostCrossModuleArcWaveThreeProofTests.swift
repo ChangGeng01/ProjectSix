@@ -27,18 +27,18 @@ final class BASChapter589MemoryPostCrossModuleArcWaveThreeProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testMemoryImportanceScorerConformsToCodable() {
-        assertCodable(BASMemoryImportanceScorer.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(BASMemoryImportanceScorer())
     }
 
     func testMemoryMutationWriterMutationOutcomeConformsToCodable() {
-        assertCodable(
-            BASMemoryMutationWriter.MutationOutcome.self)
+        // #18: real round-trip
+        let value = BASMemoryMutationWriter.MutationOutcome(
+            evaluated: 0,
+            applied: 0,
+            skipped: 0,
+            notFound: 0)
+        assertCodableRoundTrips(value)
     }
 }

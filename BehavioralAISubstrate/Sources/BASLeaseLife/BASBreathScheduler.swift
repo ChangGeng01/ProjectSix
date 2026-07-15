@@ -92,6 +92,13 @@ public actor BASBreathScheduler {
     private let clock: @Sendable () -> Date
     private var scheduled: [String: ScheduledBreath] = [:]
 
+    /// audit F10 (2026-07-12): the last guard level reconcile() saw. schedule() re-reads this
+    /// AFTER its `await bridge.register` suspension so a request that passed the pre-await
+    /// validation cannot land a LIVE OS registration when an emergency/throttle reconcile ran
+    /// during the suspension (the reconcile's cancelAll couldn't see the in-flight request).
+    /// Defaults to .nominal (no restriction) until the thermal twin first reconciles.
+    private var currentGuardLevel: BASThermalGuardLevel = .nominal
+
     public init(
         bridge: any PlatformBridge = NoOpBridge(),
         clock: @escaping @Sendable () -> Date = { Date() }
@@ -112,6 +119,25 @@ public actor BASBreathScheduler {
         }
         try Self.validate(class: request.maintenanceClass, at: guardLevel)
         _ = await bridge.register(request)
+        // audit policy-obs-misc LOW-5: `await bridge.register` is a reentrancy point — a concurrent
+        // schedule() for the SAME id may have passed the duplicate check and inserted while we were
+        // suspended. Re-check and fail closed (cancelling our own now-duplicate OS registration) so
+        // two concurrent same-id schedules cannot both land. (The register-result is deliberately not
+        // honored — see PlatformBridge.register's "records the breath either way" contract.)
+        if scheduled[request.id] != nil {
+            await bridge.cancel(id: request.id)
+            throw ScheduleError.duplicateRequest(id: request.id)
+        }
+        // audit F10: re-validate against the guard level that may have changed DURING the
+        // register suspension. If a reconcile escalated to emergency/throttle while we were
+        // parked, this request must not survive — cancel our own now-illegal OS registration
+        // and fail closed (mirrors the reconcile that couldn't see us).
+        do {
+            try Self.validate(class: request.maintenanceClass, at: currentGuardLevel)
+        } catch {
+            await bridge.cancel(id: request.id)
+            throw error
+        }
         let breath = ScheduledBreath(
             request: request,
             scheduledAt: clock(),
@@ -132,10 +158,17 @@ public actor BASBreathScheduler {
     /// escalates to `.emergency` — at that point every maintenance
     /// wakeup is a liability.
     public func cancelAll() async {
-        for id in scheduled.keys {
+        // audit M-p / x-concurrency MED-7: was `for id in scheduled.keys { await cancel } ; removeAll`.
+        // This is an actor, so a concurrent `schedule()` completing during the `await bridge.cancel`
+        // below adds its id to `scheduled` (+ a LIVE platform registration) AFTER the key snapshot;
+        // the trailing `removeAll()` then wipes that id from the dict WITHOUT cancelling its platform
+        // registration → a GHOST maintenance wakeup survives a thermal-emergency cancelAll. Drain to
+        // empty, cancelling then removing each id individually, so no id is ever dropped un-cancelled
+        // (a re-check after each await catches any concurrently-registered breath).
+        while let id = scheduled.keys.first {
             await bridge.cancel(id: id)
+            scheduled[id] = nil
         }
-        scheduled.removeAll()
     }
 
     public func scheduledBreaths() -> [ScheduledBreath] {
@@ -153,6 +186,9 @@ public actor BASBreathScheduler {
     public func reconcile(
         with guardLevel: BASThermalGuardLevel
     ) async {
+        // audit F10: record the level FIRST so any schedule() suspended at bridge.register
+        // observes it on wake and fails closed (see schedule()'s post-await re-validation).
+        currentGuardLevel = guardLevel
         switch guardLevel {
         case .emergency:
             await cancelAll()

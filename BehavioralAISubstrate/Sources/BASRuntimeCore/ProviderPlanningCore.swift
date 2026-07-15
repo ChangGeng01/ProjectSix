@@ -322,65 +322,17 @@ public struct BASProviderRoutingPolicySource: Codable, Equatable, Sendable {
 }
 
 public enum BASReferenceProviderRuntime {
-    public static let gemmaE4BProviderID = "gemmaE4B"
+    // deep-audit sweep 2026-07-13: `gemmaE4BProviderID` (the one MODEL-FAMILY name literal here)
+    // moved OUT of the model-neutral core into an `extension BASReferenceProviderRuntime` in
+    // BASAppleAdapters (BASAppleReferenceProviderID.swift), beside its only consumers. Call sites
+    // stay textually identical (`BASReferenceProviderRuntime.gemmaE4BProviderID`); only the module
+    // that DECLARES the literal changed. The four constants below are neutral CATEGORIES, not
+    // model families, so they stay. Pinned by BASModelBoundaryPinTests (no model-family name
+    // literals in BASRuntimeCore sources).
     public static let openModelProviderID = "openModel"
     public static let foundationModelsProviderID = "foundationModels"
     public static let testingStubProviderID = "testingStub"
     public static let templateProviderID = "template"
-
-    public static let fixtureRoutingPolicyID = "reference-provider-policy.v1"
-    public static let fixtureRoutingRegistry = BASProviderRoutingPolicyRegistry(
-        schemaVersion: "reference-provider-registry.v1",
-        defaultPolicyID: fixtureRoutingPolicyID,
-        policiesByID: [
-            fixtureRoutingPolicyID: BASProviderRoutingPolicy(
-                schemaVersion: fixtureRoutingPolicyID,
-                deterministicProviderID: templateProviderID,
-                testingOverrideProviderID: testingStubProviderID,
-                preferenceOrderings: [
-                    BASProviderPreferenceOrdering(
-                        preferredProviderID: gemmaE4BProviderID,
-                        orderedProviderIDs: [
-                            gemmaE4BProviderID,
-                            foundationModelsProviderID
-                        ]
-                    ),
-                    BASProviderPreferenceOrdering(
-                        preferredProviderID: openModelProviderID,
-                        orderedProviderIDs: [
-                            openModelProviderID,
-                            gemmaE4BProviderID,
-                            foundationModelsProviderID
-                        ]
-                    ),
-                    BASProviderPreferenceOrdering(
-                        preferredProviderID: foundationModelsProviderID,
-                        orderedProviderIDs: [
-                            foundationModelsProviderID,
-                            gemmaE4BProviderID
-                        ]
-                    ),
-                    BASProviderPreferenceOrdering(
-                        preferredProviderID: templateProviderID,
-                        orderedProviderIDs: [
-                            templateProviderID
-                        ]
-                    )
-                ]
-            )
-        ]
-    )
-
-    public static var fixtureRoutingPolicy: BASProviderRoutingPolicy {
-        fixtureRoutingRegistry.policyOrMissing()
-    }
-
-    public static var fixtureRoutingSource: BASProviderRoutingPolicySource {
-        BASProviderRoutingPolicySource(
-            registry: fixtureRoutingRegistry,
-            policyID: fixtureRoutingPolicyID
-        )
-    }
 
     public static func resolvedRoutingPolicyIfAvailable(
         policyID: String? = nil,
@@ -412,65 +364,6 @@ public enum BASReferenceProviderRuntime {
             registry: registry,
             policyID: policyID
         )
-    }
-
-    public static var fixturePreferenceOrderings: [BASProviderPreferenceOrdering] {
-        fixtureRoutingPolicy.preferenceOrderings
-    }
-
-    public static func registryUsesFixtureCatalog(
-        _ registry: BASProviderRoutingPolicyRegistry,
-        policyID: String? = nil
-    ) -> Bool {
-        if registry.schemaVersion == fixtureRoutingRegistry.schemaVersion ||
-            registry.defaultPolicyID == fixtureRoutingPolicyID ||
-            policyID == fixtureRoutingPolicyID {
-            return true
-        }
-
-        return registry.policyIfAvailable(for: policyID) == fixtureRoutingPolicy
-    }
-
-    @available(*, unavailable, renamed: "fixtureRoutingPolicyID", message: "Use fixtureRoutingPolicyID only for package fixtures; production code should inject a routing registry.")
-    public static let referenceRoutingPolicyID = fixtureRoutingPolicyID
-
-    @available(*, unavailable, renamed: "fixtureRoutingRegistry", message: "Use fixtureRoutingRegistry only for package fixtures; production code should inject a routing registry.")
-    public static let referenceRoutingRegistry = fixtureRoutingRegistry
-
-    @available(*, unavailable, renamed: "fixtureRoutingPolicy", message: "Use fixtureRoutingPolicy only for package fixtures; production code should inject a routing policy source.")
-    public static var referenceRoutingPolicy: BASProviderRoutingPolicy {
-        fixtureRoutingPolicy
-    }
-
-    @available(*, unavailable, renamed: "fixtureRoutingSource", message: "Use fixtureRoutingSource only for package fixtures; production code should inject a routing policy source.")
-    public static var referenceRoutingSource: BASProviderRoutingPolicySource {
-        fixtureRoutingSource
-    }
-
-    @available(*, unavailable, renamed: "fixturePreferenceOrderings", message: "Use fixturePreferenceOrderings only for package fixtures; production code should inject a routing policy source.")
-    public static var referencePreferenceOrderings: [BASProviderPreferenceOrdering] {
-        fixturePreferenceOrderings
-    }
-
-    @available(*, unavailable, renamed: "fixtureRoutingPolicyID", message: "Use fixtureRoutingPolicyID only for package fixtures; production code should inject a routing registry.")
-    public static let fallbackRoutingPolicyID = fixtureRoutingPolicyID
-
-    @available(*, unavailable, renamed: "fixtureRoutingRegistry", message: "Use fixtureRoutingRegistry only for package fixtures; production code should inject a routing registry.")
-    public static let fallbackRoutingRegistry = fixtureRoutingRegistry
-
-    @available(*, unavailable, renamed: "fixtureRoutingPolicy", message: "Use fixtureRoutingPolicy only for package fixtures; production code should inject a routing policy source.")
-    public static var fallbackRoutingPolicy: BASProviderRoutingPolicy {
-        fixtureRoutingPolicy
-    }
-
-    @available(*, unavailable, renamed: "fixtureRoutingSource", message: "Use fixtureRoutingSource only for package fixtures; production code should inject a routing policy source.")
-    public static var fallbackRoutingSource: BASProviderRoutingPolicySource {
-        fixtureRoutingSource
-    }
-
-    @available(*, unavailable, renamed: "fixturePreferenceOrderings", message: "Use fixturePreferenceOrderings only for package fixtures; production code should inject a routing policy source.")
-    public static var fallbackPreferenceOrderings: [BASProviderPreferenceOrdering] {
-        fixturePreferenceOrderings
     }
 
     public static func orderedProviderIDs(
@@ -584,11 +477,15 @@ public enum BASProviderPlanner {
         strategy: BASAdaptiveTaskStrategy? = nil,
         descriptors: [BASProviderDescriptor]
     ) -> BASProviderSelectionPlan {
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let descriptorByID = Dictionary(
-            uniqueKeysWithValues: descriptors.map { ($0.providerID, $0) }
+            descriptors.map { ($0.providerID, $0) },
+            uniquingKeysWith: { first, _ in first }
         )
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let baseIndexByID = Dictionary(
-            uniqueKeysWithValues: baseOrderedProviderIDs.enumerated().map { ($0.element, $0.offset) }
+            baseOrderedProviderIDs.enumerated().map { ($0.element, $0.offset) },
+            uniquingKeysWith: { first, _ in first }
         )
 
         let compatibleProviderIDs = strategy.map { strategy in

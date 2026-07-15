@@ -20,7 +20,6 @@ import XCTest
 @testable import BASRuntimeCore
 @testable import BASOrchestration
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASMLLoopServiceTests: XCTestCase {
 
     private func emptyDecompose() -> BASDecomposeFrame {
@@ -443,4 +442,3 @@ final class BASMLLoopServiceTests: XCTestCase {
             " Got \(result.thoughtFrame.candidates.count)")
     }
 }
-#endif

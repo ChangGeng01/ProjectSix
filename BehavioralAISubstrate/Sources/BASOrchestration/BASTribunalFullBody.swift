@@ -221,15 +221,23 @@ public extension BASSuperegoJudgment {
     ///
     /// - `vetoCandidateIDs` = candidateIDs carrying any veto mark
     ///   (sorted ascending for stable output).
-    /// - `boundaryConflicts` = `reasonCodes` from vetoMarks with
-    ///   `vetoType == .boundaryConflict` (de-duplicated, sorted).
-    /// - `valueViolations` = `reasonCodes` from vetoMarks with
-    ///   `vetoType == .valueViolation` (if any such enum case
-    ///   exists; otherwise empty).
-    /// - `dignityRisks` / `relationEthicsLoad` /
-    ///   `irreversibleWarnings` — remain empty arrays on this
-    ///   baseline derivation; hosts with richer context can call
-    ///   the init directly to populate them.
+    /// - `boundaryConflicts` = `reasonCodes` from vetoMarks whose
+    ///   `vetoType.rawValue` contains "boundary" (i.e. `.boundary`),
+    ///   de-duplicated + sorted.
+    /// - `dignityRisks` = `reasonCodes` where the rawValue contains
+    ///   "dignity" (`.dignity`); `irreversibleWarnings` = contains
+    ///   "irreversib" (`.irreversibility`). Both de-duplicated + sorted.
+    /// - `valueViolations` / `relationEthicsLoad` are ALWAYS empty on
+    ///   this baseline derivation — no `BASCourtVetoType` case maps to
+    ///   them; hosts with richer context populate them via the init.
+    /// - blindspot MED id34: this baseline categorises only 3 of the 6
+    ///   `BASCourtVetoType` cases (`.boundary`/`.dignity`/
+    ///   `.irreversibility`). The other three (`.hostConstitution`,
+    ///   `.sovereignPrecondition`, `.calibration`) still contribute
+    ///   their candidateIDs to `vetoCandidateIDs` (every veto mark is
+    ///   counted there), but their `reasonCodes` are not bucketed into a
+    ///   category field. (The doc previously named non-existent enum
+    ///   cases `.boundaryConflict` / `.valueViolation`.)
     ///
     /// ## Empty-frame behaviour
     ///

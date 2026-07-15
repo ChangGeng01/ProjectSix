@@ -171,31 +171,40 @@ enum PropertyDemoFixture {
 
     // MARK: - Intent + proof helpers
 
+    // deep-audit P0-1: the payload the demos' canonical-digest intents bind (demos execute with it).
+    static let demoPayload = Data("{}".utf8)
+
     static func intent(
-        digest: String = "intent.demo",
+        digest: String? = nil,
         sessionID: String = "sess.demo",
         toolName: String = "calendar.add_event"
     ) -> QinaoRiskGate.ActionIntent {
-        QinaoRiskGate.ActionIntent(
-            digest: digest,
+        // Default: canonical digest binding tool+payload+session+host (the form execute enforces).
+        let d = digest ?? QinaoRiskGate.ActionIntent.canonicalDigest(
+            toolName: toolName, payload: demoPayload,
+            sessionID: sessionID, hostVersionID: "host.v1")
+        return QinaoRiskGate.ActionIntent(
+            digest: d,
             toolName: toolName,
             sessionID: sessionID,
             hostVersionID: "host.v1",
             summary: "demo intent")
     }
 
+    /// integration S3: proofs are minted by the control plane (HMAC-signed) — hand-built
+    /// proofs now fail the gate by design.
     static func validProof(
         for intent: QinaoRiskGate.ActionIntent,
-        at now: Date = frozenNow(),
+        sovereign: QinaoSovereignControlPlane,
         ttl: TimeInterval = 30
-    ) -> QinaoRuntime.SnapshotContinuityProof {
-        QinaoRuntime.SnapshotContinuityProof(
-            proofID: "proof-\(UUID().uuidString)",
-            sessionID: intent.sessionID,
+    ) async -> QinaoRuntime.SnapshotContinuityProof {
+        await sovereign.issueSnapshotContinuityProof(
+            for: QinaoSovereignControlPlane.Intent(
+                digest: intent.digest,
+                sessionID: intent.sessionID,
+                hostVersionID: intent.hostVersionID),
             anchorID: "anchor-host.v1",
-            intentDigest: intent.digest,
-            issuedAt: now,
-            expiresAt: now.addingTimeInterval(ttl))
+            ttlSeconds: ttl)
     }
 
     /// Build a fully-signed bundle — used by demos that need to
@@ -210,7 +219,7 @@ enum PropertyDemoFixture {
                 digest: intent.digest,
                 sessionID: intent.sessionID,
                 hostVersionID: intent.hostVersionID))
-        let proof = validProof(for: intent)
+        let proof = await validProof(for: intent, sovereign: fx.sovereign)
         return QinaoRuntime.Signatures(
             permit: permit,
             warrant: warrant,

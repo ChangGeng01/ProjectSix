@@ -10,6 +10,7 @@
 //   • the emitted scan input is the REAL per-turn input, and the Metal reasoning ≈ the CPU scan (parity).
 
 import XCTest
+import Metal
 @testable import BASHostKit
 @testable import BASRuntimeCore
 @testable import BASMetalSubstrate
@@ -121,11 +122,19 @@ final class BASSSMMetalReasoningRunTurnTests: XCTestCase {
             x: s.x, delta: s.delta, A: s.a, B: s.b, C: s.c, shape: s.shape)
         let cpuMag = BASSSMMetalReasoning.magnitude(of: yCPU)
 
-        // Metal reasoning via the host runner (Mac GPU; graceful skip if Metal is unavailable here —
-        // on-device GPU+parity is certified by the BAS_METAL_SMOKE SSM dispatch).
-        guard let signal = await BASSSMMetalReasoning.run(
+        // Skip ONLY on genuine GPU absence. `run(...)` returning nil is the runner's
+        // own ERROR CHANNEL, not a Metal-availability probe — treating it as one
+        // made an SSM kernel regression indistinguishable from a headless box, and
+        // greened it while citing an on-device certification the nil no longer
+        // establishes.
+        guard MTLCreateSystemDefaultDevice() != nil else {
+            throw XCTSkip("No Metal device on this host — SSM GPU parity is GPU-only")
+        }
+        let produced = await BASSSMMetalReasoning.run(
             input, loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
-        else { throw XCTSkip("Metal unavailable here — SSM parity certified on-device via the BAS_METAL_SMOKE probe (ADR-039: iPhone Air 2026-06-08, ssm-metal-smoke parity_mae=0)") }
+        let signal = try XCTUnwrap(
+            produced,
+            "BASSSMMetalReasoning.run must produce a signal on a Metal-capable host")
         XCTAssertTrue(signal.didRunOnGPU)
         XCTAssertEqual(signal.magnitude, cpuMag, accuracy: 1e-4,
             "Metal SSM reasoning magnitude ≈ the CPU scan within tolerance (non-governance signal)")

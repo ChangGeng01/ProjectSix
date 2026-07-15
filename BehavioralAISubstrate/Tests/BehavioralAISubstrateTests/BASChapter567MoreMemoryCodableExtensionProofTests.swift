@@ -28,39 +28,62 @@ final class BASChapter567MoreMemoryCodableExtensionProofTests:
     XCTestCase
 {
 
-    // MARK: - Compile-time conformance helper
+    // MARK: - 5 conformance PROOFs
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
-    // MARK: - 5 compile-time conformance PROOFs
-
+    // #18: real round-trip — construct a minimal valid instance
+    // and assert it survives an encode/decode cycle.
     func testConstitutionMatchConformsToCodable() {
-        assertCodable(BASConstitutionMatch.self)
+        assertCodableRoundTrips(BASConstitutionMatch.none)
     }
 
     func testMemoryClosedLoopApplyOutcomeConformsToCodable()
     {
-        assertCodable(
-            BASMemoryClosedLoopApplyOutcome.self)
+        // #18: real round-trip
+        let report = BASMemoryImportanceReport(
+            scores: [],
+            computedAt: Date(timeIntervalSince1970: 0))
+        assertCodableRoundTrips(
+            BASMemoryClosedLoopApplyOutcome(
+                report: report,
+                appliedMutations: [:],
+                rejectedMutations: [:],
+                dryRun: false))
     }
 
     func testEvolutionPromotionGateVerdictConformsToCodable()
     {
-        assertCodable(
-            BASEvolutionPromotionGateVerdict.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASEvolutionPromotionGateVerdict(
+                allowsPromotion: false))
     }
 
     func testPreparedMemoryGovernanceDraftConformsToCodable()
     {
-        assertCodable(
+        // #18: real round-trip — composed of three nested
+        // governance types (BASMemoryGovernanceDraftInput,
+        // BASMemoryGovernanceAssessment,
+        // BASMemoryHorizonClaimDescriptor) that cannot be
+        // confidently constructed here, so use the honest
+        // compile-time-only fallback (no fake x==x assertion).
+        assertConformsToCodableAtCompileTime(
             BASPreparedMemoryGovernanceDraft.self)
     }
 
     func testShadowTrialLedgerEntryConformsToCodable() {
-        assertCodable(BASShadowTrialLedgerEntry.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASShadowTrialLedgerEntry(
+                auditID: "",
+                sessionID: "",
+                turnID: "",
+                verdictRef: "",
+                ruleIDs: [],
+                signalRefs: [],
+                actionRefs: [],
+                snapshotRef: "",
+                signaturePayload: "",
+                appendedAt: Date(timeIntervalSince1970: 0),
+                eventKind: ""))
     }
 }

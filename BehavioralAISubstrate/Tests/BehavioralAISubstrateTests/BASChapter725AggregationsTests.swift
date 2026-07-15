@@ -137,10 +137,20 @@ final class BASChapter725AggregationsTests: XCTestCase {
             let target = "atom_\((cell.n / 5) / 2)"
 
             // Warm
-            _ = swiftUsageCount(
+            let swCount = swiftUsageCount(
                 records: records, atomID: target)
-            _ = BASAutoRouteRanker.usageCountForAtom(
+            let ruCount = BASAutoRouteRanker.usageCountForAtom(
                 records: records, atomID: target)
+
+            // #18: assertion — the two implementations compute the
+            // same quantity two ways; they MUST agree, and the target
+            // atom must actually be present (non-degenerate count).
+            XCTAssertEqual(
+                ruCount, swCount,
+                "Rust and Swift usageCount disagree for \(target) in \(cell.label)")
+            XCTAssertGreaterThan(
+                swCount, 0,
+                "usageCount degenerate (0) for \(target) in \(cell.label)")
 
             // Swift timing
             let swStart = CFAbsoluteTimeGetCurrent()

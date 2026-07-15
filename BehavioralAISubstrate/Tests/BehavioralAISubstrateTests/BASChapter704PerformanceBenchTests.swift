@@ -19,7 +19,6 @@ import CryptoKit
 import BASRustMemoryTrackerBinary
 #endif
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter704PerformanceBenchTests: XCTestCase {
 
     /// Measure SHA256 wall-clock for Rust pure-NIST path vs
@@ -63,8 +62,8 @@ final class BASChapter704PerformanceBenchTests: XCTestCase {
             "Rust(SW)=\(String(format: "%.2f", rustMs))ms, " +
             "CryptoKit(HW)=" +
             "\(String(format: "%.2f", cryptoMs))ms")
-        XCTAssertLessThan(rustMs, 5000)
-        XCTAssertLessThan(cryptoMs, 5000)
+        BASPerfGate.assertBelow(rustMs, 5000)
+        BASPerfGate.assertBelow(cryptoMs, 5000)
     }
 
     /// Verify Rust + CryptoKit produce byte-identical output。
@@ -122,8 +121,8 @@ final class BASChapter704PerformanceBenchTests: XCTestCase {
             "BENCH cosine(dim=16) \(iters)x — " +
             "Rust(CPU)=\(String(format: "%.2f", rustMs))ms, " +
             "Metal(GPU)=\(String(format: "%.2f", metalMs))ms")
-        XCTAssertLessThan(rustMs, 5000)
-        XCTAssertLessThan(metalMs, 30_000)
+        BASPerfGate.assertBelow(rustMs, 5000)
+        BASPerfGate.assertBelow(metalMs, 30_000)
     }
 
     /// Chapter close-out manifest assertion — verifies the
@@ -152,4 +151,3 @@ final class BASChapter704PerformanceBenchTests: XCTestCase {
         #endif
     }
 }
-#endif

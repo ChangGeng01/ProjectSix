@@ -20,7 +20,6 @@ import XCTest
 ///   4. Resolver returns `.systemInducedDrift` + empty verdictRef
 ///      → blocked + ticket marked rejected
 ///   5. Unknown ticketID throws LifecycleError.unknownTicket
-#if !os(iOS)  // ch 1022 source-gate
 final class BASUpdateTicketLifecycleCounterHostAutoFlowTests:
     XCTestCase
 {
@@ -199,4 +198,3 @@ private actor LockedRef<Value: Sendable> {
     func set(_ value: Value) { self.stored = value }
     func get() -> Value { stored }
 }
-#endif

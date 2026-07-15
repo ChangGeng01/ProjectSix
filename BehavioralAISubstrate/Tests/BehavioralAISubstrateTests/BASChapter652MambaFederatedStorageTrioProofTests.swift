@@ -13,22 +13,24 @@ final class BASChapter652MambaFederatedStorageTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASMambaSSMScanInputsConformsToCodable() {
-        assertCodable(BASMambaSSMScanInputs.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASMambaSSMScanInputs(
+                x: [], delta: [], a: [], b: [], c: [],
+                sequenceLength: 0))
     }
 
     func testBASMambaSSMScanOutputsConformsToCodable() {
-        assertCodable(BASMambaSSMScanOutputs.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASMambaSSMScanOutputs(
+                y: [], finalHiddenStateSnapshot: []))
     }
 
     func testBASFederatedEventLogStorageErrorConformsToCodable() {
-        assertCodable(
-            BASFederatedEventLogStorageError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASFederatedEventLogStorageError.noBackends)
     }
 }

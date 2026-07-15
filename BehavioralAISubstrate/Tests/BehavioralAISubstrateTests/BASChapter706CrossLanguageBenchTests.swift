@@ -167,6 +167,26 @@ final class BASChapter706CrossLanguageBenchTests:
         }
         _ = sinkSwift
         _ = sinkRust
+
+        // #18: assertion — both implementations compute the same
+        // L2 norm, so they must AGREE (real correctness oracle),
+        // and the norm must be the non-degenerate positive value.
+        var swiftSumSq: Float = 0
+        for x in v { swiftSumSq += x * x }
+        let swiftNorm = swiftSumSq.squareRoot()
+        var rustNorm: Float = 0
+        _ = v.withUnsafeBufferPointer { vp in
+            bas_ranker_l2_norm_simd(vp.baseAddress, v.count, &rustNorm)
+        }
+        XCTAssertGreaterThan(
+            swiftNorm, 0,
+            "L2 norm of non-zero vector must be positive")
+        XCTAssertEqual(
+            rustNorm, swiftNorm, accuracy: swiftNorm * 1e-4,
+            "Rust SIMD and Swift naive L2 norm must agree")
+        XCTAssertTrue(
+            result.summaries.indices.contains(result.winnerIndex),
+            "tournament winner index must be valid")
     }
 
     // MARK: - SHA256 — CryptoKit (HW) vs Rust pure (SW)

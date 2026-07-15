@@ -109,6 +109,16 @@ public actor BASSQLiteKnowledgeGraphStorage {
     public let databaseURL: URL
     private nonisolated(unsafe) var db: OpaquePointer?
 
+    /// audit runtimecore-b MED-3 — surfaced when a bulk READ (allNodes/allEdges) errors on a BUSY
+    /// or corrupt DB. The non-throwing accessors return [] on error, which is indistinguishable
+    /// from a genuinely-empty graph (silent fail-open — a stale/locked read looked like "no graph").
+    /// A host wires this to observe the real error; the *OrThrow siblings surface it directly.
+    /// nil ⇒ unobserved (default).
+    public var onSilentFailure: (@Sendable (Error) -> Void)?
+    public func setOnSilentFailure(_ handler: (@Sendable (Error) -> Void)?) {
+        self.onSilentFailure = handler
+    }
+
     // MARK: - Lifecycle
 
     public init(databaseURL: URL) throws {
@@ -130,8 +140,23 @@ public actor BASSQLiteKnowledgeGraphStorage {
         }
         self.db = handle
 
+        // audit M-c (损坏=空): surface a structurally-corrupt store at OPEN instead of letting the
+        // reads' `(try? fetchAll) ?? []` mistake corruption for empty. Default-on, fail-closed.
+        try BASSQLiteIntegrity.assertOK(db: handle, store: "knowledge-graph")
+
+        // audit runtimecore-b MED-3: wait up to 5s on a locked DB (checkpoint/reader collision)
+        // instead of immediately erroring → far fewer transient busy-errors on the read paths.
+        try Self.runExec(db: handle, sql: "PRAGMA busy_timeout=5000;")
         try Self.runExec(
             db: handle, sql: "PRAGMA journal_mode=WAL;")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete default-on (kill-switch BAS_SECURE_DELETE=0).
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            try Self.runExec(db: handle, sql: sdSQL)
+        }
+        // memory-a F4 residual: one-time legacy freelist purge (secure_delete only
+        // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
+        // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
         // M891 fix:tighter auto-checkpoint (200 pages ≈ 800KB)
@@ -239,7 +264,18 @@ public actor BASSQLiteKnowledgeGraphStorage {
     /// stable preload sequence。
     public func allNodes() async -> [BASKnowledgeNode] {
         guard let db else { return [] }
-        return (try? Self.fetchAllNodes(db: db)) ?? []
+        // audit runtimecore-b MED-3: surface a busy/corrupt read error, don't fail-open to [].
+        do { return try Self.fetchAllNodes(db: db) }
+        catch { onSilentFailure?(error); return [] }
+    }
+
+    /// 先稳 — throwing sibling of `allNodes`: surfaces a SQLite error instead of returning [],
+    /// so a caller can distinguish "empty graph" from "DB busy/broken" (audit runtimecore-b MED-3).
+    public func allNodesOrThrow() async throws -> [BASKnowledgeNode] {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchAllNodes(db: db)
     }
 
     /// Remove a node + all incident edges。Returns true if a
@@ -256,9 +292,25 @@ public actor BASSQLiteKnowledgeGraphStorage {
         _ nodeID: String
     ) async throws -> Bool {
         guard let db else { return false }
-        // Delete incident edges first (referential consistency)
-        try Self.deleteIncidentEdges(db: db, nodeID: nodeID)
-        return try Self.deleteNode(db: db, nodeID: nodeID)
+        // audit runtimecore-b #10: the incident-edge delete + the node delete must be ATOMIC. Run as
+        // two separate autocommits, a failure after the edges are gone would leave the node with no
+        // edges (or a failed node-delete would strand already-deleted edges) — an inconsistent
+        // half-delete. Wrap both in one transaction.
+        try Self.runExec(db: db, sql: "BEGIN IMMEDIATE TRANSACTION;")
+        do {
+            // Delete incident edges first (referential consistency)
+            try Self.deleteIncidentEdges(db: db, nodeID: nodeID)
+            let removed = try Self.deleteNode(db: db, nodeID: nodeID)
+            try Self.runExec(db: db, sql: "COMMIT;")
+            // deep-audit P2-18 (2026-07-13): the node's (and incident edges') plaintext content
+            // lingers as INSERT frames in the -wal until truncated. removeNode is the explicit
+            // forget path — truncate AFTER the commit (a checkpoint can't run mid-transaction).
+            try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
+            return removed
+        } catch {
+            try? Self.runExec(db: db, sql: "ROLLBACK;")
+            throw error
+        }
     }
 
     /// Cascade-DELETE every edge incident to `nodeID` (either
@@ -350,7 +402,17 @@ public actor BASSQLiteKnowledgeGraphStorage {
     /// Bulk-fetch all edges ordered by createdAtMs ASC。
     public func allEdges() async -> [BASKnowledgeEdge] {
         guard let db else { return [] }
-        return (try? Self.fetchAllEdges(db: db)) ?? []
+        // audit runtimecore-b MED-3: surface a busy/corrupt read error, don't fail-open to [].
+        do { return try Self.fetchAllEdges(db: db) }
+        catch { onSilentFailure?(error); return [] }
+    }
+
+    /// 先稳 — throwing sibling of `allEdges` (audit runtimecore-b MED-3).
+    public func allEdgesOrThrow() async throws -> [BASKnowledgeEdge] {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchAllEdges(db: db)
     }
 
     @discardableResult
@@ -358,7 +420,11 @@ public actor BASSQLiteKnowledgeGraphStorage {
         _ edgeID: String
     ) async throws -> Bool {
         guard let db else { return false }
-        return try Self.deleteEdge(db: db, edgeID: edgeID)
+        let removed = try Self.deleteEdge(db: db, edgeID: edgeID)
+        // deep-audit P2-18 (2026-07-13): the edge's plaintext lingers as its INSERT frame in
+        // the -wal until truncated. removeEdge is the explicit forget path — truncate now.
+        try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
+        return removed
     }
 
     public var edgeCount: Int {
@@ -622,15 +688,13 @@ public actor BASSQLiteKnowledgeGraphStorage {
         }
         defer { sqlite3_finalize(stmt) }
         var out: [BASKnowledgeNode] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            // M891 fix (post-deep-audit):per-row corruption
-            // tolerance — pre-M891 a single bad node row threw
-            // out of fetchAllNodes,then `try?` in `allNodes()`
-            // swallowed the throw + returned `[]` → preload
-            // silently lost ALL nodes,not just the corrupt one。
-            // Post-M891 the bad row is skipped + good rows
-            // are preserved per chapter 一百九十一 row-by-row
-            // integrity doctrine。
+        // audit F4 (2026-07-12): distinguish a per-row DATA corruption (skip the row, keep
+        // the rest — M891 doctrine) from a STEP error (BUSY/IOERR/CORRUPT at the SQLite
+        // layer). The former is tolerated; the latter must NOT be read as end-of-data —
+        // throw so allNodes()/onSilentFailure surfaces it instead of silently returning a
+        // truncated graph.
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             do {
                 out.append(try buildNode(stmt: stmt))
             } catch {
@@ -638,6 +702,11 @@ public actor BASSQLiteKnowledgeGraphStorage {
                 // Caller can detect via storage.nodeCount vs
                 // returned-array count if needed。
             }
+            rc = sqlite3_step(stmt)
+        }
+        guard rc == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return out
     }
@@ -782,7 +851,9 @@ public actor BASSQLiteKnowledgeGraphStorage {
         }
         defer { sqlite3_finalize(stmt) }
         var out: [BASKnowledgeEdge] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        // audit F4: STEP-error fail-closed (see fetchAllNodes).
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             // M891 fix:per-row corruption tolerance (same as
             // fetchAllNodes — see that comment for rationale)。
             do {
@@ -790,6 +861,11 @@ public actor BASSQLiteKnowledgeGraphStorage {
             } catch {
                 // Skip corrupt row;continue with remaining。
             }
+            rc = sqlite3_step(stmt)
+        }
+        guard rc == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return out
     }

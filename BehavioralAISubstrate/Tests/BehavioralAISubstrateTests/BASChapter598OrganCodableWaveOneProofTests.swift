@@ -28,17 +28,21 @@ final class BASChapter598OrganCodableWaveOneProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testOrganDraftChunkConformsToCodable() {
-        assertCodable(BASOrganDraftChunk.self)
+        // #18: real round-trip
+        let value = BASOrganDraftChunk(
+            requestID: "",
+            providerID: "",
+            role: .scout,
+            bodyDelta: "",
+            cumulativeBody: "",
+            producedAt: Date(timeIntervalSince1970: 0))
+        assertCodableRoundTrips(value)
     }
 
     func testOrganRegistryObservationSnapshotConformsToCodable() {
-        assertCodable(BASOrganRegistryObservationSnapshot.self)
+        // #18: real round-trip (minimal: no descriptors)
+        assertCodableRoundTrips(
+            BASOrganRegistryObservationSnapshot(descriptors: []))
     }
 }

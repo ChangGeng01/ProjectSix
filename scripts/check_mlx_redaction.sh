@@ -20,8 +20,9 @@
 #      `ModelConfiguration`, `LanguageModelSession`,
 #      `MLXLLMConfiguration`, etc.
 #
-# Allowed: QinaoMLX (the bridge). Tested: every other Qinao module
-# under QinaoRuntimeSDK/Sources/.
+# Allowed: QinaoMLX (the bridge — it MAY import BASMLXAdapter and name MLX/HF
+# types; that is its job) and QinaoSampleHost (executable DEMO exception, rationale
+# below at the allowlist). Tested: every other Qinao module under QinaoRuntimeSDK/Sources/.
 
 set -euo pipefail
 
@@ -92,6 +93,8 @@ if [ $count -gt 0 ]; then
     exit 1
 fi
 
-echo "check_mlx_redaction: clean (QinaoMLX library + " \
-    "QinaoSampleHost executable demo are the only modules that " \
-    "may name MLX/HF types; every other Qinao module is clean)."
+# Clean message deliberately names NO modules: naming the exempted bridge modules here
+# made output-greppers misread the innocence statement as a violation list (2026-07-12
+# operator report). The allowlist + rationale live at ALLOWED_MODULES_REGEX above.
+echo "check_mlx_redaction: clean — no MLX/HF type names outside the allowlisted" \
+    "bridge modules (see ALLOWED_MODULES_REGEX in this script for the exemptions)."

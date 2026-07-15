@@ -34,7 +34,11 @@
 
 #![forbid(unsafe_op_in_unsafe_fn)]
 
-pub mod assembler;
+// audit rust LOW / operator decision 5: the legacy pre-1.2.0 `assembler` encoder used a FORGEABLE
+// 0x1F delimiter-join (a collision surface). It has zero production callers, so compile-time-fence it
+// behind `#[cfg(test)]` — its round-trip tests still run, but it is unreachable outside tests.
+#[cfg(test)]
+mod assembler;
 pub mod field;
 pub mod v1_2;
 

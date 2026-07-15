@@ -156,13 +156,20 @@ final class BASChapter1004TraceStreamingSinkTests: XCTestCase {
         let (bridge, traceLog, eventLog) = await makeBridge()
         let throwingSink = ThrowingSink()
         let event = Self.makeEvent()
-        // Expect throw from sink
+        // audit orchestration MED-4: the throw is now WRAPPED in SinkNotificationError (the writes
+        // are durable; only the notification failed) — not a bare rethrow that looks like the write
+        // itself failed and invites a double-writing retry.
+        var seenTraceSeq: Int64 = -1
         do {
             _ = try await bridge.recordEvent(
                 event, streamingTo: throwingSink)
             XCTFail("ch 1004: throwing sink MUST propagate error")
-        } catch is ThrowingSink.SinkError {
-            // expected
+        } catch let err as BASAgentTraceLogEventLogBridge.SinkNotificationError {
+            XCTAssertTrue(err.underlying is ThrowingSink.SinkError,
+                "the sink's own error must be carried as .underlying")
+            seenTraceSeq = err.committedTraceSeq
+            XCTAssertEqual(err.committedResult.traceSeq, err.committedTraceSeq,
+                "committedResult mirrors the carried fields")
         }
         // BUT the bridge writes MUST have completed before the
         // sink notification — verify trace log AND event log
@@ -172,12 +179,47 @@ final class BASChapter1004TraceStreamingSinkTests: XCTestCase {
         XCTAssertEqual(traceEvents.count, 1,
             "ch 1004 CRITICAL: sink throw MUST NOT roll back " +
             "trace-log write (best-effort notification semantics)")
+        XCTAssertEqual(seenTraceSeq, traceEvents.first?.sequenceNumber,
+            "the error's committedTraceSeq must equal the durably-committed trace seq")
         // Event log: count check via session events readback
         let eventLogEvents = await eventLog
             .events(forSession: "ch1004.test")
         XCTAssertGreaterThanOrEqual(eventLogEvents.count, 1,
             "ch 1004 CRITICAL: sink throw MUST NOT roll back " +
             "event-log write either")
+    }
+
+    // MARK: - 5b. MED-4 teeth — re-deliver from the error, no double-write
+
+    /// audit orchestration MED-4: on a sink throw the caller must be able to RE-DELIVER the event
+    /// to a sink using the error's carried committedResult — WITHOUT re-invoking recordEvent, which
+    /// would append a duplicate (new traceSeq ⇒ new eventID ⇒ event-log dedup misses). This pins the
+    /// no-duplicate recovery path the SinkNotificationError enables.
+    func testMED4_SinkThrow_CarriesResultForDuplicateFreeReDelivery()
+        async throws
+    {
+        let (bridge, traceLog, eventLog) = await makeBridge()
+        let event = Self.makeEvent()
+        let recovery = BASAgentTraceBufferingSink()
+
+        do {
+            _ = try await bridge.recordEvent(event, streamingTo: ThrowingSink())
+            XCTFail("throwing sink must surface an error")
+        } catch let err as BASAgentTraceLogEventLogBridge.SinkNotificationError {
+            // Re-deliver to a HEALTHY sink from the carried state — no re-record.
+            try await recovery.receive(
+                err.stampedEvent, eventLogResult: err.committedResult.eventLogResult)
+        }
+
+        // The logs must still hold EXACTLY ONE copy — re-delivery did not touch the bridge.
+        let traceEvents = await traceLog.events(forTurn: event.turnID)
+        let eventCount = await eventLog.events(forSession: "ch1004.test").count
+        let recovered = await recovery.snapshot()
+        XCTAssertEqual(traceEvents.count, 1, "MED-4: re-delivery must NOT append a second trace-log row")
+        XCTAssertEqual(eventCount, 1, "MED-4: re-delivery must NOT append a second event-log row")
+        XCTAssertEqual(recovered.count, 1, "the recovery sink received the event exactly once")
+        XCTAssertEqual(recovered.first?.event.sequenceNumber, traceEvents.first?.sequenceNumber,
+            "the re-delivered event carries the bridge-assigned sequence (not the caller's seqHint)")
     }
 
     // MARK: - 6. Snapshot returns accumulated order
@@ -212,4 +254,71 @@ final class BASChapter1004TraceStreamingSinkTests: XCTestCase {
         XCTAssertEqual(count, 0,
             "ch 1004: clear() MUST empty the buffer")
     }
+
+    // MARK: - audit orchestration LOW-2: concurrent recordEvent can't interleave the two writes
+
+    func testLOW2_ConcurrentRecordEventsKeepEventLogInTraceOrder() async throws {
+        let traceLog = BASAgentTraceLog()
+        let gated = GatedAppendEventLog()
+        let bridge = BASAgentTraceLogEventLogBridge(
+            traceLog: traceLog, eventLog: gated, sessionID: "low2.test")
+        let e1 = Self.makeEvent(turnID: "T", agentID: "a1")
+        let e2 = Self.makeEvent(turnID: "T", agentID: "a2")
+
+        // A enters recordEvent, holds the lane, and parks inside the FIRST event-log append.
+        let ta = Task { _ = try? await bridge.recordEvent(e1) }
+        await gated.waitUntilParked()
+        // B attempts recordEvent while A holds the lane — with the lane it must wait for A.
+        let tb = Task { _ = try? await bridge.recordEvent(e2) }
+        await Task.yield()
+        await gated.release()
+        _ = await ta.value
+        _ = await tb.value
+
+        // The durable event log's append order must agree with the embedded trace sequence.
+        let ids = await gated.appendedEventIDs()
+        let traceSeqs = ids.map { Int($0.split(separator: ".").last ?? "") ?? -1 }
+        XCTAssertEqual(traceSeqs.count, 2)
+        XCTAssertEqual(traceSeqs, traceSeqs.sorted(),
+            "event-log append order must be monotonic in trace seq — a reentrant interleave inverts it")
+    }
+}
+
+/// Event-log double that parks the FIRST append so the two-write reentrancy window is forced open,
+/// and records the eventIDs in append order.
+private actor GatedAppendEventLog: BASEventLogStorage {
+    private let inner = BASInMemoryEventLogStorage()
+    private var order: [String] = []
+    private var firstParked = false
+    private var gate: CheckedContinuation<Void, Never>?
+    private var parkedWaiter: CheckedContinuation<Void, Never>?
+    private var didPark = false
+
+    func append(_ entry: BASEventLogEntry) async throws -> (wasNew: Bool, assignedSequenceNumber: Int64) {
+        if !firstParked {
+            firstParked = true
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                gate = c; didPark = true
+                parkedWaiter?.resume(); parkedWaiter = nil
+            }
+        }
+        order.append(entry.eventID)
+        return try await inner.append(entry)
+    }
+    func events(forSession sessionID: String) async -> [BASEventLogEntry] {
+        await inner.events(forSession: sessionID)
+    }
+    func events(sinceTimestampMs since: Int64, limit: Int) async -> [BASEventLogEntry] {
+        await inner.events(sinceTimestampMs: since, limit: limit)
+    }
+    var totalCount: Int { get async { await inner.totalCount } }
+    func pruneEventsBefore(timestampMs cutoff: Int64) async throws -> Int {
+        try await inner.pruneEventsBefore(timestampMs: cutoff)
+    }
+    func appendedEventIDs() -> [String] { order }
+    func waitUntilParked() async {
+        if didPark { return }
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in parkedWaiter = c }
+    }
+    func release() { gate?.resume(); gate = nil }
 }

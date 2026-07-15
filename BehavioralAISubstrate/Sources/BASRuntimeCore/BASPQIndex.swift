@@ -14,10 +14,11 @@
 //   var rowCount: Int
 //   var byteSize: Int
 //
-// Final class (not actor) — the underlying Rust struct supports
-// concurrent reads after construction;writes serialize via the
-// caller's actor context。 `@unchecked Sendable` mirrors the
-// chapter 七百二十二 BASBpeTokenizerHandle pattern。
+// Final class (not actor) — the underlying Rust struct holds MUTABLE state
+// (train/add push into it). audit runtimecore-b MED-6: an internal NSLock now
+// serializes every handle access, so the `@unchecked Sendable` claim is REAL
+// enforcement, not the old comment-only "writes serialize via the caller's
+// actor" aspiration (which permitted UB-inducing concurrent &mut aliasing).
 
 import Foundation
 #if os(iOS) || os(macOS)
@@ -40,6 +41,15 @@ public final class BASPQIndex: @unchecked Sendable {
     /// chapter 七百二十二 BASBpeTokenizerHandle pattern。
     fileprivate nonisolated(unsafe) var opaqueHandle:
         OpaquePointer?
+
+    /// audit runtimecore-b MED-6: the Rust handle wraps MUTABLE state (train/add
+    /// push into a Box<PqIndex>). The old "@unchecked Sendable + writes serialize
+    /// via the caller's actor" was a COMMENT-ONLY contract with zero enforcement
+    /// — concurrent train/add, or a topK overlapping an add, aliased Rust's &mut
+    /// (undefined behavior). This lock makes the @unchecked Sendable claim REAL
+    /// by serializing every handle access (unlike the truly read-only
+    /// BASBpeTokenizerHandle it was modeled on, this type genuinely mutates).
+    private let _handleLock = NSLock()
 
     public let dim: Int
     public let m: Int
@@ -78,6 +88,7 @@ public final class BASPQIndex: @unchecked Sendable {
         nTrain: Int,
         iters: Int
     ) throws {
+        _handleLock.lock(); defer { _handleLock.unlock() }
         #if os(iOS) || os(macOS)
         guard let h = opaqueHandle else {
             throw BASPQIndexError.platformUnsupported
@@ -104,6 +115,7 @@ public final class BASPQIndex: @unchecked Sendable {
     /// doesn't match the index dim or the FFI rejects。
     @discardableResult
     public func add(_ vector: [Float]) throws -> Int {
+        _handleLock.lock(); defer { _handleLock.unlock() }
         #if os(iOS) || os(macOS)
         guard let h = opaqueHandle else {
             throw BASPQIndexError.platformUnsupported
@@ -130,6 +142,7 @@ public final class BASPQIndex: @unchecked Sendable {
     public func topK(
         query: [Float], k: Int
     ) throws -> [(rowID: Int, distance: Float)] {
+        _handleLock.lock(); defer { _handleLock.unlock() }
         #if os(iOS) || os(macOS)
         guard let h = opaqueHandle else {
             throw BASPQIndexError.platformUnsupported
@@ -170,6 +183,7 @@ public final class BASPQIndex: @unchecked Sendable {
 
     /// Number of vectors currently stored in the index。
     public var rowCount: Int {
+        _handleLock.lock(); defer { _handleLock.unlock() }
         #if os(iOS) || os(macOS)
         guard let h = opaqueHandle else { return 0 }
         let n = bas_pq_index_n_rows(h)
@@ -182,6 +196,7 @@ public final class BASPQIndex: @unchecked Sendable {
     /// Memory footprint in bytes (codebooks + codes)。 Use for
     /// budgeting vs Float32 baseline。
     public var byteSize: Int {
+        _handleLock.lock(); defer { _handleLock.unlock() }
         #if os(iOS) || os(macOS)
         guard let h = opaqueHandle else { return 0 }
         let s = bas_pq_index_byte_size(h)

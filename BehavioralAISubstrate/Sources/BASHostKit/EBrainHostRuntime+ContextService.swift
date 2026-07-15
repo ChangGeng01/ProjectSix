@@ -281,8 +281,13 @@ struct BASHostRuntimeEBrainContextService: BASContextServicing {
         consequenceLevel: Double
     ) -> BASUrgencyTruth {
         let normalized = userInput.lowercased()
+        // deep-audit calibration: single-word urgency markers match as WHOLE WORDS ("now" must not fire
+        // inside know/knowledge/snow). See BASHostRuntimeEBrainPromptAnalyzer.cueMatches.
+        let urgencyWords = BASHostRuntimeEBrainPromptAnalyzer.wordSet(userInput)
         let explicitUrgencyMarkers = ["now", "right now", "immediately", "urgent", "asap"]
-        let statedUrgency = explicitUrgencyMarkers.contains(where: normalized.contains) ? max(0.82, timePressure) : timePressure
+        let statedUrgency = explicitUrgencyMarkers.contains(where: {
+            BASHostRuntimeEBrainPromptAnalyzer.cueMatches($0, words: urgencyWords, normalized: normalized)
+        }) ? max(0.82, timePressure) : timePressure
         let inferredUrgency = min(
             1,
             max(

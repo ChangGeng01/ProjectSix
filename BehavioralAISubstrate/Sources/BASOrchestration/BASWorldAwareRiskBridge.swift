@@ -186,9 +186,10 @@ public actor BASWorldAwareRiskBridge {
             return intent.operation
         }()
 
-        // Evidence sufficiency: AND the caller's existing
-        // assumption with L4's view. Either side of "insufficient"
-        // wins.
+        // Evidence sufficiency is taken directly from L4's assessment (audit orchestration
+        // CLEAN-caveat: the old comment claimed a two-sided AND with a "caller's existing
+        // assumption", but ProposedIntent carries no such field, so there was nothing to AND —
+        // the value is purely L4's view).
         let evidenceSufficient = assessment.evidenceSufficient
 
         let context = BASSovereignVerdictEngine.VerdictContext(

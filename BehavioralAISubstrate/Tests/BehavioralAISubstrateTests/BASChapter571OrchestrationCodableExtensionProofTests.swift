@@ -22,25 +22,29 @@
 
 import XCTest
 @testable import BASOrchestration
+@testable import BASPolicy
 
 final class BASChapter571OrchestrationCodableExtensionProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testAssertionCeilingDecisionConformsToCodable() {
-        assertCodable(
-            BASAssertionCeilingDecision.self)
+        // #18: real round-trip
+        let decision = BASAssertionCeilingDecision(
+            permit: BASActionPermit(mode: .answer),
+            reasonCodes: [],
+            capped: false)
+        assertCodableRoundTrips(decision)
     }
 
     func testAbyssalPermitEscalationDecisionConformsToCodable()
     {
-        assertCodable(
-            BASAbyssalPermitEscalationDecision.self)
+        // #18: real round-trip
+        let decision = BASAbyssalPermitEscalationDecision(
+            permit: BASActionPermit(mode: .answer),
+            reasonCodes: [],
+            suppressedByHumanAnchor: false,
+            triggered: false)
+        assertCodableRoundTrips(decision)
     }
 }

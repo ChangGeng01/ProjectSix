@@ -15,6 +15,17 @@
 
 import PackageDescription
 
+// BAS vendor freeze note (mega-audit x-sov #3, 2026-07-08): the two prebuilt
+// xcframeworks below are the ONLY remote-fetched supply-chain input left in
+// Vendor/。 They are NOT env-gated inert (unlike EventSource / swift-huggingface,
+// whose remote deps sit behind off-by-default traits with zero consumers) because
+// the LiteRTLM product IS a live, unconditional dependency of the DeviceTestApp
+// app target (BASLiteRTE4BProbe on-phone study) — making the manifest inert would
+// break `xcodebuild` for the device app。 Instead these two urls are an EXPLICIT,
+// documented allowlist entry in scripts/check_vendor_remote_leak.sh: they are
+// CHECKSUM-PINNED binaryTargets (content-addressed — the audit's "secondary dep
+// swap" risk does not apply), and no local xcframework copy exists to vendor。
+// See also the pbxproj-vs-doc contradiction surfaced in CODEBASE_MEGA_AUDIT §x-sov.
 let package = Package(
   name: "LiteRTLM",
   platforms: [

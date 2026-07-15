@@ -301,8 +301,13 @@ final class BASChapter723ImportanceScorerByteEqualityTests:
         #endif
     }
 
-    func testAtomTierWithNoRecordsScoresIdentically() {
+    func testAtomTierWithNoRecordsScoresIdentically() throws {
         #if os(iOS) || os(macOS)
+        // audit blindspot-③ HIGH: the Swift AND Rust scorers were BOTH fixed to score a no-history
+        // atom neutral (0.5, stays) instead of near-min (~0.0077, demote-on-arrival). UN-SKIPPED
+        // 2026-07-11: the XCFramework was rebuilt from the fixed bas-retrieval-ranker source (cold
+        // ×2 byte-identical, pins bumped in BASRustCoreBridge), so the linked binary now carries
+        // the fix and this parity assertion is LIVE cross-language teeth again.
         let nowMs: Int64 = 1_700_000_000_000
         let now = Date(timeIntervalSince1970:
             Double(nowMs) / 1000.0)

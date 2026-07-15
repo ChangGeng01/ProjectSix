@@ -3,7 +3,6 @@ import Testing
 @testable import BASAppleAdapters
 @testable import BASMemory
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 struct BASAppleReopenWorkflowTests {
     @Test("decision mode executor routes comparative mode deterministically")
     func decisionModeExecutorRoutesBalanceModeDeterministically() {
@@ -115,4 +114,3 @@ struct BASAppleReopenWorkflowTests {
         #expect(finalized == false)
     }
 }
-#endif

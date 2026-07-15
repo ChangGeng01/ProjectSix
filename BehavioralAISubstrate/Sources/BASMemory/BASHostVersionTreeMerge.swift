@@ -103,6 +103,14 @@ public extension BASHostVersionTree {
                         && !existing.approvedByPolicy
                     {
                         byID[v.versionID] = v
+                    } else if v.approvedByPolicy == existing.approvedByPolicy,
+                              Self.contentTiebreakKey(v) > Self.contentTiebreakKey(existing) {
+                        // deep-audit MED: same versionID + same createdAt + same approvedByPolicy but
+                        // DIFFERENT content had NO tiebreak — local (existing) won by default, so the two
+                        // devices merging in opposite order kept DIFFERENT content, breaking the documented
+                        // commutative property. Break deterministically by a canonical content key (max),
+                        // which is a pure function of the unordered pair ⇒ both orders pick the same winner.
+                        byID[v.versionID] = v
                     }
                 }
             } else {
@@ -115,6 +123,16 @@ public extension BASHostVersionTree {
             }
             return a.versionID < b.versionID
         }
+    }
+
+    /// deep-audit MED: a total, content-derived ordering key over the fields that can differ within a
+    /// same-(versionID, createdAt, approvedByPolicy) collision — used to break the merge tie
+    /// deterministically so `mergeVersions` is commutative. Injective over content (distinct content ⇒
+    /// distinct key), unit-separated to avoid delimiter collisions.
+    private static func contentTiebreakKey(_ v: BASHostVersion) -> String {
+        [v.signature ?? "", v.parentVersionID ?? "", v.reason, v.rollbackRef ?? "",
+         v.changedFields.joined(separator: "\u{1F}"), v.schemaVersion]
+            .joined(separator: "\u{1E}")
     }
 
     /// Set-union for `[String]` collections that represent IDs.

@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 @testable import BASRuntimeCore
+import BASAppleAdapters
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASRuntimeCore")
 struct BASRuntimeCoreTests {
     @Test("provider attempt executor can reject cached output and continue to a successful provider result")
@@ -1586,4 +1586,3 @@ struct BASRuntimeCoreTests {
         )
     }
 }
-#endif

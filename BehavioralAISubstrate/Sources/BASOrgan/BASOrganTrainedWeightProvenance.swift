@@ -308,6 +308,18 @@ public enum BASOrganTrainedWeightFilter {
             return rejectionReasonViaAutoRouter(
                 for: provenance)
         }
+        return rejectionReasonViaSwiftTree(for: provenance)
+    }
+
+    /// audit M-l MED-6: the pure Swift decision tree, extracted so the routed-path `.invalidInput`
+    /// fallback can invoke it DIRECTLY. Previously that fallback flipped the process-global
+    /// `useRoutedFilter = false` (with a `defer` restore) and re-entered `rejectionReason` — a data
+    /// race: a CONCURRENT caller reading the global during that window silently took the Swift path
+    /// instead of the routed one (routing crosstalk + a write race on the shared static). Nothing
+    /// mutates the global now; `useRoutedFilter` is read once at the public entry as pure config.
+    internal static func rejectionReasonViaSwiftTree(
+        for provenance: BASOrganTrainedWeightProvenance
+    ) -> Rejection? {
         // Hash length pin first — structural invariant.
         if provenance.trainingCorpusHashHex.count != 64 {
             return .malformedHash(
@@ -447,11 +459,10 @@ public enum BASOrganTrainedWeightFilter {
         case .missingAttestationForProductionTier:
             return .missingAttestationForProductionTier
         case .invalidInput:
-            // Defensive — Rust ABI returned a bogus code。
-            // Fall back to the Swift decision tree。
-            useRoutedFilter = false
-            defer { useRoutedFilter = true }
-            return rejectionReason(for: provenance)
+            // Defensive — Rust ABI returned a bogus code。 Fall back to the Swift decision tree
+            // DIRECTLY (audit M-l MED-6: no longer flips the process-global `useRoutedFilter`, which
+            // raced concurrent callers into the Swift path + wrote a shared static mid-call)。
+            return rejectionReasonViaSwiftTree(for: provenance)
         }
     }
 }

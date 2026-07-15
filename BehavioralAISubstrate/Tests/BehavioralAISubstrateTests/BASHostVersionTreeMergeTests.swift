@@ -45,6 +45,26 @@ final class BASHostVersionTreeMergeTests: XCTestCase {
         XCTAssertEqual(ids, ["v1", "v2"])
     }
 
+    /// deep-audit MED: two devices merging in opposite order must yield byte-identical version arrays
+    /// (the documented commutative property). For a same-versionID + same-createdAt + same-approvedByPolicy
+    /// collision with DIFFERENT content, the old merge had NO tiebreak → local (existing) won, so the two
+    /// orders diverged. The content-key tiebreak restores commutativity. Unfixed: ab keeps reason-A, ba
+    /// keeps reason-B → RED.
+    func testMergeCommutativeForSameTimeSameApprovalDifferentContent() {
+        func v(_ reason: String) -> BASHostVersion {
+            BASHostVersion(versionID: "v1", createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+                changedFields: ["f"], reason: reason, approvedByPolicy: true)
+        }
+        let a = BASHostVersionTree(activeVersionID: "v1", versions: [v("reason-A")])
+        let b = BASHostVersionTree(activeVersionID: "v1", versions: [v("reason-B")])
+        let ab = a.merging(b).versions
+        let ba = b.merging(a).versions
+        XCTAssertEqual(ab.count, 1)
+        XCTAssertEqual(ba.count, 1)
+        XCTAssertEqual(ab.map(\.reason), ba.map(\.reason),
+            "merge must be commutative regardless of local/remote order")
+    }
+
     func testCollisionPicksLaterCreatedAt() {
         let earlier = version("v1", at: 100, approvedByPolicy: true)
         let later = version("v1", at: 500, approvedByPolicy: true)

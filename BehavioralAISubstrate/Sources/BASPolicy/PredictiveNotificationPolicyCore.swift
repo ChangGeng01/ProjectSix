@@ -191,8 +191,17 @@ public enum BASPredictiveNotificationPolicyEngine {
         )
     }
 
-    private static func minimumEvidenceSignalCount(for riskLevelID: String) -> Int {
+    // audit blindspot-② HIGH — internal (not private) so the monotonicity is directly unit-testable.
+    static func minimumEvidenceSignalCount(for riskLevelID: String) -> Int {
+        // "extreme" — the HIGHEST risk tier — previously fell into `default: 99`, an unreachable
+        // threshold (evidenceSignalCount < 99 always blocks), so an extreme-risk predictive
+        // intervention was NEVER notified — the exact opposite of the intent (higher risk ⇒ act
+        // SOONER, on FEWER signals). The required count is now MONOTONIC in risk:
+        // extreme(1) < high(2) = medium(2) < low/unknown(99, effectively never — a low-risk or
+        // unrecognized level does not warrant a predictive push; the unknown case stays fail-closed).
         switch riskLevelID {
+        case "extreme":
+            1
         case "medium", "high":
             2
         default:
@@ -204,8 +213,23 @@ public enum BASPredictiveNotificationPolicyEngine {
         input: BASPredictiveNotificationPolicyInput,
         calendar: Calendar
     ) -> Bool {
-        let hour = calendar.component(.hour, from: input.now)
-        return hour >= input.quietHoursStartHour || hour < input.quietHoursEndHour
+        isHourInQuietWindow(
+            hour: calendar.component(.hour, from: input.now),
+            start: input.quietHoursStartHour,
+            end: input.quietHoursEndHour)
+    }
+
+    /// audit policy-obs-misc MED-4: quiet-hours window membership. The old
+    /// formula `hour >= start || hour < end` expressed ONLY a cross-midnight
+    /// window — so a same-day window (start<end) silenced almost every hour, and
+    /// start==end silenced a FULL 24h. Now all three cases are correct:
+    ///   * start == end ⇒ empty window, NEVER quiet (was: 24h silent)
+    ///   * start <  end ⇒ same-day window [start, end)
+    ///   * start >  end ⇒ cross-midnight window (hour >= start OR hour < end)
+    static func isHourInQuietWindow(hour: Int, start: Int, end: Int) -> Bool {
+        if start == end { return false }
+        if start < end { return hour >= start && hour < end }
+        return hour >= start || hour < end
     }
 
     private static func deliveredTriggerCount(

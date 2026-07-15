@@ -1,6 +1,7 @@
 import Foundation
 import BASOrgan
 import BASAppleAdapters
+import BASHostKit   // observe→DISPOSE: BASLLMNeuralCoreService.adjudicating (default-OFF factual-belief wrap)
 import QinaoLoop
 
 /// M180 — public factory for the most common Qinao + Apple
@@ -54,23 +55,52 @@ import QinaoLoop
 /// to `QinaoLoop.LoopError.organUnavailable(reason:)` so callers can
 /// surface a typed refusal.
 ///
-/// Pass `includeDeterministicFallback: true` to register a
-/// `BASOrganDeterministicAdapter` first; the registry's "prefer
-/// most-recent on-device" rule still picks Apple FM when available
-/// but silently falls back to the deterministic adapter on an
-/// unavailable Apple FM. Useful for offline development and
-/// integration tests that need an organ but don't want a real LLM.
+/// ## ⚠️ `includeDeterministicFallback` IS A NO-OP TODAY (verified 2026-07-14)
+///
+/// It registers a `BASOrganDeterministicAdapter`, but that adapter is
+/// UNREACHABLE on every host, so nothing ever "falls back". Three verified
+/// links, each sufficient on its own:
+///
+///  1. `BASOrganRegistry.adapter(for:)` (BASOrgan/BASOrganRegistry.swift:67-87)
+///     is SELECTION-ONLY: it returns the most-recently-registered on-device
+///     adapter for the role and never retries another on failure. It never
+///     calls `currentCapacity()`.
+///  2. This factory registers the deterministic adapter FIRST and the Apple
+///     organ LAST, so "prefer most-recent" always resolves to Apple.
+///  3. `AppleFoundationOrganAdapter`'s descriptor hardcodes `runsOnDevice: true`
+///     unconditionally — it wins selection even on hosts where `draft(_:)`
+///     throws.
+///
+/// So on an unavailable Apple FM this endpoint THROWS; it does not degrade.
+/// The prior text here ("silently falls back to the deterministic adapter on an
+/// unavailable Apple FM") was false, and so is the claim that this is "useful
+/// for offline development".
+///
+/// Making it real needs a router, and that is DEFERRED on a hard blocker:
+/// `BASRoutingOrganAdapter` does not conform to `BASStreamingOrganAdapter`
+/// (BASOrgan/BASRoutingOrganAdapter.swift:68, admitted at :57-59), while
+/// `BASOrganRegistryEndpoint` resolves streaming via `as? BASStreamingOrganAdapter`
+/// with no `draft()` degrade (QinaoLoop/BASOrganRegistryEndpoint.swift:116-125).
+/// Wrapping the organ in the router today would silently convert working
+/// streaming into `organUnavailable(reason: "endpoint-not-streaming")`. The
+/// router is also INERT until `AppleFoundationOrganAdapter` maps raw
+/// FoundationModels errors to `BASOrganError` — it fails over only on
+/// `.providerUnavailable` / `.pressureRefusal` (BASRoutingOrganAdapter.swift:161-164).
+///
+/// TRIGGER to revisit: `BASRoutingOrganAdapter` gains streaming conformance
+/// (the M255-followup named at BASRoutingOrganAdapter.swift:57-59) AND the
+/// adapter's error mapping lands. Until then this parameter is kept only for
+/// source compatibility — prefer leaving it `false`.
 public extension QinaoLoop {
 
     /// One-call factory wiring Apple FoundationModels behind a
     /// `QinaoOrganEndpoint`. See file-level doc for full behavior.
     ///
-    /// - Parameter includeDeterministicFallback: when `true`,
-    ///   registers `BASOrganDeterministicAdapter` first so an
-    ///   unavailable Apple FM falls through to a deterministic stub
-    ///   instead of throwing. Default `false` (production hosts
-    ///   should surface unavailability rather than silently degrade
-    ///   to a stub).
+    /// - Parameter includeDeterministicFallback: ⚠️ NO-OP — see the file-level
+    ///   doc. It registers `BASOrganDeterministicAdapter`, but the registry is
+    ///   selection-only and always resolves to the Apple organ, so an
+    ///   unavailable Apple FM still THROWS rather than falling through. Kept for
+    ///   source compatibility; leave `false`.
     /// - Returns: an opaque endpoint hosts pass to
     ///   `QinaoLoop.init(organEndpoint:)`.
     static func makeAppleFoundationEndpoint(
@@ -78,9 +108,26 @@ public extension QinaoLoop {
     ) async -> any QinaoOrganEndpoint {
         let registry = BASOrganRegistry()
         if includeDeterministicFallback {
+            // NO-OP in practice: the Apple organ is registered last and the
+            // registry prefers the most-recently-registered on-device adapter,
+            // so this one is never selected. Retained for source compatibility
+            // until a streaming-capable router exists. See the file-level doc.
             await registry.register(BASOrganDeterministicAdapter())
         }
-        await registry.register(AppleFoundationOrganAdapter())
+        // observe→DISPOSE (Line A): route the live Apple FM organ through the factual-belief adjudicator.
+        // Default-OFF (`BAS_FACTUAL_ADJUDICATE` unset) ⇒ returns the adapter byte-equal; ON ⇒ the
+        // streaming-capable wrapper, so the chat loop's `as? BASStreamingOrganAdapter` probe resolves it and
+        // the verdict reaches `streamDraft`. The wrapper forwards `descriptor`, so the registry's
+        // on-device/recency selection (Apple FM over the deterministic fallback) is unchanged. FAIL-OPEN:
+        // missing provider/corpus ⇒ the adapter is returned unchanged.
+        let organ = BASLLMNeuralCoreService.adjudicating(
+            AppleFoundationOrganAdapter(),
+            // charter audit 2026-07-12 T4: the embedder is constructed HERE (LLM-side
+            // module) and injected — BASHostKit no longer builds the concrete MiniLM.
+            embeddingProvider: BASMiniLMEmbeddingProvider())
+        // Pre-embed the fact bank so the first ON turn doesn't stall before the first token (no-op when OFF).
+        await BASLLMNeuralCoreService.prewarmAdjudicator(organ)
+        await registry.register(organ)
         return BASOrganRegistryEndpoint(registry: registry)
     }
 }

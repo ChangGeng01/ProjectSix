@@ -127,11 +127,16 @@ final class BASEBrainTurnResultReplayHarnessTests: XCTestCase {
         var rawPinned = raw
         rawPinned.memoryBundle.retrievedAt =
             BASEBrainTurnResultReplayCanonicalizer.zeroSentinel
+        // substrate #77: canonicalization now collapses a SECOND observation-drift field
+        // (per-stage wall-clock timings) — pin it here too so the whole-struct guard still proves
+        // canonicalization touches ONLY the drift fields, nothing authorization-bearing.
+        rawPinned.layerTimingsMs = nil
         XCTAssertEqual(rawPinned, canon,
-            "R1 over-reach guard: canonicalization must change ONLY memoryBundle.retrievedAt")
+            "R1 over-reach guard: canonicalization must change ONLY the observation-drift fields "
+            + "(memoryBundle.retrievedAt + layerTimingsMs)")
 
         XCTAssertEqual(
             BASEBrainTurnResultReplayCanonicalizer.canonicalizedFields,
-            ["memoryBundle.retrievedAt"])
+            ["memoryBundle.retrievedAt", "layerTimingsMs"])
     }
 }

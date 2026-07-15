@@ -18,8 +18,12 @@ import BASRuntimeCore
 /// 2. **Session scope**: `(session)`. Revocation persists through the
 ///    session until explicitly lifted or the session ends.
 /// 3. **Feature-domain scope**: `(domain)`. Cross-session. Used when
-///    the integrity layer decides "no more external actuation
-///    anywhere, until maintenance."
+///    the integrity layer seals a feature domain ("no more external
+///    actuation in this domain, until maintenance"). Named-domain
+///    queries are partition-scoped — a differently-named domain does
+///    NOT inherit the seal. A query that omits the domain cannot dodge
+///    a seal by omission: it fails closed against every domain seal
+///    for that permission.
 ///
 /// ## Fail-closed
 ///
@@ -100,10 +104,24 @@ public actor BASSovereignPrivilegeArbiter {
         turn: String? = nil,
         featureDomain: String? = nil
     ) -> Bool {
-        // Domain revocation is the widest scope — blocks everywhere.
-        if let featureDomain,
-           let revs = domainRevocations[featureDomain],
-           revs.contains(where: { $0.permission == permission }) {
+        // Domain revocation is the widest scope. A query that NAMES a
+        // domain is partition-scoped: only that domain's revocations
+        // apply, and a differently-named domain does not inherit them
+        // (see testDomainRevocationBlocksAcrossSessions). A query that
+        // does NOT name a domain must not be able to dodge a domain
+        // seal by omission — it fails CLOSED against ANY domain
+        // revocation of the permission. (blindspot HIGH: the old code
+        // only checked domainRevocations[featureDomain], so a nil-domain
+        // query fell through to session/turn scope and returned true,
+        // silently bypassing every domain seal.)
+        if let featureDomain {
+            if let revs = domainRevocations[featureDomain],
+               revs.contains(where: { $0.permission == permission }) {
+                return false
+            }
+        } else if domainRevocations.values.contains(where: { revs in
+            revs.contains(where: { $0.permission == permission })
+        }) {
             return false
         }
         // Session revocation blocks across all turns of that session.
@@ -133,6 +151,17 @@ public actor BASSovereignPrivilegeArbiter {
         if let featureDomain,
            let rev = domainRevocations[featureDomain]?.first(where: { $0.permission == permission }) {
             return "domain(\(featureDomain)):\(rev.reasonCode)"
+        } else if featureDomain == nil {
+            // deep-audit MED: mirror isAllowed's nil-domain fail-closed (lines 122-126) — a nil-domain
+            // query is sealed by ANY domain revocation of the permission, so explainDenial must NAME that
+            // seal. Before this, explainDenial skipped the domain block entirely when featureDomain==nil,
+            // so a genuinely domain-sealed denial (isAllowed==false) returned nil ("allowed") — divergence.
+            // Deterministic: report the lowest-named sealing domain.
+            for name in domainRevocations.keys.sorted() {
+                if let rev = domainRevocations[name]?.first(where: { $0.permission == permission }) {
+                    return "domain(\(name)):\(rev.reasonCode)"
+                }
+            }
         }
         if let rev = sessionRevocations[session]?.first(where: { $0.permission == permission }) {
             return "session(\(session)):\(rev.reasonCode)"

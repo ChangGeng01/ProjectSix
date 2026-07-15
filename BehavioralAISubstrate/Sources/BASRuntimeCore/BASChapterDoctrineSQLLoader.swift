@@ -24,6 +24,28 @@ import SQLite3
 
 enum BASChapterDoctrineSQLLoader {
 
+    // MARK: - audit runtimecore-b MED-4 — degrade, don't crash
+    //
+    // JUDGMENT (2026-07-09): this loader hydrates the project's own DEVELOPMENT
+    // -HISTORY metadata (chapter numbers, "knives"/cuts, summaries — the ADR-016
+    // "doctrine collapse" registry). It gates NO runtime safety/policy decision
+    // (consumers: the entropy-chapter index + frozen-hash TEST pins). It is
+    // therefore NON-critical: a build that fails to bundle these .sql resources
+    // should degrade to EMPTY collections (the frozen-hash tests catch the
+    // packaging bug in CI) — NOT abort the whole process with a fatalError. Had
+    // this been safety-gating, the correct fix would be fail-fast, not degrade.
+    enum LoaderError: Error, Equatable {
+        case resourceMissing(String)
+        case ioFailed(String)
+        case sqlFailed(String)
+    }
+    /// Surfaced on a load failure (was a swallowed process abort) — a host can
+    /// log it; tests assert it fired. nil ⇒ unobserved (default).
+    nonisolated(unsafe) static var _onLoadFailure: (@Sendable (Error) -> Void)?
+    /// Test seam: force the load to fail so the degrade + surface path is
+    /// exercisable without un-bundling a real resource.
+    nonisolated(unsafe) static var _forceLoadFailureForTesting = false
+
     // MARK: - Lazy decoded collections
 
     /// Decoded chapter doctrine partitions, lazily produced once
@@ -47,57 +69,54 @@ enum BASChapterDoctrineSQLLoader {
 
     private static func execScript(
         _ db: OpaquePointer, _ sql: String, _ label: String
-    ) {
+    ) throws {
         var errMsg: UnsafeMutablePointer<CChar>?
         let rc = sqlite3_exec(db, sql, nil, nil, &errMsg)
         if rc != SQLITE_OK {
             let msg = errMsg.map { String(cString: $0) }
                 ?? "?"
             sqlite3_free(errMsg)
-            fatalError(
-                "chapter 七百二 SQL loader" +
-                " (\(label)):exec failed rc=\(rc)" +
-                " err=\(msg)")
+            throw LoaderError.sqlFailed(
+                "exec (\(label)) failed rc=\(rc) err=\(msg)")
         }
     }
 
     private static func readResource(
         _ name: String, _ ext: String = "sql"
-    ) -> String {
+    ) throws -> String {
         guard let url = Bundle.module.url(
             forResource: name, withExtension: ext)
         else {
-            fatalError(
-                "chapter 七百二 SQL loader:" +
-                " resource \(name).\(ext) missing" +
-                " from BASRuntimeCore Resources")
+            throw LoaderError.resourceMissing(
+                "\(name).\(ext) missing from BASRuntimeCore Resources")
         }
         do {
             return try String(
                 contentsOf: url, encoding: .utf8)
         } catch {
-            fatalError(
-                "chapter 七百二 SQL loader: read" +
-                " \(name).\(ext) failed: \(error)")
+            throw LoaderError.ioFailed(
+                "read \(name).\(ext) failed: \(error)")
         }
     }
 
     private static func withInMemoryDB<T>(
         _ scripts: [String],
-        _ body: (OpaquePointer) -> T
-    ) -> T {
+        _ body: (OpaquePointer) throws -> T
+    ) throws -> T {
+        if _forceLoadFailureForTesting {
+            throw LoaderError.sqlFailed("forced failure (testing)")
+        }
         var db: OpaquePointer?
         let openRC = sqlite3_open(":memory:", &db)
         guard openRC == SQLITE_OK, let handle = db else {
-            fatalError(
-                "chapter 七百二 SQL loader:" +
-                " sqlite3_open(:memory:) failed rc=\(openRC)")
+            throw LoaderError.ioFailed(
+                "sqlite3_open(:memory:) failed rc=\(openRC)")
         }
         defer { sqlite3_close(handle) }
         for name in scripts {
-            execScript(handle, readResource(name), name)
+            try execScript(handle, try readResource(name), name)
         }
-        return body(handle)
+        return try body(handle)
     }
 
     private static func text(
@@ -117,11 +136,21 @@ enum BASChapterDoctrineSQLLoader {
 
     // MARK: - Chapter doctrine load
 
-    private static func loadChapterDoctrineFromSQL()
+    /// Non-throwing entry (used by the lazy property): on ANY load failure,
+    /// degrade to empty + surface via _onLoadFailure (audit runtimecore-b MED-4).
+    static func loadChapterDoctrineFromSQL()
         -> (literals: [BASChapterDoctrineRecord],
             phase2: [BASChapterDoctrineRecord])
     {
-        return withInMemoryDB([
+        do { return try _loadChapterDoctrineFromSQLThrowing() }
+        catch { _onLoadFailure?(error); return (literals: [], phase2: []) }
+    }
+
+    private static func _loadChapterDoctrineFromSQLThrowing()
+        throws -> (literals: [BASChapterDoctrineRecord],
+                   phase2: [BASChapterDoctrineRecord])
+    {
+        return try withInMemoryDB([
             "010_chapter_doctrine_records_schema",
             "011_chapter_doctrine_literals_data",
             "012_chapter_doctrine_phase2_data"
@@ -141,7 +170,7 @@ enum BASChapterDoctrineSQLLoader {
                 db, parentSQL, -1, &stmt, nil) == SQLITE_OK,
                 let s = stmt
             else {
-                fatalError("prepare parent failed")
+                throw LoaderError.sqlFailed("prepare parent failed")
             }
             defer { sqlite3_finalize(s) }
             while sqlite3_step(s) == SQLITE_ROW {
@@ -245,12 +274,26 @@ enum BASChapterDoctrineSQLLoader {
 
     // MARK: - Entropy chapter index load
 
-    private static func loadEntropyChapterIndexFromSQL()
+    /// Non-throwing entry (used by the lazy property): degrade to empty +
+    /// surface on any failure (audit runtimecore-b MED-4).
+    static func loadEntropyChapterIndexFromSQL()
         -> (radical: [BASEntropyChapterEntry],
             phase2: [BASEntropyChapterEntry],
             postSweep: [BASEntropyChapterEntry])
     {
-        return withInMemoryDB([
+        do { return try _loadEntropyChapterIndexFromSQLThrowing() }
+        catch {
+            _onLoadFailure?(error)
+            return (radical: [], phase2: [], postSweep: [])
+        }
+    }
+
+    private static func _loadEntropyChapterIndexFromSQLThrowing()
+        throws -> (radical: [BASEntropyChapterEntry],
+                   phase2: [BASEntropyChapterEntry],
+                   postSweep: [BASEntropyChapterEntry])
+    {
+        return try withInMemoryDB([
             "021_entropy_chapter_entries_schema",
             "022_entropy_chapter_entries_data"
         ]) { db -> (radical: [BASEntropyChapterEntry],
@@ -273,7 +316,7 @@ enum BASChapterDoctrineSQLLoader {
             guard sqlite3_prepare_v2(
                 db, sql, -1, &stmt, nil) == SQLITE_OK,
                 let s = stmt
-            else { fatalError("prepare failed") }
+            else { throw LoaderError.sqlFailed("prepare entropy failed") }
             defer { sqlite3_finalize(s) }
             var radical: [BASEntropyChapterEntry] = []
             var phase2: [BASEntropyChapterEntry] = []
@@ -294,7 +337,7 @@ enum BASChapterDoctrineSQLLoader {
                 case "phase2":    phase2.append(entry)
                 case "postSweep": postSweep.append(entry)
                 default:
-                    fatalError(
+                    throw LoaderError.sqlFailed(
                         "unknown collection_tag '\(tag)'")
                 }
             }

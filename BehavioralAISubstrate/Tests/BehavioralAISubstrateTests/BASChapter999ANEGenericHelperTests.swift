@@ -27,7 +27,6 @@ import XCTest
 @testable import BASRuntimeCore
 @testable import BASMetalSubstrate
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter999ANEGenericHelperTests: XCTestCase {
 
     func testCRITICAL_GenericHelper_IncrementsCounterOnce() {
@@ -155,4 +154,3 @@ final class BASChapter999ANEGenericHelperTests: XCTestCase {
             "exact +20)")
     }
 }
-#endif

@@ -26,26 +26,54 @@ final class BASChapter606SovereignCodableProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testSovereignTurnParityConformsToCodable() {
-        assertCodable(BASSovereignTurnParity.self)
+        // #18: real round-trip (String enum, not CaseIterable)
+        assertCodableRoundTrips(BASSovereignTurnParity.match)
+        assertCodableRoundTrips(BASSovereignTurnParity.coordinatorLaxer)
     }
 
     func testOperationDomainConformsToCodable() {
-        assertCodable(
-            BASSovereignVerdictEngine.OperationDomain.self)
+        // #18: real round-trip (String enum, not CaseIterable)
+        assertCodableRoundTrips(
+            BASSovereignVerdictEngine.OperationDomain.pureInference)
+        assertCodableRoundTrips(
+            BASSovereignVerdictEngine.OperationDomain.toolWrite)
     }
 
     func testSovereignTurnObservationsConformsToCodable() {
-        assertCodable(BASSovereignTurnObservations.self)
+        // #18: real round-trip
+        let value = BASSovereignTurnObservations(
+            sessionID: "",
+            turnID: "",
+            snapshotRef: "",
+            policyHash: "",
+            policyLineageMissing: false,
+            auditEntryMissing: false,
+            runtimeUnstableInHighRisk: false,
+            riskPermitHeadConflict: false,
+            externalSideEffectWithoutSCT: false,
+            hostRemovalBypassed: false,
+            unauthorizedSelfMutation: false,
+            memoryOrHostWriteBypass: false,
+            irreversibilityScore: 0.0,
+            manipulationStrength: 0.0,
+            uncertaintyScore: 0.0,
+            gsiScore: 0.0,
+            hostGateValue: 0.0,
+            quarantineCount: 0,
+            runMode: .dormant,
+            emergencyBrakeLevel: .none,
+            operation: .pureInference,
+            evidenceSufficient: false)
+        assertCodableRoundTrips(value)
     }
 
     func testSovereignTurnVerifierReportConformsToCodable() {
-        assertCodable(BASSovereignTurnVerifierReport.self)
+        // #18: real round-trip — required `engineVerdict`
+        // (BASSovereignVerdict) is a large BASSchemaVersioned struct
+        // from BASRuntimeCore not confidently constructible here;
+        // honest compile-time-only fallback.
+        assertConformsToCodableAtCompileTime(
+            BASSovereignTurnVerifierReport.self)
     }
 }

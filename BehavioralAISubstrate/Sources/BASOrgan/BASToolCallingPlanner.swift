@@ -179,6 +179,15 @@ public actor BASToolCallingPlanner {
     private let policy: BASToolCallingPlanPolicy
     private let maxIterations: Int
 
+    /// audit F11 (2026-07-12): a RUNTIME tool-safety floor the host POLICY cannot bypass.
+    /// The policy is host-supplied and decides `.invokeTools`; before this, the planner
+    /// dispatched whatever the policy returned with no independent gate — tool-call safety
+    /// depended entirely on the host both restricting in policy AND wiring the dispatcher's
+    /// (default-nil) filter. When this set is non-nil, the planner drops any invocation whose
+    /// toolName is in it BEFORE dispatch, regardless of what the policy returned — a
+    /// secure-by-default seam a host can set once. Default nil = byte-equal to prior behavior.
+    private let restrictedToolDomains: Set<String>?
+
     /// Telemetry — counts tool invocations dispatched in this
     /// planner's lifetime (across multiple plan(...) calls)。
     private(set) var totalInvocationsDispatched: Int = 0
@@ -194,6 +203,7 @@ public actor BASToolCallingPlanner {
         policy: @escaping BASToolCallingPlanPolicy,
         maxIterations: Int =
             BASToolCallingPlanner.defaultMaxIterations,
+        restrictedToolDomains: Set<String>? = nil,
         contractInstall: BASLLMContractInstall? = .observeOnly(purpose: .plan)
     ) {
         precondition(maxIterations > 0,
@@ -208,6 +218,7 @@ public actor BASToolCallingPlanner {
         self.tools = tools
         self.policy = policy
         self.maxIterations = maxIterations
+        self.restrictedToolDomains = restrictedToolDomains
     }
 
     /// Run the planning loop on `goal`。Returns the final
@@ -242,9 +253,9 @@ public actor BASToolCallingPlanner {
 
             let draft: BASOrganDraft
             do {
-                // P1: tool-calling (structured/JSON) → elect prompt-lookup (TOKEN-identical under greedy).
-                draft = try await adapter.draft(
-                    request, electAccelerated: BASDecodeLanePolicy.promptLookupEligible(for: .factual))
+                // P1/S5: tool-calling (structured/JSON) is a .factual turn → pass the purpose; the planner picks
+                // the lane (TOKEN-identical under greedy; byte-equal fallback when temp>0 / no lane).
+                draft = try await adapter.draft(request, purpose: .factual)
             } catch {
                 throw BASToolCallingPlanError
                     .adapterFailed(
@@ -273,8 +284,18 @@ public actor BASToolCallingPlanner {
                     // no progress。
                     return draft
                 }
+                // audit F11: RUNTIME floor — drop any invocation on the restricted-domain set
+                // BEFORE dispatch, independent of what the host policy returned. A policy that
+                // returns .invokeTools for a restricted tool WITHOUT gating cannot slip it past.
+                let admitted: [BASToolInvocation]
+                if let restricted = restrictedToolDomains, !restricted.isEmpty {
+                    admitted = invocations.filter { !restricted.contains($0.toolName) }
+                    if admitted.isEmpty { return draft }
+                } else {
+                    admitted = invocations
+                }
                 let results = await dispatcher
-                    .dispatchBatch(invocations: invocations)
+                    .dispatchBatch(invocations: admitted)
                 toolResults.append(contentsOf: results)
                 totalInvocationsDispatched += results.count
 

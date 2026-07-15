@@ -161,8 +161,17 @@ public enum BASAgentFabricMultiRoundLoop {
     ) async -> BASAgentFabricMultiRoundResult {
         guard runtime.mode == .authoritative else { return .inert }
         // Close the auto-claim race before the first dispatch (idempotent). On overlap it throws;
-        // we surface that as inert rather than a partial loop (fail-closed).
-        do { try await runtime.wireRosterToGraph() } catch { return .inert }
+        // we surface that as a distinct fail-closed result rather than a partial loop.
+        // audit hostkit-rest LOW-1: a wire FAILURE is NOT the same as the "mode-inert" skip — return a
+        // distinct stopReason so a caller can tell a roster-wiring error from a normal not-authoritative
+        // skip (both used to be `.inert`, hiding the failure).
+        do {
+            try await runtime.wireRosterToGraph()
+        } catch {
+            return BASAgentFabricMultiRoundResult(
+                roundsRun: 0, converged: false, finalProjection: nil,
+                perRoundDigests: [], stopReason: "wire-failed")
+        }
         return await run(
             mode: runtime.mode,
             initialInput: initialInput,

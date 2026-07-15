@@ -33,17 +33,41 @@ import Foundation
 /// Actor-isolated ledger of host runtime-mode advisories。
 public actor BASEBrainHostRuntimeModeAdvisoryLedger {
 
+    /// gaps-reconciliation hostkit-rest LOW-4 (2026-07-11): the stored array grew UNBOUNDED
+    /// (manual reset only) — a long-lived host session leaked memory linearly in advisory count.
+    /// The stored DETAIL surface is now a drop-oldest ring capped at `maxStoredAdvisories`
+    /// (default 4096; pass nil for the unbounded replay-test mode), with `droppedAdvisoryCount`
+    /// auditing every eviction. The AGGREGATES (total/honored/unhonored/ratio) are running
+    /// counters that never drop — capping the ring must not skew the honesty metrics.
     private var advisories:
         [BASEBrainHostRuntimeModeAdvisory] = []
+    private let maxStoredAdvisories: Int?
+    private var _droppedAdvisoryCount = 0
+    private var _totalAdvisoryCount = 0
+    private var _honoredAdvisoryCount = 0
+    private var knownHostIDs: Set<String> = []
 
-    public init() {}
+    public init(maxStoredAdvisories: Int? = 4096) {
+        self.maxStoredAdvisories = maxStoredAdvisories
+    }
 
-    /// Record an advisory。 Order-preserving append。
+    /// Record an advisory。 Order-preserving append (drop-oldest past the cap)。
     public func record(
         advisory: BASEBrainHostRuntimeModeAdvisory
     ) {
+        _totalAdvisoryCount += 1
+        if advisory.wasHonored { _honoredAdvisoryCount += 1 }
+        knownHostIDs.insert(advisory.hostID)
         advisories.append(advisory)
+        if let cap = maxStoredAdvisories, advisories.count > cap {
+            let overflow = advisories.count - cap
+            advisories.removeFirst(overflow)
+            _droppedAdvisoryCount += overflow
+        }
     }
+
+    /// Advisories evicted from the stored ring (aggregates unaffected)。
+    public var droppedAdvisoryCount: Int { _droppedAdvisoryCount }
 
     /// Convenience that constructs the advisory via
     /// BASEBrainHostRuntimeModeAdvisoryDoctrine.advisory
@@ -59,40 +83,41 @@ public actor BASEBrainHostRuntimeModeAdvisoryLedger {
                     preferredMode: preferredMode,
                     hostID: hostID,
                     recordedAtMs: recordedAtMs)
-        advisories.append(advisory)
+        record(advisory: advisory)
     }
 
     // MARK: - Read accessors
 
-    /// Total advisories recorded since construction。
+    /// Total advisories recorded since construction (running counter — survives ring drops)。
     public var totalAdvisoryCount: Int {
-        advisories.count
+        _totalAdvisoryCount
     }
 
-    /// Distinct host IDs that have recorded an advisory。
+    /// Distinct host IDs that have recorded an advisory (survives ring drops;bounded by the
+    /// real host population, not advisory volume)。
     public var distinctHostCount: Int {
-        Set(advisories.map(\.hostID)).count
+        knownHostIDs.count
     }
 
     /// Count of advisories the substrate HONORED at the
     /// time of recording。
     public var honoredAdvisoryCount: Int {
-        advisories.filter(\.wasHonored).count
+        _honoredAdvisoryCount
     }
 
     /// Count of advisories the substrate did NOT honor
     /// (e.g. host requested .nativeV2 but production wire
     /// in is deferred per chapter 498 doctrine)。
     public var unhonoredAdvisoryCount: Int {
-        advisories.filter { !$0.wasHonored }.count
+        _totalAdvisoryCount - _honoredAdvisoryCount
     }
 
     /// Ratio of honored advisories in [0, 1]。 Zero when
     /// no advisories recorded。
     public var honoredRatio: Double {
-        guard !advisories.isEmpty else { return 0 }
-        return Double(honoredAdvisoryCount)
-            / Double(advisories.count)
+        guard _totalAdvisoryCount > 0 else { return 0 }
+        return Double(_honoredAdvisoryCount)
+            / Double(_totalAdvisoryCount)
     }
 
     /// Latest advisory recorded for the given host
@@ -117,5 +142,9 @@ public actor BASEBrainHostRuntimeModeAdvisoryLedger {
     /// session ledger instances。
     public func reset() {
         advisories.removeAll()
+        _droppedAdvisoryCount = 0
+        _totalAdvisoryCount = 0
+        _honoredAdvisoryCount = 0
+        knownHostIDs.removeAll()
     }
 }

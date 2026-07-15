@@ -19,26 +19,31 @@
 
 import XCTest
 @testable import BASOrchestration
+@testable import BASPolicy
 
 final class BASChapter572OrchestrationCodableSecondWaveProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testKunlunPermitEscalationDecisionConformsToCodable()
     {
-        assertCodable(
-            BASKunlunPermitEscalationDecision.self)
+        // #18: real round-trip
+        let decision = BASKunlunPermitEscalationDecision(
+            permit: BASActionPermit(mode: .answer),
+            reasonCodes: [],
+            suppressedByHumanAnchor: false,
+            triggered: false)
+        assertCodableRoundTrips(decision)
     }
 
     func testForbiddenCandidateZoneGateDecisionConformsToCodable()
     {
-        assertCodable(
-            BASForbiddenCandidateZoneGateDecision.self)
+        // #18: real round-trip
+        let decision = BASForbiddenCandidateZoneGateDecision(
+            denied: false,
+            reasonCodes: [],
+            wasQuarantined: false,
+            releaseConditionsMet: false)
+        assertCodableRoundTrips(decision)
     }
 }

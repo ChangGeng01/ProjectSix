@@ -23,26 +23,28 @@
 //   - ADR-016 advances M1721 → M1722
 
 import XCTest
+import Foundation
 @testable import BASObservability
 
 final class BASChapter586ObservabilityCodableExtensionProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testUnifiedStorageLocatorLocationsConformsToCodable() {
-        assertCodable(
-            BASUnifiedStorageLocator.Locations.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASUnifiedStorageLocator.Locations(
+                root: URL(fileURLWithPath: "/"),
+                auditLedgerURL: URL(fileURLWithPath: "/"),
+                lifecycleURL: URL(fileURLWithPath: "/")))
     }
 
     func testCheckpointResultConformsToCodable() {
-        assertCodable(
-            BASUpdateTicketLifecycleSQLiteStorage
-                .CheckpointResult.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASUpdateTicketLifecycleSQLiteStorage.CheckpointResult(
+                wasBusy: false,
+                walFramesAtStart: 0,
+                framesMerged: 0))
     }
 }

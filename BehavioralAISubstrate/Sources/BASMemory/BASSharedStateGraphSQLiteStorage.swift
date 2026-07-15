@@ -53,6 +53,7 @@
 
 import Foundation
 import SQLite3
+import BASRuntimeCore
 
 /// SQLite-backed `BASSharedStateGraph` persistence。 The actor's
 /// isolation boundary serializes all method calls,so the underlying
@@ -115,6 +116,14 @@ public actor BASSharedStateGraphSQLiteStorage:
         self.db = handle
         try Self.runExec(
             db: handle, sql: "PRAGMA journal_mode=WAL;")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete default-on (kill-switch BAS_SECURE_DELETE=0).
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            try Self.runExec(db: handle, sql: sdSQL)
+        }
+        // memory-a F4 residual: one-time legacy freelist purge (secure_delete only
+        // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
+        // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
+        BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
         try Self.runExec(
@@ -161,6 +170,11 @@ public actor BASSharedStateGraphSQLiteStorage:
     public func deleteObject(ref: String) async throws {
         guard let db else { return }
         try Self.deleteObjectRow(db: db, ref: ref)
+        // deep-audit P2-18 (2026-07-13): the object's payload_json plaintext lingers as the
+        // original INSERT frame in the -wal until truncated. deleteObject is the explicit
+        // forget path — truncate now, throwing (not reporting a clean delete while plaintext
+        // survives in the WAL sidecar).
+        try BASSQLiteSecureDelete.checkpointTruncateAfterSecureDelete(db: db)
     }
 
     // MARK: - Writer registry persistence
@@ -364,7 +378,7 @@ public actor BASSharedStateGraphSQLiteStorage:
                 // Skip + emit visible signal。 Logging via print
                 // is intentional — no structured logger in this
                 // module yet。
-                print(
+                BASDiagnosticLog.emit(
                     "[BASSharedStateGraphSQLiteStorage] " +
                     "WARN ch956.11 CR4: skipping row with " +
                     "unknown domain rawValue=\(raw) " +

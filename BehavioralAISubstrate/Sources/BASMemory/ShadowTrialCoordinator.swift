@@ -63,10 +63,12 @@ import BASRuntimeCore
 ///
 /// ## Errors
 ///
-/// Every failure mode is a typed `TrialError`. The coordinator never
-/// writes a partial success: if the ledger append throws, the
-/// in-memory state is not mutated. This matches the M9 "fail-closed"
-/// discipline from the sovereign side.
+/// Every failure mode is a typed `TrialError`. The coordinator never leaves a partial
+/// in-memory commit: each mutating op appends ALL its ledger entries first and mutates the
+/// in-memory maps only after every append succeeds, in a single synchronous block under a
+/// per-candidate lock (H9, 2026-07-08). If any ledger append throws, no in-memory state is
+/// mutated. (The append-only ledger cannot itself be rolled back — see `finalize` — so the
+/// guarantee is in-memory consistency, matching the M9 "fail-closed" discipline.)
 public actor BASShadowTrialCoordinator {
 
     // MARK: - Errors
@@ -135,6 +137,41 @@ public actor BASShadowTrialCoordinator {
     private var sealsByCandidate: [String: BASEvolutionSeal] = [:]
     /// The most recently queued retraction for a candidate (at most one).
     private var retractionsByCandidate: [String: BASRetractionOrder] = [:]
+
+    // MARK: - Per-candidate in-flight serialization (H9, mega-audit 2026-07-08)
+    //
+    // The coordinator is an actor, so its methods are serialized — but each mutating op
+    // SUSPENDS at `await ledger.append(...)`, and the actor admits another task during that
+    // suspension. That reopened the classic check-then-act window: two concurrent `submit`s
+    // for one candidate both passed the "no active trial" check and both appended (double
+    // trial + permanent double ledger record); two concurrent `observe`s read the same
+    // record and last-write-wins dropped an effect the ledger had already recorded.
+    //
+    // This per-candidate FIFO gate (continuation handoff — same primitive certified for the
+    // MLX session pool) makes every mutating op on a given candidate strictly serial across
+    // its `await`s, so the in-method re-read + commit is atomic w.r.t. other ops on that
+    // candidate. Different candidates stay fully concurrent.
+    private var busyCandidates: Set<String> = []
+    private var candidateWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
+
+    private func acquireCandidate(_ key: String) async {
+        if busyCandidates.contains(key) {
+            await withCheckedContinuation { candidateWaiters[key, default: []].append($0) }
+            // Woken by a handoff: busy stays true (the slot is transferred, not re-acquired).
+        } else {
+            busyCandidates.insert(key)
+        }
+    }
+
+    private func releaseCandidate(_ key: String) {
+        if var queue = candidateWaiters[key], !queue.isEmpty {
+            let next = queue.removeFirst()
+            candidateWaiters[key] = queue.isEmpty ? nil : queue
+            next.resume()   // handoff — the next waiter inherits busy=true
+        } else {
+            busyCandidates.remove(key)
+        }
+    }
 
     // MARK: - Dependencies
 
@@ -255,6 +292,13 @@ public actor BASShadowTrialCoordinator {
         try Self.ensureNonEmpty(turnID, label: "turnID")
         try Self.ensureNonEmpty(trialScope, label: "trialScope")
 
+        // H9: serialize per candidate so the check-then-append-then-commit below is atomic
+        // w.r.t. other ops on this candidate — no double-open, no double ledger record.
+        await acquireCandidate(candidate.candidateID)
+        defer { releaseCandidate(candidate.candidateID) }
+
+        // Re-read UNDER the lock (optimistic-concurrency re-check): a trial may have opened
+        // while we waited for the lock.
         if let existing = candidates[candidate.candidateID],
            existing.candidateID == candidate.candidateID,
            let active = activeTrialID(for: candidate.candidateID) {
@@ -370,13 +414,15 @@ public actor BASShadowTrialCoordinator {
     ///                candidate.sourceRefs)
     /// - `.blocked` → seal denied;   retraction queued (same cascade)
     ///
-    /// The whole finalize is atomic-ish: the trial ledger entry is
-    /// appended first; if it fails, seal + retraction are not
-    /// recorded. If the seal or retraction ledger append fails, the
-    /// trial still reaches its terminal state but the seal /
-    /// retraction fields are not populated — callers must treat
-    /// `ledgerAppendFailed` as grounds to abort higher-level
-    /// commits, same discipline as `BASSovereignAuditLedger`.
+    /// The whole finalize is ATOMIC in-memory (H9, 2026-07-08): all of the trial / seal /
+    /// retraction ledger entries are appended FIRST, and only if every append succeeds are
+    /// the in-memory maps committed — in a single synchronous block under the per-candidate
+    /// lock. Any `ledgerAppendFailed` leaves the trial pending and neither the seal nor the
+    /// retraction committed, so a `.failed`/`.blocked` outcome can never lose its retraction
+    /// while the trial is left denied. (The append-only ledger itself cannot be un-appended,
+    /// so a mid-sequence failure may leave earlier entries on the log; a caller retry
+    /// re-runs the whole finalize. The invariant this guarantees is in-memory consistency,
+    /// not ledger rollback.)
     @discardableResult
     public func finalize(
         trialID: String,
@@ -389,6 +435,14 @@ public actor BASShadowTrialCoordinator {
         try Self.ensureNonEmpty(sessionID, label: "sessionID")
         try Self.ensureNonEmpty(turnID, label: "turnID")
 
+        // H9: serialize per candidate so no two finalizes of the same trial interleave.
+        guard let key = trialsByID[trialID]?.candidateRef else {
+            throw TrialError.unknownTrial(id: trialID)
+        }
+        await acquireCandidate(key)
+        defer { releaseCandidate(key) }
+
+        // Re-read UNDER the lock (optimistic re-check).
         guard let record = trialsByID[trialID] else {
             throw TrialError.unknownTrial(id: trialID)
         }
@@ -409,13 +463,18 @@ public actor BASShadowTrialCoordinator {
         finalized.completionState = outcome.completionState
         finalized.promotionRecommendation = promotionRecommendation
 
+        // ── H9: build ALL entries + derived state first, append ALL, then commit the
+        // in-memory maps ATOMICALLY. Previously the trial terminal state was committed
+        // between the seal / retraction appends, so a seal-or-retraction append failure
+        // left the trial finalized while the retraction (the safety mechanism for a
+        // failed/blocked candidate) was permanently dropped — the partial commit the
+        // class header wrongly denies. Committing only after every append succeeds keeps
+        // the in-memory state consistent with "finalize did not complete" on any failure.
         let trialEntry = BASShadowTrialLedgerEntry(
             auditID: nextAuditID(),
             sessionID: sessionID,
             turnID: turnID,
-            // ch 1014.6 / M3795 — Round-23 CRITICAL-3 fix:
-            // U+001F separator (trialID may contain `:`)
-            verdictRef: "shadow_trial\u{001F}\(trialID)",
+            verdictRef: "shadow_trial\u{001F}\(trialID)",   // ch 1014.6 / M3795 U+001F
             ruleIDs: ["L13." + outcome.eventKind],
             signalRefs: candidate.sourceRefs,
             actionRefs: [candidate.candidateID],
@@ -428,16 +487,6 @@ public actor BASShadowTrialCoordinator {
             appendedAt: now,
             eventKind: outcome.eventKind)
 
-        _ = try await appendOrThrow(trialEntry)
-
-        // Commit the trial state change only after the ledger entry
-        // was accepted.
-        trialsByID[trialID] = finalized
-        replaceInHistory(finalized)
-
-        // Derive seal + retraction. Both write their own ledger
-        // entries; they run after the trial entry so the chain sees
-        // "trial finalized → seal issued/denied → retraction queued".
         let sealID = nextSealID()
         let seal = BASEvolutionSeal(
             sealID: sealID,
@@ -461,9 +510,7 @@ public actor BASShadowTrialCoordinator {
             auditID: nextAuditID(),
             sessionID: sessionID,
             turnID: turnID,
-            // ch 1014.6 / M3795 — Round-23 CRITICAL-3 fix:
-            // U+001F separator (sealID may contain `:`)
-            verdictRef: "evolution_seal\u{001F}\(sealID)",
+            verdictRef: "evolution_seal\u{001F}\(sealID)",   // ch 1014.6 / M3795 U+001F
             ruleIDs: ["L13." + sealEventKind],
             signalRefs: [trialID],
             actionRefs: [candidate.candidateID],
@@ -471,12 +518,12 @@ public actor BASShadowTrialCoordinator {
             signaturePayload: seal.signature,
             appendedAt: now,
             eventKind: sealEventKind)
-        _ = try await appendOrThrow(sealEntry)
-        sealsByCandidate[candidate.candidateID] = seal
 
+        var retraction: BASRetractionOrder?
+        var retractionEntry: BASShadowTrialLedgerEntry?
         if outcome != .passed {
             let retractionID = nextRetractionID()
-            let retraction = BASRetractionOrder(
+            let order = BASRetractionOrder(
                 orderID: retractionID,
                 targetRefs: [candidate.candidateID],
                 cascadeRefs: candidate.sourceRefs,
@@ -484,15 +531,12 @@ public actor BASShadowTrialCoordinator {
                     ? ["L13.shadow_trial_failed"]
                     : ["L13.shadow_trial_blocked"],
                 executionState: "queued")
-
-            let retractionEntry = BASShadowTrialLedgerEntry(
+            retraction = order
+            retractionEntry = BASShadowTrialLedgerEntry(
                 auditID: nextAuditID(),
                 sessionID: sessionID,
                 turnID: turnID,
-                // ch 1014.6 / M3795 — Round-23 CRITICAL-3:
-                // U+001F separator (retractionID may contain `:`)
-                verdictRef:
-                    "retraction\u{001F}\(retractionID)",
+                verdictRef: "retraction\u{001F}\(retractionID)",   // ch 1014.6 / M3795 U+001F
                 ruleIDs: ["L13.retraction_order_queued"],
                 signalRefs: [trialID],
                 actionRefs: [candidate.candidateID],
@@ -501,14 +545,81 @@ public actor BASShadowTrialCoordinator {
                     eventKind: "retraction_order_queued",
                     trialID: trialID,
                     candidateID: candidate.candidateID,
-                    completionState: retraction.executionState),
+                    completionState: order.executionState),
                 appendedAt: now,
                 eventKind: "retraction_order_queued")
-            _ = try await appendOrThrow(retractionEntry)
-            retractionsByCandidate[candidate.candidateID] = retraction
+        }
+
+        // APPEND ALL — any failure throws here, BEFORE any in-memory commit below.
+        _ = try await appendOrThrow(trialEntry)
+        _ = try await appendOrThrow(sealEntry)
+        if let re = retractionEntry {
+            _ = try await appendOrThrow(re)
+        }
+
+        // COMMIT ALL — one synchronous block under the lock, so it is atomic.
+        trialsByID[trialID] = finalized
+        replaceInHistory(finalized)
+        sealsByCandidate[candidate.candidateID] = seal
+        if let r = retraction {
+            retractionsByCandidate[candidate.candidateID] = r
         }
 
         return finalized
+    }
+
+    // MARK: - Cross-process resume (mega-audit 2026-07-08, The Ledger increment 3)
+
+    /// Re-inject a trial that was OPENED in an earlier process so a subsequent public
+    /// `observe()` / `finalize()` can drive it to a terminal state.
+    ///
+    /// WHY THIS EXISTS. The coordinator holds trial state in memory only — its sole ledger use
+    /// is the append-only write in `appendOrThrow`; neither init reads the ledger back, so a
+    /// fresh process starts empty. A host that persists trials across restarts (a daily journal
+    /// opens a bet today and resolves it next week) would therefore hit `.unknownTrial` on
+    /// `finalize`, because the in-memory record died with the opening process. This seam lets
+    /// such a host — which owns the cross-boot persistence — RE-INJECT the persisted open trial
+    /// and its candidate WITHOUT emitting any ledger event, so the later `observe`/`finalize`
+    /// appends only the genuinely new terminal events and every H9 optimistic-concurrency
+    /// guarantee still holds. It is purely additive and opt-in: consumers that never persist +
+    /// resume never call it and stay byte-identical (ADR-014).
+    ///
+    /// Fail-closed guards: the candidate must match the record; the record must still be OPEN
+    /// (pending/observing); and neither the trial nor another active trial for the candidate may
+    /// already be resident — no silent overwrite of live state, no second concurrent trial.
+    public func resumeTrial(
+        candidate: BASExperienceCandidate,
+        record: BASShadowTrialRecord
+    ) async throws {
+        try Self.ensureNonEmpty(candidate.candidateID, label: "candidateID")
+        try Self.ensureNonEmpty(record.trialID, label: "trialID")
+        guard candidate.candidateID == record.candidateRef else {
+            throw TrialError.invalidInput(
+                reason: "candidate.candidateID '\(candidate.candidateID)' != record.candidateRef "
+                    + "'\(record.candidateRef)'")
+        }
+        guard record.isPending else {
+            throw TrialError.trialAlreadyFinalized(
+                id: record.trialID, state: record.completionState)
+        }
+
+        await acquireCandidate(candidate.candidateID)
+        defer { releaseCandidate(candidate.candidateID) }
+
+        // Re-check UNDER the lock (a concurrent op on this candidate may have raced ahead).
+        if trialsByID[record.trialID] != nil {
+            throw TrialError.duplicateTrial(id: record.trialID)
+        }
+        if let active = activeTrialID(for: candidate.candidateID) {
+            throw TrialError.candidateAlreadyHasActiveTrial(
+                candidateID: candidate.candidateID, trialID: active)
+        }
+
+        candidates[candidate.candidateID] = candidate
+        trialsByID[record.trialID] = record
+        var history = trialsByCandidate[candidate.candidateID] ?? []
+        history.append(record)
+        trialsByCandidate[candidate.candidateID] = history
     }
 
     // MARK: - Read-side
@@ -561,6 +672,16 @@ public actor BASShadowTrialCoordinator {
         if pendingSeals > 0 { reasons.append("evolution.seal_pending") }
         if retractionPending > 0 { reasons.append("evolution.retraction_pending") }
 
+        // H9 (F8): require POSITIVE evidence, not merely the ABSENCE of negatives. A
+        // candidate the coordinator has never trialed produces an empty `reasons` list,
+        // and the old `allowsPromotion = reasons.isEmpty` let it through — an
+        // absence-of-evidence fail-open. Promotion now demands a genuinely passed trial
+        // AND an approved seal; anything short of that denies (fail-closed).
+        let hasPassedTrial = history.contains { $0.isPassed }
+        let hasApprovedSeal = sealState?.isApproved == true
+        if !hasPassedTrial { reasons.append("evolution.no_passed_trial") }
+        if !hasApprovedSeal { reasons.append("evolution.no_approved_seal") }
+
         return BASEvolutionPromotionGateVerdict(
             allowsPromotion: reasons.isEmpty,
             reasonCodes: reasons,
@@ -598,6 +719,16 @@ public actor BASShadowTrialCoordinator {
         try Self.ensureNonEmpty(sessionID, label: "sessionID")
         try Self.ensureNonEmpty(turnID, label: "turnID")
 
+        // H9: resolve the candidate key, then serialize per candidate so concurrent
+        // observes cannot read the same record and last-write-wins drop an effect.
+        guard let key = trialsByID[trialID]?.candidateRef else {
+            throw TrialError.unknownTrial(id: trialID)
+        }
+        await acquireCandidate(key)
+        defer { releaseCandidate(key) }
+
+        // Re-read UNDER the lock — authoritative now that no other op on this candidate
+        // can interleave. `apply` runs on the FRESH record so effects accumulate.
         guard let record = trialsByID[trialID] else {
             throw TrialError.unknownTrial(id: trialID)
         }

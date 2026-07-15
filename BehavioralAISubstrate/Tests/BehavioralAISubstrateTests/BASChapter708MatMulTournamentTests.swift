@@ -20,6 +20,20 @@
 //
 // Output drives the chapter-七百八-第三刀 auto-router thresholds。
 
+// ## ARCHIVE MARKER (skip triage, 2026-07-14) — "superseded" is PARTIAL
+//
+// Both named replacements are REAL and asserted (BASChapter871MatMul5Way
+// BenchmarkTests: 4 tests / 10 asserts; BASChapter871BrainMPSGraphMatMulParity
+// Tests: 11 tests / 29 asserts). But do NOT read "superseded" as "strictly
+// covers", verified 2026-07-14:
+//   - 871 DROPPED the `bas_ranker_matmul_simd_blocked` contestant despite
+//     declaring "5 contestants". That symbol is still executed AND asserted by
+//     BASChapter726Int8PerfTests, so nothing is orphaned — the supersession
+//     claim is merely over-broad.
+//   - 871's shapes are 128/256/512; this file's are 8/32/128/512. It remains the
+//     last live 8x8x8 / 32x32x32 small-shape reference — exactly the regime
+//     where the auto-router's Rust-vs-Metal threshold lives.
+
 import XCTest
 @testable import BASRuntimeCore
 @testable import BASHostKit

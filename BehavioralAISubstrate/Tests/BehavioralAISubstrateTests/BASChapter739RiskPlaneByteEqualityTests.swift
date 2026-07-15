@@ -221,8 +221,29 @@ final class BASChapter739RiskPlaneByteEqualityTests:
     private func parallelSwiftMonotonicVersionCompare(
         current: String, proposed: String
     ) -> Bool? {
+        // deep-audit blindspot-③ mirror (2026-07-11): NUMERIC component compare, not lexicographic
+        // `>` (which claimed v9 > v10, ACCEPTING A DOWNGRADE). Unparseable ⇒ nil (fail-closed).
+        func parse(_ v: String) -> [UInt64]? {
+            let body = v.hasPrefix("v") ? String(v.dropFirst()) : v
+            if body.isEmpty { return nil }
+            var out: [UInt64] = []
+            for part in body.split(separator: ".", omittingEmptySubsequences: false) {
+                guard let n = UInt64(part) else { return nil }
+                out.append(n)
+            }
+            return out
+        }
         if current.isEmpty || proposed.isEmpty { return nil }
-        return proposed > current
+        guard let c = parse(current), let p = parse(proposed) else { return nil }
+        return lexNumericGreater(p, c)
+    }
+
+    /// element-wise then by length — mirrors Rust `Vec<u64>` ordering.
+    private func lexNumericGreater(_ a: [UInt64], _ b: [UInt64]) -> Bool {
+        for i in 0..<min(a.count, b.count) {
+            if a[i] != b[i] { return a[i] > b[i] }
+        }
+        return a.count > b.count
     }
 
     func testMonotonicVersionByteEqualityGrid() {
@@ -250,6 +271,25 @@ final class BASChapter739RiskPlaneByteEqualityTests:
                 rust, swift,
                 "(\(current), \(proposed)): mismatch")
         }
+        #endif
+    }
+
+    // gaps-reconciliation runtimecore-b LOW #9 (2026-07-11): pins the documented nil contract on
+    // empty input. HONEST SCOPE (corrected by the reversal run): the old force-unwrap never
+    // crashed on THIS toolchain (empty-singleton pointer is non-nil; Rust returns -1 for zero-len)
+    // — these teeth pin the CONTRACT, and the guard removes a latent, documented-nullable UB
+    // dependence, not a live trap. This test passes with or without the guard by design.
+    func testEmptyVersionStringsReturnNilNotTrap() {
+        #if os(iOS) || os(macOS)
+        XCTAssertNil(BASAutoRouteRanker.riskPlaneMonotonicVersionCompare(
+            current: "", proposed: "v1.0.0"), "empty current ⇒ nil (documented fault contract)")
+        XCTAssertNil(BASAutoRouteRanker.riskPlaneMonotonicVersionCompare(
+            current: "v1.0.0", proposed: ""), "empty proposed ⇒ nil")
+        XCTAssertNil(BASAutoRouteRanker.riskPlaneMonotonicVersionCompare(
+            current: "", proposed: ""), "both empty ⇒ nil")
+        // non-empty still flows through FFI (sanity that the guard did not over-block)
+        XCTAssertEqual(BASAutoRouteRanker.riskPlaneMonotonicVersionCompare(
+            current: "v1.0.0", proposed: "v2.0.0"), true)
         #endif
     }
 }

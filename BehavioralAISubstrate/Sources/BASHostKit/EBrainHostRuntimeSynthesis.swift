@@ -57,7 +57,24 @@ extension BASHostRuntime {
         // seam is dormant → byte-equal (红线 7 + ADR-014). A host sets this
         // true to let the CPU-deterministic temporal-caution operator RAISE
         // L11 caution (verdict-gated, raise-only) on genuinely-uncertain turns.
-        ssmCautionOperatorEnabled: Bool = false
+        ssmCautionOperatorEnabled: Bool = false,
+        // gaps-reconciliation hostkit-spine F7 (2026-07-11): the flag alone ran the operator
+        // silently STATELESS — the face never threaded the observation sink (ssmStateOut dropped)
+        // nor the temporal inputs (turnHistory / priorSSMState always empty ⇒ fresh recurrence
+        // every turn ⇒ the chapter-188 sustained-pressure path was dead from the host face).
+        // All three default nil/[] ⇒ byte-equal off (红线 7 / ADR-014).
+        ssmCautionObservationSink:
+            (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil,
+        turnHistory: [String] = [],
+        priorSSMState: [Float]? = nil,
+        // 效率战役 effort-loop activation (2026-07-11, operator 移动端极高效): the ε→effort→tier
+        // loop's LAST dormant link — governedPlan/allocator/RunTurn-floor all existed, but the face
+        // never carried the plan, so every host turn spent the full deliberation budget. A host
+        // computes BASBrainChat.governedPlan(message:thermalLevel:probe:) (surprise×stakes×headroom)
+        // and passes it here; RunTurn floors refinement passes by the applied tier (fast=1 …
+        // max=6, min-composed with the thermal floor — effort only TIGHTENS). Default nil ⇒
+        // passthrough, byte-equal (红线 7 / ADR-014).
+        effortPlan: BASEffortPlan? = nil
     ) -> BASEBrainTurnResult {
         makeEBrainTurn(
             for: request,
@@ -71,7 +88,11 @@ extension BASHostRuntime {
             shadowTrialFeedbackEnabled: shadowTrialFeedbackEnabled,
             pendingTrialLedgerIn: pendingTrialLedgerIn,
             resolvedTrialSink: resolvedTrialSink,
-            ssmCautionOperatorEnabled: ssmCautionOperatorEnabled
+            ssmCautionOperatorEnabled: ssmCautionOperatorEnabled,
+            ssmCautionObservationSink: ssmCautionObservationSink,
+            turnHistory: turnHistory,
+            priorSSMState: priorSSMState,
+            effortPlan: effortPlan
         )
     }
 
@@ -138,7 +159,24 @@ extension BASHostRuntime {
         // BASSignalTenIntegrationTestTriageDoctrine); it is proven transitively
         // by the sync-path BASSSMCautionOperatorRunTurnTests, which exercise
         // the identical coordinator wiring.
-        ssmCautionOperatorEnabled: Bool = false
+        ssmCautionOperatorEnabled: Bool = false,
+        // gaps-reconciliation hostkit-spine F7 (2026-07-11): the flag alone ran the operator
+        // silently STATELESS — the face never threaded the observation sink (ssmStateOut dropped)
+        // nor the temporal inputs (turnHistory / priorSSMState always empty ⇒ fresh recurrence
+        // every turn ⇒ the chapter-188 sustained-pressure path was dead from the host face).
+        // All three default nil/[] ⇒ byte-equal off (红线 7 / ADR-014).
+        ssmCautionObservationSink:
+            (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil,
+        turnHistory: [String] = [],
+        priorSSMState: [Float]? = nil,
+        // 效率战役 effort-loop activation (2026-07-11, operator 移动端极高效): the ε→effort→tier
+        // loop's LAST dormant link — governedPlan/allocator/RunTurn-floor all existed, but the face
+        // never carried the plan, so every host turn spent the full deliberation budget. A host
+        // computes BASBrainChat.governedPlan(message:thermalLevel:probe:) (surprise×stakes×headroom)
+        // and passes it here; RunTurn floors refinement passes by the applied tier (fast=1 …
+        // max=6, min-composed with the thermal floor — effort only TIGHTENS). Default nil ⇒
+        // passthrough, byte-equal (红线 7 / ADR-014).
+        effortPlan: BASEffortPlan? = nil
     ) async -> BASEBrainTurnResult {
         let coordinator = buildCoordinator(
             for: request,
@@ -146,7 +184,8 @@ extension BASHostRuntime {
             projection: projection,
             now: now,
             deliberationLoopEnabled: deliberationLoopEnabled,
-            ssmCautionOperatorEnabled: ssmCautionOperatorEnabled
+            ssmCautionOperatorEnabled: ssmCautionOperatorEnabled,
+            ssmCautionObservationSink: ssmCautionObservationSink
         )
         let deviceState = deviceStateOverride
             ?? vitalMonitor?.currentDeviceState(now: now)
@@ -161,7 +200,10 @@ extension BASHostRuntime {
             recordedAt: now,
             riskHint: request.riskLevel.eBrainRiskLevel,
             feedbackEvent: nil,
-            activeKillSwitches: request.activeKillSwitches
+            activeKillSwitches: request.activeKillSwitches,
+            turnHistory: turnHistory,        // F7: temporal inputs reach the operator
+            priorSSMState: priorSSMState,
+            effortPlan: effortPlan           // effort loop: RunTurn floors passes by the tier
         )
         switch runtimeMode {
         case .v1ByteEqual:
@@ -201,7 +243,10 @@ extension BASHostRuntime {
         // L11 risk-card raise in runTurn, so — unlike `deliberationLoopEnabled`
         // — it is NOT threaded onto triSelfService (no reversibility-tilt
         // analogue). Default false → seam dormant → byte-equal (红线 7 + ADR-014).
-        ssmCautionOperatorEnabled: Bool = false
+        ssmCautionOperatorEnabled: Bool = false,
+        // F7: the observation sink the async face hands through (nil ⇒ byte-equal off).
+        ssmCautionObservationSink:
+            (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil
     ) -> BASEBrainRuntimeCoordinator {
         let enforcedCurrentBrain = currentBrain
             .applyingControlPlaneDisposition(
@@ -235,7 +280,7 @@ extension BASHostRuntime {
                 versionTree: configuration.hostVersionTree,
                 forgetRequest: configuration.hostForgetRequest
             )
-        return BASEBrainRuntimeCoordinator(
+        var coordinator = BASEBrainRuntimeCoordinator(
             powerClockService:
                 BASHostRuntimeEBrainPowerClockService(
                     prefersPureLocal: configuration.prefersPureLocal,
@@ -333,6 +378,9 @@ extension BASHostRuntime {
             // false → the L11 SSM seam stays dormant → byte-equal (红线 7).
             ssmCautionOperatorEnabled: ssmCautionOperatorEnabled
         )
+        // F7: wire the observation sink (public var on the coordinator struct; nil ⇒ unchanged).
+        coordinator.ssmCautionObservationSink = ssmCautionObservationSink
+        return coordinator
     }
 
     func makeEBrainTurn(
@@ -365,7 +413,21 @@ extension BASHostRuntime {
         // false → coordinator flag false → L11 SSM seam dormant → byte-equal
         // (红线 7 + ADR-014). Mirrors exactly how `deliberationLoopEnabled`
         // is threaded onto the coordinator below.
-        ssmCautionOperatorEnabled: Bool = false
+        ssmCautionOperatorEnabled: Bool = false,
+        // gaps-reconciliation hostkit-spine F7 (2026-07-11): sink + temporal inputs — see the
+        // public face's doc. All default nil/[] ⇒ byte-equal off (红线 7 / ADR-014).
+        ssmCautionObservationSink:
+            (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil,
+        turnHistory: [String] = [],
+        priorSSMState: [Float]? = nil,
+        // 效率战役 effort-loop activation (2026-07-11, operator 移动端极高效): the ε→effort→tier
+        // loop's LAST dormant link — governedPlan/allocator/RunTurn-floor all existed, but the face
+        // never carried the plan, so every host turn spent the full deliberation budget. A host
+        // computes BASBrainChat.governedPlan(message:thermalLevel:probe:) (surprise×stakes×headroom)
+        // and passes it here; RunTurn floors refinement passes by the applied tier (fast=1 …
+        // max=6, min-composed with the thermal floor — effort only TIGHTENS). Default nil ⇒
+        // passthrough, byte-equal (红线 7 / ADR-014).
+        effortPlan: BASEffortPlan? = nil
     ) -> BASEBrainTurnResult {
         let enforcedCurrentBrain = currentBrain.applyingControlPlaneDisposition(
             configuration.controlPlaneExecutionDisposition,
@@ -492,7 +554,10 @@ extension BASHostRuntime {
             ssmCautionOperatorEnabled: ssmCautionOperatorEnabled
         )
 
-        return coordinator.runTurn(
+        // F7: wire the observation sink + temporal inputs (nil/[] defaults ⇒ byte-equal off).
+        var wired = coordinator
+        wired.ssmCautionObservationSink = ssmCautionObservationSink
+        return wired.runTurn(
             BASEBrainTurnRequest(
                 userInput: request.prompt,
                 deviceState: deviceState,
@@ -500,7 +565,10 @@ extension BASHostRuntime {
                 recordedAt: now,
                 riskHint: request.riskLevel.eBrainRiskLevel,
                 feedbackEvent: nil,
-                activeKillSwitches: request.activeKillSwitches
+                activeKillSwitches: request.activeKillSwitches,
+                turnHistory: turnHistory,
+                priorSSMState: priorSSMState,
+                effortPlan: effortPlan       // effort loop: RunTurn floors passes by the tier
             )
         )
     }

@@ -252,6 +252,25 @@ final class QinaoLearningExportBridgeTests: XCTestCase {
         XCTAssertEqual(baseDigest.count, 64)
     }
 
+    /// deep-audit P1-13 (2026-07-13): the digest must be INJECTIVE across the domain/skeleton
+    /// boundary. The old raw "|"-join made (domain "a|b", skeleton "c") and (domain "a",
+    /// skeleton "b|c") hash to the SAME payload — a warrant issued for one could be misread as
+    /// approving its colliding sibling. The length-prefixed injective join distinguishes them.
+    /// Reversal: restoring the raw "|"-join reds this (the two digests become equal).
+    func testCandidateIntentDigestIsInjectiveAcrossDomainSkeletonBoundary() {
+        let id = UUID()
+        let c1 = QinaoMemory.LearningExportCandidate(
+            sourceMemoryID: id, generalizedSkeleton: "c", domain: "a|b",
+            confidence: 0.5, sensitivity: .medium)
+        let c2 = QinaoMemory.LearningExportCandidate(
+            sourceMemoryID: id, generalizedSkeleton: "b|c", domain: "a",
+            confidence: 0.5, sensitivity: .medium)
+        XCTAssertNotEqual(
+            QinaoRuntime.candidateIntentDigest(c1),
+            QinaoRuntime.candidateIntentDigest(c2),
+            "the raw | join collided (a|b, c) with (a, b|c); the injective join must not")
+    }
+
     // MARK: - 6. Empty candidate set still refused via bridge
 
     func testEmptyCandidateSetRefusedByBridge() async {

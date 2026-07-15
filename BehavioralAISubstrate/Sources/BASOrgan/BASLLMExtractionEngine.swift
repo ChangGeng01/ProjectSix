@@ -104,16 +104,36 @@ public struct BASLLMVerifierFeedback:
     /// Merged into `byproducts.confidenceScores`。
     public let confidenceScores: [String: Double]
 
+    /// audit organ-eval MED-5: true when the draft was NOT verified because the pipeline
+    /// gated-skipped (no stage ran — the avoided-compute path), distinct from `approved == false`
+    /// meaning "a stage failed". The report-level `gatedSkip` was write-only (no consumer could see
+    /// it); propagating it here lets the downstream L11 gate tell "unverified" from "verified-and-
+    /// rejected". A gated skip always yields `approved == false` (an unverified draft is not accepted).
+    public let gatedSkip: Bool
+
     public init(
         approved: Bool,
         amendedAnswer: String? = nil,
         counterArguments: [String] = [],
-        confidenceScores: [String: Double] = [:]
+        confidenceScores: [String: Double] = [:],
+        gatedSkip: Bool = false
     ) {
         self.approved = approved
         self.amendedAnswer = amendedAnswer
         self.counterArguments = counterArguments
         self.confidenceScores = confidenceScores
+        self.gatedSkip = gatedSkip
+    }
+
+    // audit organ-eval MED-5: byte-stable decode — feedback persisted BEFORE the gatedSkip field
+    // decodes with gatedSkip = false (absent key ⇒ not-gated). Mirrors BASLLMVerifierReport's decoder.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        approved = try c.decode(Bool.self, forKey: .approved)
+        amendedAnswer = try c.decodeIfPresent(String.self, forKey: .amendedAnswer)
+        counterArguments = try c.decode([String].self, forKey: .counterArguments)
+        confidenceScores = try c.decode([String: Double].self, forKey: .confidenceScores)
+        gatedSkip = try c.decodeIfPresent(Bool.self, forKey: .gatedSkip) ?? false
     }
 
     /// Convenience:default approval with no amendments。
@@ -401,8 +421,8 @@ public actor BASLLMExtractionEngine {
         }
         // P1: factual extraction → elect the model-free prompt-lookup lane (TOKEN-identical under greedy,
         // ~1.58x on structured/JSON output; fail-closes to draft(_:) byte-equal when temp>0 or no lane).
-        return try await adapter.draft(
-            request, electAccelerated: BASDecodeLanePolicy.promptLookupEligible(for: .factual))
+        // S5: pass the turn's purpose (.factual) directly; the planner picks the lane.
+        return try await adapter.draft(request, purpose: .factual)
     }
 
     /// Pure helper:assemble the LLM-facing prompt from the

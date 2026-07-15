@@ -66,6 +66,22 @@ final class BASEventReducerTests: XCTestCase {
             "M955:protocol method must mirror legacy method")
     }
 
+    // audit memory-b F10: a non-UUID atomID must be DROPPED deterministically, not minted at a
+    // fresh random UUID (which broke replay determinism — the same event reduced differently each run).
+    func testMalformedAtomIDIsDroppedNotMintedAtRandomUUID() {
+        let payload = BASMemoryAtomEventPayload(
+            op: .admitted, atomID: "not-a-uuid",
+            kind: .episodic, scope: .session, sensitivity: .low, tier: .warm,
+            confidence: 0.5, sourceType: "t",
+            governanceStatus: .governed, provenanceSummary: "p")
+        let event = BASEventLogEntry.memoryAtomEvent(
+            eventID: "bad", timestampMs: 0, sessionID: "s", payload: payload)
+        let r1 = BASMemoryAtomReducer.reduce(priorAtoms: [:], event: event)
+        let r2 = BASMemoryAtomReducer.reduce(priorAtoms: [:], event: event)
+        XCTAssertTrue(r1.isEmpty, "a malformed atomID must be dropped, not minted at a random UUID")
+        XCTAssertEqual(r1, r2, "reduction must be deterministic (was: two different random UUIDs)")
+    }
+
     func testReduceStepReturnsNilForNonMemoryEvent() {
         let chat = BASEventLogEntry(
             eventID: "c", timestampMs: 0, kind: .chat,

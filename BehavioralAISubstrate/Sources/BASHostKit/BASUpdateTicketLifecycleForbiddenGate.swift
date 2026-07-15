@@ -109,7 +109,11 @@ public extension BASUpdateTicketLifecycleCoordinator {
                 reasonCodes: decision.reasonCodes)
             return .rejected
         }
-        return .proposed
+        // audit hostkit-rest LOW-2 (sibling of the ZoneGate MED-2 fix): return the ACTUAL persisted
+        // state, not a hardcoded `.proposed`. A re-presented ticket whose ID is already TERMINAL
+        // (.rejected/.distilled) would otherwise report `.proposed` and inflate the ingest accept
+        // count. A fresh submit still lands in `.proposed`, so new tickets are unaffected.
+        return entry(ticketID: ticket.ticketID)?.state ?? .rejected
     }
 
     /// **M391** — forbidden-gate-aware variant of

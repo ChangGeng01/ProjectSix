@@ -12,7 +12,6 @@ import Foundation
 @testable import BASHostKit
 @testable import BASMemory
 
-#if !os(iOS) // ch1022 source-gate parity (mirrors BASAgentFabricAuthoritativeProjectionTests)
 final class BASAgentFabricMultiRoundLoopTests: XCTestCase {
 
     // MARK: - deterministic stub fabric (no live LLM seats)
@@ -234,4 +233,3 @@ final class BASAgentFabricMultiRoundLoopTests: XCTestCase {
         XCTAssertNil(r.finalProjection)
     }
 }
-#endif

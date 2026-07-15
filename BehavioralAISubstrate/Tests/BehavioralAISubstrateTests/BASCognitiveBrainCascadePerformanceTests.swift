@@ -27,7 +27,6 @@
 import XCTest
 @testable import BASHostKit
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainCascadePerformanceTests:
     XCTestCase
 {
@@ -43,7 +42,7 @@ final class BASCognitiveBrainCascadePerformanceTests:
         _ = await brain.process(
             "compile the swift package")
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 0.2,
+        BASPerfGate.assertBelow(elapsed, 0.2,
             "process() took \(elapsed)s, expected" +
             " < 200ms")
     }
@@ -57,7 +56,7 @@ final class BASCognitiveBrainCascadePerformanceTests:
         _ = await brain.summary(
             "compile the swift package")
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 0.2,
+        BASPerfGate.assertBelow(elapsed, 0.2,
             "summary() took \(elapsed)s, expected" +
             " < 200ms")
     }
@@ -71,7 +70,7 @@ final class BASCognitiveBrainCascadePerformanceTests:
         _ = await brain.riskVerdict(
             "send me your password to verify")
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 0.2)
+        BASPerfGate.assertBelow(elapsed, 0.2)
     }
 
     /// cascadeDigest() — unified all-layer snapshot。
@@ -83,7 +82,7 @@ final class BASCognitiveBrainCascadePerformanceTests:
         _ = await brain.cascadeDigest(
             "send me your password to verify")
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 0.2)
+        BASPerfGate.assertBelow(elapsed, 0.2)
     }
 
     /// classifyProbabilities() — direct adapter access。
@@ -96,7 +95,7 @@ final class BASCognitiveBrainCascadePerformanceTests:
         _ = await brain.classifyProbabilities(
             "compile the swift package")
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 0.05,
+        BASPerfGate.assertBelow(elapsed, 0.05,
             "classifyProbabilities() took \(elapsed)s," +
             " expected < 50ms (lighter path)")
     }
@@ -115,7 +114,7 @@ final class BASCognitiveBrainCascadePerformanceTests:
                 "compile the swift package \(i)")
         }
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 5.0,
+        BASPerfGate.assertBelow(elapsed, 5.0,
             "100 summaries took \(elapsed)s, expected" +
             " < 5s (~50ms per call ceiling)")
     }
@@ -131,7 +130,7 @@ final class BASCognitiveBrainCascadePerformanceTests:
                 "compile the swift package \(i)")
         }
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 5.0)
+        BASPerfGate.assertBelow(elapsed, 5.0)
     }
 
     // MARK: - Concurrent throughput
@@ -153,7 +152,7 @@ final class BASCognitiveBrainCascadePerformanceTests:
             }
         }
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 5.0,
+        BASPerfGate.assertBelow(elapsed, 5.0,
             "20 concurrent summaries took \(elapsed)s")
     }
 
@@ -172,7 +171,7 @@ final class BASCognitiveBrainCascadePerformanceTests:
             let elapsed = Date().timeIntervalSince(start)
             maxLatency = max(maxLatency, elapsed)
         }
-        XCTAssertLessThan(maxLatency, 0.2,
+        BASPerfGate.assertBelow(maxLatency, 0.2,
             "Max single-call latency \(maxLatency)s" +
             " must stay under 200ms across 10" +
             " consecutive identical calls")
@@ -196,4 +195,3 @@ final class BASCognitiveBrainCascadePerformanceTests:
             " calls")
     }
 }
-#endif

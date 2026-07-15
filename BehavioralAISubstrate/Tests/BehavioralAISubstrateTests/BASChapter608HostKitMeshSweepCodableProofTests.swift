@@ -23,21 +23,38 @@ final class BASChapter608HostKitMeshSweepCodableProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
+    private func minimalCascadeResult() -> BASLayerCascadeResult {
+        BASLayerCascadeResult(
+            outcome: .fallenThrough,
+            layerID: .l1)
+    }
+
+    private func minimalConsultation()
+        -> BASHostMeshConsultationResult
+    {
+        BASHostMeshConsultationResult(
+            cascadeResult: minimalCascadeResult(),
+            reasonCodes: [])
     }
 
     func testHostMeshConsultationResultConformsToCodable() {
-        assertCodable(BASHostMeshConsultationResult.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(minimalConsultation())
     }
 
     func testHostMeshSweepLayerEntryConformsToCodable() {
-        assertCodable(BASHostMeshSweepLayerEntry.self)
+        // #18: real round-trip
+        let value = BASHostMeshSweepLayerEntry(
+            layerID: .l1,
+            consultation: minimalConsultation())
+        assertCodableRoundTrips(value)
     }
 
     func testHostMeshSweepResultConformsToCodable() {
-        assertCodable(BASHostMeshSweepResult.self)
+        // #18: real round-trip
+        let value = BASHostMeshSweepResult(
+            layerEntries: [],
+            aggregatedReasonCodes: [])
+        assertCodableRoundTrips(value)
     }
 }

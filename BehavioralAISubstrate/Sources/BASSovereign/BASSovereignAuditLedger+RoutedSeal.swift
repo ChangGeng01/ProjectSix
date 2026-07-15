@@ -64,9 +64,23 @@ extension BASSovereignAuditLedger {
     ///
     /// This is `nonisolated(unsafe)` because it does no
     /// mutation — pure function over an immutable Data input。
+    /// Test-only override for the routed seal digest. When non-nil,
+    /// `hashViaAutoRouter` returns this instead of the Rust seal — so a
+    /// test can force the routed path to DIVERGE from the plain
+    /// `hash(_:)` (they are byte-identical in production) and thereby
+    /// discriminate WHICH SHA impl a verify path routes through. `nil`
+    /// in production. Mirrors the file's existing `useRoutedSeal`
+    /// `nonisolated(unsafe) static var` pattern. (id14 discriminating
+    /// teeth for auditChainFull's seal routing.)
+    public nonisolated(unsafe) static var _routedSealOverrideForTesting:
+        (@Sendable (Data) -> String)? = nil
+
     public nonisolated static func hashViaAutoRouter(
         _ data: Data
     ) -> String {
+        if let override = _routedSealOverrideForTesting {
+            return override(data)
+        }
         let bytes = Array(data)
         let result = BASAutoRouteRanker.ledgerSeal(bytes)
         return Data(result.value).base64EncodedString()

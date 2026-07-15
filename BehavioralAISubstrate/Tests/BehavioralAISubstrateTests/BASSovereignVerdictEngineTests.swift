@@ -327,4 +327,35 @@ final class BASSovereignVerdictEngineTests: XCTestCase {
 
         try await ledger.verifyChainIntegrity()
     }
+
+    // MARK: - audit blindspot-② HIGH: soft signals escalate to the MOST-SEVERE .high
+
+    /// privilegeViolation-high (→ .quarantine) is listed BEFORE selfMod-high (→ .deadStop). The old
+    /// code returned on the first .high, so a self-modification attack co-present with a privilege
+    /// violation was only QUARANTINED, not dead-stopped — an under-escalation of the strongest hard
+    /// signal. The verdict must be the max severity across co-present highs. Reversal (return the
+    /// first .high) reds: it yields .quarantine.
+    /// Tests the SWIFT-path soft-signal fix directly (useRouted: false). The production routed path
+    /// derives its level in Rust (bas-substrate-core verdict_decisions) — that twin was fixed too but
+    /// its parity via the SHA-pinned XCFramework re-greens only after a rebuild (see the Rust cargo
+    /// teeth `soft_signals_escalate_to_most_severe`).
+    func testCoPresentHighSoftSignalsEscalateToMostSevere_swiftPath() async {
+        let (engine, _) = makeEngine()
+        let decision = await engine.evaluateLevel(
+            ctx(soft: BASSovereignVerdictEngine.SoftSignals(
+                privilegeViolation: 0.8, selfMod: 0.8)),
+            useRouted: false)
+        XCTAssertEqual(decision.level, .deadStop,
+            "self-mod (deadStop) co-present with privilege-violation (quarantine) must escalate to "
+            + "deadStop — the earlier-listed lower-severity domain must not mask the stronger signal")
+    }
+
+    /// A lone privilegeViolation-high is still .quarantine (the fix only changes the co-present case).
+    func testSinglePrivilegeViolationHighStaysQuarantine_swiftPath() async {
+        let (engine, _) = makeEngine()
+        let decision = await engine.evaluateLevel(
+            ctx(soft: BASSovereignVerdictEngine.SoftSignals(privilegeViolation: 0.8)),
+            useRouted: false)
+        XCTAssertEqual(decision.level, .quarantine)
+    }
 }

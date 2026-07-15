@@ -9,6 +9,44 @@
 import Foundation
 import BASRuntimeCore
 
+/// audit orchestration HIGH-1 — the CANONICAL reversibility bands, single source of truth for the
+/// two producers of `BASCandidateFrontier.reversiblePaths` / `.guardPaths`. A `guardPath` is a
+/// PROTECTIVE SAFE-RETREAT fallback (HIGH reversibility) — `BASGuardBranch.fromGuardPaths` makes
+/// each one "a minimal REVERSIBLE guard branch". `BASAgentFabricAdapters` previously INVERTED this
+/// (`guardPaths = reversibility < 0.3`, the DANGER band) while `EBrainNeuralMaterializationCore`
+/// used `>= 0.7` (safe band), so the SAME frontier field fed L9 planning OPPOSITE guard sets
+/// depending on which producer ran; the `reversiblePaths` threshold also drifted (0.7 vs 0.6).
+public enum BASReversibilityBands {
+    /// A path is a guard branch (protective, safe to fall back to) at or above this reversibility.
+    public static let guardThreshold: Double = 0.7
+    /// A path is "reversible" (can be undone) at or above this reversibility.
+    public static let reversibleThreshold: Double = 0.7
+
+    public static func isGuardPath(reversibility: Double) -> Bool {
+        reversibility >= guardThreshold
+    }
+    public static func isReversiblePath(reversibility: Double) -> Bool {
+        reversibility >= reversibleThreshold
+    }
+
+    /// deep-audit MED: SINGLE source of truth for the guard lexicon. A candidate is ALSO a guard path
+    /// (regardless of reversibility band) when its title/summary explicitly names a protective/delaying
+    /// action. The two guardPaths producers had drifted: the neural producer applied this lexicon, the
+    /// fabric adapter did NOT — so a low-reversibility "pause and review" candidate was a guard path in
+    /// one and a danger path in the other. Both now call this.
+    public static func containsGuardLexicon(_ value: String) -> Bool {
+        // deep-audit calibration (journal cue-precision follow-up): these are STEMS, so match any WORD
+        // that STARTS with the stem. That keeps the legitimate morphological variants (delayed /
+        // reviewing / paused / protective / waiting) while killing the substring false-positives where
+        // the stem sits MID-word — "review" ⊄ preview, "wait" ⊄ Kuwait / await, "pause" ⊄ menopause,
+        // "bounded" ⊄ rebounded — which the old `contains()` wrongly flagged as guard paths.
+        let stems = ["delay", "pause", "wait", "review", "bounded", "protect"]
+        let words = value.lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+        return words.contains { word in stems.contains { word.hasPrefix($0) } }
+    }
+}
+
 /// A protective fallback path in the L9 candidate frontier — the "守护分支".
 public struct BASGuardBranch: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.0.0"

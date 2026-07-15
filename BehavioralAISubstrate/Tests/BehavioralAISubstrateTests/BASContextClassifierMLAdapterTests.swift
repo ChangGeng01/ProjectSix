@@ -12,6 +12,9 @@
 
 import XCTest
 @testable import BASRuntimeCore
+#if canImport(CoreML)
+import CoreML
+#endif
 
 #if !os(iOS)  // ch 1022 source-gate
 final class BASContextClassifierMLAdapterTests: XCTestCase {
@@ -430,6 +433,97 @@ final class BASContextClassifierMLAdapterTests: XCTestCase {
             "Phase B-3 sanity: model must correctly" +
             " classify at least 5/7 training examples" +
             " (got \(correct)/7)")
+    }
+
+    // MARK: - .mlmodelc runtime-compile cache (leak regression, mega-audit 2026-07-08)
+
+    /// Locate the raw source `.mlmodel`. In dev/CI bundles it is stripped (only `.mlmodelc`
+    /// survives), so we drive the cache directly off the repo source to exercise the SPM
+    /// runtime-compile path that pre-fix leaked a fresh temp `.mlmodelc` on every call.
+    private func rawSourceModelURL() -> URL? {
+        let rel = "Sources/BASRuntimeCore/Resources/BASContextClassifier.mlmodel"
+        // Try CWD (repo root when running `swift test`), then walk up from this test file.
+        let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent(rel)
+        if FileManager.default.fileExists(atPath: cwd.path) { return cwd }
+        var dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<8 {
+            let candidate = dir.appendingPathComponent(rel)
+            if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
+            dir = dir.deletingLastPathComponent()
+        }
+        return nil
+    }
+
+    /// The runtime-compile cache must (1) return a STABLE URL across calls — pre-fix each call
+    /// produced a fresh temp `.mlmodelc` bundle that was never deleted — (2) not accumulate more
+    /// than one compiled bundle for a given model, and (3) load + classify identically.
+    func testRuntimeCompileCacheIsStableAndDoesNotLeak() throws {
+        let rawURL = try XCTUnwrap(rawSourceModelURL(),
+            "raw source .mlmodel not found — cannot exercise the runtime-compile path")
+
+        // Clean this model's cache entry for a deterministic count.
+        let firstURL = try BASContextClassifierMLAdapter.cachedCompiledModelURL(rawURL: rawURL)
+        let cacheDir = firstURL.deletingLastPathComponent()
+
+        // Repeated calls must return the SAME URL (no fresh temp per call = no leak).
+        let secondURL = try BASContextClassifierMLAdapter.cachedCompiledModelURL(rawURL: rawURL)
+        let thirdURL = try BASContextClassifierMLAdapter.cachedCompiledModelURL(rawURL: rawURL)
+        XCTAssertEqual(firstURL, secondURL,
+            "cached compiled URL must be stable across calls (pre-fix returned a fresh temp each time)")
+        XCTAssertEqual(secondURL, thirdURL, "stable across three calls")
+
+        // Only ONE compiled bundle for this content hash — 3 calls did not accumulate 3 bundles.
+        let key = firstURL.lastPathComponent   // BASContextClassifier-<hash>.mlmodelc
+        let sameKey = (try FileManager.default.contentsOfDirectory(atPath: cacheDir.path))
+            .filter { $0 == key }
+        XCTAssertEqual(sameKey.count, 1, "exactly one cached bundle for this model, not one-per-call")
+
+        // The cached compiled model actually loads.
+        XCTAssertNoThrow(try MLModel(contentsOf: firstURL),
+            "the cached .mlmodelc must load as a valid CoreML model")
+    }
+
+    /// A CORRUPT-but-present cache bundle (non-empty dir missing `coremldata.bin`) must NOT be
+    /// trusted — it is treated as absent and recompiled, so a transient disk fault can't
+    /// permanently brick brain construction (the self-perpetuating-poison HIGH from the review).
+    func testCorruptCacheIsRecompiledNotTrusted() throws {
+        let rawURL = try XCTUnwrap(rawSourceModelURL())
+        let good = try BASContextClassifierMLAdapter.cachedCompiledModelURL(rawURL: rawURL)
+
+        // Corrupt the cache: strip the core member, leaving a non-empty-but-invalid bundle.
+        let core = good.appendingPathComponent("coremldata.bin")
+        try FileManager.default.removeItem(at: core)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: core.path))
+
+        // The next selection must recompile (member check fails → treated as absent).
+        let healed = try BASContextClassifierMLAdapter.cachedCompiledModelURL(rawURL: rawURL)
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: healed.appendingPathComponent("coremldata.bin").path),
+            "a structurally-corrupt cache must be recompiled, not returned as-is")
+        XCTAssertNoThrow(try MLModel(contentsOf: healed), "the recompiled model must load")
+    }
+
+    /// Retired-version sibling caches are pruned on reinstall so at most one live bundle survives
+    /// (the cross-version orphan-accumulation LOW).
+    func testStaleSiblingCachesArePrunedOnReinstall() throws {
+        let rawURL = try XCTUnwrap(rawSourceModelURL())
+        let live = try BASContextClassifierMLAdapter.cachedCompiledModelURL(rawURL: rawURL)
+        let cacheDir = live.deletingLastPathComponent()
+
+        // Plant a fake retired-version sibling.
+        let stale = cacheDir.appendingPathComponent("BASContextClassifier-deadbeefdeadbeef.mlmodelc")
+        try FileManager.default.createDirectory(at: stale, withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: stale.appendingPathComponent("coremldata.bin"))
+
+        // Force a reinstall of the live key so the prune runs.
+        try FileManager.default.removeItem(at: live)
+        _ = try BASContextClassifierMLAdapter.cachedCompiledModelURL(rawURL: rawURL)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stale.path),
+            "a retired-version sibling cache must be pruned on reinstall")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: live.path),
+            "the live-key cache must remain")
     }
 }
 #endif

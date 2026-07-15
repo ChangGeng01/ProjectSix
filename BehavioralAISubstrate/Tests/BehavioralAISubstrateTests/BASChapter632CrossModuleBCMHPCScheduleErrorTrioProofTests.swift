@@ -37,23 +37,25 @@ final class BASChapter632CrossModuleBCMHPCScheduleErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASBCMMetaPlasticityErrorConformsToCodable() {
-        assertCodable(BASBCMMetaPlasticityError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASBCMMetaPlasticityError.shapeMismatch(reason: ""))
     }
 
     func testBASHierarchicalPredictiveCodingErrorConformsToCodable() {
-        assertCodable(
-            BASHierarchicalPredictiveCodingError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASHierarchicalPredictiveCodingError.emptyLayers)
+        assertCodableRoundTrips(
+            BASHierarchicalPredictiveCodingError.shapeMismatch(reason: ""))
     }
 
     func testBASBreathSchedulerScheduleErrorConformsToCodable() {
-        assertCodable(
-            BASBreathScheduler.ScheduleError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASBreathScheduler.ScheduleError.thermalEmergencyRejectsAll)
+        assertCodableRoundTrips(
+            BASBreathScheduler.ScheduleError.unknownRequest(id: ""))
     }
 }

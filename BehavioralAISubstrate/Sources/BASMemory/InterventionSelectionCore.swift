@@ -153,8 +153,10 @@ public enum BASBrainBootstrapAdvisor {
         recommendedTemplateIDs: [String],
         templates: [BASInterventionTemplateDescriptor]
     ) -> [String] {
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let recommendationIndex = Dictionary(
-            uniqueKeysWithValues: recommendedTemplateIDs.enumerated().map { ($0.element, $0.offset) }
+            recommendedTemplateIDs.enumerated().map { ($0.element, $0.offset) },
+            uniquingKeysWith: { first, _ in first }
         )
 
         return templates

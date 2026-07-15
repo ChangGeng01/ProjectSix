@@ -5,6 +5,7 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+import BASSovereign
 // M320 — `BASUnknownReserve.derive(...)` lives in BASWorldPrior
 // and is invoked from `runTurn` to project per-turn unknowns.
 import BASWorldPrior
@@ -97,6 +98,16 @@ public struct BASEBrainRuntimeCoordinator {
     /// emit-then-write step into one routine。
     public let memoryMutationEventEmitter:
         BASMemoryMutationEventEmitter?
+
+    /// ②-observe (opt-in, 红线 7) — per-turn MODEL-HONESTY observation sink. Each turn `runTurn` scores the
+    /// realized body on the flattery / hedging / overclaim axes (pure, deterministic) and hands the host a
+    /// typed `BASModelHonestyObservationRecord`; the host durably stores it (e.g. into a
+    /// `BASModelHonestyObservationStore`) from its own context. Default nil ⇒ nothing is computed or emitted
+    /// and the turn is byte-equal (mirrors `provisionalVerdictSink`). OBSERVE lane only: it never gates and
+    /// never feeds the sovereign verdict (feeding model CONTENT into the parity-bound verdict is the trap
+    /// this deliberately stays clear of — the signal closes the "sycophancy is structurally invisible" gap).
+    public var modelHonestyObservationSink:
+        (@Sendable (BASModelHonestyObservationRecord) -> Void)?
 
     /// chapter 五百十九 / M1453:optional projection-block
     /// emission handler。 When set,V1 monolith fires this
@@ -275,6 +286,10 @@ public struct BASEBrainRuntimeCoordinator {
         memoryEventLog: (any BASEventLogStorage)? = nil,
         memoryMutationEventEmitter:
             BASMemoryMutationEventEmitter? = nil,
+        // ②-observe (opt-in, 红线 7) — per-turn model-honesty observation sink。 Default nil → byte-equal;
+        // emits a typed record (flattery/hedging/overclaim axes) only when a host provides this sink。
+        modelHonestyObservationSink:
+            (@Sendable (BASModelHonestyObservationRecord) -> Void)? = nil,
         projectionBlockEmissionHandler:
             (@Sendable
                 (BASAuditObservationProjectionsBundleObservation)
@@ -357,6 +372,16 @@ public struct BASEBrainRuntimeCoordinator {
         self.memoryEventLog = memoryEventLog
         self.memoryMutationEventEmitter =
             memoryMutationEventEmitter
+        // 触发器①落地 (2026-07-07, operator order "把三轴 band 打进每轮日志"): when the host
+        // provides no sink, BAS_HONESTY_OBSERVE=1 arms the DEFAULT log-line consumer — one 🪞
+        // line per turn to the operator's log stream (the named reader; zero disk, OBSERVE lane
+        // semantics unchanged). Env unset ⇒ nil ⇒ nothing computed, byte-equal as before.
+        if modelHonestyObservationSink == nil,
+           ProcessInfo.processInfo.environment["BAS_HONESTY_OBSERVE"] == "1" {
+            self.modelHonestyObservationSink = { print($0.summaryLine) }
+        } else {
+            self.modelHonestyObservationSink = modelHonestyObservationSink
+        }
         self.projectionBlockEmissionHandler =
             projectionBlockEmissionHandler
         self.agentFabric = agentFabric

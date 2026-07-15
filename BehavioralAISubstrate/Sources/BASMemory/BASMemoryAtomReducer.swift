@@ -145,8 +145,11 @@ public enum BASMemoryAtomReducer {
             // compat: future op variants may relax fields)。
             return
         }
-        let candidateUUID =
-            UUID(uuidString: payload.atomID) ?? UUID()
+        // audit memory-b F10: a non-UUID atomID used to fabricate a RANDOM UUID (`?? UUID()`),
+        // minting a phantom atom at a nondeterministic id — breaking replay determinism (the same
+        // event reduces differently each run). Drop the malformed atom deterministically instead,
+        // matching the malformed-payload ignore above.
+        guard let candidateUUID = UUID(uuidString: payload.atomID) else { return }
         let lastConfirmedAt = payload.lastConfirmedAtMs.map {
             Date(timeIntervalSince1970:
                 Double($0) / 1000.0)

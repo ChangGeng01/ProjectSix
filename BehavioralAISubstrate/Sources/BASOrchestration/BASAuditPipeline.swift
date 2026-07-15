@@ -187,9 +187,15 @@ public struct BASAuditPipeline: Sendable {
     ) async throws -> PerTurnOutput {
         var output = PerTurnOutput()
 
+        // audit orchestration LOW-1: honor cooperative cancellation between the (up to) 5 sequential
+        // cross-store writes — a cancelled turn must stop before the next durable write, consistent
+        // with this pipeline's documented "errors propagate up, NO partial-success" contract.
+        try Task.checkCancellation()
+
         // L6 presence
         if let observations = input.observations,
            !observations.isEmpty {
+            try Task.checkCancellation()
             output.fusedPresence = try await BASRoutedPresenceFusion
                 .fuseAndRecord(
                     observations: observations,
@@ -203,6 +209,7 @@ public struct BASAuditPipeline: Sendable {
         // L7 unknowns
         if let unknownSet = input.unknownSet,
            unknownSet.hasAny {
+            try Task.checkCancellation()
             output.unknownRecords = try await BASRoutedMirrorBladeRecording
                 .recordUnknownSet(
                     unknownSet,
@@ -216,6 +223,7 @@ public struct BASAuditPipeline: Sendable {
         // L7 contradictions
         if let contradictions = input.contradictions,
            !contradictions.isEmpty {
+            try Task.checkCancellation()
             output.contradictionRecords = try await BASRoutedMirrorBladeRecording
                 .recordContradictions(
                     contradictions,
@@ -228,6 +236,7 @@ public struct BASAuditPipeline: Sendable {
 
         // L8 atom lifecycle
         if let atom = input.atomTransition {
+            try Task.checkCancellation()
             output.atomEvent = try await BASRoutedAtomLifecycleRecording
                 .recordTransition(
                     eventID: "\(input.eventIDPrefix)-a",
@@ -244,6 +253,7 @@ public struct BASAuditPipeline: Sendable {
 
         // L5 constitution version
         if let version = input.versionRecord {
+            try Task.checkCancellation()
             output.versionRecord = try await BASRoutedHostConstitutionRecording
                 .recordVersion(
                     versionID: version.versionID,

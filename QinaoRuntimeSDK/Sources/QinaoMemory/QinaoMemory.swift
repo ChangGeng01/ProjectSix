@@ -12,9 +12,18 @@ import BASMemory
 ///
 /// The façade exposes:
 ///
-/// - `admit(_:)` — submit a candidate; runs the substrate's governance
-///   gate (confidence floor + `BASMemoryGovernance.shouldAdmit`) and
-///   promotes the candidate to a governed memory if it survives.
+/// - `admit(_:)` — submit a candidate WITHOUT a constitution. This runs
+///   ONLY the confidence floor (`BASMemoryGovernance.shouldAdmit`), then
+///   holds the survivor as a `.candidate` (un-promoted). A constitution-less
+///   host has no governance authority to certify promotion, so blind-admitted
+///   content is NOT frontstage-eligible and never auto-feeds L8 — it is stored,
+///   held for review, and absent from `recall`/`recallFrontstage`. Deep-audit
+///   P1-7 (2026-07-13): this closed a fail-open where the blind overload used to
+///   stamp `.governed` at `preferredTier`, silently bypassing the constitution's
+///   consent-lattice / promotion-scope / tier-cap / sensitive-domain governance.
+/// - `admit(_:under:)` — the GOVERNED path: a host holding a constitution admits
+///   through the consent-lattice + promotion-scope gate; survivors that the
+///   constitution permits land `.governed` (frontstage-eligible).
 /// - `recall(scope:sensitivity:tiers:)` — scope-filtered, tier-filtered
 ///   read. Uses `BASMemoryTierFilter.filter` so the ordering is exactly
 ///   the substrate's canonical policy (tier descending, confidence
@@ -102,9 +111,20 @@ public actor QinaoMemory {
 
     // MARK: - Admit
 
-    /// Run a candidate through the substrate's governance gate. On
-    /// success the returned `BASGovernedMemory` is stored; on
-    /// failure no state changes and a typed error is thrown.
+    /// Constitution-LESS admission. Runs ONLY the confidence floor, then HOLDS
+    /// the survivor as a `.candidate` — never `.governed`.
+    ///
+    /// deep-audit P1-7 (2026-07-13): this overload used to blind-`promote(candidate:)`,
+    /// which defaults `governanceStatus` to `.governed` at `candidate.preferredTier`.
+    /// That was a fail-open: a host (or third-party SDK consumer) calling the simple,
+    /// default-looking `admit(_:)` silently bypassed the ENTIRE constitution
+    /// (consent-lattice write-scope, promotion-scope review holds, warm/cold tier caps,
+    /// restricted/sensitive-domain holds) and landed content directly frontstage-eligible,
+    /// where `QinaoRuntime.sendSession` auto-feeds `frontstageBundle()` into L8. Without a
+    /// constitution there is no authority to certify promotion, so the honest posture is to
+    /// HOLD: the memory is stored (for later review) but stays `.candidate` — invisible to
+    /// `recall`/`recallFrontstage` (both governed-only) and absent from any L8 bundle.
+    /// Hosts that want governed, frontstage-eligible memory must use `admit(_:under:)`.
     @discardableResult
     public func admit(
         _ request: AdmitRequest
@@ -128,7 +148,61 @@ public actor QinaoMemory {
             throw MemoryError.rejectedByGovernance(
                 reason: "confidence-below-floor")
         }
-        let governed = BASMemoryGovernance.promote(candidate: candidate)
+        // P1-7: HELD, not governed — no constitution → no promotion authority.
+        let governed = BASMemoryGovernance.promote(
+            candidate: candidate, governanceStatus: .candidate)
+        store[governed.id] = governed
+        return governed
+    }
+
+    /// charter audit 2026-07-12 — CONSTITUTION-AWARE admission. The substrate has had
+    /// `BASMemoryGovernance.shouldAdmit(candidate:under:)` (consent-lattice
+    /// memoryWriteScope check) since the beginning, but no production path ever used it —
+    /// the facade gated on the confidence floor alone. This overload wires it: hosts that
+    /// hold a constitution admit THROUGH it, so a "disabled"/"none" memoryWriteScope
+    /// fails closed with its own stable reason string (distinct from the confidence
+    /// floor's "confidence-below-floor").
+    @discardableResult
+    public func admit(
+        _ request: AdmitRequest,
+        under constitution: BASHostConstitution
+    ) throws -> BASGovernedMemory {
+        let event = BASEventRecord(
+            kind: request.kind,
+            content: request.content,
+            timestamp: now(),
+            tags: request.tags)
+        let candidate = BASMemoryCandidate(
+            event: event,
+            scope: request.scope,
+            sensitivity: request.sensitivity,
+            confidence: request.confidence,
+            sourceType: request.sourceType,
+            preferredTier: request.preferredTier)
+        guard BASMemoryGovernance.shouldAdmit(
+            candidate: candidate,
+            minimumConfidence: minimumConfidence
+        ) else {
+            throw MemoryError.rejectedByGovernance(
+                reason: "confidence-below-floor")
+        }
+        guard BASMemoryGovernance.shouldAdmit(
+            candidate: candidate,
+            under: constitution,
+            minimumConfidence: minimumConfidence
+        ) else {
+            throw MemoryError.rejectedByGovernance(
+                reason: "memory-write-scope-disabled")
+        }
+        // deep-audit HIGH-1 (2026-07-13): promote through the CONSTITUTION-AWARE overload,
+        // not the blind one. The blind `promote(candidate:)` unconditionally stamps
+        // `.governed` at `preferredTier` — so a memoryPromotionScope of "review_required"
+        // (the seed constitution's DEFAULT) or a restricted/sensitive-domain hit would have
+        // gone straight to governed + frontstage instead of being held as `.candidate`, and
+        // the warm_only/cold_only tier cap was dropped. That was a fail-open: the gate
+        // checked admission but not promotion. `promote(candidate:under:)` enforces both.
+        let governed = BASMemoryGovernance.promote(
+            candidate: candidate, under: constitution)
         store[governed.id] = governed
         return governed
     }
@@ -165,6 +239,72 @@ public actor QinaoMemory {
                 }
                 return $0.id.uuidString < $1.id.uuidString
             }
+    }
+
+    /// integration S1 (2026-07-12) — the frontstage recall set packaged as the L8 turn
+    /// bundle. This is the bridge that lets `QinaoRuntime.sendSession` feed its OWN memory
+    /// into the Layer-8 observation pipeline instead of leaving the `memory` property a
+    /// stored-but-unused seam (turn-path audit finding C).
+    ///
+    /// Returns nil when nothing is frontstage-eligible, so a host with an empty memory keeps
+    /// today's exact semantics (L8 layer skips; no phantom `.bundleRetrieved` coverage from a
+    /// zero-atom bundle).
+    ///
+    /// The governed→atom mapping MIRRORS the substrate-canonical one in
+    /// `EBrainHostRuntime+MemoryService.memoryAtom(from:)` (BASHostKit) so both spines
+    /// project identical L8 shapes; if that mapping changes, change this one with it.
+    public func frontstageBundle(
+        activeHostVersion: String? = nil
+    ) -> BASMemoryBundle? {
+        let records = recallFrontstage()
+        guard !records.isEmpty else { return nil }
+        let atoms = records.map { Self.memoryAtom(from: $0, fallbackTimestamp: now()) }
+        return BASMemoryBundle(
+            atoms: atoms,
+            retrievalTags: [],
+            conflictRefs: atoms.filter(\.frozen).map(\.memoryID),
+            retrievedAt: now(),
+            activeHostVersion: activeHostVersion)
+    }
+
+    /// Mirror of the canonical governed→atom projection (see `frontstageBundle` doc).
+    /// `internal` so tests can pin the field mapping directly.
+    static func memoryAtom(
+        from record: BASGovernedMemory,
+        fallbackTimestamp: Date
+    ) -> BASMemoryAtom {
+        BASMemoryAtom(
+            memoryID: record.id.uuidString,
+            summary: record.content,
+            contentType: Self.atomContentType(for: record.tier),
+            source: record.sourceType,
+            timestamp: record.lastConfirmedAt ?? fallbackTimestamp,
+            confidence: record.confidence,
+            emotionalWeight: record.kind == .semantic ? 0.55 : 0.22,
+            riskRelevance: record.sensitivity == .high ? 0.82 : 0.38,
+            hostRelevance: record.kind == .profile ? 0.88 : 0.54,
+            conflictFingerprint: record.id.uuidString,
+            promotionState: Self.atomPromotionState(for: record.governanceStatus),
+            frozen: record.governanceStatus == .archived)
+    }
+
+    static func atomContentType(for tier: BASMemoryTier) -> BASMemoryAtomContentType {
+        switch tier {
+        case .hot: .hot
+        case .warm: .warm
+        case .cold: .cold
+        }
+    }
+
+    static func atomPromotionState(
+        for status: BASMemoryGovernanceStatus
+    ) -> BASPromotionState {
+        switch status {
+        case .candidate: .candidate
+        case .governed: .admitted
+        case .archived: .frozen
+        case .quarantined, .rejected: .retired
+        }
     }
 
     // MARK: - Forget (cascade across all tiers)

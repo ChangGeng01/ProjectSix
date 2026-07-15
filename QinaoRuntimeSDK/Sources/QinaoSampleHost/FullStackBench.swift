@@ -27,20 +27,20 @@ import BASObservability
 ///
 /// `BASBenchLatencyStats` (M355) over per-session wall-clock
 /// times. Caller may compare to baseline JSON via M356.
-public struct FullStackBench {
+package struct FullStackBench {
 
-    public static let scopeStatement: String =
+    package static let scopeStatement: String =
         "[scope] regression alarm, not an SLA. measures " +
         "in-process BASHostRuntime startSession only — no " +
         "Apple Foundation Models inference, no persistent " +
         "SQLite I/O, no real network. do not quote these " +
         "numbers as customer-facing latency."
 
-    public struct Outcome: Sendable, Equatable {
-        public let sessionCount: Int
-        public let turnsPerSession: Int
-        public let successfulSessions: Int
-        public let elapsedSeconds: Double
+    package struct Outcome: Sendable, Equatable {
+        package let sessionCount: Int
+        package let turnsPerSession: Int
+        package let successfulSessions: Int
+        package let elapsedSeconds: Double
 
         /// M377 chapter 八十五 — full warmup-aware outcome
         /// (combined / cold / warm triple) replacing the
@@ -52,17 +52,17 @@ public struct FullStackBench {
         /// production hosts pay once at app startup and reuse
         /// thereafter. The cold/warm split makes the steady-state
         /// number visible separately from the cold cost.
-        public let perSessionOutcome: BASBenchWarmupOutcome?
+        package let perSessionOutcome: BASBenchWarmupOutcome?
 
         /// Backward-compat accessor — returns the warm distribution
         /// when present, else combined. Use `perSessionOutcome` for
         /// full triple.
-        public var perSessionLatency: BASBenchLatencyStats? {
+        package var perSessionLatency: BASBenchLatencyStats? {
             perSessionOutcome?.warm
                 ?? perSessionOutcome?.combined
         }
 
-        public init(
+        package init(
             sessionCount: Int,
             turnsPerSession: Int,
             successfulSessions: Int,
@@ -88,7 +88,7 @@ public struct FullStackBench {
     /// real "multi-turn within one session" path would need
     /// the M314 driver pattern (separate doctrine — that's an
     /// AFM-gated bench territory).
-    public static func run(
+    package static func run(
         sessionCount: Int = 20,
         turnCount: Int = 5
     ) async -> Outcome {

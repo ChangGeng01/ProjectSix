@@ -8,7 +8,6 @@ import XCTest
 @testable import BASMetalSubstrate
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainPilotMetricsTests: XCTestCase {
 
     // MARK: - Bare brain — zero records, zero cache
@@ -212,4 +211,3 @@ final class BASCognitiveBrainPilotMetricsTests: XCTestCase {
         XCTAssertEqual(m.inMemorySummaryCount, 0)
     }
 }
-#endif

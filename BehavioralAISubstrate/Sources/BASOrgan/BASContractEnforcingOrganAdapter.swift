@@ -81,6 +81,24 @@ public struct BASContractEnforcingOrganAdapter: BASOrganAdapter {
         return result.draft
     }
 
+    /// S5: forward the turn's decode PURPOSE to the inner adapter through the SAME contract gate (never bypassed).
+    /// The contract is still derived from this adapter's own organ `purpose`; `decodePurpose` only steers the
+    /// inner planner's lane choice. Retained alongside the compatibility Bool overload (not deleted).
+    public func draft(_ request: BASOrganRequest, purpose decodePurpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft {
+        let contract = BASLLMContractDeriver.derive(
+            purpose: purpose,
+            request: request,
+            forbiddenContext: forbiddenContext,
+            agentRef: agentRef,
+            verifierRef: verifierRef,
+            sovereignConstraints: sovereignConstraints)
+        let gate = BASContractedOrganGate(adapter: inner, sovereignCheck: sovereignCheck)
+        let result = try await gate.draft(
+            contract: contract, request: request, purpose: decodePurpose)
+        traceSink?(result.trace)
+        return result.draft
+    }
+
     public func currentCapacity() async -> BASOrganCapacity {
         await inner.currentCapacity()
     }

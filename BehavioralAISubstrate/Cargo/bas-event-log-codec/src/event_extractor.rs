@@ -121,8 +121,11 @@ pub fn classify_event(
     }
     let lc = action.to_lowercase();
     // Memory-atom event check first (most specific)
+    // deep-audit MED: the authoritative Swift extractor recognizes a memory-atom event by
+    // `event.actions.contains(memoryAtomEventActionTag)` — an EXACT tag match. The port used
+    // `action.starts_with(tag)`, mis-classifying an action merely PREFIXED by the tag. Require exact.
     if source == memory_atom_event_action_tag
-        || action.starts_with(memory_atom_event_action_tag)
+        || action == memory_atom_event_action_tag
     {
         return EventClassification {
             edge_kind: EdgeKind::Causes,
@@ -130,17 +133,20 @@ pub fn classify_event(
             is_memory_atom_event: true,
         };
     }
-    // skip:* → Delays
-    if lc.starts_with("skip:") {
+    // skip:* → Delays. deep-audit MED: Swift uses `action.hasPrefix("skip:")` — CASE-SENSITIVE on
+    // the raw action. The port lowercased first (lc), so "SKIP:x" was wrongly classified as Delays.
+    if action.starts_with("skip:") {
         return EventClassification {
             edge_kind: EdgeKind::Delays,
             edge_weight: WEIGHT_DELAYS,
             is_memory_atom_event: false,
         };
     }
-    // permit:block or permit:replace → Contradicts
-    if lc.starts_with("permit:block")
-        || lc.starts_with("permit:replace")
+    // permit:block / permit:replace → Contradicts. deep-audit MED: Swift uses EXACT equality
+    // (`action == "permit:block" || action == "permit:replace"`). The port lowercased + used
+    // starts_with, so "PERMIT:BLOCK" or "permit:block:extra" was wrongly classified as Contradicts.
+    if action == "permit:block"
+        || action == "permit:replace"
     {
         return EventClassification {
             edge_kind: EdgeKind::Contradicts,
@@ -255,10 +261,18 @@ mod tests {
 
     #[test]
     fn permit_block_yields_contradicts() {
-        let c = classify_event(
-            "permit:block:tool-write", "policy", TAG);
+        // deep-audit MED: Swift matches EXACTLY (action == "permit:block"). Input was
+        // "permit:block:tool-write", which PINNED the divergent lowercased-starts_with behavior.
+        let c = classify_event("permit:block", "policy", TAG);
         assert_eq!(c.edge_kind, EdgeKind::Contradicts);
         assert_eq!(c.edge_weight, WEIGHT_CONTRADICTS);
+        // a suffixed or uppercased form is NOT contradicts (exact equality, matches Swift)
+        assert_ne!(
+            classify_event("permit:block:tool-write", "policy", TAG).edge_kind,
+            EdgeKind::Contradicts);
+        assert_ne!(
+            classify_event("PERMIT:BLOCK", "policy", TAG).edge_kind,
+            EdgeKind::Contradicts);
     }
 
     #[test]
@@ -286,12 +300,17 @@ mod tests {
     }
 
     #[test]
-    fn memory_atom_action_prefix_yields_atom_causes() {
-        let c = classify_event(
-            "memory-atom-event:admit", "ui", TAG);
-        assert_eq!(c.edge_kind, EdgeKind::Causes);
-        assert_eq!(c.edge_weight, WEIGHT_MEMORY_ATOM_CAUSES);
-        assert!(c.is_memory_atom_event);
+    fn memory_atom_action_requires_exact_tag_not_prefix() {
+        // deep-audit MED: Swift recognizes a memory-atom event by an EXACT action-tag match
+        // (event.actions.contains(tag)). A merely PREFIXED action is NOT a memory-atom event.
+        let exact = classify_event(TAG, "ui", TAG);
+        assert_eq!(exact.edge_kind, EdgeKind::Causes);
+        assert_eq!(exact.edge_weight, WEIGHT_MEMORY_ATOM_CAUSES);
+        assert!(exact.is_memory_atom_event);
+        let prefixed = classify_event("memory-atom-event:admit", "ui", TAG);
+        assert!(
+            !prefixed.is_memory_atom_event,
+            "a prefixed action is NOT a memory-atom event (exact-tag match only)");
     }
 
     #[test]
@@ -304,10 +323,13 @@ mod tests {
     }
 
     #[test]
-    fn case_insensitive_skip_prefix() {
-        let c = classify_event(
-            "SKIP:checkpoint", "ui", TAG);
-        assert_eq!(c.edge_kind, EdgeKind::Delays);
+    fn skip_prefix_is_case_sensitive() {
+        // deep-audit MED: Swift uses action.hasPrefix("skip:") — CASE-SENSITIVE on the raw action.
+        // The port lowercased first, so uppercase was wrongly classified as Delays.
+        assert_eq!(
+            classify_event("skip:checkpoint", "ui", TAG).edge_kind, EdgeKind::Delays);
+        assert_ne!(
+            classify_event("SKIP:checkpoint", "ui", TAG).edge_kind, EdgeKind::Delays);
     }
 
     #[test]

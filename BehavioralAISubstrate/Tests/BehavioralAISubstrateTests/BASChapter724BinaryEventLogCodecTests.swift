@@ -47,6 +47,22 @@ final class BASChapter724BinaryEventLogCodecTests: XCTestCase {
         #endif
     }
 
+    // audit runtimecore-b #7: decode must work on a non-zero-based Data SLICE, not just a 0-based
+    // Data — `buf[pos]` indexes by Data's own indices, so a slice would read the wrong bytes.
+    func testDecodeHandlesNonZeroBasedSlice() throws {
+        #if os(iOS) || os(macOS)
+        let entry = sample(payload: #"{"v":1}"#, prov: "p")
+        let bytes = try BASEventLogBinaryCodec.encode(entry)
+        // Build a slice whose startIndex != 0 by prepending a byte and dropping it.
+        var padded = Data([0xFF])
+        padded.append(bytes)
+        let slice = padded[padded.index(after: padded.startIndex)...]
+        XCTAssertNotEqual(slice.startIndex, 0, "the slice must be non-zero-based to exercise the fix")
+        let back = try BASEventLogBinaryCodec.decode(slice)
+        XCTAssertEqual(entry, back, "a non-zero-based slice must decode identically to the 0-based Data")
+        #endif
+    }
+
     func testRoundTripWithNonePayloadAndProvenance() throws {
         #if os(iOS) || os(macOS)
         let entry = sample(payload: nil, prov: nil)

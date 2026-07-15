@@ -52,13 +52,23 @@ final class BASChapter745EventExtractorBridgeTests: XCTestCase {
 
     func testPermitBlockYieldsContradicts() {
         #if os(iOS) || os(macOS)
+        // deep-audit #5: EXACT equality (matches the authoritative Swift extractor) — the old
+        // input "permit:block:tool-write" pinned the divergent prefix-match behavior.
         let c = BASAutoRouteRanker.classifyEvent(
-            action: "permit:block:tool-write",
+            action: "permit:block",
             source: "policy",
             memoryAtomEventActionTag: Self.TAG)
         XCTAssertEqual(c?.edgeKind, .contradicts)
         XCTAssertEqual(c?.edgeWeight ?? -1, 0.8,
             accuracy: 1e-15)
+        // suffixed / uppercased forms are NOT contradicts (exact-equality semantics)
+        XCTAssertNotEqual(BASAutoRouteRanker.classifyEvent(
+            action: "permit:block:tool-write", source: "policy",
+            memoryAtomEventActionTag: Self.TAG)?.edgeKind, .contradicts)
+        XCTAssertNotEqual(BASAutoRouteRanker.classifyEvent(
+            action: "SKIP:upper", source: "ui",
+            memoryAtomEventActionTag: Self.TAG)?.edgeKind, .delays,
+            "skip is case-SENSITIVE on the raw action (authoritative semantics)")
         #endif
     }
 
@@ -105,13 +115,17 @@ final class BASChapter745EventExtractorBridgeTests: XCTestCase {
         if action.isEmpty {
             return (0, 0, false)
         }
+        // deep-audit #5 (2026-07-11): this mirror had replicated the PORTED bug (prefix tag /
+        // lowercased skip / prefix permit) — the classic "parity test pins the divergence". It now
+        // mirrors the AUTHORITATIVE BASKnowledgeGraphEventExtractor semantics, which the rebuilt
+        // Rust binary also implements: exact tag, case-SENSITIVE skip, exact permit equality.
         let lc = action.lowercased()
-        if source == tag || action.hasPrefix(tag) {
+        if source == tag || action == tag {
             return (1, 0.4, true)
         }
-        if lc.hasPrefix("skip:") { return (2, 0.7, false) }
-        if lc.hasPrefix("permit:block")
-            || lc.hasPrefix("permit:replace") {
+        if action.hasPrefix("skip:") { return (2, 0.7, false) }
+        if action == "permit:block"
+            || action == "permit:replace" {
             return (3, 0.8, false)
         }
         if lc.contains("mention") {

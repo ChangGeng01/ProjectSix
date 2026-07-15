@@ -32,7 +32,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter1000_5SingleCanonicalConsultTests:
     XCTestCase
 {
@@ -114,10 +113,7 @@ final class BASChapter1000_5SingleCanonicalConsultTests:
         throws
     {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let path = "\(projectRoot)/Sources/BASHostKit/" +
             "BASCognitiveBrain+KernelsANE.swift"
         guard let content = try? String(
@@ -163,4 +159,3 @@ final class BASChapter1000_5SingleCanonicalConsultTests:
             "inline increments will fail this test。")
     }
 }
-#endif

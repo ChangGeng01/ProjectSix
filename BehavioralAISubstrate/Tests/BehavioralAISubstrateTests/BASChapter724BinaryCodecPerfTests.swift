@@ -156,6 +156,26 @@ final class BASChapter724BinaryCodecPerfTests: XCTestCase {
                 Double(jsonTotalBytes) /
                 Double(binTotalBytes)
 
+            // #18: assertion — both codecs must produce real, non-degenerate
+            // output and timings; a broken encoder returning empty data or a
+            // zero/NaN elapsed time (degenerate benchmark) fails here.
+            XCTAssertGreaterThan(
+                binTotalBytes, 0,
+                "binary codec produced no bytes for \(cell.label)")
+            XCTAssertGreaterThan(
+                jsonTotalBytes, 0,
+                "JSON codec produced no bytes for \(cell.label)")
+            XCTAssertTrue(
+                jsonElapsed.isFinite && jsonElapsed > 0,
+                "JSON elapsed not finite/positive for \(cell.label)")
+            XCTAssertTrue(
+                binElapsed.isFinite && binElapsed > 0,
+                "binary elapsed not finite/positive for \(cell.label)")
+            XCTAssertTrue(
+                jsonUs.isFinite && binUs.isFinite
+                    && speedup.isFinite && sizeRatio.isFinite,
+                "derived perf metrics not finite for \(cell.label)")
+
             print(String(
                 format: "  %@ |  %8.2f |   %8.2f | %5.2f×  | %5.2f×",
                 cell.label.padding(

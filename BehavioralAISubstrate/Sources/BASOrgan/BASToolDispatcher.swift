@@ -40,11 +40,18 @@
 //
 // ## Doctrine pins held
 //
-// - 不变量 #1 / #2 / #3 全保 — dispatcher is observation-class:
-//   handler results are HINTS, gate at L11 still decides what
-//   the substrate returns to the LLM
-// - 红线 7 hint-only — tool results never bypass the permit
-//   gate
+// - 不变量 #1 / #2 / #3 — dispatcher is a NEUTRAL executor: it runs whatever
+//   handler the HOST registered. charter audit 2026-07-12 HONESTY FIX: an earlier
+//   version of this header claimed "tool results never bypass the permit gate" —
+//   THERE IS NO PERMIT GATE IN THIS LANE. The only deterministic controls between an
+//   LLM-proposed invocation and the registered handler are: the planner-level
+//   restrictedToolDomains floor (F11, default nil), this dispatcher's own
+//   restrictedToolDomains filter (default nil), and the per-invocation deadline.
+//   Side-effect discipline is the HOST's: register only handlers whose effects you
+//   accept, or wire your own permit path inside the handler. The three-signature
+//   permit gate lives in QinaoRuntime.execute (SDK side) and this lane never touches
+//   it. Handler RESULTS fed back to the LLM are hints (红线 7) — that part was and
+//   remains true.
 // - 单提交口 (L11/L14) 不变 — dispatcher does NOT mutate commit
 //   token; permit synthesis is downstream
 // - chapter 二百一一 single-source-of-truth — ONE typed
@@ -127,8 +134,22 @@ public actor BASToolDispatcher {
     /// without a constitution see no behavior change)。
     private let restrictedToolDomains: Set<String>?
 
-    /// Per-invocation deadline。Handlers exceeding this are
-    /// cancelled + reported as `.timeoutExceeded`。
+    /// Per-invocation deadline。When it elapses the dispatcher reports
+    /// `.timeoutExceeded` and requests cancellation of the handler task。
+    ///
+    /// deep-audit P2-19 (2026-07-13): this is a COOPERATIVE bound, not a
+    /// hard kill。Swift structured concurrency cannot force-stop a task —
+    /// `cancelAll()` only sets the cancellation flag。A handler that checks
+    /// `Task.isCancelled` (or awaits cancellation-aware APIs) returns
+    /// promptly at the deadline;a CPU-bound or cancellation-ignoring
+    /// handler keeps running, and because the task group awaits its
+    /// children at scope exit, `dispatch()` does not actually return until
+    /// that handler finishes。The deadline therefore bounds well-behaved
+    /// handlers, and reports the breach for the rest — it does not
+    /// guarantee wall-clock return against an uncooperative handler。(The
+    /// dispatcher/planner lane is not yet wired into a live turn; hardening
+    /// this to an unstructured-Task detach + orphan-audit signal is
+    /// deferred to when that lane goes live.)
     private let deadlineMs: Int64
 
     /// Counter of successful dispatches (for observability)。
@@ -281,7 +302,14 @@ public actor BASToolDispatcher {
 
     /// TaskGroup-based deadline helper。Spawns the handler in
     /// one task and a sleep in another;whichever returns first
-    /// wins。Cancels the loser。
+    /// wins, then `cancelAll()` REQUESTS cancellation of the loser。
+    ///
+    /// deep-audit P2-19 (2026-07-13): cancellation is COOPERATIVE。When the
+    /// sleep wins (timeout), the group rethrows `.timeoutExceeded`, but
+    /// structured concurrency awaits the handler task at scope exit — so an
+    /// uncooperative handler that ignores `Task.isCancelled` blocks this
+    /// call past the deadline rather than being killed. See the
+    /// `defaultDeadlineMs` doc for the full cooperative-bound contract。
     private func withDeadline<T: Sendable>(
         deadlineMs: Int64,
         toolName: String,

@@ -2,7 +2,6 @@ import Testing
 @testable import BASOrchestration
 @testable import BASRuntimeCore
 
-#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASPromptSupportCore")
 struct BASPromptSupportCoreTests {
     @Test("prefix catalog splits immutable and adaptive prompt layers by task kind")
@@ -185,4 +184,3 @@ private func dummyAssembly(payload: String) -> BASSemanticContextAssembly {
         )
     )
 }
-#endif

@@ -15,7 +15,6 @@ import XCTest
 @testable import BASMPSGraphExecutableCacheCxx
 @testable import BASRustCoreBridge
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainContinuedDevelopmentTests:
     XCTestCase
 {
@@ -318,4 +317,3 @@ final class BASCognitiveBrainContinuedDevelopmentTests:
             "≥ 2 brain.summary events → ≥ 2 delta")
     }
 }
-#endif

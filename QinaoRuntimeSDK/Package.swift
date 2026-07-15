@@ -9,9 +9,16 @@ import PackageDescription
 ///   Human Host → Qinao SDK → Second Brain (L1–L14) → Neural Network
 ///
 /// This package is the *承载协议* (carrying protocol) between the
-/// human host and the second brain. Seven public modules, each
-/// wraps a BAS internal library; the `BAS*` symbols never leak
-/// through a Qinao public API.
+/// human host and the second brain. The Qinao facade modules each wrap a BAS
+/// substrate library. charter audit 2026-07-12 HONESTY FIX: an earlier version of
+/// this header claimed "the BAS* symbols never leak through a Qinao public API" —
+/// that is NOT true and is not the design: substrate VALUE TYPES flow through Qinao
+/// surfaces deliberately (QinaoLifecycle exposes BASThermalTwin.Reading /
+/// BASThermalGuardLevel / BASLeaseLifeCoordinator.TurnRecorded; TurnInputs carries
+/// BASContextFrame / BASDecomposeFrame / BASMemoryBundle / BASThoughtFrame /
+/// BASNeuralOrganMap; the redaction scanner bans specific internal tokens, not BAS*
+/// generally). What the facades DO hide is substrate ORCHESTRATION (runTurn,
+/// coordinators, reducers) — hosts consume typed artifacts, never drive internals.
 ///
 /// Three invariants are contracts, not advertising (§2):
 ///   1. 先醒再答 — L1 arbitrates wake/budget before generation
@@ -21,7 +28,11 @@ let package = Package(
     name: "QinaoRuntimeSDK",
     platforms: [
         .iOS(.v18),
-        .watchOS(.v11),
+        // deep-audit P2-23 (2026-07-13): watchOS REMOVED. It was declared here but its
+        // BehavioralAISubstrate dependency DROPPED watchOS package-wide at ch1040 (ADR-035
+        // option A — the vendored MLX deps don't resolve for watchOS), so a watchOS resolve of
+        // this package would fail on the transitive dependency. Re-adding needs the ADR-035
+        // §watchOS work on the BAS side first.
         .macOS(.v14)
     ],
     products: [
@@ -257,7 +268,18 @@ let package = Package(
                 "QinaoLoopSeats",
                 "QinaoSeats",
                 "QinaoWorldPrior",
-                "QinaoUI"
+                "QinaoUI",
+                // integration S2 (2026-07-12) — the LLM-free sovereign host assembly
+                // (QinaoSovereignHostAssembly.swift) composes the full stack. BOUNDARY:
+                // QinaoAppleFoundation / QinaoMLX must NEVER appear here (pinned by
+                // QinaoBoundaryPinTests).
+                "QinaoHost",
+                "QinaoMemory",
+                "QinaoRisk",
+                "QinaoSovereign",
+                "QinaoRuntime",
+                .product(name: "BASRuntimeCore", package: "BehavioralAISubstrate"),
+                .product(name: "BASMemory", package: "BehavioralAISubstrate")
             ]),
         // M180 — public factory wiring Apple FoundationModels
         // behind QinaoOrganEndpoint. Optional library: hosts that
@@ -268,7 +290,14 @@ let package = Package(
             dependencies: [
                 "QinaoLoop",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
-                .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate")
+                .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate"),
+                // observe→DISPOSE: route the registered organ through the default-OFF factual-belief
+                // adjudicator wrap (BASLLMNeuralCoreService.adjudicating). deep-audit P2-20
+                // (2026-07-14): comment corrected — BASHostKit does NOT link BASAppleAdapters
+                // (charter-T4 repointed it to BASAppleLifecycleKit). Adding BASHostKit still brings
+                // no NEW FoundationModels surface to THIS target, but only because
+                // QinaoAppleFoundation already depends on BASAppleAdapters directly (line above).
+                .product(name: "BASHostKit", package: "BehavioralAISubstrate")
             ]),
         // M222 — public factory wiring downloaded MLX Gemma weights
         // behind QinaoOrganEndpoint. Mirrors QinaoAppleFoundation;
@@ -279,7 +308,38 @@ let package = Package(
             dependencies: [
                 "QinaoLoop",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
-                .product(name: "BASMLXAdapter", package: "BehavioralAISubstrate")
+                .product(name: "BASMLXAdapter", package: "BehavioralAISubstrate"),
+                // charter audit 2026-07-12 T4: BASMiniLMEmbeddingProvider is edge-injected
+                // by this LLM-side factory (BASHostKit no longer links the adapter module);
+                // explicit dep so the import is manifest-honest, not transitively lucky.
+                //
+                // deep-audit P2-20 (2026-07-13) — NAMED DEFERRAL, not an oversight. This pulls
+                // BASAppleAdapters → FoundationModels into QinaoMLX, so an "open-weights only"
+                // host still transitively links Apple's FoundationModels. Benign today: every
+                // in-repo QinaoMLX consumer (QinaoSample / QinaoSampleHost) already links
+                // QinaoAppleFoundation → BASAppleAdapters → FoundationModels, so no module newly
+                // gains it, and nothing is shipped as an FM-free binary.
+                //   TRIGGER to decouple: the first external / binary distribution that must host
+                //   open weights WITHOUT linking FoundationModels. FIX at that point: extract
+                //   BASMiniLMEmbeddingProvider + its MiniLM.mlmodelc / vocab.txt resources out of
+                //   BASAppleAdapters into a CoreML-only module (natural home: a small
+                //   BASEmbeddingKit beside BASAppleLifecycleKit, which is pinned to zero
+                //   model-runtime imports), and depend on THAT here instead of BASAppleAdapters.
+                .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate"),
+                // observe→DISPOSE: route the registered MLX organ through the default-OFF factual-belief
+                // adjudicator wrap (BASLLMNeuralCoreService.adjudicating). BASHostKit is NOT an MLX/HF type,
+                // so the redaction seam (check_mlx_redaction.sh) stays clean — the wrap is body-only, the
+                // public factory signature is unchanged (still `async throws -> any QinaoOrganEndpoint`).
+                // TRADE-OFF (audit INFO): BASHostKit widens this target's transitive link closure by the
+                // host-kit modules NOT already pulled via QinaoLoop→BASOrchestration→BASMemory —
+                // BASMetalSubstrate, BASEvaluation, BASAdmin.
+                //   deep-audit P2-20 (2026-07-14) — comment corrected: BASHostKit does NOT pull
+                //   BASAppleAdapters/FoundationModels. charter-T4 cut that edge (BASHostKit now links
+                //   BASAppleLifecycleKit, which is pinned to zero model-runtime imports — verified in
+                //   BASModelBoundaryPinTests). So the ONLY FoundationModels path into QinaoMLX is the
+                //   DIRECT `.product(name: "BASAppleAdapters")` dependency above (line ~325) — the single
+                //   edge the named-deferral extraction (BASEmbeddingKit) would remove.
+                .product(name: "BASHostKit", package: "BehavioralAISubstrate")
             ]),
         // M228 — testable SwiftUI library backing QinaoSampleApp.
         // ContentView / SampleSession / SampleProvider live here so
@@ -295,7 +355,16 @@ let package = Package(
                 // sample app so hosts trying the SDK see all six
                 // L12 surface families on first run, not just the
                 // prompt/response panel.
-                "QinaoUI"
+                "QinaoUI",
+                // integration sample-upgrade (2026-07-12) — the sample now demonstrates
+                // the CHARTER posture: LLM endpoint on this side of the boundary, output
+                // crossing as data into the assembled LLM-free sovereign spine. The
+                // sample links BOTH sides BY DESIGN (it is a host, not an in-boundary
+                // module — QinaoBoundaryPinTests guards the assembly targets, not hosts).
+                "QinaoDefaults",
+                "QinaoRuntime",
+                "QinaoSovereign",
+                "QinaoMemory"
             ]),
         // M219 — SwiftUI macOS GUI demo executable. M228 thinned to
         // just @main + window scene; UI lives in the QinaoSample

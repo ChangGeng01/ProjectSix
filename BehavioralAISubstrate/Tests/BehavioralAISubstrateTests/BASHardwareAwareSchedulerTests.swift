@@ -157,6 +157,59 @@ final class BASHardwareAwareSchedulerTests: XCTestCase {
         }
     }
 
+    // MARK: - Latency budget miss → CPU + rationale (id29)
+
+    func testLatencyBudgetMissDowngradesToCPU() async {
+        // blindspot MED id29: when NO accelerator can meet the caller's
+        // latency budget at this thermal, assign() must return CPU with
+        // the .cpuLatencyBudgetMiss rationale (documented step 4, was
+        // never implemented). Here estimatedLatencyMs=100 → the fastest
+        // accelerator (mlMultiArray ×0.8) is 80ms, far above a 1ms
+        // budget, so no accelerator qualifies.
+        let registry = BASMetalKernelRegistry()
+        await registry.register(
+            StubMatMulKernel(backingKind: .mlMultiArray))
+        let scheduler = BASHardwareAwareScheduler(registry: registry)
+        let slowCap = BASANECapability(
+            maxBatchSize: 8,
+            supportedOps: [.matMul],
+            estimatedLatencyMs: 100.0,
+            memoryFootprintMB: 2048,
+            acceleratorPriority: .aneFirst,
+            thermalSnapshot: .nominal)
+        let tightHint = BASStageAcceleratorHint(
+            operation: .matMul,
+            preferredDataType: .float16,
+            batchSize: 1,
+            sequenceLength: 1,
+            latencyBudgetMs: 1.0)
+        let assignment = await scheduler.assign(
+            hint: tightHint, capability: slowCap, thermal: .nominal)
+        XCTAssertEqual(assignment.selectedBackingKind, .cpuBytes,
+            "no accelerator meets a 1ms budget at 100ms base latency")
+        XCTAssertNil(assignment.selectedKernelKey)
+        XCTAssertEqual(assignment.assignmentRationale,
+            .cpuLatencyBudgetMiss,
+            "budget-miss downgrade must surface .cpuLatencyBudgetMiss")
+    }
+
+    func testGenerousBudgetKeepsAccelerator() async {
+        // Contrast: a generous budget the accelerator CAN meet must
+        // NOT trigger the downgrade — the accelerator is still chosen.
+        let registry = BASMetalKernelRegistry()
+        await registry.register(
+            StubMatMulKernel(backingKind: .mlMultiArray))
+        let scheduler = BASHardwareAwareScheduler(registry: registry)
+        let assignment = await scheduler.assign(
+            hint: matMulHint(),  // budget 10ms, accel ~0.4ms
+            capability: BASANECapability.nominalAppleSilicon(),
+            thermal: .nominal)
+        XCTAssertNotEqual(assignment.selectedBackingKind, .cpuBytes,
+            "an accelerator that meets the budget must be kept")
+        XCTAssertNotEqual(assignment.assignmentRationale,
+            .cpuLatencyBudgetMiss)
+    }
+
     // MARK: - Replay determinism
 
     func testSameInputsProduceSameAssignment() async {

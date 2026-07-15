@@ -46,7 +46,7 @@ public struct BASSleepConsolidationDriver: Sendable {
     /// Canonical BGTask identifier for the SECONDARY (OS-fired)
     /// path。 Hosts list it under `BGTaskSchedulerPermittedIdentifiers`
     /// in Info.plist and register a launch handler at app launch
-    /// (`AppleBGTaskSchedulerBridge.registerConsolidationLaunchHandler`)。
+    /// (`AppleBGTaskSchedulerBridge.registerLaunchHandler`)。  // audit memory-b F13: real symbol
     public static let backgroundTaskIdentifier =
         "bas.sleep.consolidation"
 
@@ -87,6 +87,36 @@ public struct BASSleepConsolidationDriver: Sendable {
         self.retainFraction = retainFraction
         self.dryRun = dryRun
         self.clock = clock
+    }
+
+    /// OBSERVATION factory (dream-loop first activation, 2026-07-04): constructs the driver with the
+    /// standard tracker/applier quartet around the host's store, dryRun HARD-CODED true (the doctrine
+    /// mandates manual reviewed promotion — this factory can only observe). Hides the
+    /// BASRustCoreBridge dependency from app targets. nil = rust tracker unavailable.
+    ///
+    /// audit memory-b F7 / hostkit-rest MED-4: `atomTiersProvider` is now REQUIRED (was hard-coded
+    /// `{ [:] }`). An empty atom-tiers map made the importance scorer iterate nothing, so every
+    /// observation was a structural constant zero — the instrument read blank regardless of the real
+    /// corpus. The caller MUST supply the live store's (atomID → tier) snapshot (e.g. built from a
+    /// concrete store's `allAtoms()`), so the observation reflects the real universe.
+    ///
+    /// HONEST BOUND (not yet closed): the Rust importance/forget half is fed by a usage tracker that
+    /// no retrieval path currently records into (there are no live `recordRetrieval` callers), so
+    /// `rustImportanceScoreCount` stays 0 until retrieval-recording is wired — a separate, larger
+    /// workload. This factory fixes the atom-tiers half (which drives `recommendedTierMoves`); the
+    /// tracker half remains honestly empty rather than presenting 0 as a measurement.
+    public static func makeObservation(
+        store: any BASMemoryAtomStore,
+        atomTiersProvider:
+            @escaping @Sendable () async -> [String: BASMemoryTier]
+    ) -> BASSleepConsolidationDriver? {
+        guard let tracker = try? BASRustMemoryUsageTrackerActor(useRustCore: true) else { return nil }
+        return BASSleepConsolidationDriver(
+            tracker: tracker,
+            applier: BASMemoryClosedLoopApplier(store: store, tracker: BASMemoryUsageTracker()),
+            store: store,
+            atomTiersProvider: atomTiersProvider,
+            dryRun: true)
     }
 
     /// The PRIMARY entry point。 nil ⇒ one of the three guards said

@@ -218,6 +218,9 @@ public actor BASMemorySleepConsolidationPass {
         var preChainHash = ""
         var appliedMutations: [String: BASMemoryTier] = [:]
         var rejectedMutations: [String: BASMemoryTier] = [:]
+        // audit memory-b F7 — the scorer's tier-move verdict, captured on BOTH dry-run
+        // and applied passes so a dry-run observation is not structurally empty.
+        var recommendedTierMoves: [String: BASMemoryTier] = [:]
         var rustImportanceScoreCount = 0
         var forgetCandidateIDs: [String] = []
         var quarantinedAtomIDs: [String] = []
@@ -282,6 +285,13 @@ public actor BASMemorySleepConsolidationPass {
                 dryRun: request.dryRun)
             appliedMutations = applyOutcome.appliedMutations
             rejectedMutations = applyOutcome.rejectedMutations
+            // audit memory-b F7: surface the scorer's recommendation regardless of
+            // dryRun — the report is computed either way; a dry-run just doesn't WRITE
+            // it. Without this the dry-run checkpoint dropped the entire verdict.
+            recommendedTierMoves = Dictionary(
+                uniqueKeysWithValues: applyOutcome.report.mutations.map {
+                    ($0.atomID, $0.recommendedTier)
+                })
             completedStages.append(
                 BASConsolidationCheckpoint.Stage.tierApply)
             if windowExhausted() {
@@ -346,35 +356,34 @@ public actor BASMemorySleepConsolidationPass {
             }
             completedStages.append(
                 BASConsolidationCheckpoint.Stage.quarantineWrite)
-            if windowExhausted() {
-                partialCompletion = true
-                break pipeline
-            }
+        }
 
-            // ⑥ Ledger mark — applied passes leave ONE
-            // tamper-evident tracker record so the chain hash
-            // moves。 Dry-runs and no-op passes write nothing。
-            let didMutate = !appliedMutations.isEmpty
-                || !quarantinedAtomIDs.isEmpty
-            if !request.dryRun && didMutate {
-                do {
-                    let nowMs = Int(
-                        request.now.timeIntervalSince1970 * 1000)
-                    let turnRef = "consolidation.\(nowMs)"
-                    _ = try await ledgerTracker.record(
-                        atomID: Self.consolidationLedgerAtomID,
-                        sessionRef: Self.ledgerSessionRef,
-                        turnRef: turnRef,
-                        permitMode: Self.ledgerPermitMode,
-                        retrievedAt: request.now)
-                    completedStages.append(
-                        BASConsolidationCheckpoint.Stage
-                            .ledgerMark)
-                } catch {
-                    failureReasons.append("ledger_mark: \(error)")
-                    partialCompletion = true
-                    break pipeline
-                }
+        // ⑥ Ledger mark — the tamper-evidence ANCHOR. audit M-h F6 (memory-b F6 / hostkit-rest
+        // MED-4): this used to sit INSIDE the `pipeline` block after ⑤, so a window-exhaust
+        // `break pipeline` after a MUTATING stage (③ tier-apply or ⑤ quarantine) SKIPPED it → the
+        // store was mutated but postChainHash == preChainHash, breaking the documented invariant
+        // "chain hash moves ⟺ the pass mutated state" (an external tamper that also skipped the mark
+        // would then read as clean). It now runs OUTSIDE the window budget (exactly like the
+        // post-chain-hash below): a single cheap tracker append that ALWAYS fires when the pass
+        // mutated state, wherever the pipeline stopped. Dry-runs / no-op passes write nothing.
+        let didMutate = !appliedMutations.isEmpty
+            || !quarantinedAtomIDs.isEmpty
+        if !request.dryRun && didMutate {
+            do {
+                let nowMs = Int(
+                    request.now.timeIntervalSince1970 * 1000)
+                let turnRef = "consolidation.\(nowMs)"
+                _ = try await ledgerTracker.record(
+                    atomID: Self.consolidationLedgerAtomID,
+                    sessionRef: Self.ledgerSessionRef,
+                    turnRef: turnRef,
+                    permitMode: Self.ledgerPermitMode,
+                    retrievedAt: request.now)
+                completedStages.append(
+                    BASConsolidationCheckpoint.Stage.ledgerMark)
+            } catch {
+                failureReasons.append("ledger_mark: \(error)")
+                partialCompletion = true
             }
         }
 
@@ -399,6 +408,7 @@ public actor BASMemorySleepConsolidationPass {
             postChainHash: postChainHash,
             appliedMutations: appliedMutations,
             rejectedMutations: rejectedMutations,
+            recommendedTierMoves: recommendedTierMoves,
             forgetCandidateAtomIDs: forgetCandidateIDs,
             quarantinedAtomIDs: quarantinedAtomIDs,
             unjoinedForgetCandidateAtomIDs: unjoinedCandidateIDs,

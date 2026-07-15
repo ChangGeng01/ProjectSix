@@ -46,9 +46,12 @@ PINS=(
     #   - BASEntropyChapterIndex.swift:             7,276 → 310 LOC
     #   - BASChapterDoctrineRegistry+AllLiterals:   3,940 →  62 LOC
     # All three now fall under the default warn threshold;no pin needed。
-    "Sources/BASHostKit/BASCognitiveBrain.swift|4500|HostKit composition root — coordinates 10+ subsystems"
-    "Sources/BASRuntimeCore/BASAutoRouteRanker.swift|4000|chapter 七百四 auto-routing thresholds + 5-axis verdict matrix"
-    "Sources/BASMemory/BASMemoryUsageTracker.swift|3000|L8 usage tracker — 4 tier × 3 lifecycle × 5 capacity-bucket matrix"
+    # audit x-architecture LOW-8: three MORE pins removed as stale — the files have since shrunk far
+    # below the default warn threshold, so their generous pins masked the real (small) size:
+    #   - BASCognitiveBrain.swift:      pinned 4500 → actual 661 LOC
+    #   - BASAutoRouteRanker.swift:     pinned 4000 → actual 502 LOC
+    #   - BASMemoryUsageTracker.swift:  pinned 3000 → actual 297 LOC
+    # Only the genuinely-large L7 dissection core remains pinned.
     "Sources/BASOrchestration/EBrainL7MirrorBladeDecomposeCore.swift|3000|L7 whitepaper-literal §5 dissection frame + 14 typed structs"
 )
 

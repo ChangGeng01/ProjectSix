@@ -57,6 +57,14 @@ public protocol BASOrganAdapter: Sendable {
     /// the override dispatches DYNAMICALLY through a protocol-typed `adapter`.
     func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft
 
+    /// PURPOSE-based accelerated draft (DecodePlan S5 — the successor to the `electAccelerated` Bool). The host
+    /// passes the turn's PURPOSE; an adapter with a decode planner (MLX) resolves it to the best lane
+    /// (`BASDecodeLanePolicy.decodeStrategy`). The default impl IGNORES `purpose` and calls `draft(_:)` —
+    /// BYTE-EQUAL for every adapter without a lane (ADR-014). This replaces the overloaded Bool: a Boolean can
+    /// only say "accelerate or not", whereas a purpose lets the planner pick AMONG lanes (plain / draft-model /
+    /// prompt-lookup / cross-turn / saguaro). The Bool overload above is RETAINED as a thin compatibility shim (not deleted).
+    func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft
+
     /// Announce how much work this provider is willing to take on
     /// right now. Adapters that observe device pressure (thermal,
     /// memory, battery) return a reduced capacity; adapters that
@@ -68,6 +76,12 @@ public extension BASOrganAdapter {
     /// Default accelerated draft: ignore the elect flag → byte-equal to `draft(_:)`. Adapters without an
     /// accelerated lane (deterministic, Apple, remote) inherit this unchanged (ADR-014 default-off).
     func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
+        try await draft(request)
+    }
+
+    /// Default PURPOSE-based draft: ignore `purpose` → byte-equal to `draft(_:)`. No-lane adapters (deterministic,
+    /// Apple, remote) inherit this unchanged; only adapters with a planner (MLX) override it.
+    func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft {
         try await draft(request)
     }
 }
@@ -202,6 +216,22 @@ public struct BASOrganRequest: Sendable, Equatable, Codable {
     /// change vs pre-M852)。
     public let outputSchema: BASGuidedGenerationSchema?
 
+    // MARK: - P2 多agent复用 (SYSTEM_EFFICIENCY_CAMPAIGN) — seat identity on the REQUEST
+
+    /// Optional AGENT-SEAT session key. nil (default) = the historical stateless turn (byte-equal,
+    /// ADR-014). Non-nil = the adapter maintains per-(sessionID, role) conversation state (KV cache +
+    /// history reuse — MLX: the M254 ChatSession pool). Carried on the REQUEST rather than the adapter
+    /// protocol so every decorator (router / contract / adjudicator / counter) forwards it for free —
+    /// the recon's gap #1/#2 closed with one field. Seat convention: "seat:<agentRole>" (e.g.
+    /// "seat:planner"), but any stable string works.
+    public let sessionID: String?
+
+    /// Optional per-seat SYSTEM persona, consumed ONCE at session creation (sessions freeze their system
+    /// prompt; later turns' values are ignored — pass the same persona every turn for clarity). nil =
+    /// the adapter's role-derived default instructions. Enables the 8 generative seats to differ in voice
+    /// while sharing ONE trunk (BASAgentPersonaRoleTemplates-shaped strings).
+    public let personaInstructions: String?
+
     public init(
         requestID: String,
         role: BASOrganRole,
@@ -212,7 +242,9 @@ public struct BASOrganRequest: Sendable, Equatable, Codable {
         stopSequences: [String] = [],
         deadline: Date? = nil,
         tools: [BASTool] = [],
-        outputSchema: BASGuidedGenerationSchema? = nil
+        outputSchema: BASGuidedGenerationSchema? = nil,
+        sessionID: String? = nil,
+        personaInstructions: String? = nil
     ) {
         self.requestID = requestID
         self.role = role
@@ -224,6 +256,8 @@ public struct BASOrganRequest: Sendable, Equatable, Codable {
         self.deadline = deadline
         self.tools = tools
         self.outputSchema = outputSchema
+        self.sessionID = sessionID
+        self.personaInstructions = personaInstructions
     }
 }
 
@@ -269,6 +303,9 @@ public struct BASOrganDraft: Sendable, Equatable, Codable {
     /// REAL prefill/decode anatomy when the adapter can surface it (e.g. MLX); `nil` otherwise. Additive +
     /// optional → existing callers + serialized drafts are unaffected (decodeIfPresent ⇒ nil for old JSON).
     public let completionMetrics: BASOrganCompletionMetrics?
+    /// 可解释性① — THE turn line's carrier (planned vs executed lane, fail-close reason, B3
+    /// trace-exit, B2 tri-state). Additive + optional, same contract as completionMetrics.
+    public let decodeAttribution: BASDecodeAttribution?
 
     public init(
         requestID: String,
@@ -279,7 +316,8 @@ public struct BASOrganDraft: Sendable, Equatable, Codable {
         outputTokensEstimated: Int,
         producedAt: Date,
         traceID: String,
-        completionMetrics: BASOrganCompletionMetrics? = nil
+        completionMetrics: BASOrganCompletionMetrics? = nil,
+        decodeAttribution: BASDecodeAttribution? = nil
     ) {
         self.requestID = requestID
         self.providerID = providerID
@@ -290,6 +328,17 @@ public struct BASOrganDraft: Sendable, Equatable, Codable {
         self.producedAt = producedAt
         self.traceID = traceID
         self.completionMetrics = completionMetrics
+        self.decodeAttribution = decodeAttribution
+    }
+
+    /// Immutable-update helper (coding-style rule: new copy, never mutate).
+    public func withDecodeAttribution(_ a: BASDecodeAttribution?) -> BASOrganDraft {
+        BASOrganDraft(
+            requestID: requestID, providerID: providerID, role: role, body: body,
+            inputTokensEstimated: inputTokensEstimated,
+            outputTokensEstimated: outputTokensEstimated,
+            producedAt: producedAt, traceID: traceID,
+            completionMetrics: completionMetrics, decodeAttribution: a)
     }
 }
 

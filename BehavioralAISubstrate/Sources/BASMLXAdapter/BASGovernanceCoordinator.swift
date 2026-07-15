@@ -31,7 +31,8 @@ public struct BASGovernanceCoordinator: Sendable {
     /// Forward to the centralized pre-load admission check (no reimplementation).
     public func wouldExceedActiveHardCap(
         targetProviderID: String,
-        capBytes: Int = BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes
+        capBytes: Int = BASMLXMemoryModel.resolvedActiveHardCapBytes()
+            ?? BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes
     ) -> Bool {
         BASMLXMemoryBudget.wouldExceedActiveHardCap(
             targetProviderID: targetProviderID, capBytes: capBytes)

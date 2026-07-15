@@ -27,7 +27,7 @@
 
 import Foundation
 @_exported import BASAdmin
-@_exported import BASAppleAdapters
+@_exported import BASAppleLifecycleKit
 @_exported import BASEvaluation
 @_exported import BASMemory
 @_exported import BASObservability
@@ -1055,12 +1055,14 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
         }
 
         private func containsCue(_ text: String, phrases: [String]) -> Bool {
+            // deep-audit calibration: single-word cues ("now"/"must"/"plan"/"think"/"compare"/"strategy"…)
+            // match as WHOLE WORDS so they can't fire inside benign words that merely contain them
+            // (know/knowledge, mustard, plant/planet/explanation); multi-word phrases ("pros and cons",
+            // "multi-step") stay substring. See BASHostRuntimeEBrainPromptAnalyzer.cueMatches.
+            let words = BASHostRuntimeEBrainPromptAnalyzer.wordSet(text)
             let normalized = text.lowercased()
-            return phrases.contains { phrase in
-                let normalizedPhrase = phrase
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .lowercased()
-                return normalizedPhrase.isEmpty == false && normalized.contains(normalizedPhrase)
+            return phrases.contains {
+                BASHostRuntimeEBrainPromptAnalyzer.cueMatches($0, words: words, normalized: normalized)
             }
         }
 

@@ -221,6 +221,16 @@ final class BASChapter733Float16KVCacheTests: XCTestCase {
                 / Double(f32Bytes)
             let i8Ratio = Double(i8Bytes)
                 / Double(f32Bytes)
+            // #18: assertion — non-degenerate footprints, and the
+            // chapter's claimed ordering/ratios: f16 ~50% (2× shrink),
+            // i8 ~25% (4× shrink), i8 < f16 < f32.
+            XCTAssertGreaterThan(f32Bytes, 0, "\(cell.label): f32 footprint must be positive")
+            XCTAssertGreaterThan(f16Bytes, 0, "\(cell.label): f16 footprint must be positive")
+            XCTAssertGreaterThan(i8Bytes, 0, "\(cell.label): i8 footprint must be positive")
+            XCTAssertLessThan(f16Bytes, f32Bytes, "\(cell.label): f16 must be smaller than f32")
+            XCTAssertLessThan(i8Bytes, f16Bytes, "\(cell.label): i8 must be smaller than f16")
+            XCTAssertLessThan(abs(f16Ratio - 0.5), 0.1, "\(cell.label): f16 should be ~50% of f32 (got \(f16Ratio))")
+            XCTAssertLessThan(abs(i8Ratio - 0.25), 0.1, "\(cell.label): i8 should be ~25% of f32 (got \(i8Ratio))")
             print(String(
                 format: "  %@ | %5.1f | %5.1f | %5.1f | %5.2f%%  | %5.2f%%",
                 cell.label.padding(

@@ -1750,6 +1750,23 @@ int32_t bas_l8_vector_index_cosine_topk_for_domain_with_skipped(
     float* out_scores,
     int64_t* out_skipped);
 
+// audit M-l MED-4 — ATOMIC (atom_id, score) top-k in ONE call. Returns
+// atom_ids DIRECTLY (no rowid round-trip ⇒ no SQLite rowid-reuse TOCTOU)
+// with a deterministic (score DESC, atom_id ASC) order. Writes up to n
+// scores into out_scores and the n atom_ids NEWLINE-joined UTF-8 into
+// out_ids_buf (atom_ids never contain '\n'); *out_ids_needed is ALWAYS set
+// to the required ids byte length — when out_ids_buf is null or too small
+// the ids are not written (re-allocate to *out_ids_needed and call again).
+// Returns n (count written, ≤ k) or -1/-2/-3/-4 errors.
+int32_t bas_l8_vector_index_cosine_topk_atom_ids_for_domain(
+    const L8Engine* engine,
+    const char* domain_utf8, size_t domain_len,
+    const uint8_t* query_blob, size_t query_blob_len,
+    size_t k,
+    float* out_scores,
+    uint8_t* out_ids_buf, size_t out_ids_capacity,
+    int64_t* out_ids_needed);
+
 // MARK: - bas-l8-engine event_log module
 //         (chapter 九百一 / M3195 — HIGH-risk migration #1)
 //
@@ -1825,6 +1842,20 @@ int32_t bas_l8_event_log_events_for_session(
 int32_t bas_l8_event_log_events_since_ts(
     const L8Engine* engine,
     int64_t since_ms,
+    int64_t limit,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
+// H10 (mega-audit, 2026-07-08) — cursor-paginated session read. Returns events with
+// sequence_number > after_seq (ascending, up to `limit`, clamped to [1, 100000]). Loop with
+// after_seq advanced to the last seq of each batch until a batch returns < limit events, to
+// read the FULL history in bounded allocations. The un-paginated events_for_session variant
+// caps at the oldest 100k events, silently dropping late removed/quarantined events and
+// resurrecting deleted atoms; this variant is immune. Two-call size-probe protocol.
+int32_t bas_l8_event_log_events_for_session_page(
+    const L8Engine* engine,
+    const char* session_id_utf8, size_t session_id_len,
+    int64_t after_seq,
     int64_t limit,
     uint8_t* out_buf,
     size_t out_capacity);

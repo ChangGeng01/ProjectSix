@@ -251,9 +251,11 @@ public actor BASRiskCalibrationSubModelRegistry {
         }
         let key = proposed.stratumKey
         let existing = refs[key]
-        // Monotonic version check.
+        // Monotonic version check (numeric-aware — audit policy-obs-misc LOW-1: raw String `>`
+        // rejected v9→v10).
         if let existing = existing {
-            guard proposed.modelVersion > existing.modelVersion
+            guard BASCalibrationVersionOrder.compare(
+                proposed.modelVersion, existing.modelVersion) == .orderedDescending
             else {
                 throw RegistryError.nonMonotonicModelVersion(
                     current: existing.modelVersion,

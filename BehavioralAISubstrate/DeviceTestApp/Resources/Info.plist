@@ -40,5 +40,9 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>bas.sleep.consolidation</string>
+	</array>
 </dict>
 </plist>

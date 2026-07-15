@@ -44,26 +44,24 @@ final class BASChapter647SovereignPrivilegeScanTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASSovereignPrivilegeArbiterScopeKeyConformsToCodable() {
-        assertCodable(
-            BASSovereignPrivilegeArbiter.ScopeKey.self)
+        // #18: real round-trip
+        let value = BASSovereignPrivilegeArbiter.ScopeKey(sessionID: "")
+        assertCodableRoundTrips(value)
     }
 
     func testBASSovereignIntegritySentinelScanRequestConformsToCodable() {
-        assertCodable(
-            BASSovereignIntegritySentinel
-                .ScanRequest.self)
+        // #18: real round-trip
+        let value = BASSovereignIntegritySentinel.ScanRequest(claims: [])
+        assertCodableRoundTrips(value)
     }
 
     func testBASSovereignIntegritySentinelScanReportConformsToCodable() {
-        assertCodable(
-            BASSovereignIntegritySentinel
-                .ScanReport.self)
+        // #18: real round-trip (memberwise init reachable via @testable)
+        let value = BASSovereignIntegritySentinel.ScanReport(
+            failedArtifactIDs: [],
+            failedKinds: [],
+            observedSelfMutation: false)
+        assertCodableRoundTrips(value)
     }
 }

@@ -21,9 +21,13 @@
 //   - `CachePolicy` enum (`.lazy` / `.warmAtInit` /
 //     `.cachedWithTTL`)。`.lazy` projects on every read;
 //     `.warmAtInit` keeps an in-actor cache that mutates on
-//     every successful append (still serialized via actor
-//     isolation,so cache and event log can never diverge
-//     mid-write)
+//     every successful append。 Actor isolation serializes each
+//     STATEMENT but NOT the multi-`await` warm/append critical
+//     sections — every `await` is a reentrancy point。 The warm
+//     path commits its projection into locals and flips
+//     `hasWarmedCache` LAST, and the append path re-projects on a
+//     sequence gap, so a reentrant read never observes a
+//     half-warmed cache (audit memory-b F5)。
 //   - Parity surface: `admit(_:)`,`count`,`allIDs`,
 //     `allAtoms()`,`projectAll()`,`lastReplayedSequenceNumber`
 //   - Content cache: `BASGovernedMemory.content` is host-side
@@ -95,6 +99,17 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
     private var hasWarmedCache: Bool = false
     private var lastSeq: Int64? = nil
 
+    /// audit memory-b F4 — surfaced when a mutation (updateTier /
+    /// updateGovernanceStatus / remove) FAILS on an EXISTING atom. The Bool/nil
+    /// returns can't distinguish "atom not found" from "store write errored"
+    /// (both false/nil), so a real write failure was silently fail-open (counted
+    /// downstream as not-found). A host wires this to observe the real error.
+    /// nil ⇒ unobserved (default).
+    public var onSilentFailure: (@Sendable (Error) -> Void)?
+    public func setOnSilentFailure(_ handler: (@Sendable (Error) -> Void)?) {
+        self.onSilentFailure = handler
+    }
+
     // MARK: - Init
 
     public init(
@@ -126,14 +141,24 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
             if hasWarmedCache {
                 return
             }
-            hasWarmedCache = true
-            stateCache = await BASMemoryAtomReducer.project(
+            // audit memory-b F5: compute the projection into LOCALS across the awaits, then commit
+            // stateCache + set the flag LAST (with a re-check). Setting hasWarmedCache BEFORE the
+            // populating awaits left a window where a REENTRANT reader saw hasWarmedCache==true but
+            // stateCache still `[:]`; a concurrent updateTier/updateGovernanceStatus/remove whose
+            // existence guard read that false-empty projection PERMANENTLY dropped its mutation.
+            let projected = await BASMemoryAtomReducer.project(
                 from: eventLog,
                 sessionID: sessionID)
             // lastSeq from latest projected event
             let events = await eventLog.events(
                 forSession: sessionID)
+            if hasWarmedCache {
+                // A reentrant warm finished during our awaits — don't clobber its committed state.
+                return
+            }
+            stateCache = projected
             lastSeq = events.last?.sequenceNumber
+            hasWarmedCache = true
         }
     }
 
@@ -183,12 +208,24 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
         if !result.wasNew {
             return false
         }
+        // audit memory-b F5: capture the pre-append high-water mark so the O(1) incremental fold is
+        // only taken when THIS append resumed in sequence order (assignedSeq == prevSeq+1). Under a
+        // store whose async append may suspend, task-resumption order can differ from sequence order;
+        // an out-of-order fold would diverge the warm cache from the canonical log projection.
+        let prevSeq = lastSeq
         lastSeq = result.assignedSequenceNumber
         switch cachePolicy {
         case .lazy:
             return true
         case .warmAtInit, .cachedWithTTL:
             await warmCacheIfNeeded()
+            guard result.assignedSequenceNumber == (prevSeq ?? -1) + 1 else {
+                // Sequence gap ⇒ resumption order != append order. Re-derive from the authoritative
+                // log rather than fold this event onto a cache that may be missing an earlier one.
+                stateCache = await BASMemoryAtomReducer.project(
+                    from: eventLog, sessionID: sessionID)
+                return true
+            }
             stateCache = BASMemoryAtomReducer.reduce(
                 priorAtoms: stateCache,
                 event: BASEventLogEntry(
@@ -239,6 +276,9 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
             return try await appendEventAndUpdateCache(
                 payload: payload)
         } catch {
+            // audit memory-b F4: the atom EXISTS (guard passed) — a false here is
+            // a store WRITE error, not "not found". Surface it, don't fail-open.
+            onSilentFailure?(error)
             return false
         }
     }
@@ -256,6 +296,7 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
             return try await appendEventAndUpdateCache(
                 payload: payload)
         } catch {
+            onSilentFailure?(error)   // audit memory-b F4: surface the write error
             return false
         }
     }
@@ -271,32 +312,54 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
         let removed = hydrateContent(existing)
         let payload = BASMemoryAtomEventPayload(remove: id)
         do {
-            _ = try await appendEventAndUpdateCache(
+            // audit memory-b F11: honor the append result — a deduped (wasNew=false) remove event
+            // did NOT append, so don't evict the content cache or claim `removed` for a no-op.
+            let appended = try await appendEventAndUpdateCache(
                 payload: payload)
+            guard appended else { return nil }
             contentCache.removeValue(forKey: id)
             return removed
         } catch {
+            onSilentFailure?(error)   // audit memory-b F4: surface the write error (atom existed)
             return nil
         }
     }
 
     // MARK: - Parity surface (matches BASSQLiteMemoryAtomStore)
 
-    /// Admit a new atom into the store。Returns true if the
-    /// atom was new (event was appended);false if a conflicting
-    /// admission existed and was suppressed by the M942 reducer's
-    /// confidence tiebreak rule。
+    /// Admit a new atom into the store。Returns true if the admit
+    /// event was appended (the normal path);false only if the
+    /// underlying event log reports the event was not new — i.e. its
+    /// eventID already existed (idempotent-retry dedup)。Because each
+    /// admit mints a fresh `UUID().uuidString` eventID, false is
+    /// effectively unreachable in normal use and never signals a
+    /// content/atom conflict。The M942 reducer's confidence tiebreak
+    /// (BASMemoryAtomReducer) runs only inside the projection and does
+    /// not influence this Bool。
     @discardableResult
     public func admit(
         _ atom: BASGovernedMemory
     ) async throws -> Bool {
+        let key = atom.id.uuidString
         let payload = BASMemoryAtomEventPayload(admitted: atom)
         let appended = try await appendEventAndUpdateCache(
             payload: payload)
-        if appended {
-            // Cache content for in-process content fidelity
-            if !atom.content.isEmpty {
-                contentCache[atom.id.uuidString] = atom.content
+        if appended, !atom.content.isEmpty {
+            // audit memory-b F3 (2nd clause): decide the cache write on the POST-append projection
+            // winner, NOT a pre-append snapshot. Two concurrent same-id admits could both capture an
+            // empty prior projection and let a LOSING (lower-confidence) admit write its content last
+            // → a winner-metadata + loser-content HYBRID. Re-reading the winner AFTER the append and
+            // writing only when THIS atom IS the winner closes that reentrancy hole. There is NO
+            // await between this re-read and the synchronous cache write, so the check+write is atomic
+            // under actor reentrancy.
+            //
+            // Residual (out of F3's scope): two EQUAL-confidence same-id admits with different content
+            // can't be disambiguated by confidence alone — the reducer ties-to-existing but the cache
+            // compare can't see event identity. Fully robust closure would key the write on the
+            // winning eventID. F3's cited defect is a LOWER-confidence re-admit, which this fully closes.
+            let winnerConfidence = await currentProjection()[key]?.confidence
+            if winnerConfidence == atom.confidence {
+                contentCache[key] = atom.content
             }
         }
         return appended

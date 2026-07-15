@@ -22,7 +22,6 @@ import CryptoKit
 /// 7. `trusts(_:)` returns false for a public key NOT in the
 ///    manifest, even if the root signature is valid (i.e. the
 ///    manifest is authentic but doesn't list that key).
-#if !os(iOS)  // ch 1022 source-gate
 final class BASSovereignFingerprintStoreTests: XCTestCase {
 
     // MARK: - Fixtures
@@ -31,7 +30,7 @@ final class BASSovereignFingerprintStoreTests: XCTestCase {
         let sanitized = label
             .replacingOccurrences(of: "(", with: "")
             .replacingOccurrences(of: ")", with: "")
-        return "/tmp/bas-sovereign-fingerprints-\(sanitized)-\(UUID().uuidString).json"
+        return NSTemporaryDirectory() + "bas-sovereign-fingerprints-\(sanitized)-\(UUID().uuidString).json"
     }
 
     private func removeFile(_ path: String) {
@@ -339,7 +338,7 @@ final class BASSovereignFingerprintStoreTests: XCTestCase {
         let rootKey = Curve25519.Signing.PrivateKey()
         do {
             _ = try BASSovereignFingerprintStore.load(
-                from: "/tmp/definitely-does-not-exist-\(UUID().uuidString).json",
+                from: NSTemporaryDirectory() + "definitely-does-not-exist-\(UUID().uuidString).json",
                 rootPublicKey: rootKey.publicKey,
                 now: Date(timeIntervalSince1970: 1_750_000_000))
             XCTFail("expected fileUnreadable")
@@ -384,4 +383,3 @@ final class BASSovereignFingerprintStoreTests: XCTestCase {
         _ = rootKey  // suppress warning
     }
 }
-#endif

@@ -9,7 +9,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMemory
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASSQLEngineSideAggregateTests: XCTestCase {
 
     private func makeTempDBURL() -> URL {
@@ -255,4 +254,3 @@ final class BASSQLEngineSideAggregateTests: XCTestCase {
             " window")
     }
 }
-#endif

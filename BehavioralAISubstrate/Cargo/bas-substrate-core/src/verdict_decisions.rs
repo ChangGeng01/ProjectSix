@@ -15,8 +15,9 @@
 //      each maps to a min verdict level (first match wins,
 //      take MAX across hits)
 //   2. Lexicographic soft signals — 7 ordered doubles,
-//      classify each into low/mid/high,first .high pins the
-//      verdict (non-compensatory:later signals can't offset)
+//      classify each into low/mid/high,the MOST-SEVERE .high
+//      pins the verdict (audit blindspot-② HIGH: was "first .high",
+//      which let a lower-severity domain mask a higher one)
 //   3. Evidence-insufficient upgrade — for irreversible-effect
 //      operation domains,upgrade ANY final verdict to at
 //      least toolCut when evidence is insufficient
@@ -30,8 +31,6 @@
 // will likely TIE or LOSE on per-call walltime。 SQL persistence
 // (chapter 七百四十二 第三刀 verdict_decisions schema) is the
 // real Rust WIN here。
-
-use std::os::raw::c_char;
 
 // MARK: - VerdictLevel (mirrors BASSovereignVerdictLevel)
 
@@ -256,7 +255,17 @@ pub fn evaluate_soft_signals(
     let mut best_domain: Option<&'static str> = None;
     for (domain, score, hi, mid) in ordered.iter() {
         match band(*score) {
-            Band::High => return (*hi, Some(*domain)),
+            Band::High => {
+                // audit blindspot-② HIGH (mirror of the Swift fix): pin to the MOST-SEVERE .high, not
+                // the first in list order. Returning on the first .high let privilegeViolation-high
+                // (Quarantine, rank 5, index 1) MASK a co-present selfMod-high (DeadStop, rank 7,
+                // index 2), under-escalating the strongest hard signal. Take the max; list order still
+                // breaks ties (strict `>` keeps the earlier domain when ranks are equal).
+                if hi.rank() > best.rank() {
+                    best = *hi;
+                    best_domain = Some(*domain);
+                }
+            }
             Band::Mid => {
                 if mid.rank() > best.rank() {
                     best = *mid;
@@ -452,7 +461,6 @@ pub unsafe extern "C" fn bas_verdict_derive(
         audit_append_failed:
             hard_bits & 0x0800 != 0,
     };
-    let _ = c_char::from(0); // silence unused import warn
     derive_verdict_level(
         &hard, &soft, domain,
         evidence_sufficient != 0).rank()
@@ -550,8 +558,25 @@ mod tests {
             irreversible_harm: 0.95,
             ..Default::default() };
         let (lvl, dom) = evaluate_soft_signals(&s);
+        // privilegeViolation(Quarantine=5) IS more severe than irreversibleHarm(ToolCut=3), so it
+        // pins under either first-high or max-severity — this case does not discriminate the fix.
         assert_eq!(lvl, VerdictLevel::Quarantine);
         assert_eq!(dom, Some("privilegeViolation"));
+    }
+
+    #[test]
+    fn soft_signals_escalate_to_most_severe() {
+        // audit blindspot-② HIGH: privilegeViolation-high (Quarantine, rank 5) is listed BEFORE
+        // selfMod-high (DeadStop, rank 7). Co-present, the verdict must be the MOST-SEVERE (DeadStop),
+        // not the first-listed (Quarantine). Reversal (`return (*hi, ...)` on the first .high) reds.
+        let s = SoftSignals {
+            privilege_violation: 0.8,
+            self_mod: 0.8,
+            ..Default::default() };
+        let (lvl, dom) = evaluate_soft_signals(&s);
+        assert_eq!(lvl, VerdictLevel::DeadStop,
+            "self-mod (DeadStop) co-present with privilege-violation (Quarantine) must escalate");
+        assert_eq!(dom, Some("selfMod"));
     }
 
     #[test]

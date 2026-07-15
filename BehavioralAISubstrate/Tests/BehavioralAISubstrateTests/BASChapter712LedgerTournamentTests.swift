@@ -14,6 +14,21 @@
 // Use this output to pick the .ledgerBatchMinEntries threshold
 // in chapter 七百十二 第四刀 BASAutoRouteThresholds。
 
+// ## ARCHIVE MARKER (skip triage, 2026-07-14)
+//
+// Cleanest archive in the cluster — no orphaned symbol, no stale claim.
+// Verified 2026-07-14: the skip message is honest (zero XCTAssert across all 7
+// methods; testVerifyChainDepth* computes an `allOk` flag and a Rust rc but
+// sinks both into `_ = (swiftSink, rustSink)` and never asserts, so "print-only"
+// holds even there). `bas_ranker_ledger_verify_chain` stays covered by
+// BASChapter712LedgerABITests (runs) and is called in production by
+// BASAutoRouteRanker+Crypto.swift.
+//
+// Only loss while skipped: the `ledgerBatchMinEntries` crossover data. Unlike
+// chapter 715's batchedCosineMetalMinRows, NO live asserted pin depends on it —
+// so this is the lowest-value file in the cluster to revive, and still not a
+// deletion candidate under the no-verified-replacement rule.
+
 import XCTest
 import Foundation
 import CryptoKit

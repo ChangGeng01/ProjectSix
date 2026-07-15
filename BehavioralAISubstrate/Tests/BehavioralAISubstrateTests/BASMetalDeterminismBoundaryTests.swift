@@ -14,7 +14,11 @@ final class BASMetalDeterminismBoundaryTests: XCTestCase {
 
     /// The byte-deterministic spine (relative to Sources/). A NEW spine writer MUST be added here, or the
     /// boundary guard has a hole. Representative + load-bearing set (governance + durable + replay).
-    private static let spineFiles: [String] = [
+    ///
+    /// internal (NOT private): the QINAO gate #96 (metal_spine_boundary_tripwire) references this as the
+    /// SINGLE source-of-truth instead of keeping its own mirror — so a 20th spine file added here is now
+    /// automatically covered by that gate too (closes the silent list-drift hole the gate had).
+    static let spineFiles: [String] = [
         // Governance (risk → permit → verdict → commit-token)
         "BASHostKit/EBrainRuntimeCoordinator+SovereignVerdict.swift",
         "BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift",

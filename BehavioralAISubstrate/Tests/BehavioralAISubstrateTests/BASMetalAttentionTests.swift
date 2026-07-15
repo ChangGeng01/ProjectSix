@@ -10,7 +10,6 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
-#if !os(iOS)  // ch 1022 source-gate
 final class BASMetalAttentionTests: XCTestCase {
 
     // CPU reference implementation for comparison。 Same
@@ -242,4 +241,3 @@ final class BASMetalAttentionTests: XCTestCase {
         }
     }
 }
-#endif

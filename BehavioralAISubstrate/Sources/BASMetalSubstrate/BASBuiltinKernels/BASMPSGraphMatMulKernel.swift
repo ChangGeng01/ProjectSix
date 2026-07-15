@@ -200,6 +200,19 @@ public actor BASMPSGraphMatMulKernel: BASMetalKernel {
         let aBytesCount = M * K * MemoryLayout<Float>.stride
         let bBytesCount = K * N * MemoryLayout<Float>.stride
         let cBytesCount = M * N * MemoryLayout<Float>.stride
+        // audit M-l / metal #3: belt-and-suspenders — makeBuffer(bytes:length:) copies `length`
+        // bytes out of the payload's buffer, so a payload shorter than the Float-assumed byte count
+        // (e.g. a descriptor whose dtype/shape disagrees with matMul's rank-2-Float contract) would
+        // read out of bounds. Refuse before the copy. The decode-boundary byteCount check guards the
+        // serialized path; this also guards any in-process caller that hand-builds a bundle.
+        guard inputs.payloads[0].count >= aBytesCount else {
+            throw BASKernelError.shapeMismatch(
+                reason: "matMul input A payload (\(inputs.payloads[0].count)B) < required \(aBytesCount)B")
+        }
+        guard inputs.payloads[1].count >= bBytesCount else {
+            throw BASKernelError.shapeMismatch(
+                reason: "matMul input B payload (\(inputs.payloads[1].count)B) < required \(bBytesCount)B")
+        }
         guard let bufferA = inputs.payloads[0]
             .withUnsafeBytes({ rawBuffer in
                 device.makeBuffer(

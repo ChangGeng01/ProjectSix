@@ -65,10 +65,7 @@ final class BASChapter1011SchemaVersionCanonicalTests: XCTestCase {
         throws
     {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let sourcesDir = "\(projectRoot)/Sources"
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(
@@ -152,10 +149,7 @@ final class BASChapter1011SchemaVersionCanonicalTests: XCTestCase {
     /// test catches it。
     func testCRITICAL_AllNineSites_ReferenceConstant() throws {
         let projectRoot =
-            ProcessInfo.processInfo.environment[
-                "BAS_PROJECT_ROOT"] ??
-            "/Users/changgeng/Project/Project06/Project06/" +
-            "BehavioralAISubstrate"
+            BASSourceTreeAudit.repoRoot
         let pathsAndExpected: [String] = [
             "Sources/BASHostKit/" +
                 "EBrainRuntimeCoordinator+SovereignCommit.swift",
