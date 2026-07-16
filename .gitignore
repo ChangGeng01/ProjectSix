@@ -21,3 +21,9 @@ Archive/Legacy/Before/Resources/Models/*.litertlm
 scripts/__pycache__/
 **/__pycache__/
 *.pyc
+
+# Local Codex/Superpowers runtime state
+.worktrees/
+.superpowers/brainstorm/.last-port
+.superpowers/brainstorm/.last-token
+.superpowers/brainstorm/*/state/

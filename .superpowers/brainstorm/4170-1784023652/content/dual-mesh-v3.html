@@ -1,0 +1,159 @@
+<style>
+  .v3 { --line:rgba(255,255,255,.13); --muted:rgba(255,255,255,.63); --cyan:#58d7dc; --violet:#c99cff; --amber:#ffc36e; --green:#59d6a7; --red:#ff7d87; --blue:#78a9ff; }
+  .thesis { border:1px solid rgba(88,215,220,.33); background:linear-gradient(135deg,rgba(88,215,220,.08),rgba(201,156,255,.06)); border-radius:15px; padding:15px; margin:16px 0 22px; }
+  .thesis b { color:var(--cyan); }
+  .thesis p { margin:5px 0 0; color:var(--muted); font-size:12px; line-height:1.55; }
+  .mesh { border:1px solid var(--line); border-radius:15px; padding:12px; margin:10px 0; }
+  .mesh-head { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+  .mesh-head h3 { margin:0; font-size:14px; }
+  .mesh-head span { font-size:10px; color:var(--muted); }
+  .rail { display:flex; gap:8px; overflow-x:auto; margin-top:10px; padding-bottom:3px; }
+  .rail div { min-width:128px; border:1px solid var(--line); border-radius:10px; padding:8px; font-size:10px; line-height:1.4; }
+  .artifact-mesh { border-color:rgba(88,215,220,.34); background:rgba(88,215,220,.035); }
+  .artifact-mesh .rail div { border-color:rgba(88,215,220,.25); }
+  .cap-mesh { border-color:rgba(255,195,110,.36); background:rgba(255,195,110,.035); }
+  .cap-mesh .rail div { border-color:rgba(255,195,110,.26); }
+  .cells { display:grid; grid-template-columns:repeat(7,1fr); gap:7px; margin:11px 0; }
+  .cell { border:1px solid rgba(201,156,255,.27); border-radius:11px; padding:9px; min-height:76px; background:rgba(201,156,255,.035); }
+  .cell b { display:block; font-size:11px; margin-bottom:4px; color:rgba(255,255,255,.9); }
+  .cell span { font-size:9px; line-height:1.35; color:var(--muted); }
+  .cell.life { border-color:rgba(89,214,167,.34); background:rgba(89,214,167,.04); }
+  .cell.neural { border-color:rgba(120,169,255,.34); background:rgba(120,169,255,.04); }
+  .cell.sov { border-color:rgba(255,195,110,.4); background:rgba(255,195,110,.04); }
+  .anatomy { display:grid; grid-template-columns:1fr 34px 1.2fr 34px 1fr; gap:8px; align-items:center; margin:13px 0; }
+  .anatomy-box { border:1px solid var(--line); border-radius:12px; padding:12px; min-height:86px; }
+  .anatomy-box h3 { font-size:13px; margin:0 0 5px; }
+  .anatomy-box p { font-size:10px; line-height:1.5; color:var(--muted); margin:0; }
+  .arrow { text-align:center; color:var(--muted); }
+  .private-port { margin:8px auto 0; max-width:520px; border:1px dashed rgba(120,169,255,.37); border-radius:11px; padding:9px; text-align:center; color:var(--blue); font-size:10px; }
+  .grammar { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+  .verb { border:1px solid var(--line); border-radius:11px; padding:10px; }
+  .verb b { display:block; font-size:11px; color:var(--cyan); margin-bottom:5px; }
+  .verb p { margin:0; color:var(--muted); font-size:9px; line-height:1.45; }
+  .flow { display:flex; gap:6px; align-items:stretch; overflow-x:auto; padding:4px 0; }
+  .flow-node { min-width:125px; border:1px solid var(--line); border-radius:10px; padding:9px; font-size:10px; line-height:1.4; }
+  .flow-node b { display:block; margin-bottom:4px; }
+  .flow-arrow { align-self:center; color:var(--muted); }
+  .deny { border-color:rgba(255,125,135,.42); background:rgba(255,125,135,.04); }
+  .allow { border-color:rgba(89,214,167,.37); background:rgba(89,214,167,.04); }
+  .lattice { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 0; }
+  .level { border:1px solid var(--line); border-radius:11px; padding:10px; text-align:center; font-size:10px; }
+  .level b { display:block; margin-bottom:3px; }
+  .level small { color:var(--muted); }
+  .enforce { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; }
+  .guard { border:1px solid var(--line); border-radius:11px; padding:11px; }
+  .guard h3 { margin:0 0 5px; font-size:12px; }
+  .guard p { margin:0; font-size:10px; color:var(--muted); line-height:1.48; }
+  .performance { border:1px solid rgba(120,169,255,.31); background:rgba(120,169,255,.04); border-radius:13px; padding:12px; margin:14px 0; }
+  .performance p { margin:0; font-size:11px; color:var(--muted); line-height:1.55; }
+  .section-title { margin-top:25px; }
+  .decision { margin-top:25px; }
+  @media(max-width:860px){
+    .cells { grid-template-columns:repeat(2,1fr); }
+    .anatomy { grid-template-columns:1fr; }
+    .arrow { transform:rotate(90deg); }
+    .grammar,.enforce,.lattice { grid-template-columns:1fr 1fr; }
+  }
+</style>
+
+<div class="v3">
+  <h2>v3 · 双网格：更深合作 + 更强隔离</h2>
+  <p class="subtitle">不是让层彼此知道更多内部细节，而是让它们共享更丰富、权限更窄、来源更完整的语义 Artifact。</p>
+
+  <div class="thesis">
+    <b>Zero Trust inside · High bandwidth through artifacts</b>
+    <p>LayerCore 像细胞：内部实现、可变状态和机制完全私有；外部通过膜交换 claims、evidence、plans、verdicts、permits、receipts。合作强度由 Artifact richness 决定，隔离强度由 Capability precision 决定，两者可以同时增加。</p>
+  </div>
+
+  <div class="mesh artifact-mesh">
+    <div class="mesh-head"><h3>上层网格 · Artifact Mesh</h3><span>合作带宽：内容寻址、不可变、可追溯的语义 DAG</span></div>
+    <div class="rail">
+      <div><b>Claims</b><br>陈述、置信度、依赖证据</div><div><b>Evidence</b><br>source/version/authority/freshness</div><div><b>Plans</b><br>query、context、candidate、commit</div><div><b>Decisions</b><br>verification、permit、authorization</div><div><b>Receipts</b><br>execution、state、cache、resource</div><div><b>Lineage</b><br>parentRefs、epoch、causation、digest</div>
+    </div>
+  </div>
+
+  <div class="cells">
+    <div class="cell life"><b>L1 Life</b><span>lease / budget truth</span></div>
+    <div class="cell neural"><b>L2 Neural</b><span>execution plan / draft lineage</span></div>
+    <div class="cell neural"><b>L3 Context</b><span>admission / binding truth</span></div>
+    <div class="cell"><b>L4 Prior</b><span>versioned world claims</span></div>
+    <div class="cell"><b>L5 Constitution</b><span>policy / disclosure truth</span></div>
+    <div class="cell"><b>L6 Situation</b><span>intent hypotheses / advisory hints</span></div>
+    <div class="cell"><b>L7 Grounding</b><span>evidence eligibility / manifest</span></div>
+    <div class="cell"><b>L8 StateLake</b><span>semantic snapshot / CAS truth</span></div>
+    <div class="cell"><b>L9 Deliberation</b><span>candidate portfolio / selection</span></div>
+    <div class="cell"><b>L10 Verifier</b><span>claim support / contradiction</span></div>
+    <div class="cell"><b>L11 Risk</b><span>single RiskPermit truth</span></div>
+    <div class="cell"><b>L12 Surface</b><span>pending response / effect manifest</span></div>
+    <div class="cell"><b>L13 Evolution</b><span>prepare / reconcile truth</span></div>
+    <div class="cell sov"><b>L14 Sovereign</b><span>preflight / exact authorize / seal</span></div>
+  </div>
+
+  <div class="mesh cap-mesh">
+    <div class="mesh-head"><h3>下层网格 · Capability Mesh</h3><span>隔离强度：默认拒绝、最小可见、用途绑定</span></div>
+    <div class="rail">
+      <div><b>Audience</b><br>只能由指定 Layer/adapter 使用</div><div><b>Operation</b><br>read / query / propose / remand / prepare / dispatch</div><div><b>Projection</b><br>允许读取的字段与最大 bytes/tokens</div><div><b>Purpose</b><br>grounding / verify / risk / commit</div><div><b>Temporal</b><br>turn + epoch + lease + expiry</div><div><b>Binding</b><br>session / parent digest / policy / snapshot</div>
+    </div>
+  </div>
+
+  <h3 class="section-title">每个 LayerCell 的固定解剖</h3>
+  <div class="anatomy">
+    <div class="anatomy-box allow"><h3>Ingress Membrane</h3><p>检查 producer allowlist、schema、capability、epoch、lease、parent digest、sensitivity；按字段生成最小 projection。异常 artifact 进入 quarantine，不送进 core。</p></div>
+    <div class="arrow">→</div>
+    <div class="anatomy-box"><h3>Pure Semantic Core</h3><p>只能决定本层拥有的那一种 truth；输入是 projection，输出是新 artifact。不能查 service locator，不能改别层 artifact，不能接触私钥/DB/GPU 除非通过私有 mechanism port。</p></div>
+    <div class="arrow">→</div>
+    <div class="anatomy-box allow"><h3>Egress Membrane</h3><p>计算 digest、传播 sensitivity/taint、记录 parents、附上 determinism 与 expiry；只发布声明过的 artifact 类型。不能自行降低敏感级别。</p></div>
+  </div>
+  <div class="private-port">↓ Private MechanismPort：Kernel / Store / Adapter 的 opaque handle；只属于本层，不可转交其他层</div>
+
+  <h3 class="section-title">合作语法只有五种，越少越强</h3>
+  <div class="grammar">
+    <div class="verb"><b>1 · Query</b><p>读取拥有者发布的 projection；不能直连数据库或读取完整内部状态。</p></div>
+    <div class="verb"><b>2 · Fan-out / Join</b><p>L7/L9 先发布 plan，SpineRuntime 并发调用允许的 ports，再由原 owner reduce。</p></div>
+    <div class="verb"><b>3 · Proposal / Critique</b><p>L9 提案、L10 评价；critique 不能原地修改 candidate，必须发布新 artifact。</p></div>
+    <div class="verb"><b>4 · Remand</b><p>带 target、reason、required proof、maxEpoch；下一 epoch 重入，禁止 callback recursion。</p></div>
+    <div class="verb"><b>5 · Commit Saga</b><p>L13 prepare、L14 authorize、committer execute、L13 reconcile、L14 seal；无一方兼任两种权威。</p></div>
+  </div>
+
+  <h3 class="section-title">信息流也有硬边界</h3>
+  <div class="lattice">
+    <div class="level"><b>Public</b><small>可进入公开 surface</small></div>
+    <div class="level"><b>User Private</b><small>仅本 session scoped</small></div>
+    <div class="level"><b>Sensitive</b><small>必须投影/脱敏</small></div>
+    <div class="level"><b>Sovereign</b><small>仅 digest/proof 可外露</small></div>
+  </div>
+  <p class="subtitle">派生 Artifact 的敏感级别默认取全部 parents 的最高级；任何降级披露必须同时具备 L5 disclosure policy、L11 permit、L14 exact-digest authorization。L3 只能把已经被允许的 projection 编入模型上下文。</p>
+
+  <h3 class="section-title">一次“冲突记忆 + 高风险工具”如何深度合作而不串门</h3>
+  <div class="flow">
+    <div class="flow-node"><b>L7 QueryPlan</b>为 L4/L5/L8 分别申请最小 read capability</div><div class="flow-arrow">→</div>
+    <div class="flow-node"><b>Parallel Projections</b>只返回版本化 claims，不暴露 store/service</div><div class="flow-arrow">→</div>
+    <div class="flow-node"><b>L7 Manifest</b>保留冲突，不擅自决定事实</div><div class="flow-arrow">→</div>
+    <div class="flow-node"><b>L9 + optional L2</b>产生 candidate 与 ToolIntent proposal</div><div class="flow-arrow">→</div>
+    <div class="flow-node"><b>L10 Verify</b>逐 claim 绑定 evidence；不足则 typed remand</div><div class="flow-arrow">→</div>
+    <div class="flow-node"><b>L11 Permit</b>高风险要求 confirmation；不签 tool capability</div><div class="flow-arrow">→</div>
+    <div class="flow-node"><b>L14 + Commit Saga</b>仅对最终 canonical payload digest 授权；unknown 不重发</div>
+  </div>
+
+  <h3 class="section-title">四层强制隔离</h3>
+  <div class="enforce">
+    <div class="guard"><h3>Compile-time</h3><p>leaf targets 只依赖 RuntimeCore contracts；BASSovereign 继续不 import Memory/Policy/Orchestration。依赖图与 forbidden-import 测试锁死。</p></div>
+    <div class="guard"><h3>Runtime</h3><p>default-deny capabilities、opaque handles、session/epoch binding、actor bulkhead、deadline/circuit breaker；无 ambient service locator。</p></div>
+    <div class="guard"><h3>Data</h3><p>field projection、sensitivity/taint、content-addressed refs；trace/audit 默认只存 digest，Semantic 与 Neural 两座库永不混存。</p></div>
+    <div class="guard"><h3>Failure</h3><p>FaultArtifact 代替跨层裸异常；L5/L14 缺失 fail-closed，非关键 retrieval lane 可带 coverage 降级；故障不能传播成全局 mutable corruption。</p></div>
+  </div>
+
+  <div class="performance">
+    <p><b>不会因此变慢：</b>Artifact Mesh 传 COW typed value 或 opaque ref，header/digest 只算一次；SpineRuntime 在同一 task 内调用 pure cores，只有 L1/L2/L8/L14 等共享可变/IO 边界发生 actor hop。深度合作增加的是语义连接，不是序列化次数。</p>
+  </div>
+
+  <div class="decision">
+    <h3>是否把 v3 Dual Mesh 定为最终边界模型？</h3>
+    <p class="subtitle">确认后，下一节将把错误分级、背压/并发、cache invalidation 与测试矩阵精确化。</p>
+    <div class="options">
+      <div class="option" data-choice="approve-dual-mesh" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content"><h3>采用 Dual Mesh</h3><p>通过 richer artifacts 加强合作，通过 narrower capabilities 加强隔离。</p></div></div>
+      <div class="option" data-choice="harder-process-isolation" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content"><h3>需要进程级隔离</h3><p>希望部分 Kernel/层提升到 XPC 或独立进程边界。</p></div></div>
+      <div class="option" data-choice="more-autonomous-negotiation" onclick="toggleSelect(this)"><div class="letter">C</div><div class="content"><h3>需要更自治协商</h3><p>希望层之间可以在权限内主动订阅、议价或协商。</p></div></div>
+    </div>
+  </div>
+</div>

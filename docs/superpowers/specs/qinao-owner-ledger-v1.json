@@ -1,0 +1,1611 @@
+{
+  "schema_version": 1,
+  "ledger_id": "qinao-owner-ledger-v1",
+  "status": "planning_contract_approved",
+  "minimum_ios": "27.0",
+  "generated_from_head": "659e46576",
+  "architecture_spec": "docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md",
+  "architecture": {
+    "semantic_layers": [
+      "L1",
+      "L2",
+      "L3",
+      "L4",
+      "L5",
+      "L6",
+      "L7",
+      "L8",
+      "L9",
+      "L10",
+      "L11",
+      "L12",
+      "L13",
+      "L14"
+    ],
+    "physical_kernels": [
+      "K1",
+      "K2",
+      "K3",
+      "K4"
+    ],
+    "control_rings": [
+      "omega_resource",
+      "omega_grounding",
+      "omega_deliberation",
+      "omega_effect_evolution"
+    ],
+    "planes": [
+      "semantic_authority",
+      "kernel_ownership",
+      "execution_dag",
+      "control_ring",
+      "data",
+      "adapter_io",
+      "observe_replay"
+    ]
+  },
+  "implementation_work_packages": [
+    {
+      "id": "W0",
+      "name": "baseline_owner_ledger_and_write_freeze",
+      "exit_gate": "Current-HEAD ownership, the sole OwnerLedger/CreateGate, and every owned iOS-27 deployment setting are reconciled; the immutable Contracts, Silicon, Runtime, and Sovereign W0 receipts preserve the exact Provider/default/router split-brain, promotion/native/cutover, synthetic-success, Qinao direct-executor, and direct-dispatcher inventories; every mutable fact has one writer and retirement gate, and no direct effect, synthetic success, unscoped memory injection, preview-as-final stream, or effectful native shadow path remains production-reachable."
+    },
+    {
+      "id": "W1",
+      "name": "canonical_contracts_turn_operation_provider_inversion",
+      "exit_gate": "Canonical low-entropy, SemanticStateLake, immutable semantic-DAG, BASBudgetLeasePayload, and bounded control-loop envelope/witness/terminal value contracts, one TurnOperationRef with typed branches, external Provider package inversion, and 14/4/4/7 cardinality checks pass; Silicon Task 1 and Task 7 Steps 0, 1, 2, 4, 5, 7, and 7A commit the descriptor/containment schema-parent contract, the shared K3 Provider-branch port, identity-only registry, preflight-only routing, exact-once invocation contract, one manifest default, terminal-source pin, and provider-neutral package receipt before W2; W1 values own no mutable spend, scheduler, branch allocation, or silicon actuation."
+    },
+    {
+      "id": "W2",
+      "name": "k3_memory_erasure_convergence",
+      "exit_gate": "One K3 FULL control nucleus owns EventLog/Attempt, durable TurnOperation root/head installation, all six BASProviderBranchControlPort allocation/claim/event-head-seal/terminal-source/visibility/branch-state-lookup operations, BASBudgetLeaseControlPort lease-revision/cumulative-use CAS, the visited-digest and terminal-outcome rows, and binding/validation of Contracts-owned envelope/invocation/progress-witness Artifact IDs; duplicate install/allocation/claim/seal/pin/visibility requests, branch-state queries, and crash/lost replies reopen byte-equal or fail closed while production Provider allocation remains disabled until W4 policy/binding attachment; one encrypted content truth, scoped QinaoMemory, and monotonic erasure closure converge without a second budget, branch, or state store."
+    },
+    {
+      "id": "W3",
+      "name": "statelake_prephysical_context",
+      "exit_gate": "Only the enumerated SemanticStateLake W3 slices implement pre-physical eligibility, scoped independent windows, retrieval lanes, deterministic/shadow R5-R6 grounding validation, State Market, exact cache scope, and one context compiler pass while all production Provider paths remain disabled; the W3 receipt proves Semantic Task 8 was not pulled forward."
+    },
+    {
+      "id": "W4",
+      "name": "admitted_silicon_execution",
+      "exit_gate": "One Provider-branch-policy artifact and one execution-binding root are atomically installed; production R5-R6-context cutover, one K3-ordered Provider-branch ledger, one exactly-once admitted plan/path per typed branch, one pinned terminal source, one heavy-resource owner, and one StateABI are authoritative."
+    },
+    {
+      "id": "W5",
+      "name": "k4_release_zone_c",
+      "exit_gate": "One helper-private K4 FULL lifecycle, the same K3/K4/K3 isolated-or-remote BASProviderEgressBoundaryPermit fence, one spool/publication owner, and one independent Zone-C FULL journal pass crash, lost-reply, ambiguity, and double-consume matrices; Runtime Task 5 Steps 5A-5B separately retire synthetic/direct effect execution with no W6 file, and Silicon Task 7 Step 5C plus Step 10 commit the exact spool/L10/visibility handoff before W6."
+    },
+    {
+      "id": "W6",
+      "name": "runtime_replay_retirement_certification",
+      "exit_gate": "W6 receipt order is exactly: (1) Runtime Task 2 observation-value-only prelude; (2) Semantic Task 8 audit-value/schema-only prelude freezing first-governed BASRuntimeAuditProjectionsBundle 1.0.0 with no behavior or put; (3) Runtime Task 1B sole BASSameRunAuditOutcome declaration plus complete final first-governed BASTurnRuntimeAuditEnvelope 1.0.0 freeze; (4) Semantic Task 8 coordinator outcome behavior; (5) Runtime Tasks 2/3/4/5 integration that only populates those frozen values; (6) Runtime Task 7 authoritative engine-owned same-run outcome cutover; no later task may change either 1.0.0 wire. The 14 LayerCells execute through the existing actor mesh and one typed DAG result; SemanticStateLake Task 8's shadow-only integration and repeated closure receipt is green; every bounded RSI child has a newly won K3 budget-use receipt and monotonic progress witness, only convergedVerified evidence flows downstream, legacy authority paths are retired, and replay, erasure, link-image, thermal, memory, energy, and physical-device gates pass."
+    }
+  ],
+  "retrieval_waves": [
+    {
+      "id": "R0",
+      "name": "compiled_pre_physical_eligibility"
+    },
+    {
+      "id": "R1",
+      "name": "sql_metadata_exact_fts_bm25"
+    },
+    {
+      "id": "R2",
+      "name": "temporal_episode"
+    },
+    {
+      "id": "R3",
+      "name": "entity_relation"
+    },
+    {
+      "id": "R4",
+      "name": "dense_semantic"
+    },
+    {
+      "id": "R5",
+      "name": "dedupe_fusion_bounded_grounding_proposal"
+    },
+    {
+      "id": "R6",
+      "name": "grounding_validation_hard_revalidation_conflict_market"
+    }
+  ],
+  "controlled_documents": [
+    {
+      "path": "docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md",
+      "required_terms": [
+        "qinao-owner-ledger-v1.json",
+        "iOS 27",
+        "scripts/check_qinao_owner_ledger.py",
+      "BASArtifactScopeBinding",
+      "BASGovernedArtifactPayloadCodec",
+      "BASSiliconExecutionBinding",
+        "BASProviderBranchChainPayload",
+        "W0",
+        "W6",
+        "R0",
+        "R6",
+        "TurnOperationRef",
+        "TurnBranchRef",
+        "ProviderExecutionRef",
+        "BASProviderStepPurpose",
+        "BASProviderOutputRole",
+        "BASProviderBranchControlPort",
+        "BASProviderBranchPolicy",
+        "BASProviderVisibilityMode",
+        "BASProviderEgressBoundaryPermit",
+        "BASProviderAttemptExecutor.executeExactlyOnce",
+        "BASProviderReleaseEvidenceReference",
+        "BASProviderContainmentClass",
+        "BASOrganDescriptor",
+        "BASProviderObservedReceipt",
+        "beginProviderEgressHandoff",
+        "withRequestSequence",
+        "BASBudgetLeasePayload",
+        "BASBudgetLeaseControlPort",
+        "BASBudgetUseReceipt",
+        "BASControlLoopEnvelopePayload",
+        "BASControlLoopProgressWitnessPayload",
+        "BASControlLoopTerminalReceiptPayload",
+        "convergedVerified",
+        "BASCalendarPolicyPayload",
+      "BASMemoryHorizon",
+      "BASMemoryHorizonManifestPayload",
+      "QinaoPreparedEffectContextResolver",
+      "QinaoSovereignEffectExecutor",
+      "BASEffectBrokerExecution",
+      "outbox.effectRequestArtifactID",
+      "BASStateCommitStore",
+        "QinaoMemory",
+        "Provider"
+      ],
+      "forbidden_terms": [
+        "Scripts/check_qinao_owner_ledger.py",
+        "runtime.semantic-dag-replay-cert"
+      ]
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-15-iphone-air-architecture-convergence-master.md",
+      "required_terms": [
+        "qinao-owner-ledger-v1.json",
+        "iOS 27",
+        "scripts/check_qinao_owner_ledger.py",
+      "BASArtifactScopeBinding",
+      "BASGovernedArtifactPayloadCodec",
+      "BASSiliconExecutionBinding",
+        "BASProviderBranchChainPayload",
+        "W0",
+        "W6",
+        "R0",
+        "R6",
+        "TurnOperationRef",
+        "TurnBranchRef",
+        "ProviderExecutionRef",
+        "BASProviderStepPurpose",
+        "BASProviderOutputRole",
+        "BASProviderBranchControlPort",
+        "BASProviderBranchPolicy",
+        "BASProviderVisibilityMode",
+        "BASProviderEgressBoundaryPermit",
+        "BASProviderAttemptExecutor.executeExactlyOnce",
+        "BASProviderReleaseEvidenceReference",
+        "BASProviderContainmentClass",
+        "BASProviderObservedReceipt",
+        "beginProviderEgressHandoff",
+        "withRequestSequence",
+        "BASBudgetLeasePayload",
+        "BASBudgetLeaseControlPort",
+        "BASBudgetUseReceipt",
+        "BASControlLoopEnvelopePayload",
+        "BASControlLoopProgressWitnessPayload",
+        "BASControlLoopTerminalReceiptPayload",
+        "convergedVerified",
+        "BASStateCommitStore",
+        "synchronous=FULL"
+      ],
+      "forbidden_terms": [
+        "Scripts/check_qinao_owner_ledger.py",
+        "runtime.semantic-dag-replay-cert"
+      ]
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md",
+      "required_terms": [
+        "qinao-owner-ledger-v1.json",
+        "iOS 27",
+        "scripts/check_qinao_owner_ledger.py",
+      "BASArtifactScopeBinding",
+      "BASGovernedArtifactPayloadCodec",
+      "BASSiliconExecutionBinding",
+        "BASProviderBranchChainPayload",
+        "create_permissions",
+        "candidate_path",
+        "BASLayerActor",
+        "BASCognitiveLayer",
+        "artifact.mesh",
+        "TurnOperationRef",
+        "TurnBranchRef",
+        "ProviderExecutionRef",
+        "BASProviderStepPurpose",
+        "BASProviderOutputRole",
+        "BASProviderBranchControlPort",
+        "BASProviderBranchPolicy",
+        "BASProviderVisibilityMode",
+        "BASProviderContainmentClass",
+        "BASOrganDescriptor",
+        "BASProviderObservedReceipt",
+        "beginProviderEgressHandoff",
+        "withRequestSequence",
+        "BASBudgetLeasePayload",
+        "BASBudgetLeaseControlPort",
+        "BASBudgetUseReceipt",
+        "BASControlLoopEnvelopePayload",
+        "BASControlLoopProgressWitnessPayload",
+        "BASControlLoopTerminalReceiptPayload",
+        "convergedVerified"
+      ],
+      "forbidden_terms": [
+        "Scripts/check_qinao_owner_ledger.py",
+        "artifact.identity-and-storage"
+      ]
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-15-iphone-air-silicon-execution-spine.md",
+      "required_terms": [
+        "qinao-owner-ledger-v1.json",
+        "iOS 27",
+        "scripts/check_qinao_owner_ledger.py",
+      "BASArtifactScopeBinding",
+      "BASGovernedArtifactPayloadCodec",
+      "BASSiliconExecutionBinding",
+        "BASProviderBranchChainPayload",
+        "execution.state-abi",
+        "resource.process-memory-ledger",
+        "BASStateABI",
+        "BASProcessMemoryLedger",
+        "QinaoStreamingOrganEndpoint",
+        "Provider",
+        "TurnOperationRef",
+        "TurnBranchRef",
+        "ProviderExecutionRef",
+        "BASProviderStepPurpose",
+        "BASProviderOutputRole",
+        "BASProviderBranchControlPort",
+        "BASProviderBranchPolicy",
+        "BASProviderVisibilityMode",
+        "providerEgress",
+        "BASProviderEgressBoundaryPermit",
+        "BASProviderAttemptExecutor.executeExactlyOnce",
+        "BASProviderReleaseEvidenceReference",
+        "BASProviderContainmentClass",
+        "BASOrganDescriptor",
+        "BASProviderObservedReceipt",
+        "beginProviderEgressHandoff",
+        "withRequestSequence",
+        "QinaoSeatResidencyManager"
+      ],
+      "forbidden_terms": [
+        "Scripts/check_qinao_owner_ledger.py",
+        "turn.operation",
+        "provider.route"
+      ]
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-15-iphone-air-semantic-statelake-context.md",
+      "required_terms": [
+        "qinao-owner-ledger-v1.json",
+        "iOS 27",
+        "scripts/check_qinao_owner_ledger.py",
+      "BASArtifactScopeBinding",
+      "BASGovernedArtifactPayloadCodec",
+      "BASSiliconExecutionBinding",
+        "BASProviderBranchChainPayload",
+        "state.snapshot-contracts",
+        "state.requirement-planner",
+        "state.snapshot-coordinator",
+        "state.snapshot-market",
+        "R0",
+        "R6",
+        "R0 compiled_pre_physical_eligibility",
+        "R1 sql_metadata_exact_fts_bm25",
+        "R2 temporal_episode",
+        "R3 entity_relation",
+        "R4 dense_semantic",
+        "R5 dedupe_fusion_bounded_grounding_proposal",
+        "R6 grounding_validation_hard_revalidation_conflict_market",
+        "QinaoMemory",
+        "BASContextCompiler",
+        "BASSemanticStateMarket",
+        "TurnOperationRef",
+        "TurnBranchRef",
+        "ProviderExecutionRef",
+        "BASProviderStepPurpose",
+        "BASProviderOutputRole",
+        "BASProviderBranchControlPort",
+        "BASProviderBranchPolicy",
+        "BASProviderAttemptExecutor.executeExactlyOnce",
+        "BASCacheScopeContract",
+        "BASCalendarPolicyPayload",
+        "BASMemoryHorizon",
+        "BASMemoryHorizonManifestPayload",
+        "MemoryHorizonPersistenceCore.swift",
+        "synchronous=FULL",
+        "pre-query physical"
+      ],
+      "forbidden_terms": [
+        "Scripts/check_qinao_owner_ledger.py",
+        "semantic.snapshot-"
+      ]
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-15-iphone-air-sovereign-release-effects.md",
+      "required_terms": [
+        "qinao-owner-ledger-v1.json",
+        "iOS 27",
+        "scripts/check_qinao_owner_ledger.py",
+      "BASArtifactScopeBinding",
+      "BASGovernedArtifactPayloadCodec",
+      "BASSiliconExecutionBinding",
+        "BASProviderBranchChainPayload",
+        "release.spool-publication",
+        "sovereign.k4-durable-lifecycle",
+        "trust.algorithm-agile-manifest",
+        "effect.zone-c-saga",
+        "BASStateCommitStore",
+        "QinaoRuntime.execute",
+        "synchronous=FULL",
+        "BASEffectBroker",
+        "actuator-evidence-unavailable",
+        "TurnOperationRef",
+        "TurnBranchRef",
+        "ProviderExecutionRef",
+        "BASProviderStepPurpose",
+        "BASProviderOutputRole",
+        "BASProviderBranchControlPort",
+        "BASProviderBranchPolicy",
+        "BASProviderVisibilityMode",
+        "BASProviderEgressBoundaryPermit",
+        "BASProviderAttemptExecutor.executeExactlyOnce",
+        "BASProviderReleaseEvidenceReference",
+        "BASProviderObservedReceipt",
+        "beginProviderEgressHandoff",
+        "BASBudgetLeasePayload",
+        "BASBudgetLeaseControlPort",
+        "BASBudgetUseReceipt",
+        "convergedVerified",
+        "BASK3ActivatedStateEvidence",
+        "finalizedPublicationRecord(for:)",
+        "publication_permit_pending",
+        "effect_permit_pending",
+        "BoundaryAnchorReceipt",
+        "BoundaryArmReceipt",
+      "BASSchemaVersioned",
+      "BASEBrainSchemaGovernanceRegistry",
+      "QinaoPreparedEffectContextResolver",
+      "QinaoSovereignEffectExecutor",
+      "BASEffectBrokerExecution",
+      "outbox.effectRequestArtifactID"
+      ],
+      "forbidden_terms": [
+        "Scripts/check_qinao_owner_ledger.py",
+        "runtime.semantic-dag-replay-cert"
+      ]
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-15-iphone-air-runtime-replay-certification.md",
+      "required_terms": [
+        "qinao-owner-ledger-v1.json",
+        "iOS 27",
+        "scripts/check_qinao_owner_ledger.py",
+      "BASArtifactScopeBinding",
+      "BASGovernedArtifactPayloadCodec",
+      "BASSiliconExecutionBinding",
+        "BASProviderBranchChainPayload",
+        "runtime.semantic-dag",
+        "runtime.replay-manifest",
+        "runtime.certification",
+        "TurnOperation",
+        "TurnOperationRef",
+        "TurnBranchRef",
+        "ProviderExecutionRef",
+        "BASProviderStepPurpose",
+        "BASProviderOutputRole",
+        "BASProviderBranchControlPort",
+        "BASProviderBranchPolicy",
+        "BASProviderVisibilityMode",
+        "BASProviderEgressBoundaryPermit",
+        "BASProviderAttemptExecutor.executeExactlyOnce",
+        "BASProviderReleaseEvidenceReference",
+        "BASProviderContainmentClass",
+        "BASOrganDescriptor",
+        "BASProviderObservedReceipt",
+        "beginProviderEgressHandoff",
+        "withRequestSequence",
+        "BASBudgetLeaseControlPort",
+        "BASBudgetUseReceipt",
+        "BASControlLoopEnvelopePayload",
+        "BASControlLoopProgressWitnessPayload",
+        "BASControlLoopTerminalReceiptPayload",
+        "convergedVerified",
+        "BASK3ActivatedStateEvidence",
+        "history.doctrine-metadata",
+        "BASHistoryAudit",
+      "relocation_candidate",
+      "finalizedPublicationRecord(for:)",
+      "QinaoPreparedEffectContextResolver",
+      "QinaoSovereignEffectExecutor",
+      "BASEffectBrokerExecution",
+      "outbox.effectRequestArtifactID",
+      "semanticDAGAuthoritative",
+        "QinaoStreamingOrganEndpoint",
+        "BASArchitectureReplayManifest",
+        "BASAppleSiliconCertification",
+        ".executed",
+        "production.cutover"
+      ],
+      "forbidden_terms": [
+        "Scripts/check_qinao_owner_ledger.py",
+        "runtime.spool-final",
+        "effect.authorization",
+        "runtime.semantic-dag-replay-cert"
+      ]
+    }
+  ],
+  "rules": {
+    "doctrine": "one semantic authority, one mutation owner, one durable truth; many non-authoritative rebuildable projections",
+    "allowed_redundancy": [
+      "immutable content-addressed replica with digest equality",
+      "watermark-bound disposable projection or cache",
+      "shadow or candidate execution with no commit authority",
+      "backup in a separate fault domain with no live write authority",
+      "bounded compatibility adapter with an explicit retirement gate"
+    ],
+    "forbidden_redundancy": [
+      "second semantic decision authority",
+      "second mutable owner for the same transition",
+      "second durable truth or integrity chain",
+      "second result, effect, retry, fallback, or publication authority",
+      "adapter-owned ranking, authorization, persistence, retry, cache, scheduling, or external effect"
+    ],
+    "classification_values": [
+      "R",
+      "E",
+      "A",
+      "M"
+    ],
+    "status_values": [
+      "approved_missing",
+      "converging",
+      "implemented",
+      "nonconforming",
+      "planned",
+      "relocation_candidate",
+      "reopened_gate"
+    ],
+    "disposition_values": [
+      "retain",
+      "merge",
+      "freeze",
+      "retire"
+    ]
+  },
+  "create_allowlist": [
+    "artifact.mesh",
+    "resource.process-memory-ledger",
+    "execution.state-abi",
+    "state.snapshot-contracts",
+    "state.requirement-planner",
+    "state.snapshot-coordinator",
+    "state.snapshot-market",
+    "release.spool-publication",
+    "sovereign.k4-durable-lifecycle",
+    "trust.algorithm-agile-manifest",
+    "effect.zone-c-saga",
+    "runtime.semantic-dag",
+    "runtime.replay-manifest",
+    "runtime.certification"
+  ],
+  "create_permissions": [
+    {
+      "owner_id": "artifact.mesh",
+      "authority_symbol": "BASArtifactStorePort",
+      "create_proof_task": "contracts-layercell:Task 2",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASMemory/BASArtifactSQLiteStore.swift",
+        "BehavioralAISubstrate/Sources/BASMemory/SQL/024_artifact_mesh_v1.sql",
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASArtifactMeshCore.swift"
+      ]
+    },
+    {
+      "owner_id": "resource.process-memory-ledger",
+      "authority_symbol": "BASProcessMemoryLedger",
+      "create_proof_task": "silicon-execution-spine:Task 5",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASLeaseLife/BASProcessMemoryLedger.swift"
+      ]
+    },
+    {
+      "owner_id": "execution.state-abi",
+      "authority_symbol": "BASStateABI",
+      "create_proof_task": "silicon-execution-spine:Task 2",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASStateABI.swift"
+      ]
+    },
+    {
+      "owner_id": "state.snapshot-contracts",
+      "authority_symbol": "BASSemanticStateLakeContracts",
+      "create_proof_task": "semantic-statelake-context:Task 1",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASSemanticStateLakeContracts.swift"
+      ]
+    },
+    {
+      "owner_id": "state.requirement-planner",
+      "authority_symbol": "BASStateRequirementPlanner",
+      "create_proof_task": "semantic-statelake-context:Task 3",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASOrchestration/BASStateRequirementPlanner.swift"
+      ]
+    },
+    {
+      "owner_id": "state.snapshot-coordinator",
+      "authority_symbol": "BASSemanticSnapshotCoordinator",
+      "create_proof_task": "semantic-statelake-context:Task 4",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASMemory/BASSemanticSnapshotCoordinator.swift"
+      ]
+    },
+    {
+      "owner_id": "state.snapshot-market",
+      "authority_symbol": "BASSemanticStateMarket",
+      "create_proof_task": "semantic-statelake-context:Task 6",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASOrchestration/BASSemanticStateMarket.swift"
+      ]
+    },
+    {
+      "owner_id": "release.spool-publication",
+      "authority_symbol": "BASResponseReleaseCoordinator",
+      "create_proof_task": "sovereign-release-effects:Task 1",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASHostKit/BASResponseReleaseCoordinator.swift",
+        "BehavioralAISubstrate/Sources/BASMemory/BASPublicationJournalSQLiteStorage.swift",
+        "BehavioralAISubstrate/Sources/BASMemory/SQL/028_response_publication.sql",
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASResponsePublicationContracts.swift"
+      ]
+    },
+    {
+      "owner_id": "sovereign.k4-durable-lifecycle",
+      "authority_symbol": "BASSovereignTokenAuthority",
+      "create_proof_task": "sovereign-release-effects:Task 3",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASSovereign/SQL/014_sovereign_capability_lifecycle.sql"
+      ]
+    },
+    {
+      "owner_id": "trust.algorithm-agile-manifest",
+      "authority_symbol": "BASSovereignTrustManifestPayload",
+      "create_proof_task": "sovereign-release-effects:Task 2",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASSovereign/BASSovereignTrustManifest.swift"
+      ]
+    },
+    {
+      "owner_id": "effect.zone-c-saga",
+      "authority_symbol": "BASEffectBroker",
+      "create_proof_task": "sovereign-release-effects:Task 5",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASEffectBroker/BASEffectBroker.swift",
+        "BehavioralAISubstrate/Sources/BASEffectBroker/BASEffectBrokerSQLiteStorage.swift",
+        "BehavioralAISubstrate/Sources/BASEffectBroker/SQL/001_effect_saga_v1.sql"
+      ]
+    },
+    {
+      "owner_id": "runtime.semantic-dag",
+      "authority_symbol": "BASSemanticTurnDAG",
+      "create_proof_task": "runtime-replay-certification:Task 1",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASSemanticTurnDAG.swift"
+      ]
+    },
+    {
+      "owner_id": "runtime.replay-manifest",
+      "authority_symbol": "BASArchitectureReplayManifest",
+      "create_proof_task": "runtime-replay-certification:Task 4",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASArchitectureReplayManifest.swift"
+      ]
+    },
+    {
+      "owner_id": "runtime.certification",
+      "authority_symbol": "BASAppleSiliconCertification",
+      "create_proof_task": "runtime-replay-certification:Task 6",
+      "allowed_paths": [
+        "BehavioralAISubstrate/Sources/BASEvaluation/BASAppleSiliconCertification.swift"
+      ]
+    }
+  ],
+  "owners": [
+    {
+      "owner_id": "identity.semantic-layers",
+      "domain": "L1-L14 stable semantic identity",
+      "classification": "E",
+      "work_package": "W1",
+      "authority_owner": "BASCognitiveLayer",
+      "mutable_state_owner": "none",
+      "storage_owner": "BASCognitiveLayer Codable raw values",
+      "recovery_owner": "legacy wire adapters into BASCognitiveLayer",
+      "single_writer_required": false,
+      "status": "converging",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASObservationReconciliationCore.swift",
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardLayerMapping.swift"
+      ],
+      "allowed_projections": [
+        {
+          "name": "motherboard layer compatibility view",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": false
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "BASMotherboardLayer14",
+          "disposition": "freeze",
+          "reason": "It is a second independently editable fourteen-case enum until converted into an exhaustive projection."
+        }
+      ],
+      "forbidden": [
+        "second fourteen-case semantic enum",
+        "display alias in signatures, replay, or capability audience"
+      ],
+      "retirement_gate": "All production serialization, signatures, kill epochs, telemetry, and replay use BASCognitiveLayer; legacy decoding remains adapter-only."
+    },
+    {
+      "owner_id": "identity.kernel-ring-plane",
+      "domain": "K1-K4, four ControlRings, and seven orthogonal planes",
+      "classification": "E",
+      "work_package": "W1",
+      "authority_owner": "BASMotherboardArchitecture identity owner",
+      "mutable_state_owner": "none",
+      "storage_owner": "canonical stable identity raw values",
+      "recovery_owner": "legacy three-plane and primary-kernel compatibility adapters",
+      "single_writer_required": false,
+      "status": "converging",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardArchitecture.swift",
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardLayerMapping.swift"
+      ],
+      "allowed_projections": [
+        {
+          "name": "legacy motherboard plane mapping",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": false
+        }
+      ],
+      "current_conflicts": [],
+      "forbidden": [
+        "adding layers, kernels, rings, or planes without an architecture decision",
+        "counting R0-R6 or W0-W6 as runtime architecture members"
+      ],
+      "retirement_gate": "Static cardinality is exactly 14/4/4/7 and every legacy taxonomy has one exhaustive canonical mapping."
+    },
+    {
+      "owner_id": "semantics.layercell",
+      "domain": "LayerCell ingress, pure semantic core, and egress membranes",
+      "classification": "E",
+      "work_package": "W1",
+      "authority_owner": "BASCognitiveLayer-specific LayerCore",
+      "mutable_state_owner": "existing BASLayerActor mesh mechanisms",
+      "storage_owner": "Artifact Mesh receipts and K3 state references",
+      "recovery_owner": "existing layer kill state, replay, and typed remand receipts",
+      "single_writer_required": false,
+      "status": "planned",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASLayerActor.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [],
+      "forbidden": [
+        "second semantic actor mesh",
+        "filesystem, SQLite, network, signer, model runtime, or tool imports in a pure LayerCore"
+      ],
+      "retirement_gate": "Every LayerCell dispatch reaches the existing actor mesh and no duplicate budget deduction or kill-epoch advance exists."
+    },
+    {
+      "owner_id": "artifact.mesh",
+      "domain": "keyed artifact identity, CAS storage, and ordinary child attestations",
+      "classification": "M",
+      "work_package": "W1",
+      "authority_owner": "BASArtifactStorePort is the Artifact Mesh canonical identity contract",
+      "mutable_state_owner": "single Artifact Mesh CAS head owner",
+      "storage_owner": "one Artifact Mesh store and ordinary put receipt path",
+      "recovery_owner": "CAS reopen, digest verification, and head replay",
+      "single_writer_required": true,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md",
+        "docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md"
+      ],
+      "allowed_projections": [
+        {
+          "name": "artifact index",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [],
+      "forbidden": [
+        "payload self ID, digest, storage locator, or signature",
+        "special attestation, replay-object, response-spool, or manifest object store"
+      ],
+      "retirement_gate": "All new artifact payloads use typed BASArtifactID and one put-to-receipt path; no special object store remains."
+    },
+    {
+      "owner_id": "resource.process-memory-ledger",
+      "domain": "process-wide reservation, ordinary activation, and single heavy-owner lifecycle",
+      "classification": "M",
+      "work_package": "W4",
+      "authority_owner": "BASProcessMemoryLedger under the K1 resource-admission contract",
+      "mutable_state_owner": "one process-shared BASProcessMemoryLedger",
+      "storage_owner": "the single in-process actor map only; no durable reservation or activation store",
+      "recovery_owner": "idempotent cancel, complete, and pressure unwind; process loss invalidates every lease and callers re-admit from fresh verified K3 Attempt and system-memory truth",
+      "single_writer_required": true,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASMLXAdapter/BASMLXMemoryBudget.swift",
+        "QinaoRuntimeSDK/Sources/QinaoSeats/QinaoSeatResidencyManager.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-silicon-execution-spine.md"
+      ],
+      "allowed_projections": [
+        {
+          "name": "logical seat residency view",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "QinaoSeatResidencyManager",
+          "disposition": "freeze",
+          "reason": "It is a logical scheduler view and cannot own MLX residency or heavy resources."
+        }
+      ],
+      "forbidden": [
+        "second pending, active, or heavy-owner map",
+        "Qinao factory constructing an unleased heavy adapter"
+      ],
+      "retirement_gate": "All eager, session, stream, retrieval, verifier, artifact, publication, and replay work uses the same process ledger and reservations balance under cancellation."
+    },
+    {
+      "owner_id": "model.manifest-invocation",
+      "domain": "model identity, host default profile, capability manifest, and per-turn invocation identity",
+      "classification": "E",
+      "work_package": "W1",
+      "authority_owner": "BASModelCapabilityManifest and BASLLMInvocationContract",
+      "mutable_state_owner": "signed host profile registry",
+      "storage_owner": "canonical model manifest and invocation artifacts",
+      "recovery_owner": "manifest replay and fail-closed schema parity",
+      "single_writer_required": true,
+      "status": "converging",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASOrgan/BASModelCapabilityManifest.swift",
+        "QinaoRuntimeSDK/Sources/QinaoMLX/QinaoMLXEndpoint.swift"
+      ],
+      "allowed_projections": [
+        {
+          "name": "Provider-private model catalog view",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "QinaoMLXModel and independent Gemma default",
+          "disposition": "retire",
+          "reason": "SDK-owned model cases and defaults conflict with the signed Qwen3.5 host profile and manifest."
+        }
+      ],
+      "forbidden": [
+        "SDK hard-coded Qwen, Gemma, or Provider default",
+        "third editable model identity"
+      ],
+      "retirement_gate": "Qinao, manifest, catalog, planner, adapter, and telemetry resolve one model ID; changing the host profile changes the real loaded model."
+    },
+    {
+      "owner_id": "execution.state-abi",
+      "domain": "complete cross-backend StateABI and physical state compatibility",
+      "classification": "M",
+      "work_package": "W4",
+      "authority_owner": "BASStateABI bound by BASExecutionPlan",
+      "mutable_state_owner": "Provider-private leased physical state",
+      "storage_owner": "StateABI-bound checkpoints and cache metadata",
+      "recovery_owner": "certified converter or canonical re-prefill",
+      "single_writer_required": true,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASMLXAdapter/BASSessionKVStore.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-silicon-execution-spine.md"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [],
+      "forbidden": [
+        "attention-only compatibility claim",
+        "implicit tokenizer, template, RNG, grammar, modality, or runtime identity"
+      ],
+      "retirement_gate": "Every state byte transfer either matches the exhaustive ABI or uses a current certified converter; all other paths re-prefill."
+    },
+    {
+      "owner_id": "execution.plan-provider-router",
+      "domain": "BASExecutionPlan election and load/prefill/cache/decode template actuation while consuming the Contracts-owned Provider-branch-policy Artifact ID",
+      "classification": "E",
+      "work_package": "W4",
+      "authority_owner": "BASExecutionPlan and BASExecutionPlanElector",
+      "mutable_state_owner": "none locally; K3 alone owns Provider ordinal, claim, terminal-source, visibility, and ordered event-head mutation",
+      "storage_owner": "Artifact Mesh stores the Contracts-owned BASProviderBranchPolicy bytes; this owner stores only BASExecutionPlan and BASSiliconExecutionBinding mappings that reference its Artifact ID",
+      "recovery_owner": "reopen the exact policy/plan/binding and query K3 branch state; after possible start recovery is query-only and a new causal branch cannot disguise retry/fallback",
+      "single_writer_required": true,
+      "status": "converging",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASOrgan/BASExecutionPlan.swift",
+        "BehavioralAISubstrate/Sources/BASOrgan/BASExecutionPlanElector.swift",
+        "BehavioralAISubstrate/Sources/BASMLXAdapter/MLXOrganAdapter.swift"
+      ],
+      "allowed_projections": [
+        {
+          "name": "Provider registry identity and capability view",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "adapter-local eager, session, stream, retry, and fallback election",
+          "disposition": "merge",
+          "reason": "Mechanism adapters currently re-elect parts of the plan and can hide fallback or retry."
+        }
+      ],
+      "forbidden": [
+        "wrapper-hidden retry",
+        "stream and eager using different plan, purpose, router, or fallback truth",
+        "Provider mutating Qinao authority or state",
+        "copying BASProviderBranchPolicy purpose, output-role, causality, count, answer-only, verifier, or visibility fields into the execution binding or another policy artifact",
+        "copying QualityIdentity, NeuralExecution, StateABI, bundle, fallback, semantic-plan, or verification-policy fields into BASSiliconExecutionBinding instead of reopening its mapped artifacts",
+        "second physical Provider invocation on one providerEgress branch after claim or possible start",
+        "caller-minted or reused Provider ordinal, sibling replacement of the pinned terminal source, or Provider allocation after visibility"
+      ],
+      "retirement_gate": "Every Provider call references one TurnOperationRef, exact K3-allocated providerEgress ordinal/purpose/output role, branch-bound ProviderExecutionRef, plan ID, and K3 claim/event head; intermediate calls are proposal-only and exactly one pinned terminal source feeds the sole visible stream/spool/final."
+    },
+    {
+      "owner_id": "cache.scope",
+      "domain": "physical cache admission/acquisition leases and disposable bytes consuming the canonical BASCacheScopeContract",
+      "classification": "E",
+      "work_package": "W1",
+      "authority_owner": "state.snapshot-contracts owns the canonical BASCacheScopeContract value bound by BASExecutionPlan",
+      "mutable_state_owner": "each existing cache owner may hold only subordinate disposable Provider/mechanism bytes under that contract and a lease",
+      "storage_owner": "BASCacheScopeContract-keyed metadata plus Provider-private physical bytes; neither is semantic authority",
+      "recovery_owner": "contract mismatch is a miss followed by canonical re-prefill; physical cache state is always discardable",
+      "single_writer_required": true,
+      "status": "converging",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASMLXAdapter/BASSessionKVStore.swift",
+        "BehavioralAISubstrate/Sources/BASOrgan/BASLLMPromptCache.swift",
+        "BehavioralAISubstrate/Sources/BASHostKit/BASKVCacheRegistry.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-semantic-statelake-context.md"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [
+        {
+          "symbol": "BASLLMPromptCache and BASKVCacheRegistry",
+          "disposition": "freeze",
+          "reason": "They are not production-wired and lack the exhaustive authority, workspace, ABI, tokenizer, template, epoch, and exact-token scope."
+        }
+      ],
+      "forbidden": [
+        "cache hit with any mismatched scope field",
+        "Qinao ownership of Provider physical KV bytes",
+        "Provider ownership of logical visibility or reuse policy"
+      ],
+      "retirement_gate": "Mutation of every CacheScopeContract field causes a miss; cross-window restore and arbitrary session rebinding are rejected."
+    },
+    {
+      "owner_id": "state.k3-control-nucleus",
+      "domain": "authoritative EventLog, Attempt head, semantic BudgetLease install/use/revision CAS plus visited-digest/outcome rows and evidence-ID validation, Provider branch allocation/claim/seal/terminal-source/visibility, idempotency, outbox, staging, projector cursor, boundary permit, tombstone, and deletion epoch",
+      "classification": "E",
+      "work_package": "W2",
+      "authority_owner": "the composite BASK3ControlNucleusStorage: BASEventLogStorage, BASBudgetLeaseControlPort, BASProviderBranchControlPort contract",
+      "mutable_state_owner": "BASSQLiteEventLogStorage is the sole production K3 control-nucleus writer and transaction owner",
+      "storage_owner": "BASSQLiteEventLogStorage owns one SQLite file, one connection/write owner, and one WAL with synchronous FULL",
+      "recovery_owner": "integrity-bound replay, monotonic HWM, queryable byte-equal BudgetUse outcomes and Provider branch claims/heads, transient BASK3ActivatedStateEvidence lookup, signed checkpoint lineage, and idempotent reopen",
+      "single_writer_required": true,
+      "status": "reopened_gate",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASSQLiteEventLogStorage.swift",
+        "BehavioralAISubstrate/Sources/BASHostKit/BASHostStorageWireBuilder.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md",
+        "docs/superpowers/plans/2026-07-15-iphone-air-sovereign-release-effects.md",
+        "docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md"
+      ],
+      "allowed_projections": [
+        {
+          "name": "atom, user-state, FTS, vector, temporal, graph, and semantic indexes",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "separate EventLog, atom, user-state, graph, and planned StateCommit writable stores",
+          "disposition": "merge",
+          "reason": "Cross-WAL state transitions cannot prove same-transaction durability or one replay truth."
+        },
+        {
+          "symbol": "Swift and Rust writable EventLog implementations",
+          "disposition": "freeze",
+          "reason": "Exactly one implementation may hold the production writer lease; the other is a parity and migration adapter."
+        }
+      ],
+      "forbidden": [
+        "independent BASStateCommitStore, BudgetLease store/manager/map, or second control WAL",
+        "BASLayerSlice, Runtime, Qinao, Provider, K4, or adapter-local remaining-budget counter acting as spend/recovery truth",
+        "semantic, silicon, runtime, sovereign, Qinao, or adapter-local Provider ordinal, claim, terminal-source, visibility, or retry map",
+        "K3 writing K4 capability-use or boundary-anchor rows, or Zone-C dispatch, ack, indeterminate, or reconcile rows",
+        "projection cursor advancing past an uncommitted source batch",
+        "non-throwing authoritative read that maps corruption to empty data"
+      ],
+      "retirement_gate": "Crash injection at every transaction and reply boundary reconstructs one byte-equal state; TurnOperation root/head install plus all six Provider branch allocate/claim/event-head-seal/terminal-source-pin/visibility/branch-state-lookup operations are byte-equal idempotent or fail closed after lost replies, production allocation stays disabled until W4 policy/binding attachment, concurrent/replayed semantic-budget claims cannot double-spend, repeated/false-progress/stale loop claims remain proposal-only, and old writable stores are sealed read-only migration inputs."
+    },
+    {
+      "owner_id": "state.snapshot-contracts",
+      "domain": "immutable snapshot, barrier, watermark, query, result, conflict, coverage, and selection value vocabulary",
+      "classification": "M",
+      "work_package": "W1",
+      "authority_owner": "BASSemanticStateLakeContracts value contract",
+      "mutable_state_owner": "none",
+      "storage_owner": "ordinary Artifact Mesh payloads and existing K3 event references",
+      "recovery_owner": "bounded decode, schema governance, canonical vectors, and artifact replay",
+      "single_writer_required": false,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "docs/superpowers/plans/2026-07-15-iphone-air-semantic-statelake-context.md"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [],
+      "forbidden": [
+        "lane-specific replacement for canonical snapshot or eligibility vocabulary",
+        "contract type owning retrieval, ranking, storage, retry, or authority decisions"
+      ],
+      "retirement_gate": "Every lane, planner, snapshot coordinator, State Market, and context compiler consumes the same schema-governed values and canonical vectors."
+    },
+    {
+      "owner_id": "state.requirement-planner",
+      "domain": "pure L7 StateRequirementPlan and physical eligibility projection",
+      "classification": "M",
+      "work_package": "W3",
+      "authority_owner": "BASStateRequirementPlanner",
+      "mutable_state_owner": "none; output is an immutable Attempt artifact",
+      "storage_owner": "ordinary Artifact Mesh plan payload",
+      "recovery_owner": "recompute from the same scoped input and verify canonical plan bytes",
+      "single_writer_required": false,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "docs/superpowers/plans/2026-07-15-iphone-air-semantic-statelake-context.md"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [],
+      "forbidden": [
+        "planner performing retrieval, scoring, model execution, persistence, or effect dispatch",
+        "lane adapter weakening workspace, Attempt, purpose, authority, sensitivity, policy, or deletion predicates"
+      ],
+      "retirement_gate": "The exact plan lowers to every physical lane before lookup and produces zero call count for every forbidden partition."
+    },
+    {
+      "owner_id": "state.snapshot-coordinator",
+      "domain": "one immutable multi-lane snapshot lifecycle and barrier coordination seam",
+      "classification": "M",
+      "work_package": "W3",
+      "authority_owner": "BASSemanticSnapshotCoordinator",
+      "mutable_state_owner": "existing K3 lifecycle events and Artifact Mesh heads",
+      "storage_owner": "Artifact Mesh snapshot payload plus existing K3 lane watermarks",
+      "recovery_owner": "reopen the exact snapshot, verify every lane watermark, and reject late mutation",
+      "single_writer_required": true,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "docs/superpowers/plans/2026-07-15-iphone-air-semantic-statelake-context.md"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [],
+      "forbidden": [
+        "second snapshot ledger, event sequence, watermark truth, or mutable result collector",
+        "late lane result mutating a sealed snapshot epoch"
+      ],
+      "retirement_gate": "Crash and late-result tests reopen one immutable snapshot whose lane watermarks and Artifact Mesh identity are unchanged."
+    },
+    {
+      "owner_id": "state.snapshot-market",
+      "domain": "snapshot join, global hard eligibility, conflict, coverage, diversity, token cost, and deterministic State Market selection",
+      "classification": "M",
+      "work_package": "W3",
+      "authority_owner": "BASSemanticStateMarket over one immutable workspace snapshot",
+      "mutable_state_owner": "none; values are immutable Attempt artifacts",
+      "storage_owner": "Artifact Mesh snapshot and K3 lane watermarks",
+      "recovery_owner": "reopen exact snapshot, verify lane watermarks, and start a new Attempt for late results",
+      "single_writer_required": false,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASMemory/BASRAGRetriever.swift",
+        "BehavioralAISubstrate/Sources/BASHostKit/BASL8RoutedMemoryService.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-semantic-statelake-context.md"
+      ],
+      "allowed_projections": [
+        {
+          "name": "SQL, exact, FTS, dense, temporal, and entity lane results",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "post-ANN and post-rerank governance filtering",
+          "disposition": "merge",
+          "reason": "Denied content can affect membership, truncation, timing, context construction, and grounding before the late filter."
+        }
+      ],
+      "forbidden": [
+        "denied candidate causing ANN, FTS, Rust, Metal, context-builder, reranker, or grounder work",
+        "authority or eligibility as a compensable score",
+        "lane-local allow decision becoming global admission"
+      ],
+      "retirement_gate": "R0 compiles the physical partition or predicate before every lane; R6 sees only eligible, deduplicated, provenance-bound candidates."
+    },
+    {
+      "owner_id": "state.memory-content-erasure",
+      "domain": "governed memory content, workspace/window scope, monotonic deletion, and erasure closure",
+      "classification": "E",
+      "work_package": "W2",
+      "authority_owner": "L8 memory lifecycle under L14 erasure authorization",
+      "mutable_state_owner": "K3 control nucleus",
+      "storage_owner": "encrypted immutable Artifact Mesh content referenced by K3 events",
+      "recovery_owner": "event and artifact replay plus deletion-epoch owner acknowledgements and rescan",
+      "single_writer_required": true,
+      "status": "reopened_gate",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASMemory/BASEventSourcedMemoryAtomStore.swift",
+        "BehavioralAISubstrate/Sources/BASMemory/BASSQLiteMemoryAtomStore.swift",
+        "QinaoRuntimeSDK/Sources/QinaoMemory/QinaoMemory.swift"
+      ],
+      "allowed_projections": [
+        {
+          "name": "QinaoMemory facade recall view",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        },
+        {
+          "name": "FTS, vector, temporal, graph, cache, and usage views",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "QinaoMemory actor dictionary",
+          "disposition": "merge",
+          "reason": "It is process-global, writable, automatically injected, and not scoped by workspace/window/Attempt."
+        },
+        {
+          "symbol": "event-sourced contentCache",
+          "disposition": "merge",
+          "reason": "Cold replay loses content, while retaining legacy payload_json would preserve a second durable truth."
+        },
+        {
+          "symbol": "QinaoForgetCascadeReceipt completed",
+          "disposition": "freeze",
+          "reason": "It can claim completion after deleting only RAM and string-named cache references."
+        }
+      ],
+      "forbidden": [
+        "memory admission or recall without workspace incarnation, window, Attempt, and authority scope",
+        "completed erasure before every owner acknowledgement and rescan",
+        "physical deletion of an unanchored tombstone or deletion epoch"
+      ],
+      "retirement_gate": "Cold replay restores exact authorized content; cross-window recall is zero; restart after erasure cannot recover content from any projection, WAL, spill, cache, or old snapshot."
+    },
+    {
+      "owner_id": "state.context-compiler",
+      "domain": "tokenize-once context allocation, ordering, rendering, and fingerprints",
+      "classification": "E",
+      "work_package": "W3",
+      "authority_owner": "BASContextCompiler",
+      "mutable_state_owner": "none; compilation is pure",
+      "storage_owner": "CompiledContextDescriptor artifact",
+      "recovery_owner": "deterministic recompilation from the bound snapshot and policy",
+      "single_writer_required": false,
+      "status": "converging",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASOrchestration/ContextCompilerCore.swift",
+        "BehavioralAISubstrate/Sources/BASOrchestration/CognitionKernelCore.swift"
+      ],
+      "allowed_projections": [
+        {
+          "name": "semantic, scoped, and turn-admission input projections",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "BASCognitionKernel duplicate compaction, render, and fingerprint",
+          "disposition": "merge",
+          "reason": "A second pass can drop preserved blocks or produce a different prompt identity."
+        }
+      ],
+      "forbidden": [
+        "second allocator, tokenizer, orderer, renderer, or fingerprint owner",
+        "character budget in an exact production context contract"
+      ],
+      "retirement_gate": "Every request invokes one tokenizer and one compiler; all wrappers produce identical ordered spans, bytes, and fingerprints."
+    },
+    {
+      "owner_id": "release.spool-publication",
+      "domain": "durable response bytes, provisional/exact release, reservation, sink, and finalization",
+      "classification": "M",
+      "work_package": "W5",
+      "authority_owner": "BASResponseSpoolPayload and BASExactReleasePreparationPayload are immutable release evidence; BASResponseReleaseCoordinator is the sole release coordinator",
+      "mutable_state_owner": "BASPublicationJournalSQLiteStorage alone owns reservation/finalization; BASResponseReleaseCoordinator owns one once-only sink handoff but no K3/K4 row",
+      "storage_owner": "Artifact Mesh stores the exact spool/preparation/through-visibility lineage; BASPublicationJournalSQLiteStorage owns one durable publication journal",
+      "recovery_owner": "BASResponseReleaseCoordinator.finalizedPublicationRecord(for:) is the sole public read-only journal view; it never re-arms K3, reclaims K4, or invents sink success",
+      "single_writer_required": true,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASHostKit/BASTurnRuntimeEngine.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-sovereign-release-effects.md"
+      ],
+      "allowed_projections": [
+        {
+          "name": "BASEBrainTurnResult host projection",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "stream then second canonical generation",
+          "disposition": "retire",
+          "reason": "UI bytes and authoritative candidate can come from two model executions."
+        }
+      ],
+      "forbidden": [
+        "second visible release or final result",
+        "publication journal or coordinator writing K3 pending/arm rows or K4 claim/anchor rows",
+        "provisional bytes driving tools, durable state, or exact authorization",
+        "stream or publication boundary without the exact Provider visibility receipt and required chunk/final verification evidence",
+        "placing a future buffered visibility receipt into the pre-visibility spool and creating a causal identity cycle"
+      ],
+      "retirement_gate": "Each K3-allocated Provider branch is called at most once; exactly one pinned terminal source feeds the sole stream/spool/final path; the separate through-visibility branch chain gates release/publication; concatenated verified stream bytes, spool hash, selected candidate, audit digest, and final displayed bytes are identical."
+    },
+    {
+      "owner_id": "sovereign.k4-durable-lifecycle",
+      "domain": "durable capability issue, reserve, claim, spend, halt, anchor, version, and recovery",
+      "classification": "M",
+      "work_package": "W5",
+      "authority_owner": "BASSovereignTokenAuthority in the iOS 27 Enhanced Security helper",
+      "mutable_state_owner": "one helper-private K4 lifecycle state machine",
+      "storage_owner": "one helper-private SQLite WAL with synchronous FULL and stable Keychain key",
+      "recovery_owner": "idempotent request lookup, nonce tombstones, signed K3 anchors, and append-only migration",
+      "single_writer_required": true,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASSovereign/BASSovereignTokenAuthority.swift",
+        "BehavioralAISubstrate/Sources/BASSovereign/BASSovereignLedgerStorage.swift",
+        "QinaoRuntimeSDK/Sources/QinaoSovereign/QinaoSovereign.swift"
+      ],
+      "allowed_projections": [
+        {
+          "name": "K4 audit and host status view",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "null or actor-memory production K4 state",
+          "disposition": "retire",
+          "reason": "Restart can clear spent, halt, anchor, version, and processed-turn truth."
+        }
+      ],
+      "forbidden": [
+        "release-mode in-process K4 compatibility path",
+        "K4 model execution, tool dispatch, K3 row mutation, or Zone-C dispatch, ack, indeterminate, or reconcile row mutation",
+        "unanchored K3 rollback or tail deletion accepted as clean"
+      ],
+      "retirement_gate": "Kill/restart around every K4 transition preserves spent and halt truth; K4 rejects any K3 epoch, HWM, root, deletion-epoch, or schema rollback."
+    },
+    {
+      "owner_id": "trust.algorithm-agile-manifest",
+      "domain": "algorithm-agile signer identity, key custody, trust rotation, and optional Secure Enclave P-256 root",
+      "classification": "M",
+      "work_package": "W5",
+      "authority_owner": "BASSovereignTrustManifestPayload is the one signed trust manifest",
+      "mutable_state_owner": "K4 key lifecycle owner",
+      "storage_owner": "Keychain and optional Secure Enclave private key plus public trust manifest",
+      "recovery_owner": "key-history verification and append-only rotation",
+      "single_writer_required": true,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASSovereign/BASSovereignLedgerStorage.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-sovereign-release-effects.md"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [],
+      "forbidden": [
+        "calling an exportable Keychain Ed25519 seed a Secure Enclave key",
+        "custom signature, randomness, DER, or ASN.1 implementation"
+      ],
+      "retirement_gate": "Every historical signature remains verifiable across algorithm and key rotation; custody claims match the actual key mechanism."
+    },
+    {
+      "owner_id": "effect.zone-c-saga",
+      "domain": "typed Zone-C effect boundary identity and the dispatch, ack, indeterminate, and reconcile reducer",
+      "classification": "M",
+      "work_package": "W5",
+      "authority_owner": "BASEffectBroker is the sole Zone-C saga authority and emits BASEffectReceiptPayload with shared BASEffectTerminalOutcome",
+      "mutable_state_owner": "BASEffectBrokerSQLiteStorage owns one reducer keyed by (turnOperationRef, effectBranchRef, effectBoundaryInstanceID)",
+      "storage_owner": "BASEffectBrokerSQLiteStorage owns one Zone-C SQLite WAL with synchronous FULL",
+      "recovery_owner": "BASEffectBroker performs provider idempotency query and reconcile; compensation requires a new authorization and operator escalation is a projection, not a reducer state",
+      "single_writer_required": true,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "QinaoRuntimeSDK/Sources/QinaoRuntime/QinaoRuntime.swift",
+        "BehavioralAISubstrate/Sources/BASOrgan/BASToolDispatcher.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-sovereign-release-effects.md"
+      ],
+      "allowed_projections": [
+        {
+          "name": "stage and dispatch observation ledgers",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "QinaoRuntime.consumedBundles",
+          "disposition": "freeze",
+          "reason": "Credential-bundle actor memory is not durable operation idempotency."
+        },
+        {
+          "symbol": "direct BASToolDispatcher handler execution",
+          "disposition": "retire",
+          "reason": "The public execution lane has no durable claim or permit gate."
+        },
+        {
+          "symbol": "synthetic executed command receipt",
+          "disposition": "retire",
+          "reason": "A command projection cannot prove real external actuation."
+        }
+      ],
+      "forbidden": [
+        "blind retry after dispatch ambiguity",
+        "free-string operation ID as authority or handler invocation without durable K4 claim, K3 arm, and the typed Zone-C journal key",
+        "Zone C writing K3 staging, seal, activation, pending, or arm state, or K4 capability/anchor lifecycle rows",
+        "K3, K4, Runtime, Qinao, adapter, or tool dispatcher writing Zone-C dispatch, ack, indeterminate, or reconcile rows"
+      ],
+      "retirement_gate": "Fault injection before and after K4 claim, K3 pending/arm, Zone-C dispatch, provider completion, journal commit, and reply yields one BASEffectReceiptPayload outcome or query/reconcile-only indeterminate state, never a duplicate effect."
+    },
+    {
+      "owner_id": "runtime.turn-operation",
+      "domain": "one admitted TurnOperation root, typed branch-reference composition, transient unsealed Provider-event tail validation, and a reference-only join to the existing public result owner",
+      "classification": "E",
+      "work_package": "W1",
+      "authority_owner": "BASTurnRuntimeEngine owns reference composition/delegation plus only the transient unsealed Provider-event tail validator; the K3 control nucleus remains sole admitted Attempt/head/branch-allocation/checkpoint/terminal-seal authority, and EBrainTurnResult.swift remains sole BASEBrainTurnResult value owner",
+      "mutable_state_owner": "the existing BASTurnRuntimeEngine actor privately owns one process-local (base ProviderExecutionRef, nextSequence, digest) CAS for the unsealed tail; it owns no durable head or branch truth",
+      "storage_owner": "none for the transient tail; K3, Artifact Mesh, and the independent publication journal remain disjoint durable writers",
+      "recovery_owner": "drops an unsealed tail and reopens the immutable root plus K3 Attempt/typed-branch checkpoint or terminal seals; runtime.semantic-executor W6 owns loop/DAG execution and release.spool-publication W5 owns spool, sink handoff, and finalization",
+      "single_writer_required": true,
+      "status": "converging",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASHostKit/BASTurnRuntimeEngine.swift",
+        "BehavioralAISubstrate/Sources/BASHostKit/EBrainTurnResult.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md",
+        "docs/superpowers/plans/2026-07-15-iphone-air-runtime-replay-certification.md"
+      ],
+      "allowed_projections": [
+        {
+          "name": "legacy V1 stage topology and host result views",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [
+        {
+          "symbol": "native StageExecutor Any path followed by V1 coordinator recomputation",
+          "disposition": "freeze",
+          "reason": "A shadow path can execute real closures and discard their outputs before a second result path runs."
+        },
+        {
+          "symbol": "BAS result, Qinao generation, and Qinao audit final surfaces",
+          "disposition": "merge",
+          "reason": "User-visible final authority is split across independent entry points."
+        }
+      ],
+      "forbidden": [
+        "TurnOperation root/reference owner executing a loop, Provider, effect, sink, spool, or publication reducer",
+        "treating the process-local unsealed Provider-event sequence/digest tail as durable, replayable, or sufficient to retry a claimed branch",
+        "more than one immutable root per admitted Attempt or branch reference detached from that root",
+        "re-owning BASEBrainTurnResult, BASAuthoritativeTurnResultPayload, K3 state, Zone-C state, or publication state",
+        "shadow stage with Provider, K3, K4, Zone-C, tool, network, or mutable filesystem capability; only scoped immutable observation put/reopen through Artifact Mesh is allowed"
+      ],
+      "retirement_gate": "Admission produces one immutable TurnOperationRef and only root-bound typed branches; the sole process-local hot-tail CAS is covered only by bounded K3 checkpoint/terminal seals and is discarded on crash; W6 consumes the references through the sole semantic executor, W5 alone carries the K3-pinned source through spool/publication, and EBrainTurnResult.swift remains the sole BASEBrainTurnResult value owner."
+    },
+    {
+      "owner_id": "runtime.semantic-executor",
+      "domain": "typed semantic-node execution through the existing runtime actor mesh after exact K3 budget-use and loop-evidence validation",
+      "classification": "E",
+      "work_package": "W6",
+      "authority_owner": "typed BASNativeStageExecutor semantic-node executor",
+      "mutable_state_owner": "BASTurnRuntimeEngine transient ready set and existing stage ledger; no durable Attempt or authority-head ownership",
+      "storage_owner": "ordinary Artifact Mesh invocation and receipt artifacts",
+      "recovery_owner": "Attempt cancellation, exact envelope/use/witness/terminal receipt replay, and existing stage-ledger recovery",
+      "single_writer_required": true,
+      "status": "converging",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASHostKit/BASNativeStageExecutor.swift",
+        "BehavioralAISubstrate/Sources/BASHostKit/BASTurnRuntimeEngine.swift"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [
+        {
+          "symbol": "StageExecutor and RoutedStageExecutor returning Any",
+          "disposition": "freeze",
+          "reason": "An untyped authoritative closure can execute effects, discard outputs, and trigger a second result path."
+        }
+      ],
+      "forbidden": [
+        "authoritative Any-returning stage closure",
+        "loop mechanism call with missing, foreign, replayed-noncallable, or unvalidated BudgetUse evidence",
+        "semantic executor owning a second scheduler, actor mesh, retry loop, Provider call, or result"
+      ],
+      "retirement_gate": "Authoritative compositions accept only the typed executor and route both single and parallel loop nodes through the same store-backed envelope/BudgetUse gate; Any-returning executors are capability-denied shadow/test adapters."
+    },
+    {
+      "owner_id": "runtime.semantic-dag",
+      "domain": "immutable canonical fourteen-LayerCell semantic topology plus typed node and bounded control-loop invocation/receipt vocabulary",
+      "classification": "M",
+      "work_package": "W1",
+      "authority_owner": "BASSemanticTurnDAG value contract",
+      "mutable_state_owner": "none",
+      "storage_owner": "ordinary Artifact Mesh invocation and receipt artifacts",
+      "recovery_owner": "topology validation, canonical vectors, conditional-edge evidence, and exact envelope/prior-use/witness/terminal typed receipt replay",
+      "single_writer_required": false,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "docs/superpowers/plans/2026-07-15-iphone-air-runtime-replay-certification.md"
+      ],
+      "allowed_projections": [
+        {
+          "name": "frozen eighteen-stage compatibility topology",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": false
+        }
+      ],
+      "current_conflicts": [],
+      "forbidden": [
+        "DAG contract implementing a scheduler, actor, ledger, retry loop, Provider, storage, or external effect",
+        "DAG-local budget counter, mutable visited-digest set, fifth control ring, or non-converged loop evidence unlocking an authoritative edge",
+        "legacy eighteen-stage identity becoming semantic authority"
+      ],
+      "retirement_gate": "Every authoritative node executes through the existing typed executor/actor mesh and produces one schema-governed receipt; conditional edges derive from reopened owner evidence, dynamic remands create only new DAG children, and only convergedVerified loop evidence completes an authoritative predecessor."
+    },
+    {
+      "owner_id": "runtime.replay-manifest",
+      "domain": "one complete pre-publication replay manifest and event-truth-derived lookup binding",
+      "classification": "M",
+      "work_package": "W6",
+      "authority_owner": "BASArchitectureReplayManifest value contract",
+      "mutable_state_owner": "existing K3 event source and publication journal",
+      "storage_owner": "ordinary Artifact Mesh manifest payload plus rebuildable K3 source-entry index",
+      "recovery_owner": "four replay modes and source-head-bound manifest reopen",
+      "single_writer_required": true,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "docs/superpowers/plans/2026-07-15-iphone-air-runtime-replay-certification.md"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [],
+      "forbidden": [
+        "second manifest object store, event ID, watermark, cursor, or integrity chain",
+        "publication reservation before complete manifest durability"
+      ],
+      "retirement_gate": "Cold replay resolves one complete manifest from the integrity-bound source head before publication reservation or lost-reply recovery."
+    },
+    {
+      "owner_id": "runtime.certification",
+      "domain": "aggregate E0-E5 evidence, candidate-tree identity, and exact 40/30 claim verdict",
+      "classification": "M",
+      "work_package": "W6",
+      "authority_owner": "BASAppleSiliconCertification",
+      "mutable_state_owner": "one immutable certification verdict per exact candidate tree",
+      "storage_owner": "Artifact Mesh evidence references and signed certification result",
+      "recovery_owner": "exact candidate-tree materialization and independent evidence re-verification",
+      "single_writer_required": true,
+      "status": "approved_missing",
+      "evidence_paths": [
+        "docs/superpowers/plans/2026-07-15-iphone-air-runtime-replay-certification.md"
+      ],
+      "allowed_projections": [
+        {
+          "name": "telemetry, signposts, and delayed field metrics",
+          "authority": false,
+          "mutable": false,
+          "rebuildable": true,
+          "source_watermark_required": true
+        }
+      ],
+      "current_conflicts": [],
+      "forbidden": [
+        "telemetry substituting for canonical evidence",
+        "certification from a different tree, binary, controller, verifier, or device profile",
+        "40 or 30 tok/s product claim without the exact physical protocol"
+      ],
+      "retirement_gate": "The exact materialized candidate tree passes three full suites and all declared physical gates; evidence and runtime tree identities match."
+    },
+    {
+      "owner_id": "production.cutover",
+      "domain": "one production-authoritative runtime route and deterministic rollback boundary",
+      "classification": "E",
+      "work_package": "W6",
+      "authority_owner": "semantic authoritative composition selected at build/deployment time",
+      "mutable_state_owner": "none; runtime route is not user- or environment-selectable",
+      "storage_owner": "workspace build configuration and signed release manifest",
+      "recovery_owner": "Git/tree deployment rollback to a separately certified build",
+      "single_writer_required": true,
+      "status": "converging",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASHostKit/BASTurnRuntimeDefaultModeFlipReadinessGate.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-runtime-replay-certification.md"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [],
+      "forbidden": [
+        "production V1, native Any, coordinator, or environment-selected alternate result route",
+        "runtime rollback path that can re-enable a retired authority without a separately certified tree"
+      ],
+      "retirement_gate": "Entrypoint and link-image scans prove one authoritative runtime; rollback changes the deployed tree rather than selecting a hidden in-process route."
+    },
+    {
+      "owner_id": "provider.package-boundary",
+      "domain": "model-neutral Qinao SDK and concrete Provider package dependency direction",
+      "classification": "A",
+      "work_package": "W1",
+      "authority_owner": "Qinao value-only Provider/Proposal contracts; BASExecutableProviderPlanner.resolve alone owns preallocation route resolution",
+      "mutable_state_owner": "K3 owns claim/retry/terminal truth; a concrete Provider package owns only private model/session/cache mechanism state",
+      "storage_owner": "Provider-private model, cache, session, and mechanism bytes only; no route, ordinal, retry, result, or terminal ledger",
+      "recovery_owner": "BASExecutableProviderPlanner.resolve and canonical descriptor put finish before K3 allocation; K3 freezes route/ordinal and owns recovery; BASProviderAttemptExecutor.executeExactlyOnce → BASOrganAdapter.executePlanned is the sole physical call seam; isolated/remote execution uses the package-only same-K3 handoff, while QinaoOrganEndpoint may construct BASProviderObservedReceipt but cannot promote it; unresolved sent_or_unknown remains K3-query-only",
+      "single_writer_required": true,
+      "status": "converging",
+      "evidence_paths": [
+        "QinaoRuntimeSDK/Package.swift",
+        "QinaoRuntimeSDK/Sources/QinaoLoop/QinaoOrganEndpoint.swift",
+        "BehavioralAISubstrate/Sources/BASOrgan/BASOrganAdapter.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-silicon-execution-spine.md"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [
+        {
+          "symbol": "QinaoMLX and QinaoAppleFoundation concrete SDK products",
+          "disposition": "retire",
+          "reason": "Concrete model runtimes currently live inside the model-neutral SDK package."
+        }
+      ],
+      "forbidden": [
+        "Qinao SDK importing MLX, Core AI, Foundation Models, model weights, or Provider-private state",
+        "Provider receiving K3, K4, tool, or mutable authority handles",
+        "Provider-package or Qinao-local route, ordinal, retry, result, terminal-source, observation-promotion, or fallback map",
+        "isolated-extension or remote Provider transport without the one K3-pending K4-anchor K3-arm BASProviderEgressBoundaryPermit fence",
+        "caller-restated Provider ID or containment class substituting for the K3 allocation/claim receipt-bound descriptor Artifact ID",
+        "public or adapter-accessible beginProviderEgressHandoff seam",
+        "changing route or allocating a fallback ordinal after K3 has allocated the affected Provider branch"
+      ],
+      "retirement_gate": "Package and link-image scans prove concrete Providers depend inward on Qinao contracts and Qinao core has no reverse dependency; BASExecutableProviderPlanner.resolve precedes every K3 allocation/claim; BASProviderAttemptExecutor.executeExactlyOnce → BASOrganAdapter.executePlanned is the only physical call; every isolated/remote send is made only by the fresh package-only beginProviderEgressHandoff winner, and QinaoOrganEndpoint observation becomes authoritative only when K3 validates and seals it; unresolved sent_or_unknown remains nonterminal, nonpublishable, and query-only."
+    },
+    {
+      "owner_id": "platform.ios27",
+      "domain": "workspace-owned iOS deployment and production composition floor",
+      "classification": "E",
+      "work_package": "W0",
+      "authority_owner": "workspace build manifests and generated project settings",
+      "mutable_state_owner": "none",
+      "storage_owner": "Package.swift and Xcode project generation inputs",
+      "recovery_owner": "regenerate projects and verify resolved build settings",
+      "single_writer_required": false,
+      "status": "nonconforming",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Package.swift",
+        "QinaoRuntimeSDK/Package.swift",
+        "docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [
+        {
+          "symbol": "workspace-owned iOS 18 package declarations",
+          "disposition": "merge",
+          "reason": "The approved product floor is iOS 27, while current manifests still declare iOS 18."
+        }
+      ],
+      "forbidden": [
+        "release iOS 18-26 compatibility slice",
+        "in-process production K4 fallback"
+      ],
+      "retirement_gate": "Every workspace-owned iOS package, app, and extension resolves a 27.0 deployment target; vendored manifests remain upstream-owned."
+    },
+    {
+      "owner_id": "history.doctrine-metadata",
+      "domain": "dormant chapter-doctrine and development-history metadata",
+      "classification": "A",
+      "work_package": "W6",
+      "authority_owner": "development and audit history documentation",
+      "mutable_state_owner": "none",
+      "storage_owner": "dev-only archive or audit product",
+      "recovery_owner": "source-control history and explicit audit-tool loading",
+      "single_writer_required": false,
+      "status": "relocation_candidate",
+      "evidence_paths": [
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASChapterDoctrineRegistry.swift",
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASChapterDoctrineSQLLoader.swift",
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASChapterDoctrineRegistry+AllLiterals.swift",
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASChapterDoctrineRegistry+Literals.swift",
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/SQL/010_chapter_doctrine_records_schema.sql",
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/SQL/011_chapter_doctrine_literals_data.sql",
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/SQL/012_chapter_doctrine_phase2_data.sql",
+        "BehavioralAISubstrate/Package.swift"
+      ],
+      "allowed_projections": [],
+      "current_conflicts": [
+        {
+          "symbol": "dormant doctrine SQL resources in BASRuntimeCore release graph",
+          "disposition": "retire",
+          "reason": "The loader declares development-history metadata non-critical while the shipping RuntimeCore still bundles and hydrates it."
+        }
+      ],
+      "forbidden": [
+        "development-history metadata gating runtime safety or policy",
+        "silent deletion before archive, consumer, build, and link-image parity checks"
+      ],
+      "retirement_gate": "Release artifacts contain no dormant doctrine resources; explicit dev and audit tooling preserves equivalent historical access."
+    }
+  ]
+}
