@@ -3,7 +3,7 @@
   "ledger_id": "qinao-owner-ledger-v1",
   "status": "planning_contract_approved",
   "minimum_ios": "27.0",
-  "generated_from_head": "659e46576",
+  "generated_from_head": "6703354b6",
   "architecture_spec": "docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md",
   "architecture": {
     "semantic_layers": [
@@ -878,6 +878,16 @@
           "symbol": "adapter-local eager, session, stream, retry, and fallback election",
           "disposition": "merge",
           "reason": "Mechanism adapters currently re-elect parts of the plan and can hide fallback or retry."
+        },
+        {
+          "symbol": "role/LIFO registry routing",
+          "disposition": "retire",
+          "reason": "BASOrganRegistry currently resolves by role, recency, and a secondary neural ranking instead of one already-elected explicit Provider ID."
+        },
+        {
+          "symbol": "missing exact-once call and four-phase actuation receipts",
+          "disposition": "merge",
+          "reason": "The current Provider attempt loop can traverse candidates, while load, prefill, cache, and decode lack one ordered receipt vector validated against the frozen plan."
         }
       ],
       "forbidden": [
@@ -1350,6 +1360,11 @@
       ],
       "current_conflicts": [
         {
+          "symbol": "missing BASTurnRuntimeEngine.TurnOperation root",
+          "disposition": "merge",
+          "reason": "Streaming and eager consumers cannot yet join one admitted root with typed Provider, provisional-stream, final-publication, and spool references."
+        },
+        {
           "symbol": "native StageExecutor Any path followed by V1 coordinator recomputation",
           "disposition": "freeze",
           "reason": "A shadow path can execute real closures and discard their outputs before a second result path runs."
@@ -1552,20 +1567,19 @@
       "storage_owner": "Package.swift and Xcode project generation inputs",
       "recovery_owner": "regenerate projects and verify resolved build settings",
       "single_writer_required": false,
-      "status": "nonconforming",
+      "status": "implemented",
       "evidence_paths": [
         "BehavioralAISubstrate/Package.swift",
+        "BehavioralAISubstrate/DeviceTestApp/project.yml",
+        "BehavioralAISubstrate/DeviceTestApp/BASDeviceTest.xcodeproj/project.pbxproj",
         "QinaoRuntimeSDK/Package.swift",
+        "SampleHost/Package.swift",
+        "BehavioralAISubstrate/scripts/check-ios27-floor.sh",
+        "BehavioralAISubstrate/scripts/test_check_ios27_floor.py",
         "docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md"
       ],
       "allowed_projections": [],
-      "current_conflicts": [
-        {
-          "symbol": "workspace-owned iOS 18 package declarations",
-          "disposition": "merge",
-          "reason": "The approved product floor is iOS 27, while current manifests still declare iOS 18."
-        }
-      ],
+      "current_conflicts": [],
       "forbidden": [
         "release iOS 18-26 compatibility slice",
         "in-process production K4 fallback"
