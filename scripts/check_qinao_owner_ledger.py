@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import re
@@ -12,9 +13,7 @@ import sys
 from pathlib import Path, PurePosixPath
 
 
-EXPECTED_ARCHITECTURE_SPEC = (
-    "docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md"
-)
+EXPECTED_ARCHITECTURE_SPEC = "docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md"
 EXPECTED_LEDGER_STATUS = "planning_contract_approved"
 EXPECTED_CONTROLLED_DOCUMENTS = [
     "docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md",
@@ -34,9 +33,7 @@ FIRST_GOVERNED_SCHEMA_CONTRACTS = {
     EXPECTED_CONTROLLED_DOCUMENTS[6]: ("BASTurnRuntimeAuditEnvelope", "1.0.0"),
 }
 FIRST_GOVERNED_FORBIDDEN_PHRASES = {
-    EXPECTED_CONTROLLED_DOCUMENTS[3]: (
-        "legacy missing-schema bytes decode as 1.0.0",
-    ),
+    EXPECTED_CONTROLLED_DOCUMENTS[3]: ("legacy missing-schema bytes decode as 1.0.0",),
     EXPECTED_CONTROLLED_DOCUMENTS[4]: (),
     EXPECTED_CONTROLLED_DOCUMENTS[6]: (),
 }
@@ -52,7 +49,7 @@ HISTORY_DOCTRINE_RUNTIME_PATHS = [
     "BehavioralAISubstrate/Sources/BASRuntimeCore/SQL/012_chapter_doctrine_phase2_data.sql",
 ]
 HISTORY_DOCTRINE_AUDIT_PATHS = [
-    path.replace("Sources/BASRuntimeCore/", "Sources/BASHistoryAudit/")
+    str.replace(path, "Sources/BASRuntimeCore/", "Sources/BASHistoryAudit/")
     for path in HISTORY_DOCTRINE_RUNTIME_PATHS
 ]
 MANDATORY_CONTROLLED_DOCUMENT_TERMS = {
@@ -556,6 +553,247 @@ CREATE_PROOF_FIELDS = {
 }
 MIN_CREATE_PROOF_CHARS = 24
 MAX_JSON_BYTES = 1_048_576
+MAX_AUDIT_BOUNDARY_SOURCE_BYTES = 4_194_304
+
+AUDIT_ASSET_FILENAMES = (
+    "qinao-owner-ledger-v1.json",
+    "check_qinao_owner_ledger.py",
+    "test_check_qinao_owner_ledger.py",
+)
+AUDIT_ASSET_RELATIVE_PATHS = (
+    "docs/superpowers/specs/qinao-owner-ledger-v1.json",
+    "scripts/check_qinao_owner_ledger.py",
+    "scripts/test_check_qinao_owner_ledger.py",
+)
+PRODUCTION_BUILD_SURFACES = (
+    "BehavioralAISubstrate/Package.swift",
+    "SampleHost/Package.swift",
+    "QinaoRuntimeSDK/Package.swift",
+    "BehavioralAISubstrate/DeviceTestApp/project.yml",
+    "BehavioralAISubstrate/DeviceTestApp/BASDeviceTest.xcodeproj/project.pbxproj",
+)
+OWNED_PRODUCTION_BUILD_ROOTS = (
+    "BehavioralAISubstrate",
+    "QinaoRuntimeSDK",
+    "SampleHost",
+)
+OWNED_BUILD_SURFACE_PATTERNS = (
+    "**/Package.swift",
+    "**/Package@swift-*.swift",
+    "**/*.pbxproj",
+    "**/*.yml",
+    "**/*.yaml",
+)
+CONVENTIONAL_XCODEGEN_FILENAMES = {
+    "project.yaml",
+    "project.yml",
+    "xcodegen.yaml",
+    "xcodegen.yml",
+}
+NON_QINAO_BUILD_COMPONENTS = {
+    ".build",
+    ".swiftpm",
+    "DerivedData",
+    "Vendor",
+}
+OWNER_GATE_RELATIVE_PATH = "scripts/check_qinao_owner_ledger.py"
+FILESYSTEM_WRITE_METHODS = {
+    "chmod",
+    "copy",
+    "copy_into",
+    "hardlink_to",
+    "lchmod",
+    "link_to",
+    "mkdir",
+    "move",
+    "move_into",
+    "rename",
+    "replace",
+    "rmdir",
+    "symlink_to",
+    "touch",
+    "truncate",
+    "unlink",
+    "write",
+    "write_bytes",
+    "write_text",
+    "writelines",
+}
+FORBIDDEN_EMIT_CALLS = {
+    "json.dump",
+    "marshal.dump",
+    "os.link",
+    "os.makedirs",
+    "os.mkdir",
+    "os.remove",
+    "os.removedirs",
+    "os.rename",
+    "os.renames",
+    "os.replace",
+    "os.rmdir",
+    "os.symlink",
+    "os.truncate",
+    "os.unlink",
+    "pickle.dump",
+    "shutil.copy",
+    "shutil.copy2",
+    "shutil.copyfile",
+    "shutil.copytree",
+    "shutil.move",
+    "sqlite3.connect",
+    "yaml.dump",
+}
+SUBPROCESS_CALLS = {
+    "subprocess.call",
+    "subprocess.check_call",
+    "subprocess.check_output",
+    "subprocess.Popen",
+    "subprocess.run",
+}
+READ_ONLY_SUBPROCESS_PREFIX = ("git", "cat-file", "-t")
+DANGEROUS_ALIAS_MODULES = {
+    "builtins",
+    "json",
+    "marshal",
+    "os",
+    "pickle",
+    "shutil",
+    "sqlite3",
+    "subprocess",
+    "yaml",
+}
+DANGEROUS_ALIAS_TARGETS = (
+    FORBIDDEN_EMIT_CALLS
+    | SUBPROCESS_CALLS
+    | {
+        "open",
+        "builtins.open",
+        "print",
+        "builtins.print",
+        "exec",
+        "eval",
+        "compile",
+        "__import__",
+        "getattr",
+        "setattr",
+        "delattr",
+        "os.system",
+    }
+)
+ALLOWED_MODULE_IMPORTS = {
+    "argparse",
+    "ast",
+    "hashlib",
+    "json",
+    "re",
+    "subprocess",
+    "sys",
+}
+ALLOWED_FROM_IMPORTS = {
+    "__future__": {("annotations", None)},
+    "pathlib": {("Path", None), ("PurePosixPath", None)},
+}
+ALLOWED_DIRECT_CALL_NAMES = {
+    "Path",
+    "PurePosixPath",
+    "SystemExit",
+    "ValueError",
+    "all",
+    "any",
+    "bool",
+    "enumerate",
+    "isinstance",
+    "len",
+    "list",
+    "print",
+    "range",
+    "set",
+    "sorted",
+    "tuple",
+    "type",
+    "zip",
+}
+ALLOWED_QUALIFIED_CALLS = {
+    "argparse.ArgumentParser",
+    "ast.iter_child_nodes",
+    "ast.parse",
+    "ast.walk",
+    "hashlib.sha256",
+    "json.dumps",
+    "json.load",
+    "re.compile",
+    "re.escape",
+    "re.findall",
+    "re.finditer",
+    "re.fullmatch",
+    "re.match",
+    "re.search",
+    "str.replace",
+    "subprocess.run",
+}
+PROTECTED_QUALIFIED_ROOTS = {
+    "argparse",
+    "ast",
+    "hashlib",
+    "json",
+    "re",
+    "str",
+    "subprocess",
+}
+PROTECTED_IMPORTED_NAMES = ALLOWED_MODULE_IMPORTS | {
+    "Path",
+    "PurePosixPath",
+}
+FORBIDDEN_REFLECTION_REGISTRIES = {
+    "sys.meta_path",
+    "sys.modules",
+    "sys.path_hooks",
+    "sys.path_importer_cache",
+}
+ALLOWED_METHOD_CALLS = {
+    "add",
+    "add_argument",
+    "append",
+    "as_posix",
+    "casefold",
+    "count",
+    "encode",
+    "end",
+    "endswith",
+    "exists",
+    "extend",
+    "find",
+    "findall",
+    "finditer",
+    "get",
+    "glob",
+    "group",
+    "hexdigest",
+    "is_absolute",
+    "is_file",
+    "is_relative_to",
+    "isalnum",
+    "isspace",
+    "items",
+    "join",
+    "lower",
+    "match",
+    "parse_args",
+    "partition",
+    "read_text",
+    "relative_to",
+    "removeprefix",
+    "resolve",
+    "rfind",
+    "rstrip",
+    "split",
+    "splitlines",
+    "start",
+    "startswith",
+    "stat",
+    "strip",
+    "update",
+}
 
 
 class DuplicateJSONKeyError(ValueError):
@@ -665,7 +903,10 @@ def validate_master_work_package_rows(contents: str) -> list[str]:
         )
         return errors
     for work_package_id, row in zip(matches, rows, strict=True):
-        if sha256_utf8(row) != EXPECTED_MASTER_WORK_PACKAGE_ROW_DIGESTS[work_package_id]:
+        if (
+            sha256_utf8(row)
+            != EXPECTED_MASTER_WORK_PACKAGE_ROW_DIGESTS[work_package_id]
+        ):
             errors.append(
                 f"master work-package {work_package_id}: reviewed row changed; "
                 "cross-plan slices, material, and receipt gate require explicit "
@@ -685,9 +926,7 @@ def validate_first_governed_schema_contracts(
         contents = controlled_document_contents.get(document_path, "")
         lines = contents.splitlines()
         marker_found = any(
-            "first-governed" in line
-            and type_name in line
-            and current_version in line
+            "first-governed" in line and type_name in line and current_version in line
             for line in lines
         )
         if not marker_found:
@@ -781,7 +1020,8 @@ def validate_memory_content_finalization_contract(
         return [
             "Semantic memory migration must contain exactly one pinned Task 4A section"
         ]
-    normalized = " ".join(sections[0].split()).replace("`", "").replace("*", "")
+    normalized = " ".join(sections[0].split())
+    normalized = str.replace(str.replace(normalized, "`", ""), "*", "")
     required_markers = (
         "beginMemoryContentFinalization",
         ".finalizing",
@@ -902,8 +1142,7 @@ def validate_value_prelude_declaration_ownership(
             continue
         for declaration in declarations:
             positions = [
-                match.start()
-                for match in re.finditer(re.escape(declaration), contents)
+                match.start() for match in re.finditer(re.escape(declaration), contents)
             ]
             if (
                 len(positions) != 1
@@ -914,7 +1153,10 @@ def validate_value_prelude_declaration_ownership(
                     "be declared exactly once inside its value prelude, before "
                     f"Step 1; found={positions!r}"
                 )
-            if document_path == EXPECTED_CONTROLLED_DOCUMENTS[6] and len(positions) == 1:
+            if (
+                document_path == EXPECTED_CONTROLLED_DOCUMENTS[6]
+                and len(positions) == 1
+            ):
                 line_start = contents.rfind("\n", 0, positions[0]) + 1
                 line_end = contents.find("\n", positions[0])
                 declaration_line = contents[
@@ -926,12 +1168,9 @@ def validate_value_prelude_declaration_ownership(
                         "remain Hashable so BASTurnRuntimeAuditEnvelope preserves "
                         "its existing Hashable conformance"
                     )
-        if (
-            document_path == EXPECTED_CONTROLLED_DOCUMENTS[6]
-            and not any(
-                "BASTurnRuntimeAuditEnvelope" in line and "Hashable" in line
-                for line in contents.splitlines()
-            )
+        if document_path == EXPECTED_CONTROLLED_DOCUMENTS[6] and not any(
+            "BASTurnRuntimeAuditEnvelope" in line and "Hashable" in line
+            for line in contents.splitlines()
         ):
             errors.append(
                 f"controlled document {document_path}: BASTurnRuntimeAuditEnvelope "
@@ -967,9 +1206,10 @@ def validate_runtime_envelope_initializer_defaults(
 def task_section_has_file_operation(section: str, workspace_path: str) -> bool:
     for line in section.splitlines():
         operation, separator, operand = line.partition(":")
-        if not separator or re.fullmatch(
-            r"- (?:Create|Modify)(?: \[[^\]\n]+\])?", operation
-        ) is None:
+        if (
+            not separator
+            or re.fullmatch(r"- (?:Create|Modify)(?: \[[^\]\n]+\])?", operation) is None
+        ):
             continue
         candidate = operand.strip().strip("`")
         if candidate == workspace_path or candidate.endswith(f"/{workspace_path}"):
@@ -1014,8 +1254,785 @@ def load_bounded_json_object(path: Path) -> dict:
     return value
 
 
-def validate_ledger(data: dict, root: Path) -> list[str]:
+def strip_c_style_comments(contents: str) -> str:
+    """Mask C/Swift comments while preserving quoted and raw-string paths."""
+    output: list[str] = []
+    index = 0
+    line_comment = False
+    block_depth = 0
+    string_delimiter: str | None = None
+    raw_hash_count = 0
+
+    while index < len(contents):
+        if line_comment:
+            if contents[index] == "\n":
+                output.append("\n")
+                line_comment = False
+            else:
+                output.append(" ")
+            index += 1
+            continue
+
+        if block_depth:
+            if contents.startswith("/*", index):
+                output.extend("  ")
+                block_depth += 1
+                index += 2
+            elif contents.startswith("*/", index):
+                output.extend("  ")
+                block_depth -= 1
+                index += 2
+            else:
+                output.append("\n" if contents[index] == "\n" else " ")
+                index += 1
+            continue
+
+        if string_delimiter is not None:
+            terminator = string_delimiter + ("#" * raw_hash_count)
+            if contents.startswith(terminator, index):
+                output.append(terminator)
+                index += len(terminator)
+                string_delimiter = None
+                raw_hash_count = 0
+            elif raw_hash_count == 0 and contents[index] == "\\":
+                output.append(contents[index])
+                index += 1
+                if index < len(contents):
+                    output.append(contents[index])
+                    index += 1
+            else:
+                output.append(contents[index])
+                index += 1
+            continue
+
+        if contents.startswith("//", index):
+            output.extend("  ")
+            line_comment = True
+            index += 2
+            continue
+        if contents.startswith("/*", index):
+            output.extend("  ")
+            block_depth = 1
+            index += 2
+            continue
+
+        raw_cursor = index
+        while raw_cursor < len(contents) and contents[raw_cursor] == "#":
+            raw_cursor += 1
+        if raw_cursor < len(contents) and contents[raw_cursor] == '"':
+            raw_hash_count = raw_cursor - index
+            string_delimiter = '"""' if contents.startswith('"""', raw_cursor) else '"'
+            opener_end = raw_cursor + len(string_delimiter)
+            output.append(contents[index:opener_end])
+            index = opener_end
+            continue
+        if contents[index] == "'":
+            string_delimiter = "'"
+            output.append("'")
+            index += 1
+            continue
+
+        output.append(contents[index])
+        index += 1
+    return "".join(output)
+
+
+def strip_yaml_comments(contents: str) -> str:
+    """Mask YAML comments without treating hashes inside scalars as comments."""
+    output: list[str] = []
+    quote: str | None = None
+    index = 0
+    while index < len(contents):
+        character = contents[index]
+        if quote is not None:
+            output.append(character)
+            if quote == '"' and character == "\\" and index + 1 < len(contents):
+                index += 1
+                output.append(contents[index])
+            elif character == quote:
+                if (
+                    quote == "'"
+                    and index + 1 < len(contents)
+                    and contents[index + 1] == "'"
+                ):
+                    index += 1
+                    output.append("'")
+                else:
+                    quote = None
+            index += 1
+            continue
+        if character in {'"', "'"}:
+            quote = character
+            output.append(character)
+            index += 1
+            continue
+        if character == "#":
+            while index < len(contents) and contents[index] != "\n":
+                output.append(" ")
+                index += 1
+            continue
+        output.append(character)
+        index += 1
+    return "".join(output)
+
+
+def yaml_uses_anchor_or_alias(contents: str) -> bool:
+    quote: str | None = None
+    index = 0
+    while index < len(contents):
+        character = contents[index]
+        if quote is not None:
+            if quote == '"' and character == "\\" and index + 1 < len(contents):
+                index += 2
+                continue
+            if character == quote:
+                if (
+                    quote == "'"
+                    and index + 1 < len(contents)
+                    and contents[index + 1] == "'"
+                ):
+                    index += 2
+                    continue
+                quote = None
+            index += 1
+            continue
+        if character in {'"', "'"}:
+            quote = character
+            index += 1
+            continue
+        if character in {"&", "*"}:
+            previous = contents[index - 1] if index else " "
+            following = contents[index + 1] if index + 1 < len(contents) else ""
+            if (previous.isspace() or previous in "[,:") and (
+                following.isalnum() or following in "_-"
+            ):
+                return True
+        index += 1
+    return False
+
+
+def strip_build_declaration_comments(path: Path, contents: str) -> str:
+    """Remove comments without weakening active build-declaration checks."""
+    if path.suffix in {".swift", ".pbxproj"}:
+        return strip_c_style_comments(contents)
+    if path.suffix in {".yml", ".yaml"}:
+        return strip_yaml_comments(contents)
+    return contents
+
+
+def qualified_ast_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        prefix = qualified_ast_name(node.value)
+        if prefix is not None:
+            return f"{prefix}.{node.attr}"
+    return None
+
+
+def call_open_mode(call: ast.Call) -> ast.AST | None:
+    if len(call.args) >= 2:
+        return call.args[1]
+    for keyword in call.keywords:
+        if keyword.arg == "mode":
+            return keyword.value
+    return None
+
+
+def open_call_is_read_only(call: ast.Call) -> bool:
+    mode_node = call_open_mode(call)
+    if mode_node is None:
+        return True
+    if not isinstance(mode_node, ast.Constant) or not isinstance(mode_node.value, str):
+        return False
+    return not any(flag in mode_node.value for flag in "wax+")
+
+
+def subprocess_call_is_read_only(call: ast.Call) -> bool:
+    if len(call.args) != 1 or not isinstance(call.args[0], (ast.List, ast.Tuple)):
+        return False
+    command = call.args[0].elts
+    if len(command) != len(READ_ONLY_SUBPROCESS_PREFIX) + 1:
+        return False
+    prefix: list[str] = []
+    for element in command[: len(READ_ONLY_SUBPROCESS_PREFIX)]:
+        if not isinstance(element, ast.Constant) or not isinstance(element.value, str):
+            return False
+        prefix.append(element.value)
+    if tuple(prefix) != READ_ONLY_SUBPROCESS_PREFIX:
+        return False
+    object_id = command[-1]
+    if not isinstance(object_id, ast.Name) or object_id.id != "object_id":
+        return False
+
+    keyword_values = {
+        keyword.arg: keyword.value
+        for keyword in call.keywords
+        if keyword.arg is not None
+    }
+    if len(keyword_values) != len(call.keywords) or set(keyword_values) != {
+        "check",
+        "cwd",
+        "stderr",
+        "stdout",
+        "text",
+    }:
+        return False
+    cwd = keyword_values["cwd"]
+    stdout = keyword_values["stdout"]
+    stderr = keyword_values["stderr"]
+    text_mode = keyword_values["text"]
+    check = keyword_values["check"]
+    return (
+        isinstance(cwd, ast.Name)
+        and cwd.id == "root"
+        and qualified_ast_name(stdout) == "subprocess.PIPE"
+        and qualified_ast_name(stderr) == "subprocess.DEVNULL"
+        and isinstance(text_mode, ast.Constant)
+        and text_mode.value is True
+        and isinstance(check, ast.Constant)
+        and check.value is False
+    )
+
+
+def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
+    """Reject code paths that could make the owner gate an artifact emitter."""
+    try:
+        tree = ast.parse(contents, filename=source_name)
+    except SyntaxError as error:
+        return [f"owner gate must parse before read-only validation: {error}"]
+
     errors: list[str] = []
+    parent_by_node = {
+        child: parent
+        for parent in ast.walk(tree)
+        for child in ast.iter_child_nodes(parent)
+    }
+    module_declarations = [
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    ]
+    module_declaration_names = [node.name for node in module_declarations]
+    duplicate_module_declarations = sorted(
+        {
+            name
+            for name in module_declaration_names
+            if module_declaration_names.count(name) > 1
+        }
+    )
+    if duplicate_module_declarations:
+        errors.append(
+            "owner gate must remain read-only; module callables may be declared "
+            f"only once: {duplicate_module_declarations!r}"
+        )
+    declared_callable_names = set(module_declaration_names)
+    base_protected_binding_names = (
+        ALLOWED_DIRECT_CALL_NAMES | PROTECTED_IMPORTED_NAMES | PROTECTED_QUALIFIED_ROOTS
+    )
+    protected_binding_names = base_protected_binding_names | declared_callable_names
+
+    for node in ast.walk(tree):
+        bound_name: str | None = None
+        binding_line: int | None = None
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            bound_name = node.id
+            binding_line = node.lineno
+        elif isinstance(node, ast.arg):
+            bound_name = node.arg
+            binding_line = node.lineno
+        elif isinstance(node, ast.ExceptHandler):
+            bound_name = node.name
+            binding_line = node.lineno
+        elif isinstance(node, (ast.MatchAs, ast.MatchStar)):
+            bound_name = node.name
+            binding_line = node.lineno
+        elif isinstance(node, ast.MatchMapping):
+            bound_name = node.rest
+            binding_line = node.lineno
+        if (
+            isinstance(bound_name, str)
+            and bound_name.startswith("__")
+            and bound_name.endswith("__")
+        ):
+            errors.append(
+                "owner gate must remain read-only; reflection through implicit "
+                f"protocol binding {bound_name!r} is forbidden at "
+                f"{source_name}:{binding_line}"
+            )
+        if bound_name in protected_binding_names:
+            errors.append(
+                "owner gate must remain read-only; binding or deleting protected "
+                f"name {bound_name!r} is forbidden at {source_name}:{binding_line}"
+            )
+
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            location = f"{source_name}:{node.lineno}"
+            is_module_declaration = parent_by_node.get(node) is tree
+            if node.name.startswith("__") and node.name.endswith("__"):
+                errors.append(
+                    "owner gate must remain read-only; reflection through implicit "
+                    f"protocol declaration {node.name!r} is forbidden at {location}"
+                )
+            if not is_module_declaration and node.name in protected_binding_names:
+                errors.append(
+                    "owner gate must remain read-only; nested declarations may not "
+                    f"bind protected name {node.name!r} at {location}"
+                )
+            if is_module_declaration and node.name in base_protected_binding_names:
+                errors.append(
+                    "owner gate must remain read-only; module declarations may not "
+                    f"bind protected name {node.name!r} at {location}"
+                )
+            if node.decorator_list:
+                errors.append(
+                    "owner gate must remain read-only; decorators are forbidden "
+                    f"because they invoke implicit callables at {location}"
+                )
+            if isinstance(node, ast.ClassDef) and node.keywords:
+                errors.append(
+                    "owner gate must remain read-only; class metaclass keywords are "
+                    f"forbidden at {location}"
+                )
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for imported in node.names:
+                if imported.name not in ALLOWED_MODULE_IMPORTS or imported.asname:
+                    errors.append(
+                        "owner gate must remain read-only; import is outside the "
+                        f"audited allowlist at {source_name}:{node.lineno}: "
+                        f"{imported.name!r} as {imported.asname!r}"
+                    )
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            for imported in node.names:
+                allowed_names = ALLOWED_FROM_IMPORTS.get(module, set())
+                if (imported.name, imported.asname) not in allowed_names:
+                    errors.append(
+                        "owner gate must remain read-only; from-import is outside "
+                        f"the audited allowlist at {source_name}:{node.lineno}: "
+                        f"{module}.{imported.name} as {imported.asname!r}"
+                    )
+        elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr)):
+            value = node.value
+            referenced_name = qualified_ast_name(value)
+            if (
+                referenced_name in DANGEROUS_ALIAS_TARGETS
+                or referenced_name in DANGEROUS_ALIAS_MODULES
+            ):
+                errors.append(
+                    "owner gate must remain read-only; dangerous callable/module "
+                    f"alias of {referenced_name!r} at {source_name}:{node.lineno}"
+                )
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute):
+            continue
+        referenced_name = qualified_ast_name(node)
+        if node.attr.startswith("__") and node.attr.endswith("__"):
+            errors.append(
+                "owner gate must remain read-only; reflection through dunder "
+                f"attribute {node.attr!r} is forbidden at {source_name}:{node.lineno}"
+            )
+        if referenced_name in FORBIDDEN_REFLECTION_REGISTRIES:
+            errors.append(
+                "owner gate must remain read-only; reflection through runtime "
+                f"registry {referenced_name!r} is forbidden at "
+                f"{source_name}:{node.lineno}"
+            )
+        parent = parent_by_node.get(node)
+        direct_string_replace = (
+            referenced_name == "str.replace"
+            and isinstance(parent, ast.Call)
+            and parent.func is node
+        )
+        if node.attr in FILESYSTEM_WRITE_METHODS and not direct_string_replace:
+            errors.append(
+                "owner gate must remain read-only; forbidden write capability "
+                f"{node.attr} referenced at {source_name}:{node.lineno}"
+            )
+        if node.attr == "open":
+            direct_read_only_open = (
+                isinstance(parent, ast.Call)
+                and parent.func is node
+                and open_call_is_read_only(parent)
+            )
+            if not direct_read_only_open:
+                errors.append(
+                    "owner gate must remain read-only; open capability may not "
+                    f"be aliased at {source_name}:{node.lineno}"
+                )
+        if referenced_name in SUBPROCESS_CALLS:
+            parent = parent_by_node.get(node)
+            direct_read_only_call = (
+                referenced_name == "subprocess.run"
+                and isinstance(parent, ast.Call)
+                and parent.func is node
+                and subprocess_call_is_read_only(parent)
+            )
+            if not direct_read_only_call:
+                errors.append(
+                    "owner gate must remain read-only; subprocess callable may not "
+                    f"be aliased at {source_name}:{node.lineno}"
+                )
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        call_name = qualified_ast_name(node.func)
+        method_name = node.func.attr if isinstance(node.func, ast.Attribute) else None
+        location = f"{source_name}:{node.lineno}"
+
+        if isinstance(node.func, ast.Name):
+            if node.func.id not in (
+                ALLOWED_DIRECT_CALL_NAMES | declared_callable_names
+            ):
+                errors.append(
+                    "owner gate must remain read-only; unapproved direct callable "
+                    f"{node.func.id!r} at {location}"
+                )
+        elif isinstance(node.func, ast.Attribute):
+            approved_attribute_call = (
+                call_name in ALLOWED_QUALIFIED_CALLS
+                or method_name == "open"
+                or method_name in ALLOWED_METHOD_CALLS
+            )
+            if not approved_attribute_call:
+                errors.append(
+                    "owner gate must remain read-only; unapproved method/capability "
+                    f"{call_name or method_name!r} at {location}"
+                )
+        else:
+            errors.append(
+                "owner gate must remain read-only; computed callables are forbidden "
+                f"at {location}"
+            )
+
+        if call_name in FORBIDDEN_EMIT_CALLS:
+            errors.append(
+                f"owner gate must remain read-only; forbidden emit call "
+                f"{call_name} at {location}"
+            )
+            continue
+        if call_name in {
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "getattr",
+            "setattr",
+            "delattr",
+            "os.system",
+        }:
+            errors.append(
+                f"owner gate must remain read-only; dynamic execution "
+                f"{call_name} is forbidden at {location}"
+            )
+            continue
+        if call_name in SUBPROCESS_CALLS:
+            if call_name != "subprocess.run" or not subprocess_call_is_read_only(node):
+                errors.append(
+                    "owner gate must remain read-only; subprocess execution is "
+                    f"limited to git cat-file at {location}"
+                )
+            continue
+        if (
+            call_name == "open" or method_name == "open"
+        ) and not open_call_is_read_only(node):
+            errors.append(
+                f"owner gate must remain read-only; writable open at {location}"
+            )
+            continue
+        if call_name == "print":
+            for keyword in node.keywords:
+                if keyword.arg != "file":
+                    continue
+                target_name = qualified_ast_name(keyword.value)
+                if target_name not in {"sys.stdout", "sys.stderr"}:
+                    errors.append(
+                        "owner gate must remain read-only; print may target only "
+                        f"stdout/stderr at {location}"
+                    )
+    return errors
+
+
+def read_audit_boundary_source(
+    root: Path, relative_path: str
+) -> tuple[str | None, str | None]:
+    candidate = root / relative_path
+    try:
+        resolved_root = root.resolve(strict=True)
+        resolved_candidate = candidate.resolve(strict=True)
+        resolved_candidate.relative_to(resolved_root)
+    except (FileNotFoundError, OSError, ValueError) as error:
+        return (
+            None,
+            f"audit boundary source is missing or escapes --root: {relative_path}: {error}",
+        )
+    if not resolved_candidate.is_file():
+        return None, f"audit boundary source must be a regular file: {relative_path}"
+    try:
+        size = resolved_candidate.stat().st_size
+        if size > MAX_AUDIT_BOUNDARY_SOURCE_BYTES:
+            return None, (
+                "audit boundary source exceeds "
+                f"{MAX_AUDIT_BOUNDARY_SOURCE_BYTES} bytes: {relative_path}"
+            )
+        return resolved_candidate.read_text(encoding="utf-8"), None
+    except (OSError, UnicodeError) as error:
+        return (
+            None,
+            f"audit boundary source cannot be read as UTF-8: {relative_path}: {error}",
+        )
+
+
+def swift_resource_references(contents: str) -> tuple[set[str], list[str]]:
+    references: set[str] = set()
+    errors: list[str] = []
+    call_pattern = re.compile(r"\.(?:copy|process)\s*\(")
+    literal_pattern = re.compile(
+        r"\.(?:copy|process)\s*\(\s*(?:path\s*:\s*)?"
+        r'(?P<hashes>#{0,8})"(?P<path>(?:\\.|[^"\\])*)"(?P=hashes)'
+    )
+    member_pattern = re.compile(r"\.(?:copy|process)\b")
+    for member in member_pattern.finditer(contents):
+        cursor = member.end()
+        while cursor < len(contents) and contents[cursor].isspace():
+            cursor += 1
+        if cursor >= len(contents) or contents[cursor] != "(":
+            line = contents.count("\n", 0, member.start()) + 1
+            errors.append(
+                f"SwiftPM resource factory at line {line} must be called directly; "
+                "aliases are forbidden"
+            )
+    for call in call_pattern.finditer(contents):
+        line = contents.count("\n", 0, call.start()) + 1
+        literal = literal_pattern.match(contents, call.start())
+        if literal is None:
+            errors.append(
+                f"SwiftPM resource call at line {line} must use one static "
+                "string literal"
+            )
+            continue
+        cursor = literal.end()
+        while cursor < len(contents) and contents[cursor].isspace():
+            cursor += 1
+        reference = literal.group("path")
+        if cursor >= len(contents) or contents[cursor] not in {",", ")"}:
+            errors.append(
+                f"SwiftPM resource call at line {line} must not compose its path"
+            )
+            continue
+        if re.search(r"\\#*\(", reference):
+            errors.append(
+                f"SwiftPM resource call at line {line} must not interpolate its path"
+            )
+            continue
+        if "\\" in reference:
+            errors.append(
+                f"SwiftPM resource call at line {line} must use an unescaped path"
+            )
+            continue
+        references.add(reference)
+    return references, errors
+
+
+def build_path_references(path: Path, contents: str) -> tuple[set[str], list[str]]:
+    """Extract build-owned paths that may include a whole audit directory."""
+    references: set[str] = set()
+    errors: list[str] = []
+    if path.suffix == ".swift":
+        references, errors = swift_resource_references(contents)
+    elif path.suffix in {".yml", ".yaml"}:
+        if yaml_uses_anchor_or_alias(contents):
+            errors.append(
+                "XcodeGen YAML anchors/aliases are forbidden in the production "
+                "build declaration"
+            )
+        if "\\" in contents:
+            errors.append(
+                "XcodeGen YAML escaped scalars are forbidden because membership "
+                "must remain statically inspectable"
+            )
+        for line in contents.splitlines():
+            scalar = line.strip()
+            if scalar.startswith("-"):
+                scalar = scalar[1:].strip()
+            if scalar.startswith("path:"):
+                scalar = scalar.removeprefix("path:").strip()
+            elif not scalar.startswith(("../", "./", "/")):
+                continue
+            scalar = scalar.rstrip(",").strip()
+            if len(scalar) >= 2 and scalar[0] == scalar[-1] and scalar[0] in {'"', "'"}:
+                scalar = scalar[1:-1]
+            if scalar:
+                references.add(scalar)
+        path_pattern = re.compile(r"(?<![A-Za-z0-9_])((?:(?:\.\.?/)+|/)[^\s,\]\}\"']+)")
+        references.update(match.group(1) for match in path_pattern.finditer(contents))
+    elif path.suffix == ".pbxproj":
+        pattern = re.compile(
+            r"\b(?:name|path)\s*=\s*(?:\"((?:\\.|[^\"\\])*)\"|([^;]+));"
+        )
+        for match in pattern.finditer(contents):
+            reference = (match.group(1) or match.group(2) or "").strip()
+            if reference:
+                references.add(reference)
+    return references, errors
+
+
+def build_surface_base(root: Path, relative_path: str) -> Path:
+    path = Path(relative_path)
+    parent = path.parent.parent if path.suffix == ".pbxproj" else path.parent
+    return (root / parent).resolve(strict=False)
+
+
+def audit_assets_covered_by_reference(
+    root: Path,
+    relative_path: str,
+    reference: str,
+) -> list[str]:
+    base = build_surface_base(root, relative_path)
+    candidates: list[Path]
+    if any(character in reference for character in "*?["):
+        if Path(reference).is_absolute():
+            return []
+        try:
+            candidates = [path.resolve(strict=False) for path in base.glob(reference)]
+        except (OSError, ValueError):
+            return []
+    else:
+        candidates = [(base / reference).resolve(strict=False)]
+    covered: list[str] = []
+    for asset_relative_path in AUDIT_ASSET_RELATIVE_PATHS:
+        asset = (root / asset_relative_path).resolve(strict=False)
+        if any(
+            candidate == asset or candidate in asset.parents for candidate in candidates
+        ):
+            covered.append(asset_relative_path)
+    return covered
+
+
+def candidate_is_xcodegen_spec(
+    root: Path,
+    candidate: Path,
+    relative_path: str,
+) -> bool:
+    """Recognize conventional or content-identifiable XcodeGen YAML specs."""
+    if candidate.name in CONVENTIONAL_XCODEGEN_FILENAMES:
+        return True
+    contents, read_error = read_audit_boundary_source(root, relative_path)
+    if read_error is not None:
+        return True
+    assert contents is not None
+    active_contents = strip_yaml_comments(contents)
+    return (
+        re.search(
+            r"""(?m)^(?:targets|"targets"|'targets')\s*:""",
+            active_contents,
+        )
+        is not None
+    )
+
+
+def owned_production_build_surfaces(root: Path) -> list[str]:
+    """Discover current Qinao manifests while retaining required known surfaces."""
+    surfaces = set(PRODUCTION_BUILD_SURFACES)
+    for owned_root_relative in OWNED_PRODUCTION_BUILD_ROOTS:
+        owned_root = root / owned_root_relative
+        for pattern in OWNED_BUILD_SURFACE_PATTERNS:
+            for candidate in owned_root.glob(pattern):
+                try:
+                    relative = candidate.relative_to(root)
+                except ValueError:
+                    continue
+                if any(
+                    component in NON_QINAO_BUILD_COMPONENTS
+                    for component in relative.parts
+                ):
+                    continue
+                relative_path = relative.as_posix()
+                if candidate.suffix in {
+                    ".yaml",
+                    ".yml",
+                } and not candidate_is_xcodegen_spec(
+                    root,
+                    candidate,
+                    relative_path,
+                ):
+                    continue
+                surfaces.add(relative_path)
+    return sorted(surfaces)
+
+
+def validate_audit_asset_boundary(root: Path) -> list[str]:
+    """Keep architecture audit assets outside production/runtime ownership."""
+    errors: list[str] = []
+    for relative_path in owned_production_build_surfaces(root):
+        contents, read_error = read_audit_boundary_source(root, relative_path)
+        if read_error is not None:
+            errors.append(read_error)
+            continue
+        assert contents is not None
+        active_contents = strip_build_declaration_comments(
+            Path(relative_path), contents
+        )
+        for asset_name in AUDIT_ASSET_FILENAMES:
+            if asset_name in active_contents:
+                errors.append(
+                    f"audit asset {asset_name!r} must not enter production build "
+                    f"surface {relative_path!r}"
+                )
+        references, reference_errors = build_path_references(
+            Path(relative_path),
+            active_contents,
+        )
+        errors.extend(
+            f"{error}; production build surface {relative_path!r} is unverifiable"
+            for error in reference_errors
+        )
+        for reference in sorted(references):
+            if "$" in reference or any(character in reference for character in "{}"):
+                errors.append(
+                    f"dynamic build reference {reference!r} cannot prove audit-asset "
+                    f"exclusion in production build surface {relative_path!r}"
+                )
+                continue
+            if Path(reference).is_absolute() and any(
+                character in reference for character in "*?["
+            ):
+                errors.append(
+                    f"absolute glob reference {reference!r} cannot prove audit-asset "
+                    f"exclusion in production build surface {relative_path!r}"
+                )
+                continue
+            covered_assets = audit_assets_covered_by_reference(
+                root,
+                relative_path,
+                reference,
+            )
+            if covered_assets:
+                errors.append(
+                    f"build reference {reference!r} covers audit asset "
+                    f"{covered_assets[0]!r} and must not enter production build "
+                    f"surface {relative_path!r}"
+                )
+
+    gate_contents, read_error = read_audit_boundary_source(
+        root, OWNER_GATE_RELATIVE_PATH
+    )
+    if read_error is not None:
+        errors.append(read_error)
+    else:
+        assert gate_contents is not None
+        errors.extend(
+            validate_owner_gate_read_only(gate_contents, OWNER_GATE_RELATIVE_PATH)
+        )
+    return errors
+
+
+def validate_ledger(data: dict, root: Path) -> list[str]:
+    errors = validate_audit_asset_boundary(root)
     if set(data) != EXPECTED_TOP_LEVEL_FIELDS:
         errors.append(
             "ledger top-level fields must be exactly "
@@ -1030,19 +2047,28 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
     if data.get("minimum_ios") != "27.0":
         errors.append("minimum_ios must be exactly '27.0'")
     if data.get("architecture_spec") != EXPECTED_ARCHITECTURE_SPEC:
-        errors.append(f"architecture_spec must be exactly {EXPECTED_ARCHITECTURE_SPEC!r}")
+        errors.append(
+            f"architecture_spec must be exactly {EXPECTED_ARCHITECTURE_SPEC!r}"
+        )
     generated_from_head = data.get("generated_from_head")
-    if not isinstance(generated_from_head, str) or re.fullmatch(
-        r"[0-9a-f]{7,40}", generated_from_head
-    ) is None:
-        errors.append("generated_from_head must be a 7-40 character lowercase Git hex ID")
+    if (
+        not isinstance(generated_from_head, str)
+        or re.fullmatch(r"[0-9a-f]{7,40}", generated_from_head) is None
+    ):
+        errors.append(
+            "generated_from_head must be a 7-40 character lowercase Git hex ID"
+        )
     elif not git_commit_exists(root, generated_from_head):
         errors.append(
             "generated_from_head must resolve to a Git commit under --root: "
             f"{generated_from_head!r}"
         )
     serialized = json.dumps(data, ensure_ascii=False)
-    if re.search(r"\b(?:TBD|TODO|FIXME)\b|implement later|fill in details", serialized, re.IGNORECASE):
+    if re.search(
+        r"\b(?:TBD|TODO|FIXME)\b|implement later|fill in details",
+        serialized,
+        re.IGNORECASE,
+    ):
         errors.append("ledger contains placeholder text")
     architecture_value = data.get("architecture")
     if not isinstance(architecture_value, dict):
@@ -1090,13 +2116,24 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                 errors.append("implementation work package entry must be an object")
                 continue
             if set(item) != {"id", "name", "exit_gate"}:
-                errors.append("implementation work package fields must be exactly id/name/exit_gate")
+                errors.append(
+                    "implementation work package fields must be exactly id/name/exit_gate"
+                )
             if not is_nonempty_string(item.get("id")):
-                errors.append("implementation work package id must be a non-empty string")
+                errors.append(
+                    "implementation work package id must be a non-empty string"
+                )
             if not is_nonempty_string(item.get("name")):
-                errors.append("implementation work package name must be a non-empty string")
-            if not isinstance(item.get("exit_gate"), str) or not item["exit_gate"].strip():
-                errors.append(f"work package {item.get('id')!r}: exit_gate must be non-empty")
+                errors.append(
+                    "implementation work package name must be a non-empty string"
+                )
+            if (
+                not isinstance(item.get("exit_gate"), str)
+                or not item["exit_gate"].strip()
+            ):
+                errors.append(
+                    f"work package {item.get('id')!r}: exit_gate must be non-empty"
+                )
             work_packages.append(item)
     retrieval_waves_value = data.get("retrieval_waves")
     if not isinstance(retrieval_waves_value, list):
@@ -1183,7 +2220,9 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
             )
         document_path = controlled_document.get("path")
         if not is_normalized_workspace_path(document_path):
-            errors.append("controlled document path must be normalized and workspace-relative")
+            errors.append(
+                "controlled document path must be normalized and workspace-relative"
+            )
             continue
         candidate = (root / document_path).resolve()
         if not candidate.is_relative_to(root) or not candidate.is_file():
@@ -1254,24 +2293,16 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
         validate_same_run_audit_outcome_ownership(controlled_document_contents)
     )
     errors.extend(
-        validate_memory_content_finalization_contract(
-            controlled_document_contents
-        )
+        validate_memory_content_finalization_contract(controlled_document_contents)
     )
     errors.extend(
-        validate_silicon_descriptor_wave_ownership(
-            controlled_document_contents
-        )
+        validate_silicon_descriptor_wave_ownership(controlled_document_contents)
     )
     errors.extend(
-        validate_value_prelude_declaration_ownership(
-            controlled_document_contents
-        )
+        validate_value_prelude_declaration_ownership(controlled_document_contents)
     )
     errors.extend(
-        validate_runtime_envelope_initializer_defaults(
-            controlled_document_contents
-        )
+        validate_runtime_envelope_initializer_defaults(controlled_document_contents)
     )
     declared_work_packages = {
         work_package_id
@@ -1299,8 +2330,7 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
         errors.append(f"rules.doctrine must be exactly {EXPECTED_DOCTRINE!r}")
     if rules.get("allowed_redundancy") != EXPECTED_ALLOWED_REDUNDANCY:
         errors.append(
-            "rules.allowed_redundancy must be exactly "
-            f"{EXPECTED_ALLOWED_REDUNDANCY!r}"
+            f"rules.allowed_redundancy must be exactly {EXPECTED_ALLOWED_REDUNDANCY!r}"
         )
     if rules.get("forbidden_redundancy") != EXPECTED_FORBIDDEN_REDUNDANCY:
         errors.append(
@@ -1338,7 +2368,9 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                 "owner_id/authority_symbol/create_proof_task/allowed_paths"
             )
         raw_owner_id = permission.get("owner_id")
-        owner_id = raw_owner_id if is_nonempty_string(raw_owner_id) else "<missing-owner-id>"
+        owner_id = (
+            raw_owner_id if is_nonempty_string(raw_owner_id) else "<missing-owner-id>"
+        )
         if owner_id in permission_owner_ids:
             errors.append(f"duplicate create permission owner_id: {owner_id}")
         permission_owner_ids.add(owner_id)
@@ -1393,7 +2425,9 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                 f"{owner_id}: create_proof_task {create_proof_task!r} does not name a controlled domain plan"
             )
         else:
-            domain_plan_contents = controlled_document_contents.get(domain_plan_path, "")
+            domain_plan_contents = controlled_document_contents.get(
+                domain_plan_path, ""
+            )
             for required_plan_term in (
                 owner_id,
                 permission.get("authority_symbol"),
@@ -1458,11 +2492,15 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                 f"owner-card fields must be exactly {sorted(EXPECTED_OWNER_FIELDS)!r}"
             )
         raw_owner_id = owner.get("owner_id")
-        owner_id = raw_owner_id if is_nonempty_string(raw_owner_id) else "<missing-owner-id>"
+        owner_id = (
+            raw_owner_id if is_nonempty_string(raw_owner_id) else "<missing-owner-id>"
+        )
         for field in required_owner_fields:
             value = owner.get(field)
             if not isinstance(value, str) or not value.strip():
-                errors.append(f"{owner_id}: required owner-card field {field} is missing")
+                errors.append(
+                    f"{owner_id}: required owner-card field {field} is missing"
+                )
         if not isinstance(owner.get("single_writer_required"), bool):
             errors.append(
                 f"{owner_id}: single_writer_required must be an explicit boolean"
@@ -1471,7 +2509,10 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
         if (
             not isinstance(forbidden_rules, list)
             or not forbidden_rules
-            or any(not isinstance(rule, str) or not rule.strip() for rule in forbidden_rules)
+            or any(
+                not isinstance(rule, str) or not rule.strip()
+                for rule in forbidden_rules
+            )
         ):
             errors.append(f"{owner_id}: forbidden must be a non-empty string list")
         evidence_paths = owner.get("evidence_paths", [])
@@ -1488,21 +2529,27 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                     continue
                 candidate = (root / evidence_path).resolve()
                 if not candidate.is_relative_to(root) or not candidate.exists():
-                    errors.append(f"{owner_id}: evidence path does not exist: {evidence_path}")
+                    errors.append(
+                        f"{owner_id}: evidence path does not exist: {evidence_path}"
+                    )
         if owner_id in seen_owner_ids:
             errors.append(f"duplicate owner_id: {owner_id}")
         seen_owner_ids.add(owner_id)
         owner_id_order.append(owner_id)
         classification = owner.get("classification")
-        if not isinstance(classification, str) or classification not in allowed_classifications:
+        if (
+            not isinstance(classification, str)
+            or classification not in allowed_classifications
+        ):
             errors.append(
                 f"{owner_id}: classification {classification!r} is not declared"
             )
         work_package = owner.get("work_package")
-        if not isinstance(work_package, str) or work_package not in declared_work_packages:
-            errors.append(
-                f"{owner_id}: work_package {work_package!r} is not declared"
-            )
+        if (
+            not isinstance(work_package, str)
+            or work_package not in declared_work_packages
+        ):
+            errors.append(f"{owner_id}: work_package {work_package!r} is not declared")
         expected_owner_assignment = EXPECTED_OWNER_ASSIGNMENTS.get(owner_id)
         if expected_owner_assignment is None:
             errors.append(f"{owner_id}: no reviewed owner assignment exists")
@@ -1549,9 +2596,7 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                 if (root / path).is_file()
             ]
             audit_paths_present = [
-                path
-                for path in HISTORY_DOCTRINE_AUDIT_PATHS
-                if (root / path).is_file()
+                path for path in HISTORY_DOCTRINE_AUDIT_PATHS if (root / path).is_file()
             ]
             if status == "relocation_candidate":
                 expected_history_evidence = [
@@ -1672,9 +2717,8 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                             f"{owner_id}: M lifecycle status 'converging' requires "
                             "at least one approved path to exist"
                         )
-                    if (
-                        status == "implemented"
-                        and existing_path_count != len(allowed_paths)
+                    if status == "implemented" and existing_path_count != len(
+                        allowed_paths
                     ):
                         errors.append(
                             f"{owner_id}: M lifecycle status 'implemented' requires "
@@ -1693,10 +2737,16 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                     f"{owner_id}: conflict fields must be exactly symbol/disposition/reason"
                 )
             for field in ("symbol", "reason"):
-                if not isinstance(conflict.get(field), str) or not conflict.get(field, "").strip():
+                if (
+                    not isinstance(conflict.get(field), str)
+                    or not conflict.get(field, "").strip()
+                ):
                     errors.append(f"{owner_id}: conflict field {field} is missing")
             disposition = conflict.get("disposition")
-            if not isinstance(disposition, str) or disposition not in allowed_dispositions:
+            if (
+                not isinstance(disposition, str)
+                or disposition not in allowed_dispositions
+            ):
                 errors.append(
                     f"{owner_id}: disposition {disposition!r} is not declared"
                 )
@@ -1748,10 +2798,7 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                 )
     missing_reviewed_owners = sorted(set(EXPECTED_OWNER_ASSIGNMENTS) - seen_owner_ids)
     if missing_reviewed_owners:
-        errors.append(
-            "reviewed owner IDs are missing: "
-            f"{missing_reviewed_owners!r}"
-        )
+        errors.append(f"reviewed owner IDs are missing: {missing_reviewed_owners!r}")
     expected_owner_id_order = list(EXPECTED_OWNER_ASSIGNMENTS)
     if owner_id_order != expected_owner_id_order:
         errors.append(
@@ -1879,11 +2926,12 @@ def validate_candidate(candidate: dict, ledger: dict) -> list[str]:
                 normalized_proof_values.append(value.strip().casefold())
             else:
                 normalized_proof_values.append(value.strip().casefold())
-        if (
-            len(normalized_proof_values) == len(CREATE_PROOF_FIELDS)
-            and len(set(normalized_proof_values)) != len(normalized_proof_values)
-        ):
-            errors.append("candidate create_proof values must be distinct by proof field")
+        if len(normalized_proof_values) == len(CREATE_PROOF_FIELDS) and len(
+            set(normalized_proof_values)
+        ) != len(normalized_proof_values):
+            errors.append(
+                "candidate create_proof values must be distinct by proof field"
+            )
         serialized_proof = json.dumps(create_proof, ensure_ascii=False)
         if re.search(
             r"\b(?:TBD|TODO|FIXME)\b|implement later|fill in details",
@@ -1909,7 +2957,12 @@ def main() -> int:
     for candidate_path in args.candidate_manifest:
         try:
             candidate = load_bounded_json_object(candidate_path.resolve())
-        except (OSError, json.JSONDecodeError, DuplicateJSONKeyError, ValueError) as error:
+        except (
+            OSError,
+            json.JSONDecodeError,
+            DuplicateJSONKeyError,
+            ValueError,
+        ) as error:
             errors.append(f"candidate manifest {candidate_path}: {error}")
             continue
         if ledger_errors:
@@ -1926,15 +2979,16 @@ def main() -> int:
         proposed_path = candidate.get("candidate_path")
         if isinstance(proposed_path, str):
             if proposed_path in seen_candidate_paths:
-                errors.append(f"duplicate candidate_path across manifests: {proposed_path}")
+                errors.append(
+                    f"duplicate candidate_path across manifests: {proposed_path}"
+                )
             seen_candidate_paths.add(proposed_path)
     if errors:
         for error in errors:
             print(f"owner-ledger: ERROR: {error}", file=sys.stderr)
         return 1
     print(
-        f"owner-ledger: PASS ({ledger_path}; "
-        f"candidates={len(args.candidate_manifest)})"
+        f"owner-ledger: PASS ({ledger_path}; candidates={len(args.candidate_manifest)})"
     )
     return 0
 

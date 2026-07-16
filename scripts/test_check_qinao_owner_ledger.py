@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Callable
+from unittest import mock
 
 try:
     from scripts import check_qinao_owner_ledger as checker
@@ -29,6 +30,32 @@ CREATE_PROOF = {
 
 
 class QinaoOwnerLedgerCLITests(unittest.TestCase):
+    @staticmethod
+    def make_audit_boundary_root(
+        directory: str,
+        checker_source: str = "print('read-only audit gate')\n",
+    ) -> Path:
+        root = Path(directory)
+        for relative_path in (
+            "BehavioralAISubstrate/Package.swift",
+            "SampleHost/Package.swift",
+            "QinaoRuntimeSDK/Package.swift",
+            "BehavioralAISubstrate/DeviceTestApp/project.yml",
+            "BehavioralAISubstrate/DeviceTestApp/BASDeviceTest.xcodeproj/project.pbxproj",
+        ):
+            path = root / relative_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            comment = (
+                "# production build declaration\n"
+                if path.suffix in {".yml", ".yaml"}
+                else "// production build declaration\n"
+            )
+            path.write_text(comment, encoding="utf-8")
+        checker_path = root / "scripts" / "check_qinao_owner_ledger.py"
+        checker_path.parent.mkdir(parents=True, exist_ok=True)
+        checker_path.write_text(checker_source, encoding="utf-8")
+        return root
+
     @staticmethod
     def run_ledger(ledger: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -158,6 +185,451 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
             msg=f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}",
         )
         self.assertIn("owner-ledger: PASS", completed.stdout)
+
+    def test_audit_asset_boundary_validator_is_installed(self) -> None:
+        self.assertTrue(
+            hasattr(checker, "validate_audit_asset_boundary"),
+            "CreateGate must enforce the audit-asset/production boundary",
+        )
+
+    def test_package_manifest_cannot_include_audit_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_audit_boundary_root(directory)
+            manifest = root / "QinaoRuntimeSDK" / "Package.swift"
+            manifest.write_text(
+                '.copy("../scripts/check_qinao_owner_ledger.py")\n',
+                encoding="utf-8",
+            )
+
+            errors = checker.validate_audit_asset_boundary(root)
+
+        self.assertTrue(
+            any(
+                "check_qinao_owner_ledger.py" in error
+                and "production build surface" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_double_slash_resource_path_cannot_spoof_swift_comment_filter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_audit_boundary_root(directory)
+            manifest = root / "QinaoRuntimeSDK" / "Package.swift"
+            manifest.write_text(
+                '.copy("../scripts//check_qinao_owner_ledger.py")\n',
+                encoding="utf-8",
+            )
+
+            errors = checker.validate_audit_asset_boundary(root)
+
+        self.assertTrue(
+            any("check_qinao_owner_ledger.py" in error for error in errors),
+            errors,
+        )
+
+    def test_comment_only_audit_asset_mentions_are_not_membership(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_audit_boundary_root(directory)
+            manifest = root / "QinaoRuntimeSDK" / "Package.swift"
+            manifest.write_text(
+                "// check_qinao_owner_ledger.py stays outside production\n"
+                "/* qinao-owner-ledger-v1.json is an audit-only contract. */\n",
+                encoding="utf-8",
+            )
+
+            errors = checker.validate_audit_asset_boundary(root)
+
+        self.assertEqual(errors, [])
+
+    def test_xcodegen_project_cannot_include_owner_ledger(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_audit_boundary_root(directory)
+            project = root / "BehavioralAISubstrate" / "DeviceTestApp" / "project.yml"
+            project.write_text(
+                "targets:\n  BASDeviceTest:\n    sources:\n"
+                "      - ../../docs/superpowers/specs/qinao-owner-ledger-v1.json\n",
+                encoding="utf-8",
+            )
+
+            errors = checker.validate_audit_asset_boundary(root)
+
+        self.assertTrue(
+            any(
+                "qinao-owner-ledger-v1.json" in error
+                and "production build surface" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_xcodegen_project_cannot_include_root_audit_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_audit_boundary_root(directory)
+            project = root / "BehavioralAISubstrate" / "DeviceTestApp" / "project.yml"
+            project.write_text(
+                "targets:\n  BASDeviceTest:\n    sources:\n"
+                "      - path: ../../scripts\n",
+                encoding="utf-8",
+            )
+
+            errors = checker.validate_audit_asset_boundary(root)
+
+        self.assertTrue(
+            any(
+                "scripts" in error and "production build surface" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_xcodegen_glob_and_alias_cannot_cover_audit_assets(self) -> None:
+        project_sources = {
+            "glob": "targets:\n  App:\n    sources:\n      - path: ../../scripts/*.py\n",
+            "alias": (
+                "auditPath: &auditPath ../../scripts\n"
+                "targets:\n  App:\n    sources:\n      - *auditPath\n"
+            ),
+        }
+        for case, source in project_sources.items():
+            with self.subTest(case=case):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = self.make_audit_boundary_root(directory)
+                    project = (
+                        root / "BehavioralAISubstrate" / "DeviceTestApp" / "project.yml"
+                    )
+                    project.write_text(source, encoding="utf-8")
+
+                    errors = checker.validate_audit_asset_boundary(root)
+
+                self.assertTrue(
+                    any("production build surface" in error for error in errors),
+                    errors,
+                )
+
+    def test_swift_resource_path_must_be_one_static_literal(self) -> None:
+        manifests = {
+            "raw-audit-directory": '.copy(#"../scripts"#)\n',
+            "dynamic-resource": "let resource = makeResourcePath()\n.copy(resource)\n",
+            "factory-alias": ('let include = Resource.copy\ninclude("../scripts")\n'),
+            "escaped-separator": '.copy("..\\u{2F}scripts")\n',
+        }
+        for case, source in manifests.items():
+            with self.subTest(case=case):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = self.make_audit_boundary_root(directory)
+                    manifest = root / "QinaoRuntimeSDK" / "Package.swift"
+                    manifest.write_text(source, encoding="utf-8")
+
+                    errors = checker.validate_audit_asset_boundary(root)
+
+                self.assertTrue(
+                    any("production build surface" in error for error in errors),
+                    errors,
+                )
+
+    def test_xcodegen_yaml_indirection_is_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_audit_boundary_root(directory)
+            project = root / "BehavioralAISubstrate" / "DeviceTestApp" / "project.yml"
+            sources = {
+                "absolute-alias": (
+                    f'audit: &audit "{(root / "scripts").as_posix()}"\n'
+                    "targets:\n  App:\n    sources: [*audit]\n"
+                ),
+                "unicode-escape": (
+                    'targets:\n  App:\n    sources: ["..\\u002F..\\u002Fscripts"]\n'
+                ),
+            }
+            for case, source in sources.items():
+                with self.subTest(case=case):
+                    project.write_text(source, encoding="utf-8")
+
+                    errors = checker.validate_audit_asset_boundary(root)
+
+                    self.assertTrue(
+                        any("production build surface" in error for error in errors),
+                        errors,
+                    )
+
+    def test_generated_xcode_project_cannot_include_gate_tests(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_audit_boundary_root(directory)
+            project = (
+                root
+                / "BehavioralAISubstrate"
+                / "DeviceTestApp"
+                / "BASDeviceTest.xcodeproj"
+                / "project.pbxproj"
+            )
+            project.write_text(
+                "test_check_qinao_owner_ledger.py in Resources\n",
+                encoding="utf-8",
+            )
+
+            errors = checker.validate_audit_asset_boundary(root)
+
+        self.assertTrue(
+            any(
+                "test_check_qinao_owner_ledger.py" in error
+                and "production build surface" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_new_owned_build_surface_is_discovered_automatically(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_audit_boundary_root(directory)
+            manifest = root / "QinaoRuntimeSDK" / "Experimental" / "Package.swift"
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                '.copy("../../scripts")\n',
+                encoding="utf-8",
+            )
+
+            errors = checker.validate_audit_asset_boundary(root)
+
+        self.assertTrue(
+            any(
+                "QinaoRuntimeSDK/Experimental/Package.swift" in error
+                and "production build surface" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_versioned_swiftpm_and_xcodegen_yaml_surfaces_are_discovered(self) -> None:
+        surfaces = {
+            "QinaoRuntimeSDK/Package@swift-6.2.swift": ('.copy("../scripts")\n'),
+            "QinaoRuntimeSDK/Experimental/project.yaml": (
+                "targets:\n  App:\n    sources:\n      - ../../scripts\n"
+            ),
+            "QinaoRuntimeSDK/Experimental/device-spec.yaml": (
+                "name: Device\ntargets:\n  App:\n    sources:\n      - ../../scripts\n"
+            ),
+        }
+        for relative_path, source in surfaces.items():
+            with self.subTest(relative_path=relative_path):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = self.make_audit_boundary_root(directory)
+                    surface = root / relative_path
+                    surface.parent.mkdir(parents=True, exist_ok=True)
+                    surface.write_text(source, encoding="utf-8")
+
+                    errors = checker.validate_audit_asset_boundary(root)
+
+                self.assertTrue(
+                    any(
+                        relative_path in error and "production build surface" in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+    def test_vendored_build_surfaces_remain_outside_qinao_ownership(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_audit_boundary_root(directory)
+            manifest = (
+                root
+                / "BehavioralAISubstrate"
+                / "Vendor"
+                / "Dependency"
+                / "Package.swift"
+            )
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                '.copy("../../../../scripts")\n',
+                encoding="utf-8",
+            )
+
+            errors = checker.validate_audit_asset_boundary(root)
+
+        self.assertEqual(errors, [])
+
+    def test_owner_gate_cannot_emit_swift_sql_or_runtime_configuration(self) -> None:
+        emitters = {
+            "GeneratedAuthority.swift": (
+                "from pathlib import Path\n"
+                "Path('GeneratedAuthority.swift').write_text('generated')\n"
+            ),
+            "generated-schema.sql": (
+                "with open('generated-schema.sql', 'w', encoding='utf-8') as handle:\n"
+                "    handle.write('generated')\n"
+            ),
+            "runtime-config.json": (
+                "import subprocess\n"
+                "subprocess.run(['sh', '-c', 'echo generated > runtime-config.json'])\n"
+            ),
+            "indirect-runtime-config.json": (
+                "from pathlib import Path\n"
+                "emit = Path('indirect-runtime-config.json').write_text\n"
+                "emit('generated')\n"
+            ),
+            "import-aliased-subprocess.json": (
+                "from subprocess import run as invoke\n"
+                "invoke(['sh', '-c', 'echo generated > imported.json'])\n"
+            ),
+            "import-aliased-open.json": (
+                "from builtins import open as sink\n"
+                "handle = sink('imported-open.json', 'w')\n"
+                "handle.close()\n"
+            ),
+            "assigned-subprocess.json": (
+                "import subprocess\n"
+                "runner = subprocess.run\n"
+                "runner(['sh', '-c', 'echo generated > assigned.json'])\n"
+            ),
+            "assigned-path-open.json": (
+                "from pathlib import Path\n"
+                "sink = Path('assigned-path-open.json').open\n"
+                "handle = sink('w')\n"
+                "handle.close()\n"
+            ),
+            "io-open-alias.json": (
+                "from io import open as sink\n"
+                "handle = sink('io-open-alias.json', 'w')\n"
+                "handle.close()\n"
+            ),
+            "os-open-write.json": (
+                "from os import open as fd_open, write as fd_write\n"
+                "descriptor = fd_open('os-open-write.json', 65)\n"
+                "fd_write(descriptor, b'generated')\n"
+            ),
+            "dynamic-import.json": (
+                "import importlib\n"
+                "invoke = importlib.import_module('subprocess').run\n"
+                "invoke(['sh', '-c', 'echo generated > dynamic-import.json'])\n"
+            ),
+            "subprocess-dict.json": (
+                "import subprocess\n"
+                "runner = subprocess.__dict__['run']\n"
+                "runner(['sh', '-c', 'echo generated > subprocess-dict.json'])\n"
+            ),
+            "path-dict-open.json": (
+                "from pathlib import Path\n"
+                "opener = Path.__dict__['open']\n"
+                "handle = opener(Path('path-dict-open.json'), 'w')\n"
+                "handle.close()\n"
+            ),
+            "globals-registry.json": (
+                "import subprocess\n"
+                "runner = globals()['subprocess'].run\n"
+                "runner(['sh', '-c', 'echo generated > globals-registry.json'])\n"
+            ),
+            "sys-modules.json": (
+                "import subprocess\n"
+                "import sys\n"
+                "runner = sys.modules['subprocess'].run\n"
+                "runner(['sh', '-c', 'echo generated > sys-modules.json'])\n"
+            ),
+            "path-replace.json": (
+                "from pathlib import Path\n"
+                "Path('source.tmp').replace('path-replace.json')\n"
+            ),
+            "subprocess-executable.json": (
+                "import subprocess\n"
+                "subprocess.run(\n"
+                "    ['git', 'cat-file', '-t', 'HEAD'],\n"
+                "    executable='./untrusted-writer',\n"
+                ")\n"
+            ),
+            "for-shadowed-print.json": (
+                "import subprocess\n"
+                "for print in [subprocess.__dict__['run']]:\n"
+                "    print(['sh', '-c', 'echo generated > for-shadowed-print.json'])\n"
+            ),
+            "implicit-path-move.json": (
+                "from pathlib import Path\n"
+                "class ArtifactPath(\n"
+                "    type('ArtifactPath', (Path,), {'__truediv__': Path.move})\n"
+                "):\n"
+                "    pass\n"
+                "ArtifactPath('source.tmp') / 'implicit-path-move.json'\n"
+            ),
+        }
+        for emitted_path, source in emitters.items():
+            with self.subTest(emitted_path=emitted_path):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = self.make_audit_boundary_root(
+                        directory,
+                        checker_source=source,
+                    )
+
+                    errors = checker.validate_audit_asset_boundary(root)
+
+                self.assertTrue(
+                    any("read-only" in error for error in errors),
+                    errors,
+                )
+
+    def test_owner_gate_protects_approved_names_across_all_binding_forms(self) -> None:
+        binding_forms = {
+            "for": "for print in ():\n    pass\n",
+            "async-for": (
+                "async def consume(items):\n"
+                "    async for print in items:\n"
+                "        pass\n"
+            ),
+            "comprehension": "[None for print in ()]\n",
+            "with": ("from pathlib import Path\nwith Path('.') as print:\n    pass\n"),
+            "except": "try:\n    pass\nexcept OSError as print:\n    pass\n",
+            "lambda": "lambda print: None\n",
+            "function": "def print():\n    pass\n",
+            "class": "class print:\n    pass\n",
+            "match": "match 0:\n    case print:\n        pass\n",
+            "delete": "del print\n",
+            "qualified-root": (
+                "from pathlib import Path\nfor str in [Path]:\n    pass\n"
+            ),
+        }
+        for case, source in binding_forms.items():
+            with self.subTest(case=case):
+                errors = checker.validate_owner_gate_read_only(source, case)
+                self.assertTrue(
+                    any("read-only" in error and "bind" in error for error in errors),
+                    errors,
+                )
+
+    def test_owner_gate_rejects_reflection_and_module_registries_at_source(
+        self,
+    ) -> None:
+        sources = {
+            "dunder": ("import subprocess\nhidden = subprocess.__dict__['run']\n"),
+            "module-registry": (
+                "import subprocess\nimport sys\nhidden = sys.modules['subprocess']\n"
+            ),
+            "implicit-protocol-call": (
+                "from pathlib import Path\n"
+                "class ArtifactPath(Path):\n"
+                "    __truediv__ = Path.replace\n"
+                "ArtifactPath('source.tmp') / 'Generated.swift'\n"
+            ),
+        }
+        for case, source in sources.items():
+            with self.subTest(case=case):
+                errors = checker.validate_owner_gate_read_only(source, case)
+                self.assertTrue(
+                    any(
+                        "read-only" in error and "reflection" in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+    def test_ledger_validation_runs_audit_asset_boundary(self) -> None:
+        with LEDGER.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        sentinel = "audit boundary sentinel"
+
+        with mock.patch.object(
+            checker,
+            "validate_audit_asset_boundary",
+            return_value=[sentinel],
+        ):
+            errors = checker.validate_ledger(data, ROOT)
+
+        self.assertIn(sentinel, errors)
 
     def test_missing_owner_must_be_explicitly_allowlisted(self) -> None:
         def mutate(data: dict) -> None:
@@ -318,7 +790,9 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
         )
         self.assertIn("candidates=1", completed.stdout)
 
-    def test_every_allowlisted_production_path_passes_one_combined_create_gate(self) -> None:
+    def test_every_allowlisted_production_path_passes_one_combined_create_gate(
+        self,
+    ) -> None:
         with LEDGER.open("r", encoding="utf-8") as handle:
             ledger = json.load(handle)
         candidates = [
@@ -586,7 +1060,9 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
         self.assertIn("classification", completed.stderr)
         self.assertIn("W99", completed.stderr)
 
-    def test_missing_owner_work_package_is_pinned_to_its_create_proof_task(self) -> None:
+    def test_missing_owner_work_package_is_pinned_to_its_create_proof_task(
+        self,
+    ) -> None:
         def mutate(data: dict) -> None:
             owner = next(
                 item for item in data["owners"] if item["owner_id"] == "artifact.mesh"
@@ -728,7 +1204,9 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
         self.assertIn("disposition", completed.stderr)
         self.assertIn("coexist", completed.stderr)
 
-    def test_work_packages_and_retrieval_waves_use_separate_exact_namespaces(self) -> None:
+    def test_work_packages_and_retrieval_waves_use_separate_exact_namespaces(
+        self,
+    ) -> None:
         def mutate(data: dict) -> None:
             data["implementation_work_packages"][0]["id"] = "R0"
             data["retrieval_waves"][0]["id"] = "W0"
@@ -763,8 +1241,7 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
 
     def test_master_work_package_rows_are_pinned(self) -> None:
         master = (
-            ROOT
-            / "docs/superpowers/plans/"
+            ROOT / "docs/superpowers/plans/"
             "2026-07-15-iphone-air-architecture-convergence-master.md"
         ).read_text(encoding="utf-8")
         mutated = master.replace(
@@ -818,9 +1295,7 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
 
     def test_create_proof_cannot_move_to_a_later_task_part_or_wave(self) -> None:
         path = "BehavioralAISubstrate/Sources/BASRuntimeCore/BASSemanticTurnDAG.swift"
-        reviewed_heading = checker.EXPECTED_CREATE_TASK_HEADINGS[
-            "runtime.semantic-dag"
-        ]
+        reviewed_heading = checker.EXPECTED_CREATE_TASK_HEADINGS["runtime.semantic-dag"]
         relocated = f"""
 {reviewed_heading}
 
@@ -927,8 +1402,7 @@ Create Proof
                 "shape is final.\n"
             ),
             checker.EXPECTED_CONTROLLED_DOCUMENTS[6]: (
-                "The first-governed BASTurnRuntimeAuditEnvelope 1.0.0 "
-                "shape is final.\n"
+                "The first-governed BASTurnRuntimeAuditEnvelope 1.0.0 shape is final.\n"
             ),
         }
 
@@ -947,7 +1421,9 @@ Create Proof
         )
         errors = checker.validate_first_governed_schema_contracts(contents)
 
-        self.assertTrue(any("BASRuntimeAuditProjectionsBundle" in item for item in errors))
+        self.assertTrue(
+            any("BASRuntimeAuditProjectionsBundle" in item for item in errors)
+        )
         self.assertTrue(any("missing-schema" in item for item in errors))
 
     def test_same_run_audit_outcome_has_one_runtime_owner(self) -> None:
@@ -974,7 +1450,9 @@ Create Proof
         )
         errors = checker.validate_same_run_audit_outcome_ownership(contents)
 
-        self.assertTrue(any("exactly one Runtime-owned declaration" in item for item in errors))
+        self.assertTrue(
+            any("exactly one Runtime-owned declaration" in item for item in errors)
+        )
 
     def test_memory_finalization_fence_must_precede_checkpoint_put(self) -> None:
         valid = """### Task 4A: Migrate Memory Content
@@ -1126,7 +1604,9 @@ publicationSinkReceiptArtifactID = nil
             }
         )
 
-        self.assertTrue(any("publicationSinkReceiptArtifactID" in item for item in errors))
+        self.assertTrue(
+            any("publicationSinkReceiptArtifactID" in item for item in errors)
+        )
 
     def test_controlled_documents_keep_mandatory_boundary_terms(self) -> None:
         def mutate(data: dict) -> None:
@@ -1139,9 +1619,7 @@ publicationSinkReceiptArtifactID = nil
             data["controlled_documents"][2]["required_terms"].remove(
                 "BASProviderBranchControlPort"
             )
-            data["controlled_documents"][3]["required_terms"].remove(
-                "TurnBranchRef"
-            )
+            data["controlled_documents"][3]["required_terms"].remove("TurnBranchRef")
             data["controlled_documents"][4]["required_terms"].remove(
                 "BASProviderBranchPolicy"
             )
@@ -1279,9 +1757,9 @@ publicationSinkReceiptArtifactID = nil
 
     def test_projection_and_conflict_schema_is_not_extensible_by_accident(self) -> None:
         def mutate(data: dict) -> None:
-            data["owners"][0]["allowed_projections"][0][
-                "source_watermark_required"
-            ] = "sometimes"
+            data["owners"][0]["allowed_projections"][0]["source_watermark_required"] = (
+                "sometimes"
+            )
             del data["owners"][0]["current_conflicts"][0]["reason"]
 
         completed = self.run_mutated_ledger(mutate)
