@@ -10,7 +10,7 @@ let package = Package(
         // and BASRuntimeCore's CoreML + BASMetalSubstrate's Metal cannot
         // compile there) and was never a real target for a Metal/CoreML/MLX
         // device-ML substrate. Re-adding it requires the ADR-035 §watchOS work.
-        .iOS(.v18),
+        .iOS("27.0"),
         .macOS(.v14)
     ],
     products: [

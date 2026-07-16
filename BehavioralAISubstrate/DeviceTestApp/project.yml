@@ -23,7 +23,7 @@ name: BASDeviceTest
 options:
   bundleIdPrefix: dev.changgeng.bas
   deploymentTarget:
-    iOS: "18.0"
+    iOS: "27.0"
   developmentLanguage: "en"
 
 settings:
@@ -31,7 +31,7 @@ settings:
     DEVELOPMENT_TEAM: U4ZLQM8399
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "6.0"
-    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "27.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     ENABLE_PREVIEWS: YES
     SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
@@ -55,6 +55,8 @@ targets:
     # (Gemma4 E4B+E2B ≈ 4.2GB) can exceed the default ~3.4GB iOS per-process cap on the 8GB iPhone Air.
     entitlements:
       path: Resources/BASDeviceTestApp.entitlements
+      properties:
+        com.apple.developer.kernel.increased-memory-limit: true
     info:
       path: Resources/Info.plist
       properties:
@@ -70,6 +72,8 @@ targets:
           - armv7
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        BGTaskSchedulerPermittedIdentifiers:
+          - bas.sleep.consolidation
     dependencies:
       - package: BehavioralAISubstrate
         product: BASHostKit

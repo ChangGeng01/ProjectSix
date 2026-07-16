@@ -11,7 +11,7 @@
 // standalone SPM package that depends on BehavioralAISubstrate
 // via a sibling-path dependency。
 //
-// Platform target:**iOS 18** (macOS floor aligned to v14 for
+// Platform target:**iOS 27** (macOS floor aligned to v14 for
 // resolution only)。 SampleHost contains UIKit-using bench panels +
 // SwiftUI iOS app shells (5 UIKit-using files,11 SwiftUI-only
 // files,38 cross-platform helpers)。
@@ -52,7 +52,7 @@ import PackageDescription
 let package = Package(
     name: "SampleHost",
     platforms: [
-        .iOS(.v18),
+        .iOS("27.0"),
         // deep-audit P2-22 (2026-07-13): align the macOS floor with BAS (.macOS(.v14)) so a
         // macOS `swift build` fails on the real UIKit imports, not a confusing implicit-floor
         // (macOS 12 default) vs dependency-floor mismatch during resolution.

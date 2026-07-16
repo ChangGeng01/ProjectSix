@@ -27,7 +27,7 @@ import PackageDescription
 let package = Package(
     name: "QinaoRuntimeSDK",
     platforms: [
-        .iOS(.v18),
+        .iOS("27.0"),
         // deep-audit P2-23 (2026-07-13): watchOS REMOVED. It was declared here but its
         // BehavioralAISubstrate dependency DROPPED watchOS package-wide at ch1040 (ADR-035
         // option A — the vendored MLX deps don't resolve for watchOS), so a watchOS resolve of
