@@ -1,7 +1,7 @@
 # iPhone Air → Future Apple Silicon 14-Layer System Architecture Design
 
-**Status:** Final Qinao cognitive-substrate convergence locked after adversarial review; implementation conformance remains `REVISE`
-**Date:** 2026-07-14; final convergence revision 2026-07-16
+**Status:** A+ convergence approved; architecture and implementation remain `REVISE` until the reopened physical fault-model gates in Sections 34 and 37 close
+**Date:** 2026-07-14; A+ convergence revision 2026-07-16
 **Scope:** Current iPhone Air/A19 Pro baseline, iOS 27 minimum across every workspace-owned iOS package slice/app/extension target, and capability-driven future Apple Silicon
 **Decision:** Adopt a capability-driven backend portfolio under invariant semantic, quality, state, and sovereign contracts
 
@@ -31,12 +31,12 @@ The final verdict is deliberately split:
 
 | Question | Verdict |
 |---|---|
-| Is the revised architecture internally consistent under the abstract fault model? | **PASS** |
+| Is the A+ architecture ready to be called closed under the abstract fault model? | **REVISE until the reopened K3 durability, capability attenuation, remote-egress, cache-scope, erasure, and non-convergence gates pass** |
 | Does current production code conform to this complete architecture? | **REVISE** |
 | Can current iPhone Air promise general or sustained `40 tok/s`? | **NO; thermally-cold resident accepted-decode 40 is an UNVERIFIED workload-qualified stretch target** |
 | Can current iPhone Air promise sustained `30 tok/s`? | **NO under current evidence** |
 
-`PASS` in this document never means that the future architecture is implemented or production-certified.
+No prose-only review, prior abstract-model pass, or green retained-foundation test can close these reopened gates. A later `PASS` means only that the written architecture's fault model and acceptance matrix are internally closed; it still does not mean that the future architecture is implemented or production-certified.
 
 ## 2. Goal
 
@@ -147,6 +147,16 @@ The code audit captured these concrete ship blockers at the review snapshot:
 | sovereign state | `BASSovereignTokenAuthority` and relevant consumed-bundle paths retain in-memory issuance/spend state | helper-private transactional durable ledger |
 | receipt semantics | current control-plane receipts lack exact effect/profile/adapter/idempotency/seal state; some coordinator paths synthesize generic execution | expanded signed operation receipt and durable saga |
 | state folding | SQLite event append has a strong transaction foundation, but convenience folding paths can start from zero, ignore duplicate/new status, or continue after append error | hydrate from log, deterministic event identity, CAS and projector cursor |
+| K3 durability | EventLog and memory currently use separate WAL databases with `synchronous=NORMAL`; they cannot satisfy the target's same-transaction control-state invariant across power loss | one K3 control nucleus in one SQLite file/WAL with `synchronous=FULL`; replayable projections remain separate and non-authoritative |
+| memory isolation | `QinaoMemory` frontstage state is process-global and can be auto-injected without an authority/workspace/window/session filter | scope every admission/recall/bundle to the canonical workspace/Attempt closure and deny an absent scope |
+| erasure closure | current delete paths can remove only process memory, prune by wall time, or ignore spill-file deletion while still returning a completed-looking receipt | monotonic deletion epoch, tombstone, owner purge acknowledgements, rescan, and no completed receipt before closure |
+| retrieval isolation | current vector paths can score a broad corpus before the final deny filter, and RRF can count duplicate/correlated appearances repeatedly | compile hard eligibility into the physical partition before ANN/Rust/reranking; lane dedupe/source caps precede fusion |
+| loop authority | current multi-round code can retain a final projection after cycle/budget termination and feed it forward as if authoritative | only `converged + verified` may become authoritative; every other terminal state remains typed proposal/degraded/remand evidence |
+| cache scope | current session/KV persistence binds only a subset of model and sequence identity | one exhaustive cache-scope contract binds model, modality, StateABI, tokenizer/template, authority/workspace/snapshot, epoch vector, and exact token history |
+| effect cutover | current consumed-bundle truth is actor memory and direct tool execution can survive as a competing path | K4 claim plus Zone-C durable saga are the sole authority; legacy bundle state is a read-only cache after an epoch cutover |
+| MLX concurrency | the current two-session cap is a smoke configuration, not thread-safety, state-isolation, or thermal proof for the pinned vendored runtime | production cap is one until the exact runtime passes the multi-seat/TSAN/state/termination/memory/thermal gate |
+| MLX image closure | package resolution does not prove that final App→MLX and App→Framework→MLX paths produced one C runtime/state singleton in each process | Release link-map/`nm`/`otool` and runtime sentinel gate; exactly one MLX image per process |
+| device execution profile | current static profile lacks the exact OS/runtime/known-issue/build/shape/modality/entitlement closure required to reuse device evidence safely | every change produces a new quarantined profile key and requires the declared recertification |
 
 All entries in this table are implementation `REVISE`; none invalidates the selected target architecture.
 
@@ -173,7 +183,7 @@ Every proposed component is classified before implementation:
 | kernel/ring/plane identity | `BASMotherboardKernel` plus current motherboard compatibility types | Extend the four-kernel owner with stable K1–K4 projection; add only the genuinely missing ring and seven-view identities; explicitly map the legacy three-domain plane rather than treating it as the seven-view taxonomy |
 | layer execution | `BASLayerActor`, `BASLayerReferenceActor`, `BASLayerCascadeRunner`, `BAS14LayerMeshMap/Assembler`, `BASLayerSlice`, current kill-switch state | LayerCell adds pure ingress/core/egress membranes around this actor mesh; budgets and kill epochs have one owner and are projected, not deducted or advanced twice |
 | common envelopes | `BASResult`, `BASFrameEnvelope`, `BASPermit`, `BASBundle`, `BASCard` | New domain records reuse these low-entropy shapes unless a materially different canonical payload is proven |
-| event truth and replay order | `BASEventLogEntry`, `BASEventLogStorage`, `BASSQLiteEventLogStorage`, existing integrity chain and replay harnesses | State commit, replay identity, and manifest indexing derive from this sequence/hash truth; no second event log, cursor timeline, WAL, or hash chain |
+| event truth and replay order | `BASEventLogEntry`, `BASEventLogStorage`, `BASSQLiteEventLogStorage`, existing integrity chain and replay harnesses | State commit, replay identity, authoritative heads/cursors, outbox, and boundary permits converge into its one K3 `FULL` control nucleus; replayable projection WALs have independent single owners and source watermarks but no second event sequence or hash chain |
 | retrieval mechanisms | `BASL8RoutedMemoryService`, `BASRAGRetriever`, vector/FTS/temporal/entity/graph stores | SemanticStateLake lanes are adapters and snapshot-bound projections; they never rebuild an index or retrieval engine |
 | context packing | `BASContextCompiler` in `ContextCompilerCore.swift` | Tokenize-once spans, exact budgets, and descriptor binding extend this owner; scoped/semantic/turn compilers supply inputs or compatibility projections |
 | model identity and invocation | `BASModelCapabilityManifest`, `BASModelManifestRegistry`, `BASLLMInvocationContract` | Quality identity is a canonical projection; the neural execution contract extends/nests the invocation contract rather than becoming a third editable model identity |
@@ -214,7 +224,7 @@ A cleaner name, a preferred folder layout, a new `Core`/`Manager`/`Registry`/`St
 - One ordered `BASLaneWatermark` representation carries lane, sequence, root/provenance, and required proof. Snapshot and replay reuse it; dictionary counters and replay-specific copies are forbidden.
 - A response spool is one Artifact Mesh object derived from the existing canonical rendered output. Verification, risk, release, sink, reservation, and finalization records reference its artifact ID instead of copying spool/digest/presentation tuples.
 - A replay manifest is stored as an artifact. Its index and publication journal may be separate ports, but they cannot become another immutable-object store.
-- The execution plan owns one canonical silicon execution binding. Requests, child leases, K4 authorization context, usage receipts, and replay records reference that binding root; caller-supplied parallel lists of quality/profile/ABI/fallback digests are forbidden.
+- The execution plan owns one canonical silicon execution binding. Requests, child leases, K4 authorization context, usage receipts, and replay records reference that binding root; caller-supplied parallel lists of quality/profile/ABI/fallback digests are forbidden. The binding references the exact modality profile plus the approved StateRequirementPlan/retrieval-wave and verification-ladder policy artifacts used by the Attempt so replay can prove the whole execution path, but it cannot override the L7/L10 semantic decisions those artifacts contain.
 
 #### Public and upstream primitives that must not be rebuilt
 
@@ -263,17 +273,21 @@ The implementation plans and code gates must prove at least:
 
 Repository device ledgers establish a more conservative reality than a headline peak:
 
-- best observed short, nominal/thermally-cool Qwen3.5-4B decode result is approximately `34.6 tok/s`; this is not process-cold TTFT or end-to-end turn goodput;
-- a 20-minute run reports approximately `15.9 tok/s` in the final quarter;
+- best observed short, nominal/thermally-cool Qwen3.5-4B decode result is approximately `34.6 tok/s`; this engineering best is not yet an E4/full-quality headline and is not process-cold TTFT or end-to-end turn goodput;
+- the same campaign reports an approximately `16.7 tok/s` 20-minute mean and approximately `15.9 tok/s` in the final quarter;
 - measured memory bandwidth around `59 GB/s` implies a plain-decode roof around `25 tok/s` for the current 4-bit target path;
+- the measured path is approximately `0.82 GB/accepted-token`; a sustained `30 tok/s` path at the observed effective bandwidth needs roughly `0.45 GB/accepted-token`, about a 45% reduction, or a materially higher accepted-token yield per trunk read;
 - existing adaptive multi-token evidence is workload-dependent, with acceptance and thermal behavior determining accepted-token goodput.
+- the measured 14-layer substrate overhead is approximately `11 ms/turn` (about `0.3%` in the cited campaign), so pure supersteps improve boundary cleanliness and fixed overhead but cannot explain or close the 30/40 decode gap.
 
 Therefore:
 
 - `40 tok/s` is a qualified future certification target, not a current general capability;
+- the observed `34.6 → 40` gap is about 15.6%, so cold-resident 40 is a plausible research stretch but not a certified result;
 - short nominal `30+` observations must not be presented as a product SLA;
-- sustained `30 tok/s` is not supported by the current long-run evidence;
+- sustained `30 tok/s` is about 88.7% above the observed final-quarter `15.9 tok/s` and is not supported by the current long-run evidence;
 - the performance target is **accepted, verified, correctly terminated tokens per second**, not speculative proposals per second.
+- cache hits, suffix continuation, prefill reuse, avoided model calls, and council prefix forks are reported as TTFT/task-goodput/calls-avoided improvements; they are never relabelled as decode `tok/s`.
 
 ## 5. Approaches Considered
 
@@ -325,7 +339,7 @@ Costs:
 
 ### Decision
 
-Choose **Approach A**. Approaches B and C remain bounded experiments whose artifacts can be promoted only through the same evidence gates.
+Choose **Approach A+**: Approach A with the minimum physical convergence locked by this revision—one K3 `FULL` control nucleus, one-shot capability conservation, durable Provider egress/effect boundaries, complete workspace/cache/erasure scope, progressive retrieval/verification, and pure LayerCell supersteps. Approaches B and C remain bounded experiments whose artifacts can be promoted only through the same evidence gates; they cannot replace the authority spine through benchmark success alone.
 
 ## 6. Locked Counting and Naming Model
 
@@ -449,6 +463,8 @@ Ring **types** may alternate ΩG → ΩD → ΩG, so the type relation is not cl
 
 Self-scheduling is deterministic within signed budgets. Adaptation can change only fields inside a signed adaptation envelope. Self-repair can rebuild derived projections, caches, indexes, and certified physical state from authority. Self-evolution is shadow/offline evidence for a future signed epoch. On-device loops cannot rewrite executable code, model weights, schema authority, security policy, or the currently executing semantic cores.
 
+Only a terminal receipt proving `converged + verified` may feed an authoritative downstream semantic input or commit path. `cycle_detected`, `budget_exhausted`, `no_progress`, `degraded_with_coverage`, and `indeterminate_needs_reconciliation` remain typed proposal/remand/partial-evidence states; they may be disclosed or used to ask the user, but may never be concatenated into raw user input or relabelled as the loop's authoritative final answer. ΩE uses the same ring protocol for effect reconciliation and offline evolution, but those are distinct modes and cadences: reconciliation can only advance the existing saga, while evolution can only emit shadow evidence for a future signed epoch.
+
 ## 10. LayerCell Boundary
 
 Every semantic layer is implemented as:
@@ -459,7 +475,7 @@ typed ingress membrane
 pure semantic core
     ↓ emit decision/proposal artifact; no direct I/O
 typed egress membrane
-    ↓ attenuate capability; invoke private mechanism port if authorized
+    ↓ validate narrowing; request a K4-materialized one-shot grant; invoke the private mechanism port if authorized
 ```
 
 The pure core:
@@ -475,7 +491,11 @@ The membrane:
 - validates canonical bytes, schema, lineage, audience, epoch, snapshot, deadline, and budget;
 - translates semantic decisions into narrowly scoped mechanism requests;
 - records request and usage receipts;
-- attenuates—not broadens—capabilities across every edge.
+- validates that every requested field is equal or narrower, then asks K4 to materialize the production-v1 one-shot grant; the membrane never derives, signs, or forwards a delegable child grant.
+
+LayerCell is a semantic and proof boundary, not a mandatory actor, process, queue, or fsync boundary. A layer whose applicability predicate proves that no semantic change is required emits a canonical `.noChange` or `.notApplicable` disposition binding the same input/output root, the versioned predicate/proof, current Attempt/snapshot/policy epochs, and `mechanismCalls == 0`.
+
+The existing turn executor may run adjacent pure cores as one synchronous **pure superstep** only when all share the same Attempt, snapshot, capability, and budget view and there is no await, I/O, budget claim, fan-out/join, Provider call, K4 call, publication, effect, visibility, cancellation, or checkpoint boundary between them. It still emits one canonical artifact/subreceipt per semantic layer—including no-op dispositions—then batch-stores the artifacts and exposes them through one K3 compare-and-swap at superstep exit. The executor revalidates the generation vector at entry and exit and discards the unexposed batch if either check fails. It may not coalesce across L5 policy, L14 authorization, required eligibility/verification, or any externally visible boundary. There is no `SuperstepManager`, second actor mesh, or second scheduler.
 
 L14 illustrates the boundary precisely:
 
@@ -544,6 +564,10 @@ Provider trust/deployment classes are explicit:
 | `inProcessCertified` | separate package/target behind the same value contract | performance boundary only; it is **not** malicious-code isolation and shares the host process fault domain |
 | `isolatedExtension` | XPC/extension transport with schema and capability checks | stronger memory/process containment; still untrusted semantic output |
 | `remote` | authenticated network transport | additionally requires L11 disclosure approval, L14 egress authorization, data-residency policy, and a redacted/materialized request projection |
+
+Remote disclosure has a durable boundary rather than a check-then-send race. L11 and L14 first approve the exact materialized `payloadArtifactID`, destination, purpose, and disclosure class, and K4 durably claims the matching one-shot authorization against the current anchored EventLog root. Immediately before transport, the K3 control nucleus performs one conditional transaction over that claim, the still-active Attempt/generation vector, and current policy/deletion epochs, advances the request from `egress_prepared → egress_permit_pending`, and creates one `ProviderEgressBoundaryPermit(payloadArtifactID, destinationProfileDigest, stableEgressOperationID, egressBoundaryInstanceID, AttemptRef, generationVector, policyEpoch, deletionEpoch, disclosureDecisionArtifactID, authorizationGrantArtifactID, requestID, boundaryOwnerEpoch, bootSessionID)`. That pending permit is not yet usable. K4 then atomically covers the permit's committed source root and returns the durable `BoundaryAnchorReceipt` bound to the source/covering roots, permit, instance, stable operation, grant, owner/boot epoch, and short monotonic arm deadline. The existing K3 Provider-gateway state owner—not the transport adapter—performs the sole conditional consumption, requiring both artifacts, unchanged generations/epochs, the same live owner/boot epoch, and an unexpired arm deadline; it advances `egress_permit_pending → egress_boundary_armed` and emits `BoundaryArmReceipt` with the call-handoff deadline. Only that CAS winner may invoke the transport once before the deadline; it later records `sent_or_unknown` and any remote receipt. Two concurrent consumers therefore cannot both send, and no `EgressBroker` is introduced.
+
+K4 anchor issuance conservatively means disclosure is possible if the process crashes before K3 durably records arm or denial; recovery queries the same permit/anchor/remote operation and never creates another permit or blind resend. Erasure or revocation before pending-permit creation, or a later one that wins the immediate arm CAS, produces durable denial and proves no transport call. Otherwise, after the anchor exists it prevents every later chunk, release, state adoption, and new send but cannot claim the payload was undisclosed; the erasure saga waits for a destination purge/query receipt when supported, otherwise remains `erasure_indeterminate` and permanently quarantined.
 
 `ProviderProposal` and `ProviderClaimReceipt` are untrusted claims about what the Provider attempted and observed. Qinao's supervisor independently records the actual request binding, timing, cancellation, bytes/tokens accepted, state transition, and terminal result in a `ProviderObservedReceipt`; a Provider receipt never promotes itself.
 
@@ -671,25 +695,31 @@ workspaceReadSnapshotArtifactID when state-dependent
 generationVectorArtifactID + logicalEpoch
 bootSessionID or durable warrant epoch
 notBefore + monotonicDeadline / durable expiry
-maxUses + maxFanout + maxBytes + maxCost
-parentGrantArtifactID
+maxUses + maxFanout + maxBoundaryInstances + maxBytes + maxTokens + maxCost
+authorizationBasisArtifactID
 revocationGeneration
 nonce
 ```
 
 The unsigned canonical grant payload is stored through Artifact Mesh; its `BASArtifactID` is the grant identity. Its K4 signature is a child attestation. A self-contained XPC/wire wrapper may carry grant bytes, artifact ID, and attestation together, but it is not another grant schema or identity. K4 remains the only mint/reserve/claim/spend authority.
 
-The generation-vector artifact is derived from the one referenced Attempt/workspace snapshot and contains workspace, window, session, task, Attempt, capability, policy, deletion, and kill generations. It is loaded and equality-checked at use; callers cannot supply an alternate loose tuple. Provider, retrieval, release, effect, and state-mutation grants require an Attempt + snapshot closure. A durable warrant cannot act directly; it may only authorize K4 to derive a narrower Attempt-scoped grant. Missing required scope/snapshot/generation denies.
+The generation-vector artifact is derived from the one referenced Attempt/workspace snapshot and contains workspace incarnation/restoration plus workspace, window, session, task, Attempt, capability, policy, deletion, and kill generations. It is loaded and equality-checked at use; callers cannot supply an alternate loose tuple. Provider, retrieval, release, effect, and state-mutation grants require an Attempt + snapshot closure. A durable warrant cannot act directly; it may only authorize K4 to derive a narrower Attempt-scoped grant. Missing required scope/snapshot/generation denies.
 
-Rules:
+Production-v1 rules:
 
 - absent audience, operation, resource, purpose, projection, epoch, or digest binding means deny;
-- child grants can only reduce audience, operation, projection, duration, uses, bytes, or cost;
+- executable Attempt-scoped grants are one-shot and non-delegable: `maxUses == 1`, `maxFanout == 0`; runtime code cannot mint a child grant;
+- every resource, subject/audience, operation, purpose, projection, scope, snapshot, digest, generation, epoch, deadline, byte, and cost field must be equal to or a strict subset of the authorizing decision/warrant—omission or widening denies;
+- `authorizationBasisArtifactID` is audit lineage only for a K4-materialized grant; it never authorizes holder-driven delegation. A durable warrant is not executable. K4 may derive an Attempt grant only in the same helper transaction that reserves the warrant ceiling and proves, for every bounded dimension, `spent + outstandingDerivedReservations + newReservation ≤ warrantCeiling`;
 - grant maxima are authorization ceilings; the one referenced `BudgetLease`/budget owner owns reservation and atomic spend, and usage receipts prove `spent ≤ lease ≤ grant` without decrementing two counters;
 - a queued task revalidates Attempt/generation vector, revocation generation, deadline, and snapshot at start;
 - short-lived grants bind `bootSessionID` and monotonic deadlines; a reboot invalidates them;
 - long-lived warrants bind a durable, server/operator-authoritative epoch and wall-clock policy;
 - capability bytes are never used as an implicit data payload.
+
+General multi-use or transitive delegation is outside production v1 and requires a new reviewed design amendment with a complete attenuation lattice and aggregate-reservation fault model. It cannot be enabled by changing `maxFanout` in configuration.
+
+One use is the atomic K4 claim for one exact stable operation identity. A bounded Provider or release stream may emit many ordered chunks/batches under that already-claimed operation/lease: Provider chunks are observations, while release sink batches are external boundary instances. Neither is a repeated grant use or permission to start a second operation. Every external instance has a unique `boundaryInstanceID`; K4 atomically enforces non-overlapping monotonic ranges and `anchoredInstances/bytes/tokens/cost ≤ maxBoundaryInstances/maxBytes/maxTokens/maxCost`. Non-stream operations set `maxBoundaryInstances == 1`. A new stable operation still requires a fresh one-shot grant.
 
 “Exact digest” is phase-aware:
 
@@ -715,6 +745,10 @@ authority
 The epoch is an unsigned canonical artifact payload whose authorization is a child attestation. Runtime boundaries receive typed epoch and attestation artifact references; the epoch does not embed a second signature identity.
 
 Kill/revoke and the full Attempt/generation vector are checked at ingress, queue start, every Provider chunk acceptance, mechanism dispatch, provisional/exact publication boundary, Zone-C pre-dispatch boundary, effect authorization, state commit, and seal—not only once when an actor first receives input.
+
+Attempt-, policy-, authority-, and deletion-scoped runtime revocation has one mandatory order: L14's exact revocation decision first drives a K3 conditional transaction that advances the affected generation/epoch, fences descendants, and appends `RevocationFenceReceipt`; only after that commit may K4 mark the matching grant/operation revoked. K4 rejects a standalone runtime-revoke request that lacks the exact covered K3 fence artifact. Because pending-permit arm uses the same K3 nucleus, revoke-fence versus arm is one physical-WAL race with one winner, not two eventually consistent checks.
+
+The K4 boundary-anchor transaction simultaneously revalidates its own current grant/claim, revocation, key, boot/warrant, policy, deadline, and cumulative-budget state. Its committed receipt is the final K4 sovereign gate for that exact boundary instance; a later K4-local emergency/key revoke blocks every new anchor but cannot promise recall of an already anchored instance, which is already conservatively boundary-possible. K4 also requests the K3 fence path immediately for such an emergency. This defines a linearization order rather than claiming impossible revocation of an external call already dispatched.
 
 If L14/K4 is unavailable:
 
@@ -750,7 +784,7 @@ Remand invariants:
 - the resolution set must grow monotonically or the ring terminates;
 - missing mandatory L5 or L14 input fails closed;
 - optional retrieval lanes may degrade only with an explicit coverage vector;
-- a branch stopped by cycle or budget cannot acquire a committable capability unless a downstream authority explicitly accepts the degraded state.
+- a branch stopped by cycle, missing witness, or budget cannot acquire a committable capability and its last projection can never be reclassified as converged. A downstream authority may accept only its verified `CoverageVector` to construct a new refusal, partial-response disclosure, user question, or new Attempt; it cannot adopt the stopped branch's proposed answer/state/effect.
 
 ## 14. Canonical End-to-End Execution DAG
 
@@ -766,9 +800,11 @@ flowchart TD
     W[L4 World Prior] --> F[L7 State Requirement Planner]
     H[L5 Host Constitution] --> F
     E --> F
-    F --> G[L8 SemanticStateLake Snapshot and Multi-lane Retrieval]
-    G --> I[L7 Eligibility, Fusion, State Market, Conflict and Coverage]
-    I --> MS[Host Model Selection and Provider Capability Admission]
+    F --> G[L8 Snapshot-bound Progressive Retrieval Waves]
+    G --> I[L7 Hard Eligibility, Dedupe, Fusion and Coverage Reservoir]
+    I --> GR[L7 Grounding Proposal Validation and Conflict Resolution]
+    GR --> SM[L7 Final State Market and Coverage Vector]
+    SM --> MS[Host Model Selection and Provider Capability Admission]
     MS --> J[L3 Context Budget Allocator and State Compiler]
     J --> PE[L11 Provisional Eligibility]
     PE --> PG[L14 Bounded Provisional Release Grant]
@@ -812,13 +848,13 @@ Input Normalizer is Adapter/IO infrastructure outside Semantic Authority. It:
 
 ### 14.2 Admission before expensive work
 
-L14 preflight rejects structurally forbidden operations, invalid epochs, unavailable sovereign state, and impossible policy scopes before model load or retrieval fan-out. It does not pre-authorize the eventual effect. A later low-risk provisional grant may bind request plus output constraints before content exists, but it cannot authorize tools or state; exact response/effect authorization occurs only after the corresponding result or effect-request closure is known.
+L14 preflight rejects structurally forbidden operations, invalid epochs, unavailable sovereign state, and impossible policy scopes before model load or the first retrieval wave. It does not pre-authorize the eventual effect. A later low-risk provisional grant may bind request plus output constraints before content exists, but it cannot authorize tools or state; exact response/effect authorization occurs only after the corresponding result or effect-request closure is known.
 
 ### 14.3 Parallelism
 
 Parallelism exists only where artifacts are independent and budgets permit:
 
-- retrieval lanes may fan out under one snapshot;
+- independent queries inside one already admitted retrieval wave may fan out under one snapshot;
 - candidate branches may fan out under ΩD;
 - CPU parsing/index work may overlap low-intensity waits;
 - a heavy neural backend retains one authoritative result owner;
@@ -832,19 +868,21 @@ The system supports many independent logical context windows without pretending 
 
 ```text
 authorityScopeDigest
-workspaceID + workspaceGeneration
+workspaceID + workspaceIncarnationID + workspaceGeneration
 windowID + windowGeneration
 sessionID + sessionGeneration
-capabilityEpoch + policyEpoch + deletionEpoch
+restorationEpoch + capabilityEpoch + policyEpoch + deletionEpoch
 ```
 
-Stable IDs name containment; their generations fence change at the smallest safe scope. A window-local edit advances `windowGeneration`, not every sibling window. Workspace-wide authority/state-root change advances `workspaceGeneration`; session replacement advances `sessionGeneration`. The whole value has one Artifact Mesh identity, so callers cannot mix IDs from one generation with epochs from another.
+Stable IDs name containment; their generations fence change at the smallest safe scope. `workspaceIncarnationID` is a fresh durable identity for an installation/key lineage, while `restorationEpoch` advances when an older durable image is restored or imported; matching numeric generations from an obsolete image therefore cannot create an ABA cache/grant hit. On open, the workspace compares its value with the existing K4/key-lifecycle installation manifest outside the restorable workspace image; if freshness cannot be proven, it receives a new quarantined incarnation rather than resuming old grants/caches. A window-local edit advances `windowGeneration`, not every sibling window. Workspace-wide authority/state-root change advances `workspaceGeneration`; session replacement advances `sessionGeneration`. The whole value has one Artifact Mesh identity, so callers cannot mix IDs from one generation with epochs from another. Cross-uninstall/arbitrary-rollback continuity requires an external operator/server monotonic anchor; without one, the system never claims global anti-rollback.
 
-The task hierarchy is structural and finite:
+The product exposes a readable default decomposition:
 
 ```text
 Mission → Objective → WorkUnit → Attempt → SolutionArtifact
 ```
+
+Storage and scheduling do not hard-code those four semantic depths. Mission, Objective, WorkUnit, and any approved future decomposition are versioned `TaskNode.kind` values in one bounded typed DAG; `Attempt` remains the unique execution, compare-and-swap, cancellation, recovery, and effect-fencing boundary. Every graph declares maximum depth, branches, outstanding Attempts, and budget before admission.
 
 One canonical `AttemptRef` binds every derived object:
 
@@ -855,7 +893,7 @@ turnID + branchID
 attemptID + attemptGeneration
 ```
 
-Provider requests/chunks, capabilities, snapshots, compiled context, caches, heavy-seat leases, response spool, publication records, effect receipts, and state commits all carry that same Attempt binding. Each WorkUnit has one `activeAttempt` compare-and-swap head. Cancellation, remand, recovery, or replacement fences the old attempt generation before a successor can start. Late Provider, retrieval, tool, or publication results from a fenced generation may be retained as audit evidence but cannot release, commit, activate, or spend authority.
+Provider requests/chunks, capabilities, snapshots, compiled-context/cache acquisitions, heavy-seat leases, response spool, publication records, effect receipts, and state commits all carry that same Attempt binding. Immutable physical cache content may outlive the Attempt only under Section 17's split identity; every use still obtains a fresh Attempt-bound acquisition. Each WorkUnit has one `activeAttempt` compare-and-swap head. Cancellation, remand, recovery, or replacement fences the old attempt generation before a successor can start. Late Provider, retrieval, tool, or publication results from a fenced generation may be retained as audit evidence but cannot release, commit, activate, or spend authority.
 
 Task-graph mutation is an explicit patch over a base root:
 
@@ -884,7 +922,7 @@ Logical windows have three physical residency classes:
 - `warm`: immutable compiled artifacts and compatible cache/state references may remain under the MemoryLedger, but no independent heavy runtime is implied;
 - `cold`: only durable canonical events/artifacts/projections remain and context is rebuilt on admission.
 
-Each Attempt has at most one authoritative Provider lease. The process has one local accelerator-heavy `HeavyPhaseLease`; prefill is chunked and scheduling is weighted-fair with aging and a profile-derived maximum uninterruptible quantum. Remote I/O and CPU/storage work may overlap other Attempts, but a remote and local Provider cannot race to produce the authoritative result for the same Attempt. Revoking a remote lease does not claim the remote machine physically stopped: Qinao atomically advances the acceptance generation, fences the old lease, and rejects every late chunk/receipt before admitting a successor. Optional parallel proposals remain explicitly shadow/non-authoritative and can never win through arrival order.
+Each Attempt has at most one authoritative Provider lease. The process has one local accelerator-heavy `HeavyPhaseLease`; prefill is chunked and scheduled by hierarchical fair queuing in the order `authority → workspace → window → Attempt`, with per-window outstanding caps/token buckets, aging/minimum service, and a profile-derived maximum uninterruptible quantum. Creating many Attempts cannot buy a window additional scheduler weight. Remote I/O and CPU/storage work may overlap other Attempts, but a remote and local Provider cannot race to produce the authoritative result for the same Attempt. Revoking a remote lease does not claim the remote machine physically stopped: Qinao atomically advances the acceptance generation, fences the old lease, and rejects every late chunk/receipt before admitting a successor. Optional parallel proposals remain explicitly shadow/non-authoritative and can never win through arrival order.
 
 `HeavyPhaseLease` deliberately covers work coupled to this iPhone's accelerator residency, peak memory, power, and thermal envelope. Remote compute is outside that physical envelope and uses a bounded K1 network/Provider lease, so it may overlap a different local Attempt; this is not a second local heavy seat. The invariant is therefore **one local heavy phase process-wide plus one authoritative acceptance generation per Attempt**, not an unverifiable claim that a remote machine is idle.
 
@@ -907,7 +945,7 @@ At Attempt admission, K3 creates one immutable `WorkspaceReadSnapshot` Artifact 
 AttemptRef artifact ID (transitively binds ContextWorkspaceRef)
 authorityScopeDigest equality proof
 workspaceRoot + taskGraphRoot + semanticStateRoot
-versionVector + deletionEpoch
+versionVector + workspaceIncarnationID + restorationEpoch + deletionEpoch
 eventLogHighWatermark
 ordered laneWatermarks[]
 policyEpoch + schemaEpoch
@@ -917,7 +955,7 @@ openedLogicalTime
 
 There is one canonical `LaneWatermark` shape: lane ID, event/index sequence, root/integrity commitment, source/provenance identity, completeness, and required proof/attestation reference. Snapshot, lane result, and replay reuse that exact type. A dictionary of bare counters or a replay-specific watermark wrapper is not allowed because it would discard proof and ordering fields.
 
-All projections are read at the same EventLog high watermark. A lane may be older only when its canonical watermark explicitly proves that staleness and policy accepts the resulting coverage state; it cannot silently read a newer event and create a fractured snapshot. Every lane query/result, task-graph patch, compiled context, cache key, Provider request, release, and commit binds the workspace snapshot plus Attempt generation. Provider ingress/chunk acceptance, provisional/exact release, effect authorization, and state commit revalidate the current workspace/window/task/capability/policy/**deletion** epochs; erasure or authority change fences an older snapshot before it can disclose or commit. Required lanes that cannot satisfy the snapshot fail or remand according to policy. Optional late results are recorded for a later epoch and cannot change the completed Attempt.
+All projections are read at the same EventLog high watermark. A lane may be older only when its canonical watermark explicitly proves that staleness and policy accepts the resulting coverage state; it cannot silently read a newer event and create a fractured snapshot. Every lane query/result, task-graph patch, compiled context, cache acquisition/use receipt, Provider request, release, and commit binds the workspace snapshot plus Attempt generation. Provider ingress/chunk acceptance, provisional/exact release, effect authorization, and state commit revalidate the current workspace incarnation/restoration epoch plus window/task/capability/policy/**deletion** epochs; erasure, restore, or authority change fences an older snapshot before it can disclose or commit. Required lanes that cannot satisfy the snapshot fail or remand according to policy. Optional late results are recorded for a later epoch and cannot change the completed Attempt.
 
 ### 15.3 Retrieval lanes
 
@@ -928,6 +966,19 @@ The standard lanes are:
 - dense semantic;
 - temporal / episode;
 - entity / relation.
+
+L7 expresses need before mechanism selection through one `StateRequirementPlan`:
+
+```text
+required claim/slot coverage + required/optional lane classes
+ordered retrieval waves with versioned trigger predicates
+per-wave candidate/byte/token/latency/energy budgets
+minimum authority/freshness/provenance and conflict tolerance
+grounding and verification requirements
+termination, remand, and degraded-coverage policy
+```
+
+Required lanes and required coverage cannot be skipped by a marginal-value optimization. Optional expansion is admitted only when a deterministic, policy-versioned upper bound on expected marginal required-slot gain or conflict-risk reduction exceeds its incremental token, latency, memory, and energy cost. Every opened or skipped wave emits a receipt under the same snapshot; a skipped wave records the evaluated trigger and bound rather than pretending it ran.
 
 Each `LaneQuery` carries:
 
@@ -973,7 +1024,7 @@ The SQL/index filter is a lossless, equality-tested projection of the L7 predica
 
 ### 15.5 State Market
 
-Eligible candidates enter constrained multi-objective selection. The preserved vector is:
+Eligible candidates first enter a bounded, coverage-preserving reservoir; this is not final token-budget pruning and must retain unresolved conflicts and at least one admissible candidate for every reachable required claim. After optional/required grounding features are validated, the same L7 owner performs the final constrained multi-objective selection. The preserved vector is:
 
 ```text
 relevance
@@ -985,7 +1036,7 @@ tokenCost
 conflictRisk
 ```
 
-The implementation uses fixed-point/integer arithmetic, a versioned objective, stable artifact-ID tie-breaks, and a bounded epsilon/Pareto front. It may use staged optimization, Pareto filtering, or a constrained objective, but it must not erase individual dimensions into an uninspectable magic scalar or rely on platform-dependent floating-point order.
+The implementation uses fixed-point/integer arithmetic, a versioned objective, stable artifact-ID tie-breaks, and a bounded epsilon/Pareto front. Final selection is a bounded claim-coverage/concentration/conflict-aware knapsack or submodular greedy procedure whose marginal value is new required coverage, diversity, utility, and conflict reduction per token. It may use staged optimization or Pareto filtering, but it must not reduce the decision to score sorting, erase individual dimensions into an uninspectable magic scalar, or rely on platform-dependent floating-point order.
 
 Minimum selection requirements:
 
@@ -1008,9 +1059,18 @@ L7 emits typed conflict sets keyed by claim identity. Conflict resolution consid
 
 Material unresolved conflicts survive into L10/L11 or cause remand. They are never silently removed by a score tie-break.
 
-The optional small grounding model is an external Provider proposal lane after deterministic retrieval/fusion, never an authority. Policy marks grounding `required` or `optional` for the request class. A required grounding failure blocks/remands; an optional failure is recorded in coverage. The model may propose claim/evidence alignments, contradiction labels, or compression, but deterministic Qinao validation can prove only structure, referenced spans/artifacts, eligibility, scope, freshness, and rule compliance—not that a semantic judgment is true. Accepted labels retain `proposal` epistemic status and cannot raise authority.
+The optional small grounding model is an external Provider proposal lane after hard eligibility, lane-local deduplication, bounded fusion, and coverage-preserving reservoir admission—but before final token-budget pruning. Policy marks grounding `required` or `optional` for the request class. A required grounding failure blocks/remands; an optional failure is recorded in coverage. The model may propose claim/evidence alignments, contradiction labels, or compression, but deterministic Qinao validation can prove only structure, referenced spans/artifacts, eligibility, scope, freshness, and rule compliance—not that a semantic judgment is true. Accepted labels retain `proposal` epistemic status and cannot raise authority.
 
-If validated proposal features change relevance/utility/conflict inputs, the **same** L7 State Market owner reruns its versioned deterministic objective once over the same eligible set and emits the final selection/coverage receipt. This is recomputation by one owner, not a second market or grounding-owned truth. A fluent proposal cannot hide a failed required lane, introduce a new candidate, or establish authority by itself.
+The **same** L7 State Market owner then runs its versioned deterministic final objective once over the same eligible reservoir and emits the final selection/coverage receipt. This is one owner completing one staged decision, not a second market or grounding-owned truth. A fluent proposal cannot hide a failed required lane, introduce a new candidate, or establish authority by itself.
+
+L10 applies one bounded verification ladder to the selected evidence and later output:
+
+1. deterministic schema, canonical span, provenance, scope, snapshot, and Attempt binding;
+2. deterministic required-claim coverage, citation closure, conflict disclosure, tool/termination grammar, and policy checks;
+3. a small NLI/grounding Provider proposal only when request policy requires it or deterministic checks leave a declared semantic uncertainty;
+4. a heavy verifier only when residual risk exceeds its policy threshold and the versioned upper bound on expected error/conflict reduction exceeds incremental token, latency, memory, and energy cost.
+
+Required ladder stages cannot be skipped by marginal value. Each optional stage emits its residual-risk/value-of-information calculation and cost receipt whether it runs or is skipped. The one L10 owner emits the final `ConvergenceDecision`; Provider confidence cannot promote itself, and verification failure may remand only through the bounded RSI protocol.
 
 ### 15.7 State prepare and commit truth
 
@@ -1078,9 +1138,9 @@ requested
 → sealed_blinded_tombstone
 ```
 
-The first K3 transaction appends the request/quarantine transition, advances `deletionEpoch`, removes query eligibility, and transitively revokes/fences affected snapshots, caches, grants, Provider leases, and Attempts **before** any physical deletion. Every later transition is append-only and replayable. Key destruction has a durable pending state; after a crash, recovery queries key absence and continues rather than recreating it. Each cache/index/Provider/storage owner returns a purge receipt, then a closure rescan verifies no eligible derivative remains. An unreachable Provider/backup produces `erasure_indeterminate`: access remains permanently quarantined and the uncertainty is disclosed; the system never reports verified erasure or re-enables reads.
+The first K3 transaction appends the request/quarantine transition, advances `deletionEpoch`, removes query eligibility, and transitively revokes/fences affected snapshots, caches, grants, Provider leases, and Attempts **before** any physical deletion. Every later transition is append-only and replayable. Key destruction has a durable pending state; after a crash, recovery queries key absence and continues rather than recreating it. Mandatory purge owners include process RAM/frontstage state, spill and compiled-context files, FTS/vector/temporal/entity/linguistic projections, neural/prefix/session checkpoints, verifier/result caches, Provider-controlled caches, artifact payload owners, and every controlled backup/export. Each owner returns a persisted purge-or-absence receipt, then a frozen closure rescan verifies no eligible derivative remains. A swallowed deletion error, best-effort `try?`, or deletion from only one tier can never produce a completed receipt. An unreachable Provider/backup produces `erasure_indeterminate`: access remains permanently quarantined and the uncertainty is disclosed; the system never reports verified erasure or re-enables reads.
 
-This promises immediate logical revocation, cryptographic erasure of locally controlled ciphertext, and best-effort physical purge; it does not claim flash-cell bit zeroing or deletion of an unreachable third-party copy without a receipt. Snapshots/caches/releases/commits bind and recheck `deletionEpoch`, and RSI/projectors are forbidden to reconstruct deleted material from obsolete derivatives.
+This promises immediate logical revocation, cryptographic erasure of locally controlled ciphertext, and best-effort physical purge; it does not claim flash-cell bit zeroing or deletion of an unreachable third-party copy without a receipt. EventLog payload retention/compaction is sequence/checkpoint based, never a wall-clock delete that can remove a tombstone while retaining its admission event. The blinded monotonic tombstone and deletion epoch survive every permitted compaction. Snapshots/caches/releases/commits bind and recheck `deletionEpoch`, and RSI/projectors are forbidden to reconstruct deleted material from obsolete derivatives.
 
 ### 15.9 Sparse linguistic annotation graph
 
@@ -1100,29 +1160,34 @@ L6 owns situation/intent/dialogue-act interpretation, L7 owns evidence/conflict/
 
 ### 15.10 Retrieval execution chain and storage ownership
 
-The default query plan is cheap-to-expensive and authority-preserving:
+The default query plan is progressive, cheap-to-expensive, and authority-preserving:
 
 ```text
 L7 EligibilityPredicate
 → compiled SQL/index hard prefilter
-→ exact/grep
-→ SQLite FTS5/BM25
-→ dense ANN
-→ temporal/episode
-→ entity/relation graph
-→ existing Rust reciprocal-rank fusion
+→ W0 mandatory SQL/metadata + exact/grep + SQLite FTS5/BM25
+→ W1 dense ANN only for required-coverage deficit or lexical ambiguity
+→ W2 temporal/episode only for temporal intent, episode order, or update conflict
+→ W3 entity/relation only for multi-hop, coreference, or entity constraints
+→ per-lane dedupe + source/lane caps + bounded Rust reciprocal-rank fusion
 → L7 full hard-eligibility validation
-→ deterministic State Market frontier
-→ optional/required small-model grounding proposal
+→ coverage-preserving bounded reservoir
+→ W4 optional/required small-model grounding proposal
 → deterministic grounding validation
-→ bounded final State Market recomputation when accepted features changed
+→ conflict resolution + final coverage/diversity/conflict/token State Market
 ```
 
-Lanes may fan out after hard SQL/scope pruning when the profile proves net benefit; the written order is a logical guard order, not a requirement to serialize every I/O. Exact/FTS keeps lexical precision, dense retrieval recovers semantic paraphrase, temporal and entity lanes preserve episode/relation structure, and fusion retains lane/provenance labels through selection.
+Independent queries inside an already admitted wave may fan out after hard SQL/scope pruning when the profile proves net benefit; future waves do not start speculatively. W0 is mandatory whenever state is required. W1–W3 use the `StateRequirementPlan` triggers and optional marginal-value gate above. A required temporal/entity lane cannot be skipped merely because an earlier lexical result scored highly. Exact/FTS keeps lexical precision, dense retrieval recovers semantic paraphrase, temporal and entity lanes preserve episode/relation structure, and fusion retains lane/provenance labels through selection.
+
+Before RRF, each lane deduplicates candidate identity; the same candidate contributes at most once per lane. The versioned fusion policy has finite validated `k`, explicit lane/source caps, correlated-lane caps, and stable tie-breaking so repeated rows or cloned pseudo-lanes cannot manufacture authority or crowd out required coverage.
 
 “grep” means a bounded in-process literal/regex scan over already authorized materialized bytes; iOS does not spawn a shell process. It emits span/provenance receipts and is skipped when FTS metadata proves the same query can be answered more cheaply.
 
-K3 has one SQLite ownership domain, and each database path/WAL has exactly one Swift connection-pool/write owner. Existing Swift event/memory stores converge as ports or migrations inside that domain and supply immutable rows by extending the existing narrow Rust C-ABI seam to reuse the existing pure Rust RRF implementation; Swift and Rust must not independently open the same WAL. A future Rust database owner is allowed only as an end-to-end storage migration with cutover/replay proof and retirement of the Swift owner, never dual-open coexistence. Metal/MLX is reserved for certified dense/neural kernels; C/C++ is used only at stable upstream/runtime ABI seams, not to duplicate orchestration or authority already owned in Swift/Rust/SQL.
+K3 authoritative control truth has exactly one **control nucleus**: one SQLite database file, one WAL, one existing connection-pool/write owner, `journal_mode=WAL`, and `synchronous=FULL` for authoritative commits. The same physical transaction contains the EventLog entry/integrity-chain advance, workspace/task/Attempt heads and generations, BudgetLease claims, outbox/prepare/stage heads, erasure rank, authoritative projector watermarks, and stream/publication/Provider-egress/effect boundary-permit state. No `ATTACH`-WAL transaction, two-phase commit, custom WAL, or second EventLog may be used to claim that atomicity.
+
+Large immutable artifact/blob bytes are written and verified first under content identity and may remain orphaned after a crash; the K3 nucleus then references them atomically. FTS/vector/calendar/linguistic/cache tables are replayable projections and may use separate database files with exactly one owner each and `synchronous=NORMAL`, but they are never joined into the authoritative commit and must publish a source watermark/integrity root before query eligibility. K4 claim storage and Zone-C dispatch storage each use their own single `FULL` database; cross-domain closure uses stable IDs and the specified saga, never a distributed transaction. Existing Swift event/memory stores therefore converge by migration or port into the nucleus/projection split. Swift and Rust must not independently open the same WAL. A future Rust database owner is allowed only as an end-to-end cutover with replay proof and retirement of the Swift owner. Metal/MLX is reserved for certified dense/neural kernels; C/C++ stays at stable upstream/runtime ABI seams.
+
+Authoritative EventLog mode always enables the one existing integrity chain. Periodic checkpoints anchor `(eventLogHighWatermark, chainRoot)` in K4. Every external Provider-egress, stream, publication, or effect boundary additionally uses one common handshake: K3 first creates a non-usable pending permit with a unique `boundaryInstanceID`, `boundaryOwnerEpoch`, and `bootSessionID` under one stable authorized `operationID`, then commits its EventLog source root; K4 atomically revalidates its current grant/claim, revoke/key/epoch/deadline state and cumulative ceilings, then records `BoundaryAnchorReceipt(sourceWatermark, sourceRoot, coveringWatermark, coveringRoot, permitArtifactID, boundaryInstanceID, operationID, authorizationGrantArtifactID, capabilityUseReceiptArtifactID, boundaryOwnerEpoch, bootSessionID, monotonicArmDeadline)` in the existing helper ledger. The K3 active boundary-fence owner performs the sole current-generation/epoch CAS from pending to armed/possible only under that same live owner/boot epoch and before the short signed arm deadline, then emits canonical `BoundaryArmReceipt` with a still-shorter monotonic call-handoff deadline. The direct sink/transport owner may call only as that CAS winner before the handoff deadline; Zone C may call only after its own local CAS consumes the exact permit, anchor, and arm receipt once before that deadline. Suspension, deadline expiry, owner/boot loss, or a lost reply makes the anchor/arm query/reconcile/finalize-only. A durable K3 CAS-denial receipt proves that a concurrent K3-first revoke/erasure fence won before arm; absence of either arm or denial after ownership loss remains indeterminate. A tail not covered by the required anchor policy may be replayed and inspected but cannot create or arm a new external boundary. Mechanical arm/finalization events extend the same chain and are covered by the next periodic/boundary anchor; they do not authorize a second call. This extends one chain and the existing boundary state machines; it creates neither a second audit sequence nor a distributed transaction.
 
 ## 16. Context Budget Allocation and State Compilation
 
@@ -1144,7 +1209,7 @@ L3 receives only L7-approved projections. It allocates a total context budget ac
 - tokenizer and template/tool-protocol digest;
 - ordered projection digests;
 - position convention;
-- prefix-cache key;
+- prompt-prefix physical-key descriptor plus fresh acquisition requirements;
 - context budget receipt;
 - the canonical `executionBindingArtifactID`, from which QualityIdentity and the exact per-turn `NeuralExecutionContractDigest` are derived and equality-checked.
 
@@ -1176,24 +1241,76 @@ Caches are distinct and independently budgeted:
 
 | Cache | Owner | Key requirements | Recovery rule |
 |---|---|---|---|
-| compiled context cache | L3/K3 | projection order, tokenizer/template, policy epoch | rebuild from artifacts |
-| prefix cache | L2/K2 | exact model/quant/tokenizer/template, generation contract, prefix tokens, StateABI | discard/re-prefill on mismatch |
-| NeuralStateCache | L2/K2 | session, position, exact QualityIdentity, NeuralExecutionContractDigest, StateABI | never reinterpret bytes under another ABI |
+| compiled context cache | L3/K3 | exact `PhysicalContentKey` projection plus a fresh `AcquisitionScope`, ordered projection/token-span digests | rebuild from artifacts |
+| prompt-bound prefix cache | L2/K2 | exact `PrefillPhysicalStateKey` plus a fresh `AcquisitionScope`, accepted prompt-prefix digest/position, complete hybrid `PrefillStateABIDigest` | discard/re-prefill on mismatch; initialize new decode-only state |
+| in-Attempt NeuralStateCache | L2/K2 | exact `ContinuationCheckpointKey` plus a fresh same-Attempt `AcquisitionScope`, logical checkpoint version and accepted boundary | never cross Attempt or reinterpret bytes under another full ABI/contract |
 | Core AI specialization/AOT cache | Adapter/IO | source/AOT digest, device architecture, OS build, options, function/tensor ABI | cache miss/OS update triggers re-specialization and profile invalidation |
 | SemanticStateLake index cache | K3 | snapshot/schema/index epoch | reload/rebuild without changing semantic source of truth |
-| verifier/result cache | L10 mechanism port | exact input/model/policy/verifier digests | never cross policy or verifier epoch |
+| verifier/result cache | L10 mechanism port | exact physical input/model/verifier identity plus fresh policy/authority acquisition | never cross policy or verifier epoch |
 
 A cache is an optimization, not evidence of placement, correctness, authorization, or durability.
 
-Every entry carries a `CacheVisibilityClass`, authority/workspace scope where private, source snapshot/deletion/policy epochs, exact model/runtime binding where neural, and an immutable content identity. Sharing is allowed only as follows:
+Every cache kind derives its admission from one canonical composite `CacheScopeContract = { PhysicalContentKey, AcquisitionScope }`; individual caches may project out fields only when a schema proof shows that field cannot affect their bytes, visibility, policy, or semantics. The physical key identifies immutable byte/state semantics:
+
+```text
+model lineage + architecture + weights/quant digests
+cache-kind bundle/runtime/build semantic projection digests
+signed modalityContractDigest
+cache-kind semantic/ABI projection digests
+tokenizer + template + tool-protocol digests
+exact canonical input/projection/token/prefix digest + accepted position/boundary
+source-provenance closure digest
+storage-domain tag:
+  public, or keyed(authority scope + workspaceIncarnation
+  + visibilityCompartmentID + cache privacy-key epoch)
+cache-kind schema/version
+```
+
+Neural state has two non-interchangeable physical keys:
+
+```text
+PrefillPhysicalStateKey = H(
+  physical cache/storage-domain identity,
+  PrefillStateSemanticsDigest,
+  PrefillStateABIDigest,
+  exact canonical prompt tokens + position/mask boundary
+)
+
+ContinuationCheckpointKey = H(
+  PrefillPhysicalStateKey,
+  AttemptRef + logical checkpoint version,
+  full QualityIdentity + NeuralExecutionContractDigest + StateABIDigest,
+  accepted history + pending token + RNG/sampler/logit/grammar state
+)
+```
+
+`PrefillStateSemanticsDigest` is the canonical bundle projection containing every fact that can change prompt-prefill tensors: model/architecture/weights/quantization, tokenizer/template/tool/modality input projection, config/RoPE/position/mask convention, numerical dtype and runtime/kernel state semantics, and hybrid attention-KV plus GDN/recurrent/convolution geometry. It explicitly excludes temperature/warpers, seed/RNG cursor, decode-only logit processors, stop/tool grammar state, and maximum output tokens because those are initialized fresh after prefix acquisition and cannot affect prompt-prefill tensors. `PrefillStateABIDigest` is the matching schema-declared projection of full `StateABIDigest`; an excluded field needs a count-pinned non-interference proof, otherwise it stays in the prefill key. Unknown projection/schema means miss.
+
+The keyed private storage-domain tag prevents identical low-entropy content in unauthorized visibility compartments from becoming the same probeable physical identity, while remaining stable across compatible Attempts inside one expressly shared compartment. Window-private content uses a window compartment; cross-window reuse requires an explicit shared-workspace compartment authorized to both windows. The scoped cache privacy-key epoch advances on restoration and on erasure/policy invalidation of the affected compartment, so an obsolete physical domain cannot satisfy a fresh acquisition even when its raw content digest matches.
+
+The acquisition scope is a fresh, non-transferable lease for the requesting Attempt:
+
+```text
+authority scope + workspaceIncarnation + visibilityCompartmentID + visibility class
+current workspace/window/session/Attempt references and generations
+current WorkspaceReadSnapshot root + eligibility proof for the source-provenance closure
+policy + capability + deletion + restoration epochs
+lease ID + deadline
+```
+
+Any missing, unknown, or unequal required physical field, or any failed current-scope/epoch/provenance check, is a miss before physical state bytes are touched. Neural misses perform canonical re-prefill; no heuristic similarity, same model name, same session string, or matching tensor shape can upgrade a miss to a hit.
+
+Every entry carries its immutable physical identity; every use carries the complete acquisition receipt. This split makes safe suffix continuation reachable without turning an old Attempt into current authority:
 
 - process-global immutable public material: signed model weights, public AOT/specialization artifacts, and token prefixes explicitly classified as public;
-- authority/workspace-private material: compiled context, private/public-mixed prefix state, neural checkpoints, Provider proposals, verifier results, and response spools, all keyed by authority scope + workspace + snapshot + policy/deletion epochs;
-- no cache key or hit/miss timing may expose another workspace's private membership through an API-visible side channel.
+- authority/private physical material: compiled context and private/public-mixed prompt-prefix state are indexed only after a scope-first gate inside the same authorized visibility compartment and may be reacquired by a later Attempt only when the physical key is exact, the current snapshot still admits every provenance dependency, and a new Attempt-bound `AcquisitionScope` passes all generation/policy/capability/deletion/restoration checks;
+- full continuation checkpoints remain same-Attempt because their RNG/sampler/grammar/pending-token state is mutable; a later Attempt may reuse only the prompt-bound prefill state and must initialize fresh decode-only state under its current full contract;
+- Provider proposals, verifier decisions, response spools, mutable sampler/RNG cursors, and effect/release artifacts remain Attempt-bound unless a separate schema proof establishes immutable state semantics; a cache hit never carries forward authorization, budget, receipt, or semantic adoption;
+- private indexes, quotas, eviction domains, and lookup paths are partitioned by `visibilityCompartmentID`; authorization/scope validation occurs before content-key calculation or lookup, no private entry is probed across an unauthorized window/compartment/workspace, and no API result or compartment-dependent lookup timing exposes another compartment's private membership;
 
-Immutable shared entries use reference-counted leases. Cancelling/fencing one Attempt releases only that reference; it cannot invalidate another Attempt's compatible public entry. Eviction prevents new acquisition, waits for current safe references, and never converts an in-use authoritative checkpoint into missing truth.
+Immutable shared entries use reference-counted leases. Cancelling/fencing one Attempt releases only that acquisition; it cannot invalidate another Attempt's compatible public or same-compartment immutable physical entry. Eviction prevents new acquisition, waits for current safe references, and never converts an in-use authoritative checkpoint into missing truth. A physical index lookup and a successful acquisition are separate receipts, so a stale hit cannot be observed as usable state.
 
-Qwen3.5-4B is a hybrid Gated DeltaNet/attention model. Its continuation state is therefore not safely modeled as an arbitrary trimmable attention-only KV prefix. Reuse requires an exact compatible prefix checkpoint covering attention KV **and** recurrent/convolution state at the same accepted-token boundary; otherwise Qinao performs canonical re-prefill. Apple EpiCache-style episodic eviction remains a research lane until the hybrid StateABI, continuation quality, and recovery proof pass.
+Qwen3.5-4B is a hybrid Gated DeltaNet/attention model. Its prompt-bound state is therefore not safely modeled as an arbitrary trimmable attention-only KV prefix. Reuse requires an exact compatible prefill checkpoint covering attention KV **and** recurrent/convolution state at the same accepted-token boundary; otherwise Qinao performs canonical re-prefill. An optional content-addressed radix/hash-block index may locate the longest exact compatible prefix and share immutable public or same-compartment blocks by reference with copy-on-write branches; it is an index inside the existing cache owner, not an authority, scheduler, or per-window runtime. Apple EpiCache-style episodic eviction remains a research lane until the hybrid StateABI, continuation quality, and recovery proof pass.
 
 ## 18. Silicon Capability Fabric
 
@@ -1206,11 +1323,12 @@ Contains raw or explicitly classified observations and is stored as an Artifact 
 ```text
 capturedAt + freshness
 device capability fingerprint
-OS build + runtime/vendor build
+exact OS build + current knownIssueSetDigest + runtime/vendor build
 public API availability
 thermal state + Low Power state
 memory advisory + resolved active hard cap
 model/runtime access state
+required entitlement/lifecycle state
 requested/observed/unknown placement fields
 probe provenance + observation quality
 ```
@@ -1218,6 +1336,7 @@ probe provenance + observation quality
 Rules:
 
 - unknown enum/state is not mapped to nominal;
+- `knownIssueSetDigest` canonically binds the applicable official issue IDs/statuses/source revision plus local deny overrides captured for that exact OS/runtime profile; any changed, resolved, or introduced issue invalidates the prior profile rather than being interpreted dynamically during a turn;
 - presence of an ANE does not imply operation support, batch size, memory, latency, or placement;
 - private/undocumented diagnostics are research-only and cannot become a public SDK contract;
 - architecture/chip names may namespace assets and evidence, but cannot alone select a production strategy.
@@ -1231,11 +1350,12 @@ QualityIdentity
 supported generationSemanticsDigest / contract family
 artifact/bundle digest
 adapter binary/build digest
-backend graph/kernel digest
+backend graph/kernel/metallib digest
+MLX core version/commit + Swift wrapper version/commit when applicable
 device capability fingerprint + SKU cohort
-OS build cohort + runtime/vendor commit
+exact OS build for beta/research profiles, or a separately proven release cohort + knownIssueSetDigest + runtime/vendor commit
 phase + batch + context + shape bucket
-StateABIDigest
+StateABIDigest + modalityContractDigest
 specialization/AOT options and function identity
 quality, latency, memory, thermal, energy evidence
 evidence grade + sample count + devices + expiry
@@ -1316,7 +1436,7 @@ The objective is healthy completed-task utility: verified accepted/released good
 | Phase | Authoritative owner | Useful cooperation | Prohibited pattern |
 |---|---|---|---|
 | normalize / intent | CPU at appropriate QoS | storage/network adapters supply bytes | blocking UI thread with model or whole-file state reads |
-| retrieval | CPU + SQLite/index/storage under K3 budget | independent lanes fan out; dense microhead only if certified | SemanticStateLake work stealing heavy decode memory without reservation |
+| retrieval | CPU + SQLite/index/storage under K3 budget | independent queries inside the admitted wave fan out; dense microhead only if certified and triggered | SemanticStateLake work stealing heavy decode memory without reservation |
 | context compile | CPU/K3 mechanism | copy-on-write artifacts, tokenize once | repeated serialization and tokenization per backend |
 | model load | one external Provider under a K2 logical lease | storage read, signature verification, prewarm | SDK-owned concrete model package, two private trunks, or load before dynamic admission |
 | prefill | one Provider holding the process-wide local `HeavyPhaseLease` | GPU/NAX/ANE path only as certified by exact profile; bounded chunk yield | parallel “race” whose losing full prefill is discarded |
@@ -1324,20 +1444,25 @@ The objective is healthy completed-task utility: verified accepted/released good
 | verification | CPU first; accelerator only by profile | independent cheap checks overlap | verifier contention that reduces accepted-token goodput |
 | prepare/commit | K3 storage + K4 helper + Zone-C broker | small crypto/SQLite work | model residency duplicated for commit |
 
-“One heavy owner” means one authoritative local accelerator-intensive execution owner process-wide per phase, and one authoritative Provider lease per Attempt. It does not prevent safe internal batching inside that owner, remote/network waits overlapping a different local phase, or CPU/storage work under separate reservations. Weighted fairness, aging, bounded prefill chunks, and a profile-derived maximum uninterruptible quantum prevent one long-context window from indefinitely blocking others.
+“One heavy owner” means one authoritative local accelerator-intensive execution owner process-wide per phase, and one authoritative Provider lease per Attempt. It does not prevent safe internal batching inside that owner, remote/network waits overlapping a different local phase, or CPU/storage work under separate reservations. Hierarchical authority→workspace→window→Attempt fairness, aging/minimum service, per-window caps, bounded prefill chunks, and a profile-derived maximum uninterruptible quantum prevent one long-context window or an Attempt-Sybil window from indefinitely blocking others.
 
 ## 20. Backend Portfolio and Horizons
 
-### 20.1 H0 — Current production baseline
+### 20.1 H0 — Current incumbent production candidate
 
 **External certified Qwen3.5-4B MLX/Metal Provider**
 
-- is the current signed host-default full-quality Provider, not a concrete runtime embedded in Qinao SDK;
+- is the target signed host-default full-quality Provider after relocation and certification, not a concrete runtime embedded in Qinao SDK; current code must not claim this boundary already conforms;
 - owns leased physical model bytes, runtime sessions, load, prefill, token loop, and physical prefix/continuation state while Qinao K2 owns the logical plan, identity, lease, checkpoint, acceptance, and retry truth;
 - NAX/TensorOps use is an internal MLX/Metal optimization that requires actual-use evidence; a miss falls back inside the same MLX/Metal model identity;
 - all entry points, including session decode, use the same planner/executor/fallback semantics.
 - the official Qwen3.5-4B bundle describes a hybrid Gated DeltaNet/attention trunk and multi-step-trained MTP; production native MTP therefore requires the exact signed MTP tensors, decoder algorithm/configuration, target-verification contract, and StateABI. Model-name or head-presence detection is insufficient, and Qinao does not train a redundant second MTP head.
 - the model card's native `262,144` context is a model capability, not an iPhone admission promise. L3/K1 select a smaller exact context/window whenever the certified resident+transient ledger cannot prove the larger shape fits; they report truncation/coverage rather than loading an unsafe advertised maximum.
+- the current repository pins MLX core `0.31.1`. MLX core `0.31.2`/`0.32.0` and the separately versioned Swift wrapper are candidate evidence only: thread-local stream/cache changes, small-M quantized matmul, RoPE, qvm, metallib, deployment-target, or iOS fixes may help this workload, but any version change invalidates the old profile and must pass pinned A/B, full identity, state, memory, thermal, and recovery recertification before promotion;
+- each Release app and extension process proves exactly one MLX C runtime/state-singleton image using final link maps plus `nm`/`otool` (and a runtime sentinel/image-base check where available). SwiftPM source identity alone is insufficient. One image in the app and one in a separate extension process is valid; two images inside one process denies promotion;
+- local session/decode concurrency defaults to one slot. A value above one requires the exact pinned core/wrapper to pass TSAN where supported plus eight-seat token/termination/state-isolation, cancellation, footprint, UI, and 1800-second thermal tests. Internal MTP for one target remains serialized unless separately certified;
+- the current Qwen MTP candidate binds the GDN/recurrent dtype—whose FP32 mechanism setting has limited identity evidence—inside StateABI and the profile. The existing small prompt sample is mechanism evidence, not the 50-prompt × two-device full-blood gate. Sampling MTP/switching remains disabled until RNG algorithm, stream, and cursor are explicit, checkpointed, and replay-equivalent rather than ambient `Float.random` state;
+- a signed `textOnly` modality profile omits the vision encoder for a text-only request and includes that choice in `modalityContractDigest`; this preserves the chosen text contract rather than weakening it. A visual request selects a visual-capable modality profile and lazily loads the vision path only after a fresh K1 resident+maximum-transient admission. Text and visual caches never alias.
 
 **Core ML microheads**
 
@@ -1356,6 +1481,8 @@ All three are Provider/adapter implementations outside Qinao SDK. Only the signe
 ### 20.2 H1 — Core AI research and certification lane
 
 Core AI may provide AOT, stateful inference, optimized layouts, preallocation, and improved framework integration. Its `InferenceFunction` concurrency capability permits concurrent tasks when memory policy allows; serialization is therefore a memory/thermal/ownership policy, not an assumed API-safety requirement.
+
+For the 2026-07-16 review snapshot, Apple's live iOS/iPadOS 27 Beta 3 release notes mark earlier Qwen dynamic-control, state-plus-dynamic-output, quantized-placement, encode-blocking, Metal-validation, and custom-Metal-load issues as fixed. That is not a promotion certificate: current AIModelCache-policy, AOT, app-group/cache, stale compiled-model, entitlement, and newly introduced issues remain part of the exact `knownIssueSetDigest`. Every beta build is its own cohort and requires fresh certification; a resolved issue invalidates the old denial profile but does not automatically promote the backend. Specialization is device/OS-bound and an OS update or cache purge is an expected cache miss/rebuild event. Background-inference entitlement and Neural Engine memory attribution remain lifecycle/admission facts, not a second execution owner.
 
 Core AI remains research-only until it proves:
 
@@ -1400,6 +1527,7 @@ QualityIdentity = {
   quantizationDigest,
   tokenizerDigest,
   templateAndToolProtocolDigest,
+  modalityContractDigest,
   generationSemanticsDigest,
   verifierDigest,
   sovereignPolicyEpoch
@@ -1482,10 +1610,10 @@ The four modes are:
 
 1. **full prefill** — consume complete canonical tokens;
 2. **suffix continuation** — reuse an exact compatible prefix state and prefill only the suffix;
-3. **prefix cache restore** — restore state whose prefix key, QualityIdentity, NeuralExecutionContractDigest, and StateABI match exactly;
+3. **prefix cache restore** — restore prompt-bound state whose `PrefillPhysicalStateKey`, `PrefillStateSemanticsDigest`, and `PrefillStateABIDigest` match exactly, then initialize fresh decode-only state under the current full QualityIdentity/NeuralExecutionContract;
 4. **context rebuild** — discard state and reconstruct canonical context/tokens before full prefill.
 
-Selection records why a cache/state was accepted or rejected. “File exists” or “same model name” is insufficient.
+Selection records why a cache/state was accepted or rejected. Cross-Attempt suffix continuation is permitted only through an exact immutable `PrefillPhysicalStateKey` followed by a fresh Attempt-bound `AcquisitionScope`; changed sampling/RNG/termination/output-limit fields create fresh decode state rather than a false prefill miss, while any prefill-semantic/ABI change misses. The old Attempt's authority, budget, decode cursor, and receipts are never inherited. “File exists” or “same model name” is insufficient.
 
 ### 22.2 Decode Router
 
@@ -1529,6 +1657,8 @@ pending-input token ID/digest, ownership, and accepted-boundary convention
 RNG/sampler/logit-processor state convention
 stop/tool/structured-grammar automaton state convention
 ```
+
+`PrefillStateABIDigest` is a canonical, versioned projection of this schema at the accepted prompt boundary. It must retain every field that can change attention KV, GDN/recurrent/convolution state, position, mask, dtype/layout, or pending-input ownership; decode-only RNG/sampler/logit/termination automata may be excluded only when the projection proves they are in canonical uninitialized state and the new Attempt creates them fresh. It is an identity projection, not an ABI converter or a claim that two different runtimes are numerically equivalent.
 
 ### 23.2 Target truth and speculation scratch are separate
 
@@ -1653,19 +1783,19 @@ Output has two release classes:
 
 ### 26.1 Low-risk provisional stream
 
-Before the first byte, L11 evaluates provisional eligibility from the admitted request, L5 policy, L7 coverage/conflict state, and L3 compiled-context descriptor. L14 then issues a bounded provisional release grant whose operation and budget cover only L10 streaming verification and L12 provisional UI release. Every L2 chunk must then pass the L10 streaming constraint gate before L12 may release it:
+Before the first byte, L11 evaluates provisional eligibility from the admitted request, L5 policy, L7 coverage/conflict state, and L3 compiled-context descriptor. L14 then issues a bounded provisional release grant whose operation and budget cover only L10 streaming verification and L12 provisional UI release. K4 durably claims it once for `stableStreamOperationID` before the first L10 streaming-verifier mechanism gate; this independent claim may overlap already-admitted Provider prefill, but no chunk gate or release may outrun its commit. Every L2 chunk must then pass the L10 streaming constraint gate before L12 may release it:
 
 - output is hash-chained and marked provisional;
-- `ChunkVerificationReceipt` binds prior-chain digest, chunk digest/index, active constraint/policy digests, sensitivity/risk result, Attempt/generation vector, and the authoritative `BudgetUseReceipt`;
+- `ChunkVerificationReceipt` binds prior-chain digest, chunk digest/index, active constraint/policy digests, sensitivity/risk result, Attempt/generation vector, the stable operation's canonical `CapabilityUseReceipt`, and the authoritative `BudgetUseReceipt`;
 - a denied, timed-out, or missing chunk receipt stops provisional release; it never fails open;
 - it cannot drive tools, external effects, durable state, or evolution;
 - final verification may retract or replace it according to declared UI semantics;
-- its grant binds maximum bytes/tokens, audience, Attempt/snapshot/generation vector, policy/deletion epochs, and expiry;
+- its one-shot stable stream-operation grant binds maximum boundary instances/bytes/tokens/cost, audience, Attempt/snapshot/generation vector, policy/deletion epochs, and expiry;
 - once any provisional byte is visible, Provider failure cannot trigger automatic same-turn regeneration; the runtime may finalize already-proven material, disclose interruption, or offer an explicit new/resume Attempt.
 
-L12 releases verified chunks in bounded contiguous sink batches, never by an unguarded per-token callback. Immediately before each batch, the K3 active-Attempt owner runs one conditional transaction that requires the exact active Attempt/generation, prior stream-chain head, and unarmed `[firstChunkIndex,lastChunkIndex]`; it then issues a one-use `StreamBatchBoundaryPermit` and records that exact batch as `visible_or_unknown`. The first permit also marks `stream_visibility_armed`, permanently disabling same-turn retry. L12 can call the sink only by consuming that permit. Revocation after issuance cannot pretend the armed batch stayed invisible, while any later batch fails the active-generation CAS.
+L12 releases verified chunks in bounded contiguous sink batches, never by an unguarded per-token callback. Immediately before each batch, the K3 active-Attempt owner runs one conditional transaction that requires the exact active Attempt/generation, prior stream-chain head, non-overlap with every earlier range, and an unarmed `[firstChunkIndex,lastChunkIndex]`; it advances that exact batch to `stream_permit_pending`, creates one non-usable `StreamBatchBoundaryPermit(streamID, stableStreamOperationID, batchBoundaryInstanceID, firstChunkIndex, lastChunkIndex, chainDigest, byteCount, tokenCount, AttemptRef, generationVector, policyEpoch, deletionEpoch, provisionalReleaseGrantArtifactID, boundaryOwnerEpoch, bootSessionID)`, and commits the resulting EventLog source root. K4 proves that source root is covered, equality-checks the already-claimed stable operation, atomically charges only the instance's non-overlapping boundary/byte/token deltas, and returns `BoundaryAnchorReceipt` referencing the one canonical `CapabilityUseReceipt`. The same K3 stream owner performs the sole CAS `stream_permit_pending → visible_or_unknown`, requiring the exact permit, anchor, unchanged live generations/epochs, prior stream-chain head, same live owner/boot epoch, and unexpired arm deadline, and emits `BoundaryArmReceipt`; only that winner may call the sink once before its call-handoff deadline. The first successful arm also marks `stream_visibility_armed`, permanently disabling same-turn retry. No per-batch grant use, separate stream manager, or boundary ledger is introduced.
 
-The sink uses `(streamID, firstChunkIndex, lastChunkIndex, chainDigest)` as an idempotency/query key when supported. A crash or missing receipt after permit issuance is never resent; an unqueryable batch terminates the stream as visibility-indeterminate. Batch bounds come from the signed latency/byte profile, so this closes the check→revoke→sink race without requiring a SQLite transaction per decoded token.
+The sink uses `(stableStreamOperationID, batchBoundaryInstanceID, firstChunkIndex, lastChunkIndex, chainDigest)` as an idempotency/query key when supported. K4 anchor issuance is conservatively visibility-possible: after an anchor or arm is issued, a crash or missing receipt is queried but never resent, and an unqueryable batch terminates the stream as visibility-indeterminate. Batch bounds come from the signed latency/byte profile; the profile may disable provisional streaming when K4 IPC/`FULL`-commit latency, energy, or sink semantics cannot meet the SLO. This closes the check→revoke→sink race without a durable transaction per decoded token.
 
 The streaming gate is deliberately narrower than final L10 but has real L10 verification authority and its own latency/resource budget. It may use deterministic constraints and separately certified classifiers; “low-risk request” is not a substitute for examining each chunk. The provisional grant does not authorize the final answer. Completed output still passes L9 selection, L12 exact presentation/spooling, L10 exact-byte verification, L11 final risk/confirmation, and L14 exact-result authorization.
 
@@ -1676,8 +1806,9 @@ The streaming gate is deliberately narrower than final L10 but has real L10 veri
 - L11 issues the final risk permit/confirmation requirement over that same artifact ID;
 - L14 authorizes that exact result artifact ID;
 - L12 first emits an exact release-preparation artifact; K3 stores/reopens the complete pre-publication manifest and reserves one publication idempotency key;
-- immediately before the sink call, one K3 conditional transaction requires `activeAttempt == expected`, exact current generation vector, and publication state `prepared`, then advances `prepared → sink_boundary_armed`; only that atomic transition permits the one call;
-- the sink receipt advances `sink_boundary_armed → finalized`. Crash/timeout after arm but without a queryable receipt becomes `publication_indeterminate`; recovery never calls the sink again, even though this conservative at-most-once rule can under-deliver.
+- immediately before the sink call, one K3 conditional transaction requires `activeAttempt == expected`, exact current generation vector, current policy/deletion epochs, and publication state `prepared`; it advances `prepared → publication_permit_pending`, creates one non-usable `PublicationBoundaryPermit(publicationID, spoolArtifactID, sinkProfileDigest, stablePublicationOperationID, publicationBoundaryInstanceID, AttemptRef, generationVector, policyEpoch, deletionEpoch, finalReleaseGrantArtifactID, boundaryOwnerEpoch, bootSessionID)`, and commits the EventLog source root;
+- K4 proves the permit source root is covered by its same-or-newer monotonic root and atomically claims the one-shot grant for `stablePublicationOperationID` plus anchors that exact permit/instance/operation/grant tuple in one transaction; the same K3 publication owner performs the sole CAS `publication_permit_pending → sink_boundary_armed` with the claim, permit, and `BoundaryAnchorReceipt`, requiring the same live owner/boot epoch and unexpired arm deadline, emits `BoundaryArmReceipt`, and only that winner may call the sink once before its call-handoff deadline;
+- the sink receipt advances `sink_boundary_armed → finalized`. K4 anchor issuance is already conservatively visibility-possible; crash/timeout after anchor or arm but without a queryable receipt becomes `publication_indeterminate`, and recovery never calls the sink again even though this at-most-once rule can under-deliver.
 
 If L10/L11 remands the presentation, L12 emits a new spool artifact and the old artifact's authorization path is abandoned. Medium/high-risk output has no provisional release. Pure response release and external-effect execution are separate branches; an ordinary response does not enter the effect outbox. Provisional content never becomes an implicit state/effect instruction.
 
@@ -1685,16 +1816,16 @@ If L10/L11 remands the presentation, L12 emits a new spool artifact and the old 
 
 Same-turn automatic retry is admitted only when **all** of these predicates are proven from K3/K4/Provider-observed evidence:
 
-1. the workspace/Attempt generation is still active, the failed physical attempt and **every spawned response/publication/effect branch** are terminal or generation-fenced, and none remains `dispatch_ready`, `stream_visibility_armed`, or `sink_boundary_armed`;
+1. the workspace/Attempt generation is still active, the failed physical attempt and **every spawned Provider-egress/response/publication/effect branch** are terminal or generation-fenced, and none remains `egress_boundary_armed`, `dispatch_ready`, `stream_visibility_armed`, or `sink_boundary_armed`;
 2. semantic mutation is absent or has been atomically restored by Qinao proof; append-only audit evidence alone is not semantic mutation;
 3. no provisional visibility fence was ever armed; observed “zero bytes” without that persisted proof is insufficient;
-4. no publication/stream boundary permit or `EffectBoundaryPermit` was issued and no sink/effect boundary was armed/crossed;
+4. no `ProviderEgressBoundaryPermit`, publication/stream boundary permit, `EffectBoundaryPermit`, or `BoundaryAnchorReceipt` was issued and no egress/sink/effect boundary was armed/crossed;
 5. `QualityIdentity` and the exact per-turn neural contract are unchanged;
 6. target StateABI is compatible or canonical context/accepted-history rebuild is available;
 7. the transition is a signed fallback edge inside the original authorization envelope;
 8. current memory, thermal, deadline, capability, and Provider admission passes again.
 
-`restored` requires a Qinao-produced `MutationRestorationProof`. Post-recovery workspace/task/semantic heads must equal the admissible pre-attempt semantic roots, while the pre-attempt EventLog is a verified prefix of the new log. The suffix may contain only allowlisted failure, audit, fence, and restoration transitions whose deterministic fold proves that semantic-root equality. Grants, leases, nonces, and budgets are **not** rolled back or resurrected: the proof requires their terminal/fenced/spent/released disposition and a successor obtains fresh authority/resources. Staged/outbox branches must be absent or terminal, and no stream/publication/effect boundary permit may have been issued. A Provider assertion cannot prove restoration.
+`restored` requires a Qinao-produced `MutationRestorationProof`. Post-recovery workspace/task/semantic heads must equal the admissible pre-attempt semantic roots, while the pre-attempt EventLog is a verified prefix of the new log. The suffix may contain only allowlisted failure, audit, fence, and restoration transitions whose deterministic fold proves that semantic-root equality. Grants, leases, nonces, and budgets are **not** rolled back or resurrected: the proof requires their terminal/fenced/spent/released disposition and a successor obtains fresh authority/resources. Staged/outbox branches must be absent or terminal, and no Provider-egress/stream/publication/effect boundary permit may have been issued. A Provider assertion cannot prove restoration.
 
 Any unknown predicate is false. Fencing a branch invalidates acceptance but does not pretend an already armed/crossed external boundary was cancelled. A pure `AttemptRecoveryDecision` derives from persisted evidence; it is not a fourth reducer, hidden retry manager, or Provider choice. Cross-model fallback is never same-turn recovery: it terminates `model_change_required`, discloses the change, recompiles context, and starts a newly authorized Attempt.
 
@@ -1717,12 +1848,14 @@ Contains only the selected Provider package/runtime, leased physical model asset
 On the iOS 27 minimum deployment, a minimal Enhanced Security helper owns:
 
 - signature operation;
-- issuance/reserve/spend ledger plus non-deletable global nonce tombstones across authorization IDs and key rotation;
+- issuance/reserve/spend ledger plus non-deletable nonce tombstones across authorization IDs and key rotation **within the current installation/key lineage**;
 - key manifest and rotation state;
 - audit-chain anchoring;
 - query-by-requestID recovery protocol.
 
 It contains no model, KV, prompt corpus, UI, or effect adapter. Its private storage is not writable by Zone A. Enhanced Security narrows process/sandbox exposure; it does not automatically provide transactionality, remote attestation, semantic correctness, or effect idempotency.
+
+Purely local storage cannot prove a globally monotonic tombstone across uninstall, arbitrary backup rollback, or destruction of the key lineage. Cross-lineage continuity requires a server/operator monotonic anchor. Without that anchor, a restored or reinstalled store receives a new quarantined incarnation and cannot reuse the former lineage's grants, nonces, profiles, or cache identity.
 
 The product deployment floor is iOS 27. Production K4 therefore always uses the Enhanced Security helper extension boundary; there is no in-process production compatibility mode. A same-process signer/service may exist only in tests and must be labeled `testOnly`, use separate keys/storage, and remain impossible to select from a release build.
 
@@ -1770,7 +1903,7 @@ Rotation uses one algorithm-agile signed trusted-key manifest, overlapping verif
 
 ## 29. Durable Authorization Ledger
 
-K4 commits issuance before returning a signature. The helper-private transaction covers:
+K4 uses one helper-private SQLite database/WAL with `synchronous=FULL` and commits issuance before returning a signature. The helper-private transaction covers:
 
 ```text
 requestID uniqueness
@@ -1778,15 +1911,31 @@ authID + nonce uniqueness
 capabilityGrantArtifactID
 authorizationContextArtifactID + canonical root
 issued/reserved/spent/revoked status
+authorization-basis/warrant ID + aggregate spent/outstanding reservation vector
 operationID binding
 key epoch + policy epoch + boot/warrant epoch
 deadline
 audit-chain link
+unique boundary-anchor tuple:
+  permitSourceWatermark + permitSourceRoot
+  coveringWatermark + coveringRoot
+  permitArtifactID + boundaryInstanceID
+  operationID + authorizationGrantArtifactID + capabilityUseReceiptArtifactID
+  boundaryOwnerEpoch + bootSessionID + monotonicArmDeadline
+  ordered range + boundary/byte/token/cost delta and cumulative totals
 ```
 
 The authorization-context artifact is owned by the exact execution/effect/release plan and binds its request, model/profile/lease/effect/fallback/StateABI/quality/neural facts once. K4 loads and recomputes the grant and context roots; a caller cannot supply a second `grantCanonicalDigest` or an optional list of equivalent identity fields.
 
-The K4-local claim transaction atomically changes `issued/reserved → spent_for_operation` and persists the one canonical capability-use/claim receipt before returning it. Validation and claim cannot each consume the grant or write competing receipts. That atomicity stops at the K4 storage boundary; it does not include Zone-C storage. A crash or lost IPC reply is recovered by querying the same `requestID/operationID`; the host does not ask for a fresh signature.
+The K4-local derivation transaction first enforces the production-v1 one-shot/non-delegable rule and atomically reserves every bounded field against the durable authorization basis. The K4-local claim transaction atomically changes `issued/reserved → spent_for_operation`, transfers the outstanding reservation to spent, and persists the one canonical capability-use/claim receipt before returning it. For final publication—or another release whose external boundary is genuinely its first protected use—the first-anchor transaction may perform that exact claim and first-instance anchor together in the same K4 transaction; later instances require the same already-claimed stable operation. A provisional stream instead claims before its first L10 verifier gate. Validation, standalone claim, and combined claim+anchor cannot each consume the grant or write competing receipts. That atomicity stops at the K4 storage boundary; it does not include Zone-C storage. A crash or lost IPC reply is recovered by querying the same `requestID/operationID`; the host does not ask for a fresh signature.
+
+For an external boundary, K4 serializes one monotonic anchored EventLog head. It accepts a new source root only as an append-only descendant of that head and indexes every typed pending-permit entry in the verified extension. If a permit's source root is already an ancestor of the current anchored head, K4 proves inclusion in that already-anchored descendant and issues the permit-specific receipt without moving the head backward. A source root on a fork, with a mismatched entry, or beyond an unverifiable gap is rejected/quarantined. Thus a later periodic/boundary anchor may cover an earlier delayed permit without starving it.
+
+K4 atomically revalidates the grant/claim status, runtime revocation-fence coverage, key/boot/warrant/policy epochs, deadline, and cumulative ceilings, then inserts the unique tuple above before returning `BoundaryAnchorReceipt`. Repeating the identical boundary-instance request returns the same receipt; reuse of a permit or `boundaryInstanceID` with a different root/range/grant is rejected. Reusing one stable operation across multiple instances is allowed only for an explicitly bounded ordered stream and only while the atomic cumulative ledger remains within every grant/lease ceiling; it is not another capability use. The anchor adds no semantic authority and cannot widen the already claimed one-shot grant. It is the final K4 sovereign gate and conservative cross-WAL linearization fence for that instance: once issued, recovery treats the exact boundary instance as possible and may only query/reconcile/finalize it, never create a replacement permit/instance or blind-call the sink/transport/adapter.
+
+An Attempt/policy/authority/deletion runtime revoke is accepted by K4 only after the exact K3 `RevocationFenceReceipt` is covered by the monotonic EventLog anchor; this makes K3 fence-versus-arm the sole race. A K4-local emergency/key revoke is serialized against anchor issuance in this ledger: if it commits first, anchor denies; if the anchor commits first, that instance has already crossed the sovereign dispatch boundary and is conservatively possible, while every later anchor denies. K4 cannot advertise recall of an already anchored external boundary.
+
+K4 may amortize storage cost by group-committing several already-materialized, independently validated anchor tuples within a signed micro-batch latency bound. Each tuple still receives an individual receipt and linearization position; a failed group exposes none. K4 never pre-anchors future tokens, unverified output, unprepared effects, or an authorization range, so batching changes fsync economics but not boundary semantics.
 
 Ledger corruption, rollback suspicion, missing schema migration, or loss enters quarantine. Recreating an empty ledger under the same signing key is forbidden.
 
@@ -1818,8 +1967,8 @@ This classification determines recovery. It is part of the adapter profile and e
 The end-to-end view is derived from three append-only state machines with non-overlapping write ownership:
 
 ```text
-K3 state/outbox:
-prepared → handed_to_zone_c → effect_boundary_possible → effect_terminal_recorded
+K3 state/outbox projection (the K4-anchored joined transition is shown):
+prepared → handed_to_zone_c → effect_permit_pending → effect_boundary_possible → effect_terminal_recorded
 → staged → sealed → activated
 
 K4 authorization:
@@ -1842,20 +1991,24 @@ Required ordering:
 4. Zone C uses a local transaction to persist `dispatch_pending(operationID, authID, requestDigest, attemptRefArtifactID, generationVectorArtifactID)`.
 5. Zone C asks K4 to claim that exact authorization. K4 uses its own transaction to bind/spend it for the operation and returns the durable capability-use/claim receipt artifact.
 6. Zone C uses a second local transaction to persist that receipt reference, move to `dispatch_ready`, and emit a `DispatchReadyReceipt` bound to the full Attempt/generation vector.
-7. Zone C presents that receipt to the K3 active-Attempt owner. One K3 conditional transaction requires `activeAttempt == expected`, exact current generations, the matching K4 claim, no prior boundary permit, and the K3 outbox branch still `handed_to_zone_c`; it then appends `effect_boundary_possible`, makes same-turn retry impossible, and issues one-use `EffectBoundaryPermit(operationID, AttemptRef, generationVector, dispatchReadyReceipt)`.
-8. Zone C can advance `dispatch_ready → dispatch_boundary_armed` only by atomically consuming that exact permit once. The permit is a K3 recovery/hand-off fence, not a second semantic authorization; L14/K4's exact effect authorization remains required. Only then may Zone C call the adapter once with the stable provider idempotency key where supported.
-9. The existing tool/effect adapter executes; Zone C records provider transaction/result/observed-state data as a terminal or indeterminate receipt artifact plus child signature attestation.
-10. L13 reconciles the exact receipt, creates `StateCommitIntent` with terminal receipt/outcome and `newStateDigest`, and stages the resulting state invisibly under compare-and-swap.
-11. L14 decides the terminal seal; K4 signs it.
-12. K3 activates staged state and advances the visible head only after seal.
+7. Zone C presents that receipt to the K3 active-Attempt owner. One K3 conditional transaction requires `activeAttempt == expected`, exact current generations/epochs, the matching K4 claim, no prior boundary permit, and the K3 outbox branch still `handed_to_zone_c`; it advances the branch to `effect_permit_pending`, issues one non-usable `EffectBoundaryPermit(operationID, effectBoundaryInstanceID, AttemptRef, generationVector, dispatchReadyReceipt, authorizationGrantArtifactID, boundaryOwnerEpoch, bootSessionID)`, and commits the EventLog source root.
+8. K4 proves the permit source root is covered by its same-or-newer monotonic anchored root and atomically records the exact permit/instance/operation/grant tuple, returning the durable `BoundaryAnchorReceipt`. Anchor issuance makes recovery conservatively boundary-possible; it does not grant a second semantic authorization.
+9. The K3 active-Attempt/boundary-fence owner performs the sole CAS `effect_permit_pending → effect_boundary_possible`, requiring the exact permit plus anchor and revalidating the current Attempt/generation/policy/deletion epochs, live owner/boot epoch, and arm deadline. A concurrent revoke/erasure therefore wins or loses this one K3 transaction. The CAS winner emits `BoundaryArmReceipt` with the call-handoff deadline; a durable CAS denial proves no adapter call was authorized.
+10. Zone C can advance `dispatch_ready → dispatch_boundary_armed` only by atomically consuming that exact permit, anchor, and arm receipt once before the call-handoff deadline. Only the Zone-C CAS winner may call the adapter once with the stable provider idempotency key where supported.
+11. The existing tool/effect adapter executes; Zone C records provider transaction/result/observed-state data as a terminal or indeterminate receipt artifact plus child signature attestation.
+12. L13 reconciles the exact receipt, creates `StateCommitIntent` with terminal receipt/outcome and `newStateDigest`, and stages the resulting state invisibly under compare-and-swap.
+13. L14 decides the terminal seal; K4 signs it.
+14. K3 activates staged state and advances the visible head only after seal.
 
 There is no cross-process atomic transaction between K4 and Zone C. Crash gaps close by stable identity and queries:
 
 - after Zone-C `dispatch_pending` but before K4 claim, retry/query the same K4 request;
 - after K4 claim but before Zone C stores the reply, recover the same ClaimReceipt by `requestID/operationID`;
-- after `dispatch_ready` but before K3 issues `EffectBoundaryPermit`, resume only the same still-active branch; a fenced generation fails the K3 conditional transaction;
-- once K3 issues `EffectBoundaryPermit`, recovery treats the boundary as possible even if Zone C never records consumption; it never asks for another permit or dispatches again;
-- at or after permit issuance/`dispatch_boundary_armed`, only query/reconcile/finalize the same provider operation, or remain `outcome_indeterminate` when the adapter cannot establish truth; even a crash between arm and the physical call does not authorize a second dispatch.
+- after `dispatch_ready` but before K3 commits `effect_permit_pending`, resume only the same still-active branch; a fenced generation fails the K3 conditional transaction;
+- after K3 commits the pending permit but before K4 anchors it, resume only the same anchor request for that exact permit/root while the branch remains active; never mint a second permit;
+- immediately after K4 returns the anchor, K3 may perform only the exact in-flight generation/epoch CAS above; a durable denial terminates `failed_before_effect`, while owner/process loss before either arm or denial becomes boundary-possible and query-only;
+- once K3 issues `BoundaryArmReceipt`, recovery treats the boundary as possible even if Zone C never records consumption; it never asks for another permit or dispatches again;
+- at or after anchor uncertainty/arm/`dispatch_boundary_armed`, only query/reconcile/finalize the same provider operation, or remain `outcome_indeterminate` when the adapter cannot establish truth; even a crash between arm and the physical call does not authorize a second dispatch.
 
 ### 30.3 Failure rules
 
@@ -1867,7 +2020,7 @@ There is no cross-process atomic transaction between K4 and Zone C. Crash gaps c
 - a generic exception cannot be mapped to ordinary failure without dispatch-boundary evidence;
 - only signed terminal outcomes may be sealed as their matching terminal state;
 - `partial`, `cancel_requested`, or unresolved unknown outcomes cannot be sealed as committed success;
-- capability reserve/spend is a durable saga continuation, not a one-shot burn that prevents recovery.
+- a one-shot capability claim is a durable, queryable saga fact, not an irreversible process-memory burn: recovery resumes or reconciles the same operation identity and can never claim the grant for a second operation.
 
 The system does not promise general exactly-once external effects. It promises durable intent, stable identity, no automatic redispatch after the durable dispatch boundary, adapter query/idempotency evidence, explicit indeterminate state, separately authorized compensation where defined, and auditable recovery.
 
@@ -1935,15 +2088,16 @@ A replayable turn records references to:
 
 - canonical input and source event identity;
 - policy, naming, layer-kill, and key epochs;
-- SemanticStateLake snapshot and lane watermarks;
-- admitted/selected artifacts and conflict manifest;
+- SemanticStateLake snapshot, lane watermarks, exact `StateRequirementPlan`, ordered wave open/skip receipts, marginal-value policy artifacts, and per-wave budgets;
+- deduped reservoir, grounding proposal/validation, final admitted/selected artifacts, coverage vector, conflict manifest, and State Market objective/receipt;
 - canonical compiled token history;
 - the one execution-binding artifact plus its referenced bundle, profile, lease, fallback graph, and StateABI artifacts;
 - randomness seed/sampling receipt where policy permits;
-- every proposal, acceptance, fallback, remand, verification, risk, release-preparation, effect, state, and seal receipt;
+- the verification-ladder policy, deterministic-stage receipts, residual-risk/value-of-information decisions, and every proposal, acceptance, fallback, remand, convergence, risk, release-preparation, Provider-egress, effect, state, and seal receipt;
+- every pending boundary permit, K4 `BoundaryAnchorReceipt`, arm/possible observation, query/reconciliation result, and terminal/indeterminate disposition;
 - the linked publication reservation, idempotency key, sink receipt, and publication finalization record.
 
-Publication uses a durable at-most-once replay barrier. The complete pre-publication manifest contains the decision graph and prepared release but cannot contain a sink receipt that does not exist yet. K3 durably stores/reopens that manifest and reserves one publication identity/idempotency key. Immediately before the one sink call it revalidates Attempt/generation and persists `sink_boundary_armed`; that state is conservatively visibility-possible and forbids automatic retry/republish. The sink receipt is appended as a linked finalization record before the host API returns. Recovery only queries/finalizes the same publication identity. If the sink cannot establish truth, the branch remains `publication_indeterminate`; a raw prepared manifest permits a same-branch continuation only before arm, while an armed manifest is never permission to repeat the call.
+Publication uses a durable at-most-once replay barrier. The complete pre-publication manifest contains the decision graph and prepared release but cannot contain a sink receipt that does not exist yet. K3 durably stores/reopens that manifest and reserves one publication identity/idempotency key. Immediately before the one sink call it revalidates Attempt/generation/epochs, commits `publication_permit_pending` and its EventLog root, obtains K4's atomic stable-operation claim plus exact `BoundaryAnchorReceipt`, and then performs the sole K3 CAS to `sink_boundary_armed`; only that winner calls the sink. The sink receipt is appended as a linked finalization record before the host API returns. Recovery only queries/finalizes the same publication identity after anchor/arm. If the sink cannot establish truth, the branch remains `publication_indeterminate`; a raw prepared manifest may continue the same branch, an unanchored pending permit may resume only its exact K4 claim+anchor request while still active, and an anchored or armed manifest is never permission to repeat the call.
 
 Replay differentiates:
 
@@ -1996,8 +2150,9 @@ Final promotion evidence is bound to a Git candidate-tree ID and the exact insta
 ### 33.4 Concurrency and UI gate
 
 - one process-wide **local** authoritative heavy owner, plus a separately bounded remote-I/O lease class that cannot race the same Attempt;
-- at most the separately certified internal decode slots for that owner; the current candidate cap is two;
+- one internal decode slot is the production default for the current pinned MLX core/wrapper; a higher cap is a separately certified profile only after TSAN where supported plus eight-seat token/termination/state/cancellation/memory/UI/thermal stress;
 - eight-logical-window stress: no starvation, no duplicate authoritative result, one local heavy phase, and footprint remains under the same cap;
+- final Release link-map/`nm`/`otool` plus runtime sentinel evidence proves exactly one MLX runtime image/state-singleton per process;
 - main-thread synchronous blocking `p99 < 8 ms`;
 - model and SemanticStateLake files are not synchronously whole-file-read on MainActor;
 - cancellation and backpressure leave no orphan reservation, branch, session, or saga.
@@ -2075,22 +2230,22 @@ Until then, “40” remains a workload-qualified thermally-cool resident-decode
 
 The certification harness/protocol is implementation-complete when it deterministically emits an evidence-backed `promote` **or** `deny` verdict. Product-default cutover and a public 40/30 claim require `promote`; architecture/runtime completion does not falsify or bypass physics by requiring a known-failing benchmark to pass.
 
-## 34. Eight Adversarial Verification Loops
+## 34. Eight Adversarial Verification Passes
 
-Three independent domain reviews attacked semantic/state boundaries, performance/thermal/memory behavior, and sovereign/future-device behavior. A fourth independent lock review then attacked the integrated specification and forced two more correction rounds. The Qinao Provider/workspace/memory/RSI convergence reopened all eight loops rather than assuming the earlier pass transferred; they close only under the stronger invariants below.
+Earlier independent domain and lock reviews attacked semantic/state, performance/thermal/memory, and sovereign/future-device boundaries and produced historical abstract passes. The 2026-07-16 A+ red team found that those passes did not model cross-WAL power loss, aggregate capability derivation, remote check→revoke→send, complete cache scope, non-converged control-ring adoption, or final linked MLX image identity. That evidence is superseded for closure purposes. Because the A+ revision changes shared identity, durability, routing, and recovery assumptions, all eight review passes are reopened and remain `REVISE` until the integrated model and Section 37 tests are rerun from zero. These are documentation/red-team passes, not runtime `ControlRing` instances; runtime ring cardinality remains exactly four.
 
-| Loop | Failure found | Revision locked | Design result |
+| Pass | Failure found | Revision locked | Design result |
 |---|---|---|---|
-| **1. Cardinality/counting** | 14 could be misread as 10 cores + 4 loops; Silicon was called another plane | four independent axes; exact seven-plane list; Silicon Capability Fabric is cross-plane only | PASS |
-| **2. Authority/purity** | L14 appeared both pure and stateful; an SDK-owned model or fluent Provider proposal could become hidden authority | L14 core emits decisions and K4 signs; Qinao owns identity/adoption/release/commit while value-only external Providers return untrusted proposals/claims | PASS |
-| **3. Artifact/capability isolation** | workspace-private state/cache could cross windows; late attempts could spend old authority; unknown result/new-state digests were pre-bound | `ContextWorkspaceRef` + snapshot + Attempt generation on all artifacts/capabilities, active-attempt CAS fence, visibility-scoped caches, StatePrepare before exact result | PASS |
-| **4. Crash/effect saga** | Provider/response/effect retry could duplicate visible bytes or external action after a lost receipt | automatic retry requires eight proven preconditions; no retry after visibility; publication/effect query/reconcile only after boundary; independent branch join preserves indeterminate truth | PASS |
-| **5. StateABI/fallback** | attention-only KV reasoning ignored Qwen GDN state; MTP scratch could corrupt target truth; Provider state could become unknown | complete hybrid/RNG/grammar/pending-token checkpoint, target/scratch split, exact ABI/converter or canonical re-prefill, unknown state invalidated, hysteretic MTP fallback | PASS |
-| **6. Thermal/full-blood** | serious/critical collapsed; fallback edge looked like resource admission; headline tok/s ignored energy/thermal/rebuild cost | explicit states, one MemoryLedger/heavy phase, re-admission on every edge, uncertainty-aware Pareto/hysteresis, exact 40/30 protocols | PASS |
-| **7. Replay/release/concurrency** | multiple windows implied multiple runtimes; task patch rebase and RSI could loop/re-enter; retrieval projections could fracture | logical active/warm/cold windows, fair single heavy phase, serializable patch proof, one snapshot watermark, progress-witness/cross-ring DAG, one result owner | PASS |
-| **8. Security/memory/evolution** | in-process Provider looked sandboxed; calendar memories duplicated truth; erasure conflicted with append-only audit; self-repair could become self-modification | trust classes, EventLog+bitemporal manifests, erasure key destruction/blinded tombstone/deletion epoch, future-epoch shadow evolution, quarantine-first device profiles | PASS |
+| **1. Cardinality/counting** | 14 could be misread as 10 cores + 4 loops; a superstep could be mistaken for another layer/manager | four independent axes; exact counts; LayerCell supersteps are executor optimizations only | REVISE — rerun required |
+| **2. Authority/purity** | SDK-owned model, grounding/verifier proposal, or old/new coordinator could become hidden authority | value-only Provider; one L7/L10 owner; one typed stage result; no parallel manager/commit path | REVISE — rerun required |
+| **3. Artifact/capability isolation** | private state/cache could cross windows; a parent grant could overbook multiple children | visibility-compartment prefill/continuation cache split; incarnation/restoration scope; one-shot non-delegable grant; K4 aggregate warrant reservation | REVISE — rerun required |
+| **4. Crash/effect/egress saga** | cross-WAL partial commit, remote revoke race, or lost receipt could duplicate disclosure/effect | one K3 `FULL` nucleus; K3-fence-first revocation; K4 claim/anchor sovereign gate; durable egress/publication/effect permits; query/reconcile-only after anchor uncertainty/arm | REVISE — rerun required |
+| **5. StateABI/fallback** | attention-only state, implicit RNG, modality aliasing, or runtime upgrade could create false continuation | complete hybrid/RNG/grammar/modality state; exhaustive cache contract; canonical re-prefill | REVISE — rerun required |
+| **6. Thermal/full-blood** | headline tok/s ignored energy/thermal/rebuild cost and unproven multi-session concurrency | one-slot default; exact profile/build/known-issue gate; 40/30 protocols; task-goodput truth | REVISE — rerun required |
+| **7. Replay/release/concurrency** | Attempt Sybil scheduling, non-converged projection adoption, or retrieval fan-out could break fairness/coverage | hierarchical fairness; proposal-only non-convergence; progressive waves and one result owner | REVISE — rerun required |
+| **8. Security/memory/evolution** | false completed erasure, wall-clock tombstone pruning, fail-open allowlist, or anti-rollback overclaim | owner-closure ACK/rescan; monotonic tombstone; default deny; scoped incarnation/anchor claim | REVISE — rerun required |
 
-These are abstract architecture results. The same loops remain `REVISE` against current implementation until the corresponding code and physical-device tests exist.
+No row returns to `PASS` independently: the closure verdict is an integrated result because shared Attempt, epoch, storage, capability, and execution-binding identities cross rows. Current implementation remains separately `REVISE` even after a later design-level pass.
 
 ## 35. Current Code: Reuse, Extend, Adapt, Missing
 
@@ -2102,7 +2257,7 @@ Section 4.4 is the implementation authority for this classification. The archite
 - `BASLayerActor`, layer reference/cascade/mesh machinery, budgets and kill-switch foundations;
 - `BASLowEntropyPrimitives` and `BASSovereignCanonicalBytes`/Rust parity;
 - MLX/Metal production mechanisms **inside an external Provider package**, `BASExecutionPlan`, decode policy/planner, acceptance, rollback, sessions, pressure primitives, and upstream wired-memory manager;
-- `BASEventLogEntry/Storage`, the one Swift SQLite WAL/integrity/replay owner, `BASMemoryAtom`, current FTS/vector/temporal/entity indexes, existing pure Rust RRF, and current replay harnesses;
+- `BASEventLogEntry/Storage` as the nucleus candidate and sole EventLog/integrity/replay sequence, `BASMemoryAtom`, current FTS/vector/temporal/entity indexes, existing pure Rust RRF, and current replay harnesses; current multiple WAL stores are migration inputs, not already-conformant one-transaction authority;
 - `BASContextCompiler` and current renderers/compilers as the one packing chain;
 - current model manifest, invocation contract, device/thermal probes, and Core AI shadow evidence;
 - current candidate/render/risk/provider-release types;
@@ -2113,12 +2268,13 @@ Section 4.4 is the implementation authority for this classification. The archite
 
 - add stable K1–K4/ring/seven-plane projections without duplicating L1–L14;
 - add LayerCell membranes around the actor mesh without a new actor scheduler;
-- add canonical attenuated CapabilityGrant semantics while extending the one sovereign mint/consume authority;
-- add exact snapshot-bound eligibility/conflict/State Market projections without another retrieval or ranking truth;
+- add production-v1 one-shot/non-delegable CapabilityGrant semantics and aggregate durable-warrant reservation while extending the one sovereign mint/consume authority;
+- add exact snapshot-bound progressive-wave eligibility, coverage reservoir, grounding, conflict, and final State Market projections without another retrieval or ranking truth;
 - add tokenize-once spans, exact allocation, and descriptor binding to `BASContextCompiler`;
 - add canonical quality/StateABI/execution binding to the existing manifest/invocation/plan chain;
 - add `ContextWorkspaceRef`, task-DAG roots/patches, `AttemptRef` generation fencing, read snapshots, fair heavy-phase admission, and active/warm/cold residency to the existing turn/session/task owners;
 - add value-only Provider/Proposal contracts, trust classes, observed receipts, and Provider state leases by extending existing Qinao proposal/release/seat/runtime gates;
+- converge EventLog, heads/generations, BudgetLease claims, authoritative watermarks, outbox/staging, boundary permits, and erasure rank into the one K3 `FULL` control nucleus; keep FTS/vector/calendar/linguistic/cache data as watermark-bound replayable projection WALs;
 - add bitemporal EventLog projections, calendar manifests, linguistic annotations, deletion epoch/erasure closure, and deterministic State Market/grounding validation to the current state owners;
 - add durable spool/finalization to the existing candidate/render/risk/release chain;
 - add algorithm agility and durable K4 lifecycle while explicitly migrating current fingerprint/token schemas;
@@ -2165,7 +2321,16 @@ Paths frozen as compatibility/test-only until retirement:
 - dormant opaque `StateGraphBus`-style transport as an alternate state/authority mesh;
 - any model default embedded in SDK code or any entry point that bypasses the one execution binding/attempt fence.
 
-The converged implementation has no duplicate event log, SQL owner/WAL, retrieval index, RRF ranker, context compiler, task/attempt scheduler, model registry, MemoryLedger, heavy-seat arbiter, commit gate, publication journal, effect reducer, or retry truth. Swift owns host orchestration and Apple lifecycle; SQL owns indexed durable projections under one connection owner; Rust owns existing pure deterministic fusion/canonical hot logic behind narrow C ABI; Metal/MLX and unavoidable C/C++ runtime code stay inside Provider/upstream execution seams.
+Authority cutovers are epoch boundaries, never long-lived dual writes:
+
+- choose and migrate the existing EventLog database into the K3 control nucleus; import authoritative heads/claims/outbox state under a sealed checkpoint, shadow-replay projection databases, atomically advance the workspace restoration/schema epoch, then freeze old writable stores. The old memory WAL becomes a read-only migration source or a replayable projection and can never participate in a cross-WAL commit;
+- keep public `QinaoRuntime.execute` only as a compatibility adapter into K4 claim + Zone-C saga. Raise the authorization/policy/boot epoch at cutover so old bundles whose consumed history cannot be reconstructed are invalid. `consumedBundles` may remain a read cache but cannot claim authority, and direct tool dispatch is frozen before cutover;
+- make the native stage DAG return the sole typed authoritative result before any semantic stage/effect is enabled; the legacy coordinator becomes shadow-only and is then retired. A routed result may never be discarded and recomputed by the old path;
+- empty or missing MCP/tool allowlists deny. The former fail-open behavior and its tests change in the same cutover;
+- external-content FTS projections either gain transactionally maintained triggers/rebuild/parity checks against their source watermark or are removed from production claims; dormant schema is not a lane;
+- RRF migration adds lane-local dedupe, finite-`k` validation, and source/correlated-lane caps in the existing Rust owner and proves Swift/Rust byte parity before enabling the new fusion ABI.
+
+The converged implementation has no duplicate event log, authoritative control WAL, retrieval index, RRF ranker, context compiler, task/attempt scheduler, model registry, MemoryLedger, heavy-seat arbiter, commit gate, publication journal, effect reducer, or retry truth. K3 has one authoritative `FULL` control WAL; each isolated replayable projection WAL has one owner and an authoritative source watermark but no commit authority. Swift owns host orchestration and Apple lifecycle; SQL owns indexed durability under those boundaries; Rust owns existing pure deterministic fusion/canonical hot logic behind a narrow C ABI; Metal/MLX and unavoidable C/C++ runtime code stay inside Provider/upstream execution seams.
 
 ## 36. Dependency Seams for Later Planning
 
@@ -2178,8 +2343,9 @@ This section defines architectural seams, not an implementation plan. A later im
 - one execution authority and MemoryLedger must precede adding another production backend;
 - StateABI must precede any cross-backend resident-state handoff;
 - target checkpoint/speculation-scratch separation must precede native MTP production enablement;
-- durable prepare/outbox and ledger semantics must precede external-effect migration;
-- SemanticStateLake snapshot/eligibility/conflict contracts must precede widening retrieval lanes;
+- the single K3 `FULL` control nucleus and integrity-chain anchor policy must precede durable prepare/outbox, publication, remote egress, or external-effect migration;
+- production-v1 one-shot/non-delegable CapabilityGrant and K4 aggregate warrant reservation must precede any new capability consumer;
+- SemanticStateLake snapshot/hard-eligibility and progressive-wave coverage contracts must precede widening retrieval lanes or enabling dense/grounding on private state;
 - deletion epochs/erasure closure must precede retaining derived day/week/month, vector, linguistic, or Provider caches;
 - every workspace-owned package/app/extension declaration, Rust/XCFramework build environment, regenerated project, and emitted Mach-O minimum must reach and be mechanically verified at iOS 27 before the Enhanced Security boundary is a product invariant;
 - observation-only profile collection must precede promotion automation;
@@ -2189,32 +2355,36 @@ Compatibility adapters may bridge existing paths, but only one path may own the 
 
 ## 37. Acceptance Matrix
 
+Every ship-gate test binds the candidate-tree ID, installed executable digest, and exact certified profile. Crash injection covers at least `before transaction`, `after writes before commit`, `after commit before reply`, and `reopen/replay`; assertions inspect mechanism invocation count, durable receipt, state root, generation, and visible/indeterminate outcome—not only final text. A safety gate returns exact pass or deterministic deny/indeterminate. “Usually worked,” a cache hit, or a green unrelated unit suite is not a pass.
+
 | Area | Required verification |
 |---|---|
 | reuse/authority | every production `Create` has an R/E/A/M proof; semantic duplicate scan; one-owner mutation tests; adapters contain no independent decision/storage/retry/effect path |
 | counts/naming | compile/schema test finds exactly L1–L14, K1–K4, four ring IDs, seven plane IDs; aliases round-trip to stable IDs |
-| SDK/provider boundary | dependency graph forbids concrete model runtimes inside Qinao SDK; request has no handles/credentials; hostile proposal mutation corpus; `ProviderExecutionRef` duplicate-sequence replay and same-sequence/different-digest rejection; in-process trust disclaimer; remote L11/L14 egress gates |
-| workspace/task/attempt | workspace-vs-window generation/ABA races; EventLog+graph-head+activeAttempt one-transaction failure injection; transitive descendant grant fencing; late-result rejection; serializable task-patch rebase; DAG/budget/authority invariants; active/warm/cold rebuild equivalence |
-| LayerCell purity | dependency/lint tests reject direct I/O/private mechanism calls from pure cores; deterministic fixture replay |
+| SDK/provider boundary | dependency graph forbids concrete model runtimes inside Qinao SDK; request has no handles/credentials; hostile proposal mutation corpus; `ProviderExecutionRef` duplicate-sequence replay and same-sequence/different-digest rejection; in-process trust disclaimer; remote erase-vs-pending-vs-anchor-vs-arm, concurrent double-consumption, crash-before-send, lost-receipt, query/purge/indeterminate matrix for the one-use `ProviderEgressBoundaryPermit` plus exact `BoundaryAnchorReceipt`/`BoundaryArmReceipt` |
+| K3 physical durability | real single-file `FULL` SQLite crash matrix over EventLog, chain root, graph/head/generation, BudgetLease claim, cursor/watermark, outbox/staging, erasure rank, and every boundary permit; for each external boundary inject before pending commit, after pending commit/before K4 anchor, after anchor/before arm, after arm/before call, and after call/before receipt, plus suspension/owner-loss/reboot/deadline at both handoffs; reopen sees the entire old or entire new K3 tuple, never a mixture; ATTACH/multiple WAL cannot satisfy the assertion; projection replay/root parity |
+| workspace/task/attempt | workspace-incarnation/restoration and workspace-vs-window generation/ABA races; K3 EventLog+graph-head+activeAttempt transaction failure injection; transitive descendant grant fencing; late-result rejection; serializable typed TaskNode-DAG rebase; hierarchical authority→workspace→window→Attempt anti-Sybil fairness; active/warm/cold rebuild equivalence |
+| LayerCell purity/superstep | dependency/lint tests reject direct I/O/private mechanism calls from pure cores; deterministic fixture replay; canonical no-op receipts; entry/exit generation race discards the whole unexposed `putMany` batch; no coalescing across policy/authorization/I/O/visibility/effect boundaries; no second executor/scheduler |
 | artifact canonicalization | cross-process/platform vectors; parent/schema/epoch tamper rejection; privacy commitment non-linkability tests |
-| capability attenuation | mutate each audience/operation/resource/projection/purpose/turn/epoch/digest/budget field; every mismatch denies |
-| kill/revoke | queue, start, dispatch, and seal epoch races; stale work cannot commit; physical-root recovery tested |
+| capability attenuation | production grants prove `maxUses=1`, `maxFanout=0`, non-delegable; mutate every audience/operation/resource/projection/purpose/scope/snapshot/epoch/digest/budget field and every widening denies; concurrent durable-warrant derivation/crash proves `spent + outstanding + new ≤ ceiling`; one bounded stream operation accepts unique ordered boundary instances but rejects overlap/reuse and proves cumulative instances/bytes/tokens/cost stay within its one-shot grant/lease |
+| kill/revoke | queue, start, dispatch, and seal epoch races; runtime revoke must commit K3 `RevocationFenceReceipt` before K4 revoke, standalone K4 runtime revoke rejects, and K3 fence-versus-arm has one winner; K4-local emergency-revoke-before-anchor denies while anchor-before-emergency is conservatively boundary-possible; stale work cannot commit; physical-root recovery tested |
 | SemanticStateLake snapshot | lane delay/crash/restart, partial joins, conflict preservation, late result next epoch, deterministic projector replay |
-| memory projections/privacy | one `BitemporalInterval`; direct EventLog/lossless-checkpoint rebuild; timezone/tzdb/DST/week-rule changes; current/day/week/month provenance; crash at every erasure rank; quarantine-first generation revoke; key-absence recovery; owner-rescan/indeterminate; no old-snapshot release or resurrection |
+| memory projections/privacy | cross-window private marker never reaches another window's SQL/FTS/ANN/grounder/context/Provider or observable cache timing; one `BitemporalInterval`; direct EventLog/lossless-checkpoint rebuild; timezone/tzdb/DST/week-rule changes; crash/clock rollback at every erasure rank; mandatory RAM/spill/index/neural/Provider/backup owner ACK; key-absence recovery; no completed receipt before rescan; no old-snapshot release or resurrection |
 | linguistic IR | canonical UTF-8 byte spans and normalization identity; tokenizer-view drift; annotator/config/epistemic/deletion provenance; required/optional/unsupported strata; UD/UMR/dialogue-act adapter round trips; no ontology-owned authority |
-| retrieval/grounding | one SQLite WAL owner; compiled pre-query predicate equals L7 authority; forbidden partition never reaches ANN/RRF; lexical/vector/temporal/entity labels survive fusion; required/optional grounding failure; proposal epistemic status; bounded same-owner final recomputation |
-| State Market | hard-ineligible high-score items never enter; diversity/budget/conflict invariants; selection reasons replay |
-| context compiler | tokenization once; projection order and budget identity; cache collision and policy-epoch invalidation |
-| backend plan | every entry point consumes one exact plan; no discarded authoritative result; no second trunk |
+| retrieval/grounding | compiled pre-query predicate equals L7 authority and forbidden partitions have zero ANN/Rust/grounder calls; W0–W4 trigger/skip receipts, required-lane non-skipping, positive optional marginal-value bound; lane dedupe, finite RRF `k`, source/correlated-lane caps; grounding sees the bounded reservoir before final pruning; lexical/vector/temporal/entity labels survive fusion |
+| State Market | hard-ineligible high-score items never enter; duplicate high-score evidence cannot crowd out a reachable required claim; claim-coverage/diversity/budget/concentration/conflict invariants; selection and truncation reasons replay |
+| context compiler/cache | tokenization once; projection order and budget identity; mutate each `PhysicalContentKey`/prefill-semantic/ABI and fresh `AcquisitionScope` field independently, including modality/content/provenance/compartment/incarnation/snapshot/Attempt-generation/policy/capability/restoration/deletion/token boundary, and reject before state bytes are touched; changing only decode sampling/RNG/stop/max-output fields preserves the exact prompt-prefix physical hit but creates fresh decode state/full contract, while any prefill-relevant mutation misses; same-compartment cross-Attempt reuse obtains a new lease, and stale provenance/epoch or every unauthorized cross-window/workspace probe misses without membership timing; full continuation checkpoints remain same-Attempt |
+| verification ladder | required deterministic stages cannot skip; small/heavy Provider outputs remain proposals; optional stages run only under recorded residual-risk/positive-value bound; one L10 `ConvergenceDecision`; failed/non-converged output cannot release/commit |
+| backend plan/MLX closure | every entry point consumes one exact plan; no discarded authoritative result or second trunk; final link-map/`nm`/`otool` and runtime sentinel prove exactly one MLX image per process; concurrency is one until exact-runtime TSAN/eight-seat/state/termination/memory/thermal promotion |
 | StateABI | field-by-field mismatch including GDN/RNG/grammar/pending-token state, corrupt/unknown Provider state, converter failure, mid-decode revoke; target/scratch isolation; canonical re-prefill identity |
 | memory | resident/transient reservation, warning/jetsam simulation, cache eviction, eight-logical-window/one-local-heavy stress, no reservation leaks |
 | thermal/power | Low Power and each thermal state, unknown enum, transition race, critical checkpoint and resume |
 | MTP/prompt lookup | acceptance collapse, head mismatch, termination mismatch, state rollback, hysteretic re-probe |
-| RSI/control rings | concurrent branch BudgetLease CAS/double-spend; repeated digest; false textual progress; invocation-DAG remand depth; stale grant/epoch; resource pre-emption; post-effect reconciliation-only behavior |
-| K4 ledger | crash before/after commit/reply/spend, replay, duplicate request, corruption, rollback, schema upgrade, key rotation |
-| Effect Broker | crash at every state transition for all five adapter classes; `EffectBoundaryPermit` duplicate consumption; K3 Attempt-fence-versus-permit-issue CAS race; duplicate delivery; partial/cancel/unknown/reconcile/compensate |
-| response/recovery join | provisional arm-before-first-sink crash; chunk generation race; exact sink-boundary arm crash; exact-spool mismatch; branch-quiescence retry proof; restoration-root mutation; lost publication receipt query/finalize or indeterminate; response/effect branch truth preserved |
-| future profile | unknown device quarantine, OS/runtime/profile invalidation, specialization-cache loss, evidence promotion/demotion |
+| RSI/control rings | concurrent branch BudgetLease CAS/double-spend; A↔B cycle, repeated digest, false textual progress, missing witness, and budget cap all terminate with proposal-only evidence and leave authoritative input/result/state/capability unchanged; invocation-DAG remand depth; stale grant/epoch; resource pre-emption; post-effect reconciliation-only behavior |
+| K4 ledger | crash before/after issue/reserve/standalone-claim/combined-first-claim+anchor commit/reply, replay, duplicate/conflicting permit-instance/root requests, K3-fence-first runtime revoke and K4 emergency-revoke versus anchor ordering, append-only chain-extension/fork tamper, delayed R1 permit after monotonic R2 periodic/boundary anchor, concurrent out-of-order owners, bounded-stream cumulative conservation, aggregate warrant conservation, corruption, rollback, schema upgrade, key rotation; an included delayed permit gets one receipt without root rollback, identical query returns that receipt, and no anchor widens semantic authority |
+| Effect Broker | crash/suspend/owner-loss/deadline at every state transition for all five adapter classes, including pending→K4-anchor→K3-arm/deny→Zone-C-arm gaps; duplicate `EffectBoundaryPermit`/`BoundaryAnchorReceipt`/`BoundaryArmReceipt` consumption; K3 Attempt-fence-versus-pending/arm CAS races; stale handoff epochs cannot call; concurrent consumers invoke the adapter at most once; duplicate delivery; partial/cancel/unknown/reconcile/compensate; epoch cutover invalidates old RAM-only bundles and proves public execute cannot dual-claim or bypass Zone C |
+| response/recovery join | provisional pre-verifier stable-operation claim, pending/anchor/arm-before-first-sink crash, and later-instance anchor path; concurrent chunk-boundary consumption and generation race; publication pending/combined-claim+anchor/exact sink-boundary arm crash; exact-spool mismatch; K4 anchor latency profile may deterministically disable provisional stream; branch-quiescence retry proof; restoration-root mutation; lost publication receipt query/finalize or indeterminate; response/effect branch truth preserved |
+| future profile | unknown device quarantine; mutate exact iOS build/known-issue set, runtime/core/wrapper/metallib, deployment target, entitlement/lifecycle, modality, GDN dtype, RNG cursor, profile and StateABI and prove immediate invalidation; specialization-cache loss/OS update; fresh evidence promotion/demotion |
 | performance | two-device cold/warm/1800-second protocols, accepted goodput, energy, memory slope, thermal and failure disclosure |
 
 ## 38. Non-Promises and Hard Boundaries
@@ -2250,7 +2420,7 @@ The architecture explicitly refuses these claims:
 - QualityIdentity, NeuralExecutionContractDigest, and new-model lineage rule;
 - StateABI handoff/re-prefill rule;
 - target-checkpoint/speculation-scratch separation and Qwen hybrid-state completeness;
-- EventLog source truth, bitemporal horizon projections, sparse linguistic graph, one SQLite owner, and erasure/deletion-epoch closure;
+- EventLog source truth, one K3 `FULL` authoritative control nucleus, watermark-bound replayable projection WALs, bitemporal horizon projections, sparse linguistic graph, and erasure/deletion-epoch closure;
 - RSI as a bounded cross-ring protocol with progress witnesses rather than another manager/layer/ring;
 - durable authorization/effect saga and indeterminate semantics;
 - signer custody truth and algorithm agility;
@@ -2279,6 +2449,7 @@ These questions can change backend profiles and performance claims. They cannot 
 - [Metal capabilities](https://developer.apple.com/metal/capabilities/)
 - [A19 and M5 TensorOps tech talk](https://developer.apple.com/videos/play/tech-talks/111432/)
 - [Core AI](https://developer.apple.com/core-ai/)
+- [iOS & iPadOS 27 release notes](https://developer.apple.com/documentation/ios-ipados-release-notes/ios-ipados-27-release-notes)
 - [Core AI InferenceFunction](https://developer.apple.com/documentation/coreai/inferencefunction)
 - [Managing Core AI model specialization and caching](https://developer.apple.com/documentation/coreai/managing-model-specialization-and-caching)
 - [Compiling Core AI models ahead of time](https://developer.apple.com/documentation/coreai/compiling-core-ai-models-ahead-of-time)
@@ -2313,6 +2484,11 @@ These research results motivate certifiable experiments; they do not prove this 
 - [Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
 - [Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)
 - [SQLite FTS5](https://www.sqlite.org/fts5.html)
+- [SQLite ATTACH transaction atomicity](https://www.sqlite.org/lang_attach.html)
+- [SQLite WAL](https://www.sqlite.org/wal.html)
+- [SQLite PRAGMA synchronous](https://www.sqlite.org/pragma.html#pragma_synchronous)
+- [MLX releases](https://github.com/ml-explore/mlx/releases)
+- [MLX Swift README and integration guidance](https://github.com/ml-explore/mlx-swift)
 - [Reciprocal Rank Fusion](https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf)
 - [Universal Dependencies](https://universaldependencies.org/)
 - [Uniform Meaning Representation](https://umr4nlp.github.io/web/)
@@ -2351,6 +2527,9 @@ The design was grounded against, among others:
 - `BehavioralAISubstrate/Sources/BASRuntimeCore/BASSQLiteEventLogStorage.swift`
 - `BehavioralAISubstrate/Sources/BASMemory/BASSQLiteMemoryAtomStore.swift`
 - `BehavioralAISubstrate/Sources/BASMemory/BASMemoryAtomStore.swift`
+- `BehavioralAISubstrate/Sources/BASMemory/BASVectorIndex.swift`
+- `BehavioralAISubstrate/Sources/BASMemory/BASRoutedVectorIndexStorage.swift`
+- `BehavioralAISubstrate/Sources/BASMemory/BASMemoryAtomReducer.swift`
 - `BehavioralAISubstrate/Sources/BASOrchestration/ContextCompilerCore.swift`
 - `BehavioralAISubstrate/Sources/BASRuntimeCore/BASAutoRouteRanker+RankFuse.swift`
 - `BehavioralAISubstrate/Cargo/bas-retrieval-ranker/src/fuser.rs`
@@ -2359,15 +2538,20 @@ The design was grounded against, among others:
 - `BehavioralAISubstrate/Sources/BASOrgan/BASToolDispatcher.swift`
 - `BehavioralAISubstrate/Sources/BASRuntimeCore/BASSystemProbe.swift`
 - `BehavioralAISubstrate/Sources/BASOrgan/BASModelCapabilityManifest.swift`
+- `BehavioralAISubstrate/Sources/BASOrgan/BASDeviceExecutionProfile.swift`
 - `BehavioralAISubstrate/Sources/BASMLXAdapter/BASSessionKVStore.swift`
 - `BehavioralAISubstrate/Sources/BASMLXAdapter/MLXOrganAdapter+SessionPersist.swift`
 - `BehavioralAISubstrate/Sources/BASMLXAdapter/BASTrunkCheckpoint.swift`
 - `BehavioralAISubstrate/Sources/BASMLXAdapter/BASQwen35MTPSpecDecoder+FusedChain.swift`
+- `BehavioralAISubstrate/Sources/BASMLXAdapter/BASQwen35MTPSpecDecoder.swift`
 - `QinaoRuntimeSDK/Package.swift`
 - `QinaoRuntimeSDK/Sources/QinaoLoop/QinaoOrganEndpoint.swift`
 - `QinaoRuntimeSDK/Sources/QinaoLoop/QinaoLoop.swift`
 - `QinaoRuntimeSDK/Sources/QinaoSeats/QinaoAgentProposal.swift`
 - `QinaoRuntimeSDK/Sources/QinaoRuntime/QinaoRuntime.swift`
+- `QinaoRuntimeSDK/Sources/QinaoMemory/QinaoMemory.swift`
+- `BehavioralAISubstrate/Sources/BASHostKit/BASAgentFabricMultiRoundLoop.swift`
+- `BehavioralAISubstrate/Sources/BASHostKit/BASAgentFabricAuthoritativeTurn.swift`
 - `QinaoRuntimeSDK/Sources/QinaoMLX/QinaoMLXEndpoint.swift`
 - `BehavioralAISubstrate/Cargo/bas-retrieval-ranker/src/lib.rs`
 - `BehavioralAISubstrate/scripts/build-rust-xcframework.sh`
@@ -2385,9 +2569,10 @@ Qinao is the model-neutral deterministic application substrate. The host selects
 
 ```text
 Input Event → Normalizer → Intent/Risk → State Requirement
-→ SQL/Exact/FTS/Dense/Temporal/Entity retrieval
-→ Hard Eligibility → deterministic State Market
-→ Grounding/Conflict → Context Budget/Compiler
+→ Hard Eligibility → progressive SQL/Exact/FTS/Dense/Temporal/Entity waves
+→ dedupe/fusion → coverage-preserving reservoir
+→ Grounding/Conflict → final deterministic State Market
+→ Context Budget/Compiler
 → Prefill Router → Decode Router/target verification
 → Output Verifier → Response and/or Tool Runtime
 → Publication/Effect reconciliation → State Commit Gate
@@ -2400,18 +2585,20 @@ For current iPhone Air, the elegant path is to relocate the existing MLX trunk b
 
 ## 42. Design Validation Record
 
-Before this design was locked:
+Historical reviews and abstract models executed 1,096 focused assertions, 47,347 broader assertions, and a 133,006-assertion completion replay against earlier revisions. Those runs remain useful provenance, including their corrected permit-consumption and enum-equivalence oracles, but they are **superseded for closure**: their state spaces did not include the A+ cross-WAL power-loss states, aggregate warrant reservations, durable Provider egress boundary, exhaustive cache-scope mutations, MLX image closure, or the current non-convergence counterexample.
 
-- three independent reuse audits compared every proposed production `Create`, cross-plan public contract, and Apple/upstream mechanism against current repository owners. They found no exact-name collision but identified semantic duplicates that would otherwise create parallel digest, grant, event, release, lease, and recovery truth; Section 4.4 and the R/E/A/M owner map close those gaps before planning;
-- three independent domain red teams reviewed semantic/state correctness, performance/thermal/memory behavior, and security/future-device behavior; a fourth independent lock reviewer found nine integration blockers over two rounds, all of which were corrected before its final `PASS`;
-- the eight adversarial loops in Section 34 were revised to a design-level pass;
-- the final broad abstract model executed 832 assertions and the post-lock-review focused model executed another 264 assertions: 1,096 final-design assertions covering capability mutation, branch/release ordering, effect crashes and cross-domain gaps, StateABI, memory admission, bounded remand, exact generation identity, keyed artifact identity, and the thermally-cold 40 entry protocol;
-- after the workspace/Attempt, Provider, RSI, retrieval/grounding, erasure, output, and effect boundaries converged, a fresh exhaustive abstract model executed another 47,347 assertions over recovery, restoration, TaskGraph transactions, budget CAS, cache scope, Provider adoption CAS, publication/effect boundary permits, erasure, eligibility, MTP rollback, RSI termination, and response/effect joins; every assertion passed, but this remains a design-model proof rather than implementation certification;
-- the completion replay independently executed 133,006 assertions over the same final invariants with broader TaskGraph closure enumeration. Its first run was rejected because the test oracle conflated a second permit-consumption **attempt** with a successful second consumption; the oracle was corrected to model attempted and accepted consumption separately, then the complete model was rerun from zero and passed;
-- the first abstract-model run exposed a bug in its own string-based oracle; that oracle was corrected to an enum-equivalence check before any pass was accepted;
-- the existing `BASExecutionPlanElectorTests`, `BASNativeStageExecutorTests`, `BASSovereignTokenAuthorityTests`, and `BASThermalTwinTests` were run three consecutive times: `153/153` test executions passed with zero failures;
-- three independent final spec-only reviews re-ran the authority/recovery, context-memory-RSI, and execution/performance boundary matrices; all returned `PASS` with no remaining P0/P1 finding;
-- final static structure validation found exactly 14 authoritative layer rows, 4 kernel rows, 4 ring rows, and 7 plane rows; 82 fence markers formed 41 balanced code blocks and all 44 referenced local evidence paths were present;
-- `git diff --check` and Markdown structural validation passed for the design artifact.
+The 2026-07-16 A+ review therefore reopened the design and added:
 
-The existing Swift tests validate retained foundations only. They do not test or certify the not-yet-implemented Artifact Mesh, Capability Mesh, durable K4 ledger, Effect Broker, StateABI graph, SemanticStateLake, unified MemoryLedger, future backend profiles, or 40/30 performance gates.
+- one K3 `FULL` control nucleus plus orphan-safe blobs and replayable projections;
+- production-v1 one-shot/non-delegable grants with aggregate K4 warrant reservation;
+- durable remote egress, streaming, publication, and effect boundary semantics with stable operation/unique boundary-instance conservation and monotonic covering-root anchors;
+- workspace incarnation/restoration identity, visibility-compartment cache isolation, prompt-prefill versus same-Attempt continuation identity, and hierarchical window fairness;
+- progressive retrieval, pre-pruning grounding, bounded verification, and proposal-only non-convergence;
+- exact iOS/runtime/known-issue/modality/StateABI evidence and final per-process MLX image gates;
+- real crash/restart, privacy, erasure-resurrection, cache-mutation, duplicate-authority, and thermal acceptance matrices.
+
+Retained-foundation tests were also exercised repeatedly during this review: three consecutive targeted runs in BehavioralAISubstrate passed `54/54`, and three consecutive targeted QinaoRuntimeSDK runs passed `54/54`, for `108/108` repeated executions; the initial exploratory runs additionally passed `36/36`. These results validate their existing assertions only. They do not cover the reopened A+ ship gates and cannot change `REVISE` to `PASS`.
+
+After the final boundary/cache red team, a fresh bounded design-state smoke visited `1,449` unique states and checked `3,062` guarded transitions across Provider-egress, stream, publication, and effect protocols, including K3-fence-first runtime revocation, K4 emergency-revoke ordering, preclaimed operations, and publication's combined first claim+anchor; all four maintained at-most-one external call and revoke-before-arm safety. It additionally passed all `720` delayed/out-of-order root/permit schedules, `6` three-batch stream-ledger permutations, `42` prefill/acquisition mutation and positive-reuse checks, and `18` RSI adoption checks: `3,848` assertion groups total. The root oracle treats an older periodic checkpoint as an idempotent already-covered no-op rather than rolling K4 backward. This is targeted evidence for the revised contracts, not the integrated Section 37 fault model or device certification.
+
+The design may return to architecture-level `PASS` only after an integrated A+ fault model is rerun from zero and every Section 37 counterexample closes without weakening the normative rules. Current Swift implementation remains `REVISE` until the corresponding real SQLite, process-restart, cross-window, Release-link, two-device, and 1800-second tests pass.
