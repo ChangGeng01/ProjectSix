@@ -729,10 +729,13 @@
       "storage_owner": "one Artifact Mesh store and ordinary put receipt path",
       "recovery_owner": "CAS reopen, digest verification, and head replay",
       "single_writer_required": true,
-      "status": "approved_missing",
+      "status": "implemented",
       "evidence_paths": [
         "docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md",
-        "docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md"
+        "docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md",
+        "BehavioralAISubstrate/Sources/BASRuntimeCore/BASArtifactMeshCore.swift",
+        "BehavioralAISubstrate/Sources/BASMemory/SQL/024_artifact_mesh_v1.sql",
+        "BehavioralAISubstrate/Sources/BASMemory/BASArtifactSQLiteStore.swift"
       ],
       "allowed_projections": [
         {
