@@ -127,7 +127,7 @@ public enum BASLayerActorStatus:
 ///   - `arrivedAt` — wall-clock arrival time; latency math anchor
 ///   - `correlationID` — caller-supplied correlation token (e.g.
 ///     audit ID, request ID); chains across multi-turn flows
-public struct BASLayerActorInput: BASSchemaVersioned, Sendable {
+public struct BASLayerActorInput: BASSchemaVersioned, Sendable, Hashable {
     public static let currentSchemaVersion = "1.0.0"
 
     public var schemaVersion: String
@@ -176,7 +176,7 @@ public struct BASLayerActorInput: BASSchemaVersioned, Sendable {
 ///   - `reasonCodes` — typed reason code list (chapter 二百一一
 ///     audit doctrine);kebab-case strings,匹配 lint helpers
 ///   - `producedAt` — wall-clock completion time
-public struct BASLayerActorOutput: BASSchemaVersioned, Sendable {
+public struct BASLayerActorOutput: BASSchemaVersioned, Sendable, Hashable {
     public static let currentSchemaVersion = "1.0.0"
 
     public var schemaVersion: String
@@ -253,6 +253,695 @@ public protocol BASLayerActor: Actor {
         input: BASLayerActorInput
     ) async throws -> BASLayerActorOutput
 }
+
+// MARK: - Pure semantic layer membrane values
+
+public protocol BASSemanticLayerCore: Sendable {
+    associatedtype Input: Codable & Sendable & Hashable
+    associatedtype Output: Codable & Sendable & Hashable
+
+    static var layerID: BASSemanticLayerID { get }
+
+    func evaluate(
+        _ input: Input
+    ) throws -> BASLayerCoreDecision<Output>
+
+    func resume(
+        _ actorOutput: BASLayerActorOutput,
+        input: Input
+    ) throws -> Output
+}
+
+public enum BASLayerCoreDecision<
+    Output: Codable & Sendable & Hashable
+>: Codable, Sendable, Hashable {
+    case emit(Output)
+    case invoke(BASLayerActorInput)
+    case remand(BASRemandArtifact)
+    case refuse(BASRefusalArtifact)
+}
+
+public struct BASLayerCellIngressBody<
+    Input: Codable & Sendable & Hashable
+>: Codable, Sendable, Hashable {
+    public static var currentSchemaVersion: String { "1.0.0" }
+
+    public let inputArtifactID: BASArtifactID
+    public let orderedParentArtifactIDs: [BASArtifactID]
+    public let payload: Input
+    public let grantArtifactID: BASArtifactID
+    public let turnOperationRef: BASTurnOperationRef
+    public let causalTurnBranchRef: BASTurnBranchRef?
+    public let logicalEpoch: UInt64
+    public let snapshotRootArtifactID: BASArtifactID
+    public let killGeneration: UInt64
+    public let revocationGeneration: UInt64
+    public let monotonicDeadlineNanos: UInt64
+    public let budget: BASLayerSlice
+
+    public init(
+        inputArtifactID: BASArtifactID,
+        orderedParentArtifactIDs: [BASArtifactID],
+        payload: Input,
+        grantArtifactID: BASArtifactID,
+        turnOperationRef: BASTurnOperationRef,
+        causalTurnBranchRef: BASTurnBranchRef? = nil,
+        logicalEpoch: UInt64,
+        snapshotRootArtifactID: BASArtifactID,
+        killGeneration: UInt64,
+        revocationGeneration: UInt64,
+        monotonicDeadlineNanos: UInt64,
+        budget: BASLayerSlice
+    ) {
+        self.inputArtifactID = inputArtifactID
+        self.orderedParentArtifactIDs = orderedParentArtifactIDs
+        self.payload = payload
+        self.grantArtifactID = grantArtifactID
+        self.turnOperationRef = turnOperationRef
+        self.causalTurnBranchRef = causalTurnBranchRef
+        self.logicalEpoch = logicalEpoch
+        self.snapshotRootArtifactID = snapshotRootArtifactID
+        self.killGeneration = killGeneration
+        self.revocationGeneration = revocationGeneration
+        self.monotonicDeadlineNanos = monotonicDeadlineNanos
+        self.budget = budget
+    }
+}
+
+public typealias BASLayerCellIngress<
+    Input: Codable & Sendable & Hashable
+> = BASFrameEnvelope<BASLayerCellIngressBody<Input>>
+
+public struct BASLayerCellEgressBody<
+    Output: Codable & Sendable & Hashable
+>: Codable, Sendable, Hashable {
+    public let output: Output?
+    public let outputArtifactID: BASArtifactID?
+    public let capabilityUseReceiptArtifactID: BASArtifactID?
+    public let orderedParentArtifactIDs: [BASArtifactID]
+    public let terminalState: BASControlRingTerminalState
+
+    fileprivate init(
+        output: Output?,
+        outputArtifactID: BASArtifactID?,
+        capabilityUseReceiptArtifactID: BASArtifactID?,
+        orderedParentArtifactIDs: [BASArtifactID],
+        terminalState: BASControlRingTerminalState
+    ) {
+        self.output = output
+        self.outputArtifactID = outputArtifactID
+        self.capabilityUseReceiptArtifactID =
+            capabilityUseReceiptArtifactID
+        self.orderedParentArtifactIDs = orderedParentArtifactIDs
+        self.terminalState = terminalState
+    }
+}
+
+public typealias BASLayerCellEgress<
+    Output: Codable & Sendable & Hashable
+> = BASResult<BASLayerCellEgressBody<Output>>
+
+public struct BASLayerCellMembraneContext: Sendable, Equatable {
+    public let inputArtifactID: BASArtifactID
+    public let orderedParentArtifactIDs: [BASArtifactID]
+    public let grantArtifactID: BASArtifactID
+    public let turnOperationRef: BASTurnOperationRef
+    public let causalTurnBranchRef: BASTurnBranchRef?
+    public let logicalEpoch: UInt64
+    public let snapshotRootArtifactID: BASArtifactID
+    public let killSwitchState: BASLayerKillSwitchState
+    public let revocationGeneration: UInt64
+    public let monotonicDeadlineNanos: UInt64
+    public let monotonicNowNanos: UInt64
+    public let budget: BASLayerSlice
+
+    public init(
+        inputArtifactID: BASArtifactID,
+        orderedParentArtifactIDs: [BASArtifactID],
+        grantArtifactID: BASArtifactID,
+        turnOperationRef: BASTurnOperationRef,
+        causalTurnBranchRef: BASTurnBranchRef? = nil,
+        logicalEpoch: UInt64,
+        snapshotRootArtifactID: BASArtifactID,
+        killSwitchState: BASLayerKillSwitchState,
+        revocationGeneration: UInt64,
+        monotonicDeadlineNanos: UInt64,
+        monotonicNowNanos: UInt64,
+        budget: BASLayerSlice
+    ) {
+        self.inputArtifactID = inputArtifactID
+        self.orderedParentArtifactIDs = orderedParentArtifactIDs
+        self.grantArtifactID = grantArtifactID
+        self.turnOperationRef = turnOperationRef
+        self.causalTurnBranchRef = causalTurnBranchRef
+        self.logicalEpoch = logicalEpoch
+        self.snapshotRootArtifactID = snapshotRootArtifactID
+        self.killSwitchState = killSwitchState
+        self.revocationGeneration = revocationGeneration
+        self.monotonicDeadlineNanos = monotonicDeadlineNanos
+        self.monotonicNowNanos = monotonicNowNanos
+        self.budget = budget
+    }
+}
+
+public enum BASLayerCellError: Error, Sendable, Equatable {
+    case unsupportedIngressSchema(found: String)
+    case invalidArtifactID(field: String)
+    case invalidKillSwitchAuthority
+    case invalidBudgetProjection
+    case inputArtifactMismatch
+    case orderedParentArtifactsMismatch
+    case grantMismatch
+    case turnOperationMismatch
+    case causalBranchMismatch
+    case branchParentMismatch
+    case logicalEpochMismatch
+    case snapshotRootMismatch
+    case revocationGenerationMismatch
+    case deadlineMismatch
+    case budgetMismatch
+    case semanticActorLayerMismatch
+    case budgetLayerMismatch
+    case killSwitchLayerMismatch
+    case killSwitchActive
+    case killGenerationMismatch
+    case killStateChanged
+    case monotonicClockRegressed
+    case deadlineExpired
+    case invalidActorInputSchema(found: String)
+    case coreActorLayerMismatch
+    case preparedActorMismatch
+    case mechanismNotRequested
+    case actorOutputRequired
+    case actorOutputForbidden
+    case actorOutputMismatch
+    case capabilityUseReceiptRequired
+    case capabilityUseReceiptForbidden
+}
+
+public struct BASLayerActorMechanismAdapter<
+    Actor: BASLayerActor
+>: Sendable {
+    public let actor: Actor
+
+    public init(actor: Actor) {
+        self.actor = actor
+    }
+
+    public func invoke(
+        _ request: BASLayerActorInput,
+        turnOperationRef: BASTurnOperationRef
+    ) async throws -> BASLayerActorOutput {
+        guard request.schemaVersion
+                == BASLayerActorInput.currentSchemaVersion,
+              actor.layerID == request.layerID
+        else {
+            throw BASLayerActorError.internalFailure(
+                layerID: request.layerID,
+                message: "actor input identity mismatch")
+        }
+        let legacyTurnID: String
+        do {
+            legacyTurnID = try turnOperationRef.canonicalLegacyProjection()
+        } catch {
+            throw BASLayerActorError.internalFailure(
+                layerID: request.layerID,
+                message: "actor input identity mismatch")
+        }
+        guard request.turnID == legacyTurnID else {
+            throw BASLayerActorError.internalFailure(
+                layerID: request.layerID,
+                message: "actor input identity mismatch")
+        }
+        let output = try await actor.process(input: request)
+        guard output.schemaVersion
+                == BASLayerActorOutput.currentSchemaVersion,
+              output.layerID == request.layerID,
+              output.turnID == legacyTurnID
+        else {
+            throw BASLayerActorError.internalFailure(
+                layerID: request.layerID,
+                message: "actor identity mismatch")
+        }
+        return output
+    }
+}
+
+public struct BASLayerCellPreparedState<
+    Core: BASSemanticLayerCore,
+    Actor: BASLayerActor
+>: Sendable {
+    public let ingress: BASLayerCellIngress<Core.Input>
+    public let decision: BASLayerCoreDecision<Core.Output>
+
+    public var requiresMechanism: Bool {
+        if case .invoke = decision { return true }
+        return false
+    }
+
+    fileprivate let validatedContext: BASLayerCellMembraneContext
+    fileprivate let preparedCore: Core
+    fileprivate let preparedMechanism: BASLayerActorMechanismAdapter<Actor>
+
+    fileprivate init(
+        ingress: BASLayerCellIngress<Core.Input>,
+        decision: BASLayerCoreDecision<Core.Output>,
+        validatedContext: BASLayerCellMembraneContext,
+        preparedCore: Core,
+        preparedMechanism: BASLayerActorMechanismAdapter<Actor>
+    ) {
+        self.ingress = ingress
+        self.decision = decision
+        self.validatedContext = validatedContext
+        self.preparedCore = preparedCore
+        self.preparedMechanism = preparedMechanism
+    }
+}
+
+public struct BASLayerCellResolvedState<
+    Core: BASSemanticLayerCore,
+    Actor: BASLayerActor
+>: Sendable {
+    public let prepared: BASLayerCellPreparedState<Core, Actor>
+    public let output: Core.Output?
+    public let terminalState: BASControlRingTerminalState
+
+    fileprivate init(
+        prepared: BASLayerCellPreparedState<Core, Actor>,
+        output: Core.Output?,
+        terminalState: BASControlRingTerminalState
+    ) {
+        self.prepared = prepared
+        self.output = output
+        self.terminalState = terminalState
+    }
+}
+
+private enum BASLayerCellValidation {
+    static func artifactID(
+        _ artifactID: BASArtifactID,
+        field: String
+    ) throws {
+        do {
+            _ = try artifactID.storageScalar
+        } catch {
+            throw BASLayerCellError.invalidArtifactID(field: field)
+        }
+    }
+
+    static func artifactIDs(
+        _ artifactIDs: [BASArtifactID],
+        field: String
+    ) throws {
+        for (index, artifactID) in artifactIDs.enumerated() {
+            try self.artifactID(
+                artifactID,
+                field: "\(field)[\(index)]")
+        }
+    }
+
+    static func budgetProjection(_ budget: BASLayerSlice) throws {
+        guard budget.schemaVersion == BASLayerSlice.currentSchemaVersion else {
+            throw BASLayerCellError.invalidBudgetProjection
+        }
+        do {
+            guard try budget.attenuated() == budget else {
+                throw BASLayerCellError.invalidBudgetProjection
+            }
+        } catch let error as BASLayerCellError {
+            throw error
+        } catch {
+            throw BASLayerCellError.invalidBudgetProjection
+        }
+    }
+
+    static func killState(
+        _ state: BASLayerKillSwitchState
+    ) throws {
+        let authority = state.authority
+        let trimmed = authority.trimmingCharacters(
+            in: .whitespacesAndNewlines)
+        guard authority == trimmed,
+              (1...256).contains(authority.utf8.count)
+        else {
+            throw BASLayerCellError.invalidKillSwitchAuthority
+        }
+        if let signature = state.signatureAttestationArtifactID {
+            try artifactID(
+                signature,
+                field: "killSwitchState.signatureAttestationArtifactID")
+        }
+    }
+
+    static func validate<Input>(
+        _ ingress: BASLayerCellIngress<Input>,
+        context: BASLayerCellMembraneContext,
+        semanticLayerID: BASSemanticLayerID,
+        actorLayerID: BASMotherboardLayer14
+    ) throws where Input: Codable & Sendable & Hashable {
+        guard ingress.header.schemaVersion
+                == BASLayerCellIngressBody<Input>.currentSchemaVersion
+        else {
+            throw BASLayerCellError.unsupportedIngressSchema(
+                found: ingress.header.schemaVersion)
+        }
+
+        try artifactID(
+            ingress.body.inputArtifactID,
+            field: "ingress.inputArtifactID")
+        try artifactIDs(
+            ingress.body.orderedParentArtifactIDs,
+            field: "ingress.orderedParentArtifactIDs")
+        try artifactID(
+            ingress.body.grantArtifactID,
+            field: "ingress.grantArtifactID")
+        try artifactID(
+            ingress.body.turnOperationRef.artifactID,
+            field: "ingress.turnOperationRef.artifactID")
+        if let branch = ingress.body.causalTurnBranchRef {
+            try artifactID(
+                branch.turnOperationRef.artifactID,
+                field: "ingress.causalTurnBranchRef.turnOperationRef.artifactID")
+        }
+        try artifactID(
+            ingress.body.snapshotRootArtifactID,
+            field: "ingress.snapshotRootArtifactID")
+
+        try artifactID(
+            context.inputArtifactID,
+            field: "context.inputArtifactID")
+        try artifactIDs(
+            context.orderedParentArtifactIDs,
+            field: "context.orderedParentArtifactIDs")
+        try artifactID(
+            context.grantArtifactID,
+            field: "context.grantArtifactID")
+        try artifactID(
+            context.turnOperationRef.artifactID,
+            field: "context.turnOperationRef.artifactID")
+        if let branch = context.causalTurnBranchRef {
+            try artifactID(
+                branch.turnOperationRef.artifactID,
+                field: "context.causalTurnBranchRef.turnOperationRef.artifactID")
+        }
+        try artifactID(
+            context.snapshotRootArtifactID,
+            field: "context.snapshotRootArtifactID")
+        try killState(context.killSwitchState)
+        try budgetProjection(ingress.body.budget)
+        try budgetProjection(context.budget)
+
+        guard ingress.body.inputArtifactID == context.inputArtifactID else {
+            throw BASLayerCellError.inputArtifactMismatch
+        }
+        guard ingress.body.orderedParentArtifactIDs
+                == context.orderedParentArtifactIDs
+        else {
+            throw BASLayerCellError.orderedParentArtifactsMismatch
+        }
+        guard ingress.body.grantArtifactID == context.grantArtifactID else {
+            throw BASLayerCellError.grantMismatch
+        }
+        guard ingress.body.turnOperationRef == context.turnOperationRef else {
+            throw BASLayerCellError.turnOperationMismatch
+        }
+        guard ingress.body.causalTurnBranchRef
+                == context.causalTurnBranchRef
+        else {
+            throw BASLayerCellError.causalBranchMismatch
+        }
+        if let branch = ingress.body.causalTurnBranchRef,
+           branch.turnOperationRef != ingress.body.turnOperationRef
+        {
+            throw BASLayerCellError.branchParentMismatch
+        }
+        guard ingress.body.logicalEpoch == context.logicalEpoch else {
+            throw BASLayerCellError.logicalEpochMismatch
+        }
+        guard ingress.body.snapshotRootArtifactID
+                == context.snapshotRootArtifactID
+        else {
+            throw BASLayerCellError.snapshotRootMismatch
+        }
+        guard ingress.body.revocationGeneration
+                == context.revocationGeneration
+        else {
+            throw BASLayerCellError.revocationGenerationMismatch
+        }
+        guard ingress.body.monotonicDeadlineNanos
+                == context.monotonicDeadlineNanos
+        else {
+            throw BASLayerCellError.deadlineMismatch
+        }
+        guard ingress.body.budget == context.budget else {
+            throw BASLayerCellError.budgetMismatch
+        }
+
+        let layerID = semanticLayerID.motherboardLayer14
+        guard actorLayerID == layerID else {
+            throw BASLayerCellError.semanticActorLayerMismatch
+        }
+        guard context.budget.layerID == layerID,
+              ingress.body.budget.layerID == layerID
+        else {
+            throw BASLayerCellError.budgetLayerMismatch
+        }
+        guard context.killSwitchState.switchID.motherboardLayer == layerID else {
+            throw BASLayerCellError.killSwitchLayerMismatch
+        }
+        guard !context.killSwitchState.active else {
+            throw BASLayerCellError.killSwitchActive
+        }
+        guard ingress.body.killGeneration
+                == context.killSwitchState.monotonicGeneration
+        else {
+            throw BASLayerCellError.killGenerationMismatch
+        }
+        guard context.monotonicNowNanos
+                < context.monotonicDeadlineNanos
+        else {
+            throw BASLayerCellError.deadlineExpired
+        }
+    }
+
+    static func canonicalDecision<Output>(
+        _ decision: BASLayerCoreDecision<Output>,
+        turnOperationRef: BASTurnOperationRef,
+        semanticLayerID: BASSemanticLayerID
+    ) throws -> BASLayerCoreDecision<Output>
+    where Output: Codable & Sendable & Hashable {
+        guard case let .invoke(proposed) = decision else {
+            return decision
+        }
+        guard proposed.schemaVersion
+                == BASLayerActorInput.currentSchemaVersion
+        else {
+            throw BASLayerCellError.invalidActorInputSchema(
+                found: proposed.schemaVersion)
+        }
+        guard proposed.layerID == semanticLayerID.motherboardLayer14 else {
+            throw BASLayerCellError.coreActorLayerMismatch
+        }
+        let canonicalTurnID = try turnOperationRef
+            .canonicalLegacyProjection()
+        var canonical = proposed
+        canonical.turnID = canonicalTurnID
+        return .invoke(canonical)
+    }
+
+    static func samePreparedContext(
+        _ initial: BASLayerCellMembraneContext,
+        _ fresh: BASLayerCellMembraneContext
+    ) -> Bool {
+        initial.inputArtifactID == fresh.inputArtifactID
+            && initial.orderedParentArtifactIDs
+                == fresh.orderedParentArtifactIDs
+            && initial.grantArtifactID == fresh.grantArtifactID
+            && initial.turnOperationRef == fresh.turnOperationRef
+            && initial.causalTurnBranchRef == fresh.causalTurnBranchRef
+            && initial.logicalEpoch == fresh.logicalEpoch
+            && initial.snapshotRootArtifactID
+                == fresh.snapshotRootArtifactID
+            && initial.killSwitchState == fresh.killSwitchState
+            && initial.revocationGeneration == fresh.revocationGeneration
+            && initial.monotonicDeadlineNanos
+                == fresh.monotonicDeadlineNanos
+            && initial.budget == fresh.budget
+    }
+
+    static func validateActorOutput(
+        _ output: BASLayerActorOutput,
+        request: BASLayerActorInput
+    ) throws {
+        guard output.schemaVersion
+                == BASLayerActorOutput.currentSchemaVersion,
+              output.layerID == request.layerID,
+              output.turnID == request.turnID
+        else {
+            throw BASLayerCellError.actorOutputMismatch
+        }
+    }
+}
+
+// BEGIN BASLayerCell
+public struct BASLayerCell<
+    Core: BASSemanticLayerCore,
+    Actor: BASLayerActor
+>: Sendable {
+    public let core: Core
+    public let mechanism: BASLayerActorMechanismAdapter<Actor>
+
+    public init(core: Core, actor: Actor) {
+        self.core = core
+        self.mechanism = BASLayerActorMechanismAdapter(actor: actor)
+    }
+
+    public func prepare(
+        _ ingress: BASLayerCellIngress<Core.Input>,
+        context: BASLayerCellMembraneContext
+    ) throws -> BASLayerCellPreparedState<Core, Actor> {
+        try BASLayerCellValidation.validate(
+            ingress,
+            context: context,
+            semanticLayerID: Core.layerID,
+            actorLayerID: mechanism.actor.layerID)
+        let proposed = try core.evaluate(ingress.body.payload)
+        let decision = try BASLayerCellValidation.canonicalDecision(
+            proposed,
+            turnOperationRef: ingress.body.turnOperationRef,
+            semanticLayerID: Core.layerID)
+        return BASLayerCellPreparedState(
+            ingress: ingress,
+            decision: decision,
+            validatedContext: context,
+            preparedCore: core,
+            preparedMechanism: mechanism)
+    }
+
+    public func revalidateAndInvoke(
+        _ prepared: BASLayerCellPreparedState<Core, Actor>,
+        context freshContext: BASLayerCellMembraneContext
+    ) async throws -> BASLayerActorOutput {
+        guard prepared.preparedMechanism.actor === mechanism.actor else {
+            throw BASLayerCellError.preparedActorMismatch
+        }
+        guard case let .invoke(request) = prepared.decision else {
+            throw BASLayerCellError.mechanismNotRequested
+        }
+        try BASLayerCellValidation.validate(
+            prepared.ingress,
+            context: freshContext,
+            semanticLayerID: Core.layerID,
+            actorLayerID: mechanism.actor.layerID)
+        guard BASLayerCellValidation.samePreparedContext(
+            prepared.validatedContext,
+            freshContext)
+        else {
+            throw BASLayerCellError.killStateChanged
+        }
+        guard freshContext.monotonicNowNanos
+                >= prepared.validatedContext.monotonicNowNanos
+        else {
+            throw BASLayerCellError.monotonicClockRegressed
+        }
+        let output = try await mechanism.invoke(
+            request,
+            turnOperationRef: prepared.ingress.body.turnOperationRef)
+        return output
+    }
+
+    public func resume(
+        _ prepared: BASLayerCellPreparedState<Core, Actor>,
+        actorOutput: BASLayerActorOutput?
+    ) throws -> BASLayerCellResolvedState<Core, Actor> {
+        switch prepared.decision {
+        case let .emit(output):
+            guard actorOutput == nil else {
+                throw BASLayerCellError.actorOutputForbidden
+            }
+            return BASLayerCellResolvedState(
+                prepared: prepared,
+                output: output,
+                terminalState: .converged)
+        case let .invoke(request):
+            guard let actorOutput else {
+                throw BASLayerCellError.actorOutputRequired
+            }
+            try BASLayerCellValidation.validateActorOutput(
+                actorOutput,
+                request: request)
+            let output = try prepared.preparedCore.resume(
+                actorOutput,
+                input: prepared.ingress.body.payload)
+            return BASLayerCellResolvedState(
+                prepared: prepared,
+                output: output,
+                terminalState: .converged)
+        case .remand:
+            guard actorOutput == nil else {
+                throw BASLayerCellError.actorOutputForbidden
+            }
+            return BASLayerCellResolvedState(
+                prepared: prepared,
+                output: nil,
+                terminalState: .deferred)
+        case .refuse:
+            guard actorOutput == nil else {
+                throw BASLayerCellError.actorOutputForbidden
+            }
+            return BASLayerCellResolvedState(
+                prepared: prepared,
+                output: nil,
+                terminalState: .rejected)
+        }
+    }
+
+    public func makeEgress(
+        from resolved: BASLayerCellResolvedState<Core, Actor>,
+        outputArtifactID: BASArtifactID,
+        capabilityUseReceiptArtifactID: BASArtifactID?
+    ) throws -> BASLayerCellEgress<Core.Output> {
+        try BASLayerCellValidation.artifactID(
+            outputArtifactID,
+            field: "outputArtifactID")
+        if let capabilityUseReceiptArtifactID {
+            try BASLayerCellValidation.artifactID(
+                capabilityUseReceiptArtifactID,
+                field: "capabilityUseReceiptArtifactID")
+        }
+        let success: Bool
+        switch resolved.prepared.decision {
+        case .invoke:
+            guard capabilityUseReceiptArtifactID != nil else {
+                throw BASLayerCellError.capabilityUseReceiptRequired
+            }
+            success = true
+        case .emit:
+            guard capabilityUseReceiptArtifactID == nil else {
+                throw BASLayerCellError.capabilityUseReceiptForbidden
+            }
+            success = true
+        case .remand, .refuse:
+            guard capabilityUseReceiptArtifactID == nil else {
+                throw BASLayerCellError.capabilityUseReceiptForbidden
+            }
+            success = false
+        }
+        return BASResult(
+            success: success,
+            body: BASLayerCellEgressBody(
+                output: resolved.output,
+                outputArtifactID: outputArtifactID,
+                capabilityUseReceiptArtifactID:
+                    capabilityUseReceiptArtifactID,
+                orderedParentArtifactIDs:
+                    resolved.prepared.ingress.body
+                        .orderedParentArtifactIDs,
+                terminalState: resolved.terminalState),
+            diagnostics: [])
+    }
+}
+// END BASLayerCell
 
 // MARK: - Typed error boundary
 
