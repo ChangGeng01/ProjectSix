@@ -1492,6 +1492,60 @@ public enum BASEBrainSchemaGovernanceRegistry {
                 "schema.BASBudgetLeasePayload.future_rejection",
             ]
         ),
+        entry(
+            "BASJoinArtifact",
+            versionedType: BASJoinArtifact.self,
+            tests: [
+                "schema.BASJoinArtifact.current",
+                "schema.BASJoinArtifact.backward_v1",
+                "schema.BASJoinArtifact.future_rejection",
+            ]
+        ),
+        entry(
+            "BASRemandArtifact",
+            versionedType: BASRemandArtifact.self,
+            tests: [
+                "schema.BASRemandArtifact.current",
+                "schema.BASRemandArtifact.backward_v1",
+                "schema.BASRemandArtifact.future_rejection",
+            ]
+        ),
+        entry(
+            "BASRefusalArtifact",
+            versionedType: BASRefusalArtifact.self,
+            tests: [
+                "schema.BASRefusalArtifact.current",
+                "schema.BASRefusalArtifact.backward_v1",
+                "schema.BASRefusalArtifact.future_rejection",
+            ]
+        ),
+        entry(
+            "BASControlLoopEnvelopePayload",
+            versionedType: BASControlLoopEnvelopePayload.self,
+            tests: [
+                "schema.BASControlLoopEnvelopePayload.current",
+                "schema.BASControlLoopEnvelopePayload.backward_v1",
+                "schema.BASControlLoopEnvelopePayload.future_rejection",
+            ]
+        ),
+        entry(
+            "BASControlLoopProgressWitnessPayload",
+            versionedType: BASControlLoopProgressWitnessPayload.self,
+            tests: [
+                "schema.BASControlLoopProgressWitnessPayload.current",
+                "schema.BASControlLoopProgressWitnessPayload.backward_v1",
+                "schema.BASControlLoopProgressWitnessPayload.future_rejection",
+            ]
+        ),
+        entry(
+            "BASControlLoopTerminalReceiptPayload",
+            versionedType: BASControlLoopTerminalReceiptPayload.self,
+            tests: [
+                "schema.BASControlLoopTerminalReceiptPayload.current",
+                "schema.BASControlLoopTerminalReceiptPayload.backward_v1",
+                "schema.BASControlLoopTerminalReceiptPayload.future_rejection",
+            ]
+        ),
         // ── old-audit schema-parity backfill (2026-07-11): 12 BASSchemaVersioned domain
         // objects declared across BASMemory/BASOrchestration/BASPolicy/BASEvaluation but never
         // registered — the whitepaper schema-parity gate had been red. Registered here with the

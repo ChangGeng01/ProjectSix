@@ -427,6 +427,13 @@ struct BASEBrainProgramBlueprintTests {
             // Task 2A — canonical admission-time root and immutable budget.
             "BASTurnOperationPayload",
             "BASBudgetLeasePayload",
+            // Task 4 — bounded collaboration/control-loop artifact values.
+            "BASJoinArtifact",
+            "BASRemandArtifact",
+            "BASRefusalArtifact",
+            "BASControlLoopEnvelopePayload",
+            "BASControlLoopProgressWitnessPayload",
+            "BASControlLoopTerminalReceiptPayload",
             // old-audit schema-parity backfill (2026-07-11): the 12 newly-registered objects
             "DistillationBank", "EvidenceAtom", "GuardBranch", "MemoryUsageRecord",
             "RegretProfile", "RiskCalibrationBundle", "RiskCalibrationStratumDelta",

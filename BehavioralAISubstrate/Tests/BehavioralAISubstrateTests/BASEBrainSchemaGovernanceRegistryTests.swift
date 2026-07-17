@@ -29,6 +29,36 @@ struct BASEBrainSchemaGovernanceRegistryTests {
                 "schema.BASBudgetLeasePayload.backward_v1",
                 "schema.BASBudgetLeasePayload.future_rejection",
             ],
+            "BASJoinArtifact": [
+                "schema.BASJoinArtifact.current",
+                "schema.BASJoinArtifact.backward_v1",
+                "schema.BASJoinArtifact.future_rejection",
+            ],
+            "BASRemandArtifact": [
+                "schema.BASRemandArtifact.current",
+                "schema.BASRemandArtifact.backward_v1",
+                "schema.BASRemandArtifact.future_rejection",
+            ],
+            "BASRefusalArtifact": [
+                "schema.BASRefusalArtifact.current",
+                "schema.BASRefusalArtifact.backward_v1",
+                "schema.BASRefusalArtifact.future_rejection",
+            ],
+            "BASControlLoopEnvelopePayload": [
+                "schema.BASControlLoopEnvelopePayload.current",
+                "schema.BASControlLoopEnvelopePayload.backward_v1",
+                "schema.BASControlLoopEnvelopePayload.future_rejection",
+            ],
+            "BASControlLoopProgressWitnessPayload": [
+                "schema.BASControlLoopProgressWitnessPayload.current",
+                "schema.BASControlLoopProgressWitnessPayload.backward_v1",
+                "schema.BASControlLoopProgressWitnessPayload.future_rejection",
+            ],
+            "BASControlLoopTerminalReceiptPayload": [
+                "schema.BASControlLoopTerminalReceiptPayload.current",
+                "schema.BASControlLoopTerminalReceiptPayload.backward_v1",
+                "schema.BASControlLoopTerminalReceiptPayload.future_rejection",
+            ],
         ]
         for entry in BASEBrainSchemaGovernanceRegistry.governedSchemas {
             #expect(!entry.currentVersion.isEmpty)
@@ -49,10 +79,16 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 278)  // + Task 2A canonical turn-operation and budget-lease payloads
+        #expect(governedObjects.count == 284)  // + Task 4 collaboration/control-loop artifacts
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("BASTurnOperationPayload"))
         #expect(governedObjects.contains("BASBudgetLeasePayload"))
+        #expect(governedObjects.contains("BASJoinArtifact"))
+        #expect(governedObjects.contains("BASRemandArtifact"))
+        #expect(governedObjects.contains("BASRefusalArtifact"))
+        #expect(governedObjects.contains("BASControlLoopEnvelopePayload"))
+        #expect(governedObjects.contains("BASControlLoopProgressWitnessPayload"))
+        #expect(governedObjects.contains("BASControlLoopTerminalReceiptPayload"))
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
         #expect(governedObjects.contains("HostConstitution"))
@@ -614,6 +650,18 @@ struct BASEBrainSchemaGovernanceRegistryTests {
                 BASTurnOperationPayload.currentSchemaVersion,
             "BASBudgetLeasePayload":
                 BASBudgetLeasePayload.currentSchemaVersion,
+            "BASJoinArtifact":
+                BASJoinArtifact.currentSchemaVersion,
+            "BASRemandArtifact":
+                BASRemandArtifact.currentSchemaVersion,
+            "BASRefusalArtifact":
+                BASRefusalArtifact.currentSchemaVersion,
+            "BASControlLoopEnvelopePayload":
+                BASControlLoopEnvelopePayload.currentSchemaVersion,
+            "BASControlLoopProgressWitnessPayload":
+                BASControlLoopProgressWitnessPayload.currentSchemaVersion,
+            "BASControlLoopTerminalReceiptPayload":
+                BASControlLoopTerminalReceiptPayload.currentSchemaVersion,
         ]
 
         #expect(actualVersions == expectedVersions)

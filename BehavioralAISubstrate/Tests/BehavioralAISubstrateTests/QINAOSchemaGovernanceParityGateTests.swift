@@ -71,6 +71,36 @@ final class QINAOSchemaGovernanceParityGateTests: XCTestCase {
                 "schema.BASBudgetLeasePayload.backward_v1",
                 "schema.BASBudgetLeasePayload.future_rejection",
             ],
+            "BASJoinArtifact": [
+                "schema.BASJoinArtifact.current",
+                "schema.BASJoinArtifact.backward_v1",
+                "schema.BASJoinArtifact.future_rejection",
+            ],
+            "BASRemandArtifact": [
+                "schema.BASRemandArtifact.current",
+                "schema.BASRemandArtifact.backward_v1",
+                "schema.BASRemandArtifact.future_rejection",
+            ],
+            "BASRefusalArtifact": [
+                "schema.BASRefusalArtifact.current",
+                "schema.BASRefusalArtifact.backward_v1",
+                "schema.BASRefusalArtifact.future_rejection",
+            ],
+            "BASControlLoopEnvelopePayload": [
+                "schema.BASControlLoopEnvelopePayload.current",
+                "schema.BASControlLoopEnvelopePayload.backward_v1",
+                "schema.BASControlLoopEnvelopePayload.future_rejection",
+            ],
+            "BASControlLoopProgressWitnessPayload": [
+                "schema.BASControlLoopProgressWitnessPayload.current",
+                "schema.BASControlLoopProgressWitnessPayload.backward_v1",
+                "schema.BASControlLoopProgressWitnessPayload.future_rejection",
+            ],
+            "BASControlLoopTerminalReceiptPayload": [
+                "schema.BASControlLoopTerminalReceiptPayload.current",
+                "schema.BASControlLoopTerminalReceiptPayload.backward_v1",
+                "schema.BASControlLoopTerminalReceiptPayload.future_rejection",
+            ],
         ]
         for entry in registry {
             XCTAssertFalse(
@@ -487,6 +517,12 @@ final class QINAOSchemaGovernanceParityGateTests: XCTestCase {
             "ChengluMeshRegistrationReport": BASChengluMeshRegistrationReport.currentSchemaVersion,
             "BASTurnOperationPayload": BASTurnOperationPayload.currentSchemaVersion,
             "BASBudgetLeasePayload": BASBudgetLeasePayload.currentSchemaVersion,
+            "BASJoinArtifact": BASJoinArtifact.currentSchemaVersion,
+            "BASRemandArtifact": BASRemandArtifact.currentSchemaVersion,
+            "BASRefusalArtifact": BASRefusalArtifact.currentSchemaVersion,
+            "BASControlLoopEnvelopePayload": BASControlLoopEnvelopePayload.currentSchemaVersion,
+            "BASControlLoopProgressWitnessPayload": BASControlLoopProgressWitnessPayload.currentSchemaVersion,
+            "BASControlLoopTerminalReceiptPayload": BASControlLoopTerminalReceiptPayload.currentSchemaVersion,
             // old-audit schema-parity backfill (2026-07-11): the 12 newly-registered conformers
             "DistillationBank": BASDistillationBank.currentSchemaVersion,
             "EvidenceAtom": BASEvidenceAtom.currentSchemaVersion,
