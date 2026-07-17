@@ -89,6 +89,30 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
             )
             return self.run_ledger(path)
 
+    def validate_with_owner_paths_absent(
+        self,
+        data: dict,
+        owner_id: str,
+    ) -> list[str]:
+        permission = next(
+            item
+            for item in data["create_permissions"]
+            if item["owner_id"] == owner_id
+        )
+        absent_paths = {
+            (ROOT / relative_path).resolve(strict=False)
+            for relative_path in permission["allowed_paths"]
+        }
+        original_is_file = Path.is_file
+
+        def selectively_absent(path: Path) -> bool:
+            if path.resolve(strict=False) in absent_paths:
+                return False
+            return original_is_file(path)
+
+        with mock.patch.object(Path, "is_file", new=selectively_absent):
+            return checker.validate_ledger(data, ROOT)
+
     def run_candidate(self, candidate: dict) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "candidate.json"
@@ -665,30 +689,32 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
         self.assertIn("canonical M owner order", completed.stderr)
 
     def test_missing_owner_lifecycle_status_tracks_created_paths(self) -> None:
-        def mutate(data: dict) -> None:
-            owner = next(
-                item for item in data["owners"] if item["owner_id"] == "artifact.mesh"
-            )
-            owner["status"] = "converging"
+        with LEDGER.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        owner = next(
+            item for item in data["owners"] if item["owner_id"] == "artifact.mesh"
+        )
+        owner["status"] = "converging"
 
-        completed = self.run_mutated_ledger(mutate)
+        errors = self.validate_with_owner_paths_absent(data, "artifact.mesh")
 
-        self.assertNotEqual(completed.returncode, 0)
-        self.assertIn("M lifecycle status 'converging'", completed.stderr)
-        self.assertIn("at least one approved path", completed.stderr)
+        rendered = "\n".join(errors)
+        self.assertIn("M lifecycle status 'converging'", rendered)
+        self.assertIn("at least one approved path", rendered)
 
     def test_implemented_missing_owner_requires_all_approved_paths(self) -> None:
-        def mutate(data: dict) -> None:
-            owner = next(
-                item for item in data["owners"] if item["owner_id"] == "artifact.mesh"
-            )
-            owner["status"] = "implemented"
+        with LEDGER.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        owner = next(
+            item for item in data["owners"] if item["owner_id"] == "artifact.mesh"
+        )
+        owner["status"] = "implemented"
 
-        completed = self.run_mutated_ledger(mutate)
+        errors = self.validate_with_owner_paths_absent(data, "artifact.mesh")
 
-        self.assertNotEqual(completed.returncode, 0)
-        self.assertIn("M lifecycle status 'implemented'", completed.stderr)
-        self.assertIn("every approved path", completed.stderr)
+        rendered = "\n".join(errors)
+        self.assertIn("M lifecycle status 'implemented'", rendered)
+        self.assertIn("every approved path", rendered)
 
     def test_implemented_missing_owner_requires_resolved_conflicts(self) -> None:
         def mutate(data: dict) -> None:
