@@ -12,6 +12,8 @@ final class BASSemanticArchitectureIDTests: XCTestCase {
 
     func testPhysicalKernelIDIsAProjectionOnMotherboardKernel() {
         let kernel: BASPhysicalKernelID = .leaseAndLife
+        let existing: BASMotherboardKernel = kernel
+        XCTAssertEqual(existing, .leaseAndLife)
         XCTAssertEqual(kernel.architectureID, "K1")
         XCTAssertEqual(
             BASMotherboardKernel.neuralOrganRuntime.architectureID,
@@ -28,6 +30,29 @@ final class BASSemanticArchitectureIDTests: XCTestCase {
     func testMissingTaxonomiesAndLegacyPlaneProjectionAreTotal() {
         XCTAssertEqual(BASControlRingID.allCases.count, 4)
         XCTAssertEqual(BASTopLevelPlaneID.allCases.count, 7)
+        XCTAssertEqual(BASControlRingID.resource.rawValue, "ΩR")
+        XCTAssertEqual(BASControlRingID.grounding.rawValue, "ΩG")
+        XCTAssertEqual(BASControlRingID.deliberation.rawValue, "ΩD")
+        XCTAssertEqual(BASControlRingID.effectEvolution.rawValue, "ΩE")
+        XCTAssertEqual(
+            BASTopLevelPlaneID.semanticAuthority.rawValue,
+            "semantic-authority")
+        XCTAssertEqual(
+            BASTopLevelPlaneID.kernelOwnership.rawValue,
+            "kernel-ownership")
+        XCTAssertEqual(
+            BASTopLevelPlaneID.executionDAG.rawValue,
+            "execution-dag")
+        XCTAssertEqual(
+            BASTopLevelPlaneID.controlRing.rawValue,
+            "control-ring")
+        XCTAssertEqual(BASTopLevelPlaneID.data.rawValue, "data")
+        XCTAssertEqual(
+            BASTopLevelPlaneID.adapterIO.rawValue,
+            "adapter-io")
+        XCTAssertEqual(
+            BASTopLevelPlaneID.observeReplay.rawValue,
+            "observe-replay")
         let projected = Set(
             BASMotherboardPlane.allCases.flatMap(\.topLevelViewIDs))
         XCTAssertEqual(projected, Set(BASTopLevelPlaneID.allCases))

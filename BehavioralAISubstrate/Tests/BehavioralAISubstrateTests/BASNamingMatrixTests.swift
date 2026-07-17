@@ -43,6 +43,9 @@ final class BASNamingMatrixTests: XCTestCase {
         ]
 
         XCTAssertEqual(expected.count, BASCognitiveLayer.allCases.count)
+        XCTAssertEqual(
+            Set(expected.map { $0.semantic }),
+            Set(BASCognitiveLayer.allCases))
         for row in expected {
             XCTAssertEqual(row.semantic.motherboardLayer14, row.motherboard14)
             XCTAssertEqual(row.motherboard14.semanticLayerID, row.semantic)
