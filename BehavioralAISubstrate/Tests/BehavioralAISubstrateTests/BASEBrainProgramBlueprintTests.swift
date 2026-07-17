@@ -424,6 +424,9 @@ struct BASEBrainProgramBlueprintTests {
             // typed mesh registration report for canonical 8-slot
             // Chenglu CoreML adapter assembly.
             "ChengluMeshRegistrationReport",
+            // Task 2A — canonical admission-time root and immutable budget.
+            "BASTurnOperationPayload",
+            "BASBudgetLeasePayload",
             // old-audit schema-parity backfill (2026-07-11): the 12 newly-registered objects
             "DistillationBank", "EvidenceAtom", "GuardBranch", "MemoryUsageRecord",
             "RegretProfile", "RiskCalibrationBundle", "RiskCalibrationStratumDelta",

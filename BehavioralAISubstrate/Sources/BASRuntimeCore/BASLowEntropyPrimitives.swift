@@ -275,3 +275,546 @@ where
         self.presentation = presentation
     }
 }
+
+// MARK: - Canonical turn-operation identity
+
+/// An ordinary Artifact Mesh reference to the immutable admission-time turn
+/// operation payload. The Artifact Mesh ID is the only root identity; legacy
+/// strings are bounded compatibility projections of this value.
+public struct BASTurnOperationRef: Codable, Sendable, Hashable {
+    public let artifactID: BASArtifactID
+
+    public init(artifactID: BASArtifactID) throws {
+        do {
+            _ = try artifactID.storageScalar
+        } catch {
+            throw BASTurnOperationRefError.invalidArtifactID
+        }
+        self.artifactID = artifactID
+    }
+
+    public func canonicalLegacyProjection() throws -> String {
+        let bytes = BASSovereignCanonicalBytes.lengthPrefixed([
+            "bas-turn-operation-ref-v1",
+            try artifactID.storageScalar,
+        ])
+        return bytes.base64EncodedString()
+    }
+
+    public init(
+        validatingCanonicalLegacyProjection projection: String
+    ) throws {
+        let fields: [String]
+        do {
+            fields = try BASTurnLegacyProjectionDecoder.decode(projection)
+        } catch BASTurnLegacyProjectionDecodeError.nonCanonicalProjection {
+            throw BASTurnOperationRefError.nonCanonicalProjection
+        } catch {
+            throw BASTurnOperationRefError.malformedProjection
+        }
+        guard fields.count == 2 else {
+            throw BASTurnOperationRefError.malformedProjection
+        }
+        guard fields[0] == "bas-turn-operation-ref-v1" else {
+            throw BASTurnOperationRefError.unsupportedVersion
+        }
+        do {
+            try self.init(artifactID: BASArtifactID(storageScalar: fields[1]))
+        } catch let error as BASTurnOperationRefError {
+            throw error
+        } catch {
+            throw BASTurnOperationRefError.invalidArtifactID
+        }
+        guard try canonicalLegacyProjection() == projection else {
+            throw BASTurnOperationRefError.nonCanonicalProjection
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case artifactID
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            artifactID: container.decode(
+                BASArtifactID.self,
+                forKey: .artifactID))
+    }
+}
+
+public enum BASTurnOperationRefError: Error, Sendable, Equatable {
+    case invalidArtifactID
+    case malformedProjection
+    case unsupportedVersion
+    case nonCanonicalProjection
+}
+
+/// The only externally meaningful branch dimensions below one turn root.
+public enum BASTurnBranchKind: String, Codable, Sendable, Hashable, CaseIterable {
+    case providerEgress
+    case provisionalStream
+    case finalPublication
+    case effect
+}
+
+/// A typed branch below one canonical turn-operation root.
+public struct BASTurnBranchRef: Codable, Sendable, Hashable {
+    public let turnOperationRef: BASTurnOperationRef
+    public let kind: BASTurnBranchKind
+    public let ordinal: UInt64
+
+    public init(
+        turnOperationRef: BASTurnOperationRef,
+        kind: BASTurnBranchKind,
+        ordinal: UInt64
+    ) throws {
+        if kind == .provisionalStream || kind == .finalPublication,
+           ordinal != 0
+        {
+            throw BASTurnBranchRefError.nonzeroSingletonOrdinal(kind: kind)
+        }
+        self.turnOperationRef = turnOperationRef
+        self.kind = kind
+        self.ordinal = ordinal
+    }
+
+    public func canonicalLegacyProjection() throws -> String {
+        let bytes = BASSovereignCanonicalBytes.lengthPrefixed([
+            "bas-turn-branch-ref-v1",
+            try turnOperationRef.artifactID.storageScalar,
+            kind.rawValue,
+            String(ordinal),
+        ])
+        return bytes.base64EncodedString()
+    }
+
+    public init(
+        validatingCanonicalLegacyProjection projection: String
+    ) throws {
+        try self.init(
+            validatingCanonicalLegacyProjection: projection,
+            expectedTurnOperationRef: nil)
+    }
+
+    public init(
+        validatingCanonicalLegacyProjection projection: String,
+        expectedTurnOperationRef: BASTurnOperationRef
+    ) throws {
+        try self.init(
+            validatingCanonicalLegacyProjection: projection,
+            expectedTurnOperationRef: Optional(expectedTurnOperationRef))
+    }
+
+    private init(
+        validatingCanonicalLegacyProjection projection: String,
+        expectedTurnOperationRef: BASTurnOperationRef?
+    ) throws {
+        let fields: [String]
+        do {
+            fields = try BASTurnLegacyProjectionDecoder.decode(projection)
+        } catch BASTurnLegacyProjectionDecodeError.nonCanonicalProjection {
+            throw BASTurnBranchRefError.nonCanonicalProjection
+        } catch {
+            throw BASTurnBranchRefError.malformedProjection
+        }
+        guard fields.count == 4 else {
+            throw BASTurnBranchRefError.malformedProjection
+        }
+        guard fields[0] == "bas-turn-branch-ref-v1" else {
+            throw BASTurnBranchRefError.unsupportedVersion
+        }
+        let operation: BASTurnOperationRef
+        do {
+            operation = try BASTurnOperationRef(
+                artifactID: BASArtifactID(storageScalar: fields[1]))
+        } catch {
+            throw BASTurnBranchRefError.invalidParent
+        }
+        guard expectedTurnOperationRef == nil
+                || expectedTurnOperationRef == operation
+        else {
+            throw BASTurnBranchRefError.parentMismatch
+        }
+        guard let decodedKind = BASTurnBranchKind(rawValue: fields[2]) else {
+            throw BASTurnBranchRefError.unsupportedKind
+        }
+        guard !fields[3].isEmpty,
+              !(fields[3].count > 1 && fields[3].first == "0"),
+              let decodedOrdinal = UInt64(fields[3]),
+              fields[3] == String(decodedOrdinal)
+        else {
+            throw BASTurnBranchRefError.invalidOrdinal
+        }
+        try self.init(
+            turnOperationRef: operation,
+            kind: decodedKind,
+            ordinal: decodedOrdinal)
+        guard try canonicalLegacyProjection() == projection else {
+            throw BASTurnBranchRefError.nonCanonicalProjection
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case turnOperationRef
+        case kind
+        case ordinal
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            turnOperationRef: container.decode(
+                BASTurnOperationRef.self,
+                forKey: .turnOperationRef),
+            kind: container.decode(
+                BASTurnBranchKind.self,
+                forKey: .kind),
+            ordinal: container.decode(UInt64.self, forKey: .ordinal))
+    }
+}
+
+public enum BASTurnBranchRefError: Error, Sendable, Equatable {
+    case malformedProjection
+    case unsupportedVersion
+    case invalidParent
+    case parentMismatch
+    case unsupportedKind
+    case invalidOrdinal
+    case nonzeroSingletonOrdinal(kind: BASTurnBranchKind)
+    case nonCanonicalProjection
+}
+
+private enum BASTurnLegacyProjectionDecodeError: Error {
+    case malformedProjection
+    case nonCanonicalProjection
+}
+
+private enum BASTurnLegacyProjectionDecoder {
+    private static let maximumProjectionBytes = 4_096
+    private static let maximumDecodedBytes = 3_072
+    private static let maximumFieldCount = 5
+    private static let maximumFieldBytes = 1_024
+
+    static func decode(_ projection: String) throws -> [String] {
+        guard !projection.isEmpty,
+              projection.utf8.count <= maximumProjectionBytes,
+              let data = Data(base64Encoded: projection),
+              data.count <= maximumDecodedBytes
+        else {
+            throw BASTurnLegacyProjectionDecodeError.malformedProjection
+        }
+        guard data.base64EncodedString() == projection else {
+            throw BASTurnLegacyProjectionDecodeError.nonCanonicalProjection
+        }
+
+        let bytes = Array(data)
+        var fields: [String] = []
+        var index = 0
+        while index < bytes.count {
+            guard fields.count < maximumFieldCount else {
+                throw BASTurnLegacyProjectionDecodeError.malformedProjection
+            }
+            let digitStart = index
+            var length = 0
+            while index < bytes.count,
+                  bytes[index] >= 48,
+                  bytes[index] <= 57
+            {
+                guard index - digitStart < 4,
+                      !(index > digitStart && bytes[digitStart] == 48)
+                else {
+                    throw BASTurnLegacyProjectionDecodeError
+                        .malformedProjection
+                }
+                length = length * 10 + Int(bytes[index] - 48)
+                index += 1
+            }
+            guard index > digitStart,
+                  index < bytes.count,
+                  bytes[index] == 58,
+                  length <= maximumFieldBytes
+            else {
+                throw BASTurnLegacyProjectionDecodeError.malformedProjection
+            }
+            index += 1
+            guard length <= bytes.count - index else {
+                throw BASTurnLegacyProjectionDecodeError.malformedProjection
+            }
+            let end = index + length
+            guard let field = String(bytes: bytes[index..<end], encoding: .utf8)
+            else {
+                throw BASTurnLegacyProjectionDecodeError.malformedProjection
+            }
+            fields.append(field)
+            index = end
+        }
+        return fields
+    }
+}
+
+// MARK: - Admission-time turn payloads
+
+public enum BASTurnAdmissionPayloadError: Error, Sendable, Equatable {
+    case invalidArtifactID(field: String)
+    case selectedLineageTooLarge(actual: Int, maximum: Int)
+    case duplicateSelectedLineageArtifactID
+    case invalidBootSessionID
+}
+
+/// Immutable, unsigned facts admitted under one Artifact Mesh turn root.
+public struct BASTurnOperationPayload:
+    BASSchemaVersioned, Codable, Sendable, Hashable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public let schemaVersion: String
+    public let workspaceAuthorityArtifactID: BASArtifactID
+    public let workspaceIncarnationArtifactID: BASArtifactID
+    public let attemptRefArtifactID: BASArtifactID
+    public let generationVectorArtifactID: BASArtifactID
+    public let inputArtifactID: BASArtifactID
+    public let budgetLeaseArtifactID: BASArtifactID
+    public let orderedSelectedModelProfileLineageArtifactIDs: [BASArtifactID]
+    public let policyEpoch: UInt64
+    public let deletionEpoch: UInt64
+    public let restorationEpoch: UInt64
+    public let runtimeSchemaEpoch: UInt64
+
+    public init(
+        schemaVersion: String = Self.currentSchemaVersion,
+        workspaceAuthorityArtifactID: BASArtifactID,
+        workspaceIncarnationArtifactID: BASArtifactID,
+        attemptRefArtifactID: BASArtifactID,
+        generationVectorArtifactID: BASArtifactID,
+        inputArtifactID: BASArtifactID,
+        budgetLeaseArtifactID: BASArtifactID,
+        orderedSelectedModelProfileLineageArtifactIDs: [BASArtifactID],
+        policyEpoch: UInt64,
+        deletionEpoch: UInt64,
+        restorationEpoch: UInt64,
+        runtimeSchemaEpoch: UInt64
+    ) throws {
+        let artifactFields: [(String, BASArtifactID)] = [
+            ("workspaceAuthorityArtifactID", workspaceAuthorityArtifactID),
+            ("workspaceIncarnationArtifactID", workspaceIncarnationArtifactID),
+            ("attemptRefArtifactID", attemptRefArtifactID),
+            ("generationVectorArtifactID", generationVectorArtifactID),
+            ("inputArtifactID", inputArtifactID),
+            ("budgetLeaseArtifactID", budgetLeaseArtifactID),
+        ]
+        for (field, artifactID) in artifactFields {
+            try Self.validate(artifactID: artifactID, field: field)
+        }
+        guard orderedSelectedModelProfileLineageArtifactIDs.count
+                <= Self.maximumSelectedLineageCount
+        else {
+            throw BASTurnAdmissionPayloadError.selectedLineageTooLarge(
+                actual: orderedSelectedModelProfileLineageArtifactIDs.count,
+                maximum: Self.maximumSelectedLineageCount)
+        }
+        for artifactID in orderedSelectedModelProfileLineageArtifactIDs {
+            try Self.validate(
+                artifactID: artifactID,
+                field: "orderedSelectedModelProfileLineageArtifactIDs")
+        }
+        guard Set(orderedSelectedModelProfileLineageArtifactIDs).count
+                == orderedSelectedModelProfileLineageArtifactIDs.count
+        else {
+            throw BASTurnAdmissionPayloadError
+                .duplicateSelectedLineageArtifactID
+        }
+
+        self.schemaVersion = schemaVersion
+        self.workspaceAuthorityArtifactID = workspaceAuthorityArtifactID
+        self.workspaceIncarnationArtifactID = workspaceIncarnationArtifactID
+        self.attemptRefArtifactID = attemptRefArtifactID
+        self.generationVectorArtifactID = generationVectorArtifactID
+        self.inputArtifactID = inputArtifactID
+        self.budgetLeaseArtifactID = budgetLeaseArtifactID
+        self.orderedSelectedModelProfileLineageArtifactIDs =
+            orderedSelectedModelProfileLineageArtifactIDs
+        self.policyEpoch = policyEpoch
+        self.deletionEpoch = deletionEpoch
+        self.restorationEpoch = restorationEpoch
+        self.runtimeSchemaEpoch = runtimeSchemaEpoch
+    }
+
+    private static let maximumSelectedLineageCount = 64
+
+    private static func validate(
+        artifactID: BASArtifactID,
+        field: String
+    ) throws {
+        do {
+            _ = try artifactID.storageScalar
+        } catch {
+            throw BASTurnAdmissionPayloadError.invalidArtifactID(field: field)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case workspaceAuthorityArtifactID
+        case workspaceIncarnationArtifactID
+        case attemptRefArtifactID
+        case generationVectorArtifactID
+        case inputArtifactID
+        case budgetLeaseArtifactID
+        case orderedSelectedModelProfileLineageArtifactIDs
+        case policyEpoch
+        case deletionEpoch
+        case restorationEpoch
+        case runtimeSchemaEpoch
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            schemaVersion: container.decode(
+                String.self, forKey: .schemaVersion),
+            workspaceAuthorityArtifactID: container.decode(
+                BASArtifactID.self, forKey: .workspaceAuthorityArtifactID),
+            workspaceIncarnationArtifactID: container.decode(
+                BASArtifactID.self, forKey: .workspaceIncarnationArtifactID),
+            attemptRefArtifactID: container.decode(
+                BASArtifactID.self, forKey: .attemptRefArtifactID),
+            generationVectorArtifactID: container.decode(
+                BASArtifactID.self, forKey: .generationVectorArtifactID),
+            inputArtifactID: container.decode(
+                BASArtifactID.self, forKey: .inputArtifactID),
+            budgetLeaseArtifactID: container.decode(
+                BASArtifactID.self, forKey: .budgetLeaseArtifactID),
+            orderedSelectedModelProfileLineageArtifactIDs: container.decode(
+                [BASArtifactID].self,
+                forKey: .orderedSelectedModelProfileLineageArtifactIDs),
+            policyEpoch: container.decode(UInt64.self, forKey: .policyEpoch),
+            deletionEpoch: container.decode(
+                UInt64.self, forKey: .deletionEpoch),
+            restorationEpoch: container.decode(
+                UInt64.self, forKey: .restorationEpoch),
+            runtimeSchemaEpoch: container.decode(
+                UInt64.self, forKey: .runtimeSchemaEpoch))
+    }
+}
+
+/// The immutable ceiling bundle installed with the turn operation. Mutable
+/// remaining/spent counters belong only to the selected K3 owner.
+public struct BASBudgetLeasePayload:
+    BASSchemaVersioned, Codable, Sendable, Hashable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public let schemaVersion: String
+    public let attemptRefArtifactID: BASArtifactID
+    public let generationVectorArtifactID: BASArtifactID
+    public let authorizationGrantArtifactID: BASArtifactID
+    public let policyEpoch: UInt64
+    public let deletionEpoch: UInt64
+    public let bootSessionID: String
+    public let tokenCeiling: UInt64
+    public let byteCeiling: UInt64
+    public let branchCeiling: UInt64
+    public let remandRoundCeiling: UInt64
+    public let hopCeiling: UInt64
+    public let costMicrounitsCeiling: UInt64
+    public let monotonicDeadlineNanos: UInt64
+
+    public init(
+        schemaVersion: String = Self.currentSchemaVersion,
+        attemptRefArtifactID: BASArtifactID,
+        generationVectorArtifactID: BASArtifactID,
+        authorizationGrantArtifactID: BASArtifactID,
+        policyEpoch: UInt64,
+        deletionEpoch: UInt64,
+        bootSessionID: String,
+        tokenCeiling: UInt64,
+        byteCeiling: UInt64,
+        branchCeiling: UInt64,
+        remandRoundCeiling: UInt64,
+        hopCeiling: UInt64,
+        costMicrounitsCeiling: UInt64,
+        monotonicDeadlineNanos: UInt64
+    ) throws {
+        for (field, artifactID) in [
+            ("attemptRefArtifactID", attemptRefArtifactID),
+            ("generationVectorArtifactID", generationVectorArtifactID),
+            ("authorizationGrantArtifactID", authorizationGrantArtifactID),
+        ] {
+            do {
+                _ = try artifactID.storageScalar
+            } catch {
+                throw BASTurnAdmissionPayloadError.invalidArtifactID(
+                    field: field)
+            }
+        }
+        guard !bootSessionID.isEmpty,
+              bootSessionID.utf8.count <= Self.maximumBootSessionIDBytes
+        else {
+            throw BASTurnAdmissionPayloadError.invalidBootSessionID
+        }
+
+        self.schemaVersion = schemaVersion
+        self.attemptRefArtifactID = attemptRefArtifactID
+        self.generationVectorArtifactID = generationVectorArtifactID
+        self.authorizationGrantArtifactID = authorizationGrantArtifactID
+        self.policyEpoch = policyEpoch
+        self.deletionEpoch = deletionEpoch
+        self.bootSessionID = bootSessionID
+        self.tokenCeiling = tokenCeiling
+        self.byteCeiling = byteCeiling
+        self.branchCeiling = branchCeiling
+        self.remandRoundCeiling = remandRoundCeiling
+        self.hopCeiling = hopCeiling
+        self.costMicrounitsCeiling = costMicrounitsCeiling
+        self.monotonicDeadlineNanos = monotonicDeadlineNanos
+    }
+
+    private static let maximumBootSessionIDBytes = 256
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case attemptRefArtifactID
+        case generationVectorArtifactID
+        case authorizationGrantArtifactID
+        case policyEpoch
+        case deletionEpoch
+        case bootSessionID
+        case tokenCeiling
+        case byteCeiling
+        case branchCeiling
+        case remandRoundCeiling
+        case hopCeiling
+        case costMicrounitsCeiling
+        case monotonicDeadlineNanos
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            schemaVersion: container.decode(
+                String.self, forKey: .schemaVersion),
+            attemptRefArtifactID: container.decode(
+                BASArtifactID.self, forKey: .attemptRefArtifactID),
+            generationVectorArtifactID: container.decode(
+                BASArtifactID.self, forKey: .generationVectorArtifactID),
+            authorizationGrantArtifactID: container.decode(
+                BASArtifactID.self, forKey: .authorizationGrantArtifactID),
+            policyEpoch: container.decode(UInt64.self, forKey: .policyEpoch),
+            deletionEpoch: container.decode(
+                UInt64.self, forKey: .deletionEpoch),
+            bootSessionID: container.decode(
+                String.self, forKey: .bootSessionID),
+            tokenCeiling: container.decode(UInt64.self, forKey: .tokenCeiling),
+            byteCeiling: container.decode(UInt64.self, forKey: .byteCeiling),
+            branchCeiling: container.decode(
+                UInt64.self, forKey: .branchCeiling),
+            remandRoundCeiling: container.decode(
+                UInt64.self, forKey: .remandRoundCeiling),
+            hopCeiling: container.decode(UInt64.self, forKey: .hopCeiling),
+            costMicrounitsCeiling: container.decode(
+                UInt64.self, forKey: .costMicrounitsCeiling),
+            monotonicDeadlineNanos: container.decode(
+                UInt64.self, forKey: .monotonicDeadlineNanos))
+    }
+}

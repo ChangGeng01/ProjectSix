@@ -60,6 +60,18 @@ final class QINAOSchemaGovernanceParityGateTests: XCTestCase {
         )
 
         // 2) Full governance metadata present on EVERY entry (tolerance 0).
+        let canonicalArtifactPayloadTests: [String: [String]] = [
+            "BASTurnOperationPayload": [
+                "schema.BASTurnOperationPayload.current",
+                "schema.BASTurnOperationPayload.backward_v1",
+                "schema.BASTurnOperationPayload.future_rejection",
+            ],
+            "BASBudgetLeasePayload": [
+                "schema.BASBudgetLeasePayload.current",
+                "schema.BASBudgetLeasePayload.backward_v1",
+                "schema.BASBudgetLeasePayload.future_rejection",
+            ],
+        ]
         for entry in registry {
             XCTAssertFalse(
                 entry.currentVersion.isEmpty,
@@ -80,10 +92,23 @@ final class QINAOSchemaGovernanceParityGateTests: XCTestCase {
                 "Rehydrate the previous schema snapshot and preserve replay fidelity.",
                 "QINAO: \(entry.objectID) rollbackPolicy drift"
             )
+            if let exactTests = canonicalArtifactPayloadTests[entry.objectID] {
+                XCTAssertEqual(
+                    entry.migrationTestIDs,
+                    exactTests,
+                    "QINAO: \(entry.objectID) canonical fixture IDs drift"
+                )
+            } else {
+                XCTAssertEqual(
+                    entry.migrationTestIDs.count,
+                    2,
+                    "QINAO: \(entry.objectID) must carry current+backward migration tests"
+                )
+            }
             XCTAssertEqual(
+                Set(entry.migrationTestIDs).count,
                 entry.migrationTestIDs.count,
-                2,
-                "QINAO: \(entry.objectID) must carry current+backward migration tests"
+                "QINAO: \(entry.objectID) migration test IDs must be unique"
             )
             XCTAssertTrue(
                 entry.migrationTestIDs.allSatisfy { $0.hasPrefix("schema.") },
@@ -460,6 +485,8 @@ final class QINAOSchemaGovernanceParityGateTests: XCTestCase {
             "MeshSyncFrameMergeReport": BASMeshSyncFrameMergeReport.currentSchemaVersion,
             "CoreMLPredictionFrame": BASCoreMLPredictionFrame.currentSchemaVersion,
             "ChengluMeshRegistrationReport": BASChengluMeshRegistrationReport.currentSchemaVersion,
+            "BASTurnOperationPayload": BASTurnOperationPayload.currentSchemaVersion,
+            "BASBudgetLeasePayload": BASBudgetLeasePayload.currentSchemaVersion,
             // old-audit schema-parity backfill (2026-07-11): the 12 newly-registered conformers
             "DistillationBank": BASDistillationBank.currentSchemaVersion,
             "EvidenceAtom": BASEvidenceAtom.currentSchemaVersion,

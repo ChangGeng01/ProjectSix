@@ -124,9 +124,10 @@ echo "" >&2
 echo "Fix: add an entry(\"<Name>\", versionedType: <Struct>.self," \
     "tests: [...]) line to" >&2
 echo "  $REGISTRY" >&2
-echo "and update the two test expectation sites" >&2
+echo "and update the three test expectation sites" >&2
 echo "  (BASEBrainProgramBlueprintTests.swift expectedObjects," >&2
-echo "   BASEBrainSchemaGovernanceRegistryTests.swift count + expectedVersions)." >&2
+echo "   BASEBrainSchemaGovernanceRegistryTests.swift count + expectedVersions," >&2
+echo "   QINAOSchemaGovernanceParityGateTests.swift canonical versions + migration-ID policy)." >&2
 echo "" >&2
 echo "If the struct is intentionally unregistered, add it to" >&2
 echo "the ALLOWLIST in $0 with a doc comment explaining why." >&2

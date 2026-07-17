@@ -1474,6 +1474,24 @@ public enum BASEBrainSchemaGovernanceRegistry {
             versionedType: BASChengluMeshRegistrationReport.self,
             tests: ["schema.chenglu_mesh_registration_report.current", "schema.chenglu_mesh_registration_report.backward"]
         ),
+        entry(
+            "BASTurnOperationPayload",
+            versionedType: BASTurnOperationPayload.self,
+            tests: [
+                "schema.BASTurnOperationPayload.current",
+                "schema.BASTurnOperationPayload.backward_v1",
+                "schema.BASTurnOperationPayload.future_rejection",
+            ]
+        ),
+        entry(
+            "BASBudgetLeasePayload",
+            versionedType: BASBudgetLeasePayload.self,
+            tests: [
+                "schema.BASBudgetLeasePayload.current",
+                "schema.BASBudgetLeasePayload.backward_v1",
+                "schema.BASBudgetLeasePayload.future_rejection",
+            ]
+        ),
         // ── old-audit schema-parity backfill (2026-07-11): 12 BASSchemaVersioned domain
         // objects declared across BASMemory/BASOrchestration/BASPolicy/BASEvaluation but never
         // registered — the whitepaper schema-parity gate had been red. Registered here with the
