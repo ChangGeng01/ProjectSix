@@ -87,6 +87,10 @@ public enum BASCognitiveLayer: String, Sendable, Codable, CaseIterable {
     case sovereign = "L14"
 }
 
+/// Canonical architecture name for the existing 14-layer semantic
+/// identity. This is deliberately an alias, not a parallel owner.
+public typealias BASSemanticLayerID = BASCognitiveLayer
+
 /// Neutral, per-layer coverage summary. Any concrete
 /// `*ObservationBundle` (M22–M28, M30 — and any later primitive that
 /// follows the same pattern) can be projected into this shape by the

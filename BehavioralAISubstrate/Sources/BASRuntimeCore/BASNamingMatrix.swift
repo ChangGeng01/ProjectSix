@@ -107,6 +107,52 @@ public enum BASMotherboardLayer:
     case l14SovereignAudit = "l14-sovereign-audit"
 }
 
+public extension BASCognitiveLayer {
+    /// Total compatibility projection to the legacy descriptive
+    /// naming-matrix taxonomy. Semantic authority remains here.
+    var motherboardLayer: BASMotherboardLayer {
+        switch self {
+        case .leaseLife: return .l1WickLifeKernel
+        case .neuralOrgan: return .l2BrainTissue
+        case .thoughtFold: return .l3FoldedLung
+        case .worldPrior: return .l4WorldPrior
+        case .hostConstitution: return .l5HostConstitution
+        case .presenceEye: return .l6SituationField
+        case .mirrorBlade: return .l7MirrorBlade
+        case .hippocampalWell: return .l8HippocampalMemory
+        case .dreamLoop: return .l9KunlunAxis
+        case .triSelfTribunal: return .l10TriSelfTribunal
+        case .riskClimate: return .l11RiskPlane
+        case .gentleHand: return .l12SoftHand
+        case .evolutionFurnace: return .l13Evolution
+        case .sovereign: return .l14SovereignAudit
+        }
+    }
+}
+
+public extension BASMotherboardLayer {
+    /// Total compatibility projection back to the canonical semantic
+    /// layer owner.
+    var semanticLayerID: BASSemanticLayerID {
+        switch self {
+        case .l1WickLifeKernel: return .leaseLife
+        case .l2BrainTissue: return .neuralOrgan
+        case .l3FoldedLung: return .thoughtFold
+        case .l4WorldPrior: return .worldPrior
+        case .l5HostConstitution: return .hostConstitution
+        case .l6SituationField: return .presenceEye
+        case .l7MirrorBlade: return .mirrorBlade
+        case .l8HippocampalMemory: return .hippocampalWell
+        case .l9KunlunAxis: return .dreamLoop
+        case .l10TriSelfTribunal: return .triSelfTribunal
+        case .l11RiskPlane: return .riskClimate
+        case .l12SoftHand: return .gentleHand
+        case .l13Evolution: return .evolutionFurnace
+        case .l14SovereignAudit: return .sovereign
+        }
+    }
+}
+
 // MARK: - Vision section ref
 
 /// Typed white-paper section ref。Range 1-13 covers the §1-§13
@@ -299,5 +345,22 @@ public enum BASNamingMatrix {
         named conceptName: String
     ) -> BASNamingMatrixEntry? {
         entries.first { $0.conceptName == conceptName }
+    }
+
+    /// Resolve canonical stable IDs and the exact L9 display aliases
+    /// without minting another semantic-layer identity.
+    public static func layerID(
+        resolving alias: String
+    ) -> BASSemanticLayerID? {
+        if let stableID = BASSemanticLayerID(rawValue: alias) {
+            return stableID
+        }
+
+        switch alias {
+        case "Kunlun", "Dream":
+            return .dreamLoop
+        default:
+            return nil
+        }
     }
 }

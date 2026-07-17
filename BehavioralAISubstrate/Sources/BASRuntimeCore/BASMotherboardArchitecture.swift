@@ -108,6 +108,44 @@ public enum BASMotherboardPlane:
     case compute
 }
 
+/// The seven orthogonal architecture views. The legacy three-plane
+/// motherboard taxonomy projects onto these IDs; it does not own a
+/// second top-level plane hierarchy.
+public enum BASTopLevelPlaneID:
+    String, Codable, Sendable, Hashable, CaseIterable
+{
+    case semanticAuthority = "semantic-authority"
+    case kernelOwnership = "kernel-ownership"
+    case executionDAG = "execution-dag"
+    case controlRing = "control-ring"
+    case data = "data"
+    case adapterIO = "adapter-io"
+    case observeReplay = "observe-replay"
+}
+
+public extension BASMotherboardPlane {
+    /// Compatibility projection from each legacy motherboard plane
+    /// to the top-level architecture views it contains.
+    var topLevelViewIDs: [BASTopLevelPlaneID] {
+        switch self {
+        case .sovereign:
+            return [
+                .semanticAuthority,
+                .controlRing,
+                .observeReplay,
+            ]
+        case .state:
+            return [.data]
+        case .compute:
+            return [
+                .kernelOwnership,
+                .executionDAG,
+                .adapterIO,
+            ]
+        }
+    }
+}
+
 // MARK: - 四内核
 
 public enum BASMotherboardKernel:
@@ -132,7 +170,25 @@ public enum BASMotherboardKernel:
     case stateAndEvolutionGraph
 }
 
+/// Canonical architecture name for the existing four physical
+/// kernel identities. This is deliberately an alias.
+public typealias BASPhysicalKernelID = BASMotherboardKernel
+
 public extension BASMotherboardKernel {
+    /// Stable architecture projection used at contract boundaries.
+    var architectureID: String {
+        switch self {
+        case .leaseAndLife:
+            return "K1"
+        case .neuralOrganRuntime:
+            return "K2"
+        case .stateAndEvolutionGraph:
+            return "K3"
+        case .sovereignMicrokernel:
+            return "K4"
+        }
+    }
+
     /// Each kernel belongs to exactly one plane.
     var containingPlane: BASMotherboardPlane {
         switch self {
@@ -144,6 +200,16 @@ public extension BASMotherboardKernel {
             return .compute
         }
     }
+}
+
+/// Stable IDs for the four bounded receipt-driven control rings.
+public enum BASControlRingID:
+    String, Codable, Sendable, Hashable, CaseIterable
+{
+    case resource = "ΩR"
+    case grounding = "ΩG"
+    case deliberation = "ΩD"
+    case effectEvolution = "ΩE"
 }
 
 // MARK: - 八总线

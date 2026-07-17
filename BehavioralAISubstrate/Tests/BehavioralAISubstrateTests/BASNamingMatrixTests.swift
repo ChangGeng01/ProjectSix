@@ -20,6 +20,37 @@ final class BASNamingMatrixTests: XCTestCase {
         }
     }
 
+    func testLegacyLayerEnumsAreTotalProjectionsOfCognitiveLayer() {
+        let expected: [(
+            semantic: BASCognitiveLayer,
+            motherboard14: BASMotherboardLayer14,
+            naming: BASMotherboardLayer
+        )] = [
+            (.leaseLife, .l1, .l1WickLifeKernel),
+            (.neuralOrgan, .l2, .l2BrainTissue),
+            (.thoughtFold, .l3, .l3FoldedLung),
+            (.worldPrior, .l4, .l4WorldPrior),
+            (.hostConstitution, .l5, .l5HostConstitution),
+            (.presenceEye, .l6, .l6SituationField),
+            (.mirrorBlade, .l7, .l7MirrorBlade),
+            (.hippocampalWell, .l8, .l8HippocampalMemory),
+            (.dreamLoop, .l9, .l9KunlunAxis),
+            (.triSelfTribunal, .l10, .l10TriSelfTribunal),
+            (.riskClimate, .l11, .l11RiskPlane),
+            (.gentleHand, .l12, .l12SoftHand),
+            (.evolutionFurnace, .l13, .l13Evolution),
+            (.sovereign, .l14, .l14SovereignAudit),
+        ]
+
+        XCTAssertEqual(expected.count, BASCognitiveLayer.allCases.count)
+        for row in expected {
+            XCTAssertEqual(row.semantic.motherboardLayer14, row.motherboard14)
+            XCTAssertEqual(row.motherboard14.semanticLayerID, row.semantic)
+            XCTAssertEqual(row.semantic.motherboardLayer, row.naming)
+            XCTAssertEqual(row.naming.semanticLayerID, row.semantic)
+        }
+    }
+
     // MARK: - Vision section bounds
 
     func testVisionSectionInRangeIsAccepted() {
