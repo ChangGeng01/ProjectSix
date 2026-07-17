@@ -184,6 +184,10 @@ public struct BASLayerKillSwitchState:
     public var detail: String
     public var activatedAt: Date?
     public var activatedBy: String?
+    public var monotonicGeneration: UInt64
+    public var activationSequence: UInt64
+    public var authority: String
+    public var signatureAttestationArtifactID: BASArtifactID?
 
     public init(
         schemaVersion: String
@@ -193,7 +197,11 @@ public struct BASLayerKillSwitchState:
         reason: BASLayerKillSwitchReason = .manual,
         detail: String = "",
         activatedAt: Date? = nil,
-        activatedBy: String? = nil
+        activatedBy: String? = nil,
+        monotonicGeneration: UInt64 = 0,
+        activationSequence: UInt64 = 0,
+        authority: String = "",
+        signatureAttestationArtifactID: BASArtifactID? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.switchID = switchID
@@ -204,6 +212,94 @@ public struct BASLayerKillSwitchState:
         self.activatedAt = activatedAt
         self.activatedBy = activatedBy?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.monotonicGeneration = monotonicGeneration
+        self.activationSequence = activationSequence
+        self.authority = authority
+        self.signatureAttestationArtifactID
+            = signatureAttestationArtifactID
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case switchID
+        case active
+        case reason
+        case detail
+        case activatedAt
+        case activatedBy
+        case monotonicGeneration
+        case activationSequence
+        case authority
+        case signatureAttestationArtifactID
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(
+            String.self,
+            forKey: .schemaVersion)
+        switchID = try container.decode(
+            BASLayerKillSwitchID.self,
+            forKey: .switchID)
+        active = try container.decode(Bool.self, forKey: .active)
+        reason = try container.decode(
+            BASLayerKillSwitchReason.self,
+            forKey: .reason)
+        detail = try container.decode(String.self, forKey: .detail)
+        activatedAt = try container.decodeIfPresent(
+            Date.self,
+            forKey: .activatedAt)
+        activatedBy = try container.decodeIfPresent(
+            String.self,
+            forKey: .activatedBy)
+        monotonicGeneration = try container.decodeIfPresent(
+            UInt64.self,
+            forKey: .monotonicGeneration) ?? 0
+        activationSequence = try container.decodeIfPresent(
+            UInt64.self,
+            forKey: .activationSequence) ?? 0
+        authority = try container.decodeIfPresent(
+            String.self,
+            forKey: .authority) ?? ""
+        signatureAttestationArtifactID = try container.decodeIfPresent(
+            BASArtifactID.self,
+            forKey: .signatureAttestationArtifactID)
+        if let signatureAttestationArtifactID {
+            _ = try signatureAttestationArtifactID.storageScalar
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(switchID, forKey: .switchID)
+        try container.encode(active, forKey: .active)
+        try container.encode(reason, forKey: .reason)
+        try container.encode(detail, forKey: .detail)
+        try container.encodeIfPresent(activatedAt, forKey: .activatedAt)
+        try container.encodeIfPresent(activatedBy, forKey: .activatedBy)
+        if monotonicGeneration != 0 {
+            try container.encode(
+                monotonicGeneration,
+                forKey: .monotonicGeneration)
+        }
+        if activationSequence != 0 {
+            try container.encode(
+                activationSequence,
+                forKey: .activationSequence)
+        }
+        if !authority.isEmpty {
+            try container.encode(authority, forKey: .authority)
+        }
+        if let signatureAttestationArtifactID {
+            // `BASArtifactID` retains a source-compatible nonthrowing raw
+            // initializer. Revalidate at this throwing wire boundary so an
+            // unchecked invalid signature reference cannot be persisted.
+            _ = try signatureAttestationArtifactID.storageScalar
+            try container.encode(
+                signatureAttestationArtifactID,
+                forKey: .signatureAttestationArtifactID)
+        }
     }
 }
 

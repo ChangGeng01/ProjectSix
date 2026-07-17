@@ -137,6 +137,99 @@ final class BASLayerKillSwitchIDTests: XCTestCase {
         XCTAssertEqual(decoded, original)
     }
 
+    func testStateLegacyGenerationAndAuthorityDefaults() {
+        let state = BASLayerKillSwitchState(
+            switchID: .l11Risk,
+            active: false)
+
+        XCTAssertEqual(state.monotonicGeneration, 0)
+        XCTAssertEqual(state.activationSequence, 0)
+        XCTAssertEqual(state.authority, "")
+        XCTAssertNil(state.signatureAttestationArtifactID)
+    }
+
+    func testStateDecodesLegacyJSONWithoutNewFields() throws {
+        let legacy = Data(
+            #"{"active":false,"detail":"","reason":"manual","schemaVersion":"1.0.0","switchID":"l11-risk"}"#.utf8)
+
+        let decoded = try JSONDecoder().decode(
+            BASLayerKillSwitchState.self,
+            from: legacy)
+
+        XCTAssertEqual(decoded.monotonicGeneration, 0)
+        XCTAssertEqual(decoded.activationSequence, 0)
+        XCTAssertEqual(decoded.authority, "")
+        XCTAssertNil(decoded.signatureAttestationArtifactID)
+    }
+
+    func testStateLegacyDecodeReencodeKeepsCanonicalBytes() throws {
+        let legacy = Data(
+            #"{"active":false,"detail":"","reason":"manual","schemaVersion":"1.0.0","switchID":"l11-risk"}"#.utf8)
+        let decoded = try JSONDecoder().decode(
+            BASLayerKillSwitchState.self,
+            from: legacy)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+
+        XCTAssertEqual(try encoder.encode(decoded), legacy)
+    }
+
+    func testStateNewGenerationAuthorityAndSignatureRoundTrip() throws {
+        let attestation = BASArtifactID(
+            integrityAlgorithm: "sha256",
+            commitmentKeyEpoch: 7,
+            commitmentHex: String(repeating: "ab", count: 32))
+        let original = BASLayerKillSwitchState(
+            switchID: .l9Dream,
+            active: true,
+            reason: .sovereignVerdict,
+            detail: "bounded halt",
+            activatedAt: referenceDate,
+            activatedBy: "sentinel",
+            monotonicGeneration: 42,
+            activationSequence: 3,
+            authority: "host.sovereign",
+            signatureAttestationArtifactID: attestation)
+
+        let data = try JSONEncoder().encode(original)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data)
+                as? [String: Any])
+        XCTAssertEqual(object["monotonicGeneration"] as? UInt64, 42)
+        XCTAssertEqual(object["activationSequence"] as? UInt64, 3)
+        XCTAssertEqual(object["authority"] as? String, "host.sovereign")
+        XCTAssertNotNil(object["signatureAttestationArtifactID"])
+
+        let decoded = try JSONDecoder().decode(
+            BASLayerKillSwitchState.self,
+            from: data)
+        XCTAssertEqual(decoded, original)
+        XCTAssertNoThrow(try decoded.signatureAttestationArtifactID?.storageScalar)
+    }
+
+    func testStateRejectsUncheckedInvalidSignatureWhenEncoding() {
+        let uncheckedInvalid = BASArtifactID(
+            integrityAlgorithm: "SHA256",
+            commitmentKeyEpoch: 7,
+            commitmentHex: "not-hex")
+        let state = BASLayerKillSwitchState(
+            switchID: .l9Dream,
+            active: true,
+            signatureAttestationArtifactID: uncheckedInvalid)
+
+        XCTAssertThrowsError(try JSONEncoder().encode(state))
+    }
+
+    func testStateRejectsInvalidSignatureArtifactIDWhenDecoding() {
+        let invalid = Data(
+            #"{"active":true,"detail":"","reason":"manual","schemaVersion":"1.0.0","signatureAttestationArtifactID":{"commitmentHex":"not-hex","commitmentKeyEpoch":7,"integrityAlgorithm":"sha256"},"switchID":"l9-dream"}"#.utf8)
+
+        XCTAssertThrowsError(
+            try JSONDecoder().decode(
+                BASLayerKillSwitchState.self,
+                from: invalid))
+    }
+
     // MARK: - Fallthrough strategy enum
 
     func testFallthroughStrategyCardinality() {

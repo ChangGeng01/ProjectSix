@@ -8,6 +8,25 @@ import XCTest
 
 final class BASLayerSliceAndMLHeadTests: XCTestCase {
 
+    private func assertAttenuationError(
+        _ expected: BASLayerSliceAttenuationError,
+        _ operation: () throws -> BASLayerSlice,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertThrowsError(
+            try operation(),
+            file: file,
+            line: line
+        ) { error in
+            XCTAssertEqual(
+                error as? BASLayerSliceAttenuationError,
+                expected,
+                file: file,
+                line: line)
+        }
+    }
+
     // MARK: - LayerSlice budget invariants
 
     func testLayerSliceDefaultSchemaVersion() {
@@ -96,6 +115,271 @@ final class BASLayerSliceAndMLHeadTests: XCTestCase {
                 hardCapMs: 2)
             XCTAssertEqual(slice.layerID, layer)
         }
+    }
+
+    func testLayerSliceLegacyAllowanceDefaultsAreUnbounded() {
+        let slice = BASLayerSlice(
+            layerID: .l7,
+            allocatedMs: 1,
+            hardCapMs: 2)
+
+        XCTAssertEqual(
+            BASLayerSlice.legacyUnboundedAllowance,
+            UInt64.max)
+        XCTAssertEqual(
+            slice.bytesAllowance,
+            BASLayerSlice.legacyUnboundedAllowance)
+        XCTAssertEqual(
+            slice.costMicrounitsAllowance,
+            BASLayerSlice.legacyUnboundedAllowance)
+        XCTAssertEqual(
+            slice.branchAllowance,
+            BASLayerSlice.legacyUnboundedAllowance)
+        XCTAssertEqual(
+            slice.remandRoundAllowance,
+            BASLayerSlice.legacyUnboundedAllowance)
+        XCTAssertEqual(
+            slice.hopAllowance,
+            BASLayerSlice.legacyUnboundedAllowance)
+    }
+
+    func testLayerSliceDecodesLegacyJSONWithoutNewAllowances() throws {
+        let legacy = Data(
+            #"{"allocatedMs":5,"decodeTokenAllowance":2,"hardCapMs":8,"layerID":"l7","loopAllowance":3,"observabilityOnly":false,"schemaVersion":"1.0.0"}"#.utf8)
+
+        let decoded = try JSONDecoder().decode(
+            BASLayerSlice.self,
+            from: legacy)
+
+        XCTAssertEqual(decoded.bytesAllowance, UInt64.max)
+        XCTAssertEqual(decoded.costMicrounitsAllowance, UInt64.max)
+        XCTAssertEqual(decoded.branchAllowance, UInt64.max)
+        XCTAssertEqual(decoded.remandRoundAllowance, UInt64.max)
+        XCTAssertEqual(decoded.hopAllowance, UInt64.max)
+    }
+
+    func testLayerSliceLegacyDecodeReencodeKeepsCanonicalBytes() throws {
+        let legacy = Data(
+            #"{"allocatedMs":5,"decodeTokenAllowance":2,"hardCapMs":8,"layerID":"l7","loopAllowance":3,"observabilityOnly":false,"schemaVersion":"1.0.0"}"#.utf8)
+        let decoded = try JSONDecoder().decode(
+            BASLayerSlice.self,
+            from: legacy)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+
+        XCTAssertEqual(try encoder.encode(decoded), legacy)
+    }
+
+    func testLayerSliceNewAllowancesRoundTrip() throws {
+        let original = BASLayerSlice(
+            layerID: .l10,
+            allocatedMs: 4,
+            hardCapMs: 6,
+            decodeTokenAllowance: 9,
+            loopAllowance: 5,
+            observabilityOnly: true,
+            bytesAllowance: 1_024,
+            costMicrounitsAllowance: 8_192,
+            branchAllowance: 3,
+            remandRoundAllowance: 2,
+            hopAllowance: 7)
+
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(
+            BASLayerSlice.self,
+            from: data)
+
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testLayerSliceSupportsHashableIdentity() {
+        let slice = BASLayerSlice(
+            layerID: .l7,
+            allocatedMs: 1,
+            hardCapMs: 2)
+        let values: Set<BASLayerSlice> = [slice, slice]
+
+        XCTAssertEqual(values, [slice])
+    }
+
+    func testLayerSliceAttenuationAcceptsEqualityAndNarrowing() throws {
+        let parent = BASLayerSlice(
+            layerID: .l10,
+            allocatedMs: 10,
+            hardCapMs: 20,
+            decodeTokenAllowance: 100,
+            loopAllowance: 8,
+            bytesAllowance: 1_000,
+            costMicrounitsAllowance: 900,
+            branchAllowance: 7,
+            remandRoundAllowance: 6,
+            hopAllowance: 5)
+
+        let equal = try parent.attenuated()
+        XCTAssertEqual(equal, parent)
+
+        let child = try parent.attenuated(
+            allocatedMs: 9,
+            hardCapMs: 18,
+            decodeTokenAllowance: 80,
+            loopAllowance: 7,
+            bytesAllowance: 800,
+            costMicrounitsAllowance: 700,
+            branchAllowance: 6,
+            remandRoundAllowance: 4,
+            hopAllowance: 3,
+            observabilityOnly: true)
+        XCTAssertEqual(child.allocatedMs, 9)
+        XCTAssertEqual(child.hardCapMs, 18)
+        XCTAssertEqual(child.bytesAllowance, 800)
+        XCTAssertTrue(child.observabilityOnly)
+    }
+
+    func testLayerSliceAttenuationRejectsEveryBroadenedDimension() {
+        let parent = BASLayerSlice(
+            layerID: .l10,
+            allocatedMs: 10,
+            hardCapMs: 20,
+            decodeTokenAllowance: 100,
+            loopAllowance: 8,
+            bytesAllowance: 1_000,
+            costMicrounitsAllowance: 900,
+            branchAllowance: 7,
+            remandRoundAllowance: 6,
+            hopAllowance: 5)
+
+        assertAttenuationError(.allocatedMsBroadened) {
+            try parent.attenuated(allocatedMs: 11)
+        }
+        assertAttenuationError(.hardCapMsBroadened) {
+            try parent.attenuated(hardCapMs: 21)
+        }
+        assertAttenuationError(.decodeTokenAllowanceBroadened) {
+            try parent.attenuated(decodeTokenAllowance: 101)
+        }
+        assertAttenuationError(.loopAllowanceBroadened) {
+            try parent.attenuated(loopAllowance: 9)
+        }
+        assertAttenuationError(.bytesAllowanceBroadened) {
+            try parent.attenuated(bytesAllowance: 1_001)
+        }
+        assertAttenuationError(.costMicrounitsAllowanceBroadened) {
+            try parent.attenuated(costMicrounitsAllowance: 901)
+        }
+        assertAttenuationError(.branchAllowanceBroadened) {
+            try parent.attenuated(branchAllowance: 8)
+        }
+        assertAttenuationError(.remandRoundAllowanceBroadened) {
+            try parent.attenuated(remandRoundAllowance: 7)
+        }
+        assertAttenuationError(.hopAllowanceBroadened) {
+            try parent.attenuated(hopAllowance: 6)
+        }
+    }
+
+    func testLayerSliceAttenuationRejectsInvalidExplicitDomains() {
+        let parent = BASLayerSlice(
+            layerID: .l10,
+            allocatedMs: 10,
+            hardCapMs: 20,
+            decodeTokenAllowance: 100,
+            loopAllowance: 8)
+
+        for invalid in [-1.0, .nan, .infinity] {
+            assertAttenuationError(.allocatedMsInvalid) {
+                try parent.attenuated(allocatedMs: invalid)
+            }
+            assertAttenuationError(.hardCapMsInvalid) {
+                try parent.attenuated(hardCapMs: invalid)
+            }
+        }
+        assertAttenuationError(.hardCapBelowAllocated) {
+            try parent.attenuated(
+                allocatedMs: 9,
+                hardCapMs: 8)
+        }
+        assertAttenuationError(.decodeTokenAllowanceInvalid) {
+            try parent.attenuated(decodeTokenAllowance: -1)
+        }
+        assertAttenuationError(.loopAllowanceInvalid) {
+            try parent.attenuated(loopAllowance: 0)
+        }
+    }
+
+    func testLayerSliceAttenuationRejectsInvalidInheritedDomains() {
+        let valid = BASLayerSlice(
+            layerID: .l10,
+            allocatedMs: 10,
+            hardCapMs: 20,
+            decodeTokenAllowance: 100,
+            loopAllowance: 8)
+
+        for invalid in [-1.0, .nan, .infinity] {
+            var parent = valid
+            parent.allocatedMs = invalid
+            assertAttenuationError(.allocatedMsInvalid) {
+                try parent.attenuated()
+            }
+        }
+        for invalid in [-1.0, .nan, .infinity] {
+            var parent = valid
+            parent.hardCapMs = invalid
+            assertAttenuationError(.hardCapMsInvalid) {
+                try parent.attenuated()
+            }
+        }
+
+        var invalidDecode = valid
+        invalidDecode.decodeTokenAllowance = -1
+        assertAttenuationError(.decodeTokenAllowanceInvalid) {
+            try invalidDecode.attenuated()
+        }
+
+        var invalidLoop = valid
+        invalidLoop.loopAllowance = 0
+        assertAttenuationError(.loopAllowanceInvalid) {
+            try invalidLoop.attenuated()
+        }
+    }
+
+    func testLayerSliceObservabilityCanOnlyBecomeMoreRestrictive() throws {
+        let active = BASLayerSlice(
+            layerID: .l7,
+            allocatedMs: 1,
+            hardCapMs: 2,
+            observabilityOnly: false)
+        let observer = try active.attenuated(observabilityOnly: true)
+        XCTAssertTrue(observer.observabilityOnly)
+        XCTAssertEqual(
+            try observer.attenuated(observabilityOnly: true),
+            observer)
+        assertAttenuationError(.observabilityOnlyRelaxed) {
+            try observer.attenuated(observabilityOnly: false)
+        }
+    }
+
+    func testLayerSliceAttenuationIsOverflowSafeAtUInt64Max() throws {
+        let parent = BASLayerSlice(
+            layerID: .l10,
+            allocatedMs: 1,
+            hardCapMs: 1)
+
+        let equal = try parent.attenuated(
+            bytesAllowance: UInt64.max,
+            costMicrounitsAllowance: UInt64.max,
+            branchAllowance: UInt64.max,
+            remandRoundAllowance: UInt64.max,
+            hopAllowance: UInt64.max)
+        XCTAssertEqual(equal, parent)
+
+        let zero = try parent.attenuated(
+            bytesAllowance: 0,
+            costMicrounitsAllowance: 0,
+            branchAllowance: 0,
+            remandRoundAllowance: 0,
+            hopAllowance: 0)
+        XCTAssertEqual(zero.bytesAllowance, 0)
+        XCTAssertEqual(zero.hopAllowance, 0)
     }
 
     // MARK: - MLHeadKind enum

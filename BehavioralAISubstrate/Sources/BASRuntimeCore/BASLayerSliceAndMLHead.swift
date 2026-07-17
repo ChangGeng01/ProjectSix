@@ -56,6 +56,27 @@
 
 import Foundation
 
+/// Exact reason a proposed layer slice failed monotonic attenuation.
+public enum BASLayerSliceAttenuationError:
+    Error, Sendable, Equatable
+{
+    case allocatedMsInvalid
+    case hardCapMsInvalid
+    case hardCapBelowAllocated
+    case decodeTokenAllowanceInvalid
+    case loopAllowanceInvalid
+    case allocatedMsBroadened
+    case hardCapMsBroadened
+    case decodeTokenAllowanceBroadened
+    case loopAllowanceBroadened
+    case bytesAllowanceBroadened
+    case costMicrounitsAllowanceBroadened
+    case branchAllowanceBroadened
+    case remandRoundAllowanceBroadened
+    case hopAllowanceBroadened
+    case observabilityOnlyRelaxed
+}
+
 // MARK: - BASLayerSlice — per-layer budget sub-allocation
 
 /// Per-layer budget slice — sub-allocation from
@@ -75,8 +96,20 @@ import Foundation
 ///     that iterate;1 for non-iterative layers (clamped ≥1)
 ///   - `observabilityOnly` — true for watcher / hint-only layers
 ///     (红线 7);output never feeds permit/verdict logic
-public struct BASLayerSlice: BASSchemaVersioned, Sendable {
+///   - `bytesAllowance` / `costMicrounitsAllowance` /
+///     `branchAllowance` / `remandRoundAllowance` / `hopAllowance`
+///     — immutable collaboration ceilings. They are planning/display
+///     projections only; the K3 lease owner remains spend authority.
+public struct BASLayerSlice:
+    BASSchemaVersioned, Sendable, Hashable
+{
     public static let currentSchemaVersion = "1.0.0"
+
+    /// Pre-membrane callers did not declare these ceilings. Treating
+    /// absence as zero would silently deny their existing work, so the
+    /// additive wire-compatible default is an explicitly unbounded
+    /// display ceiling. K3 remains the authority that reserves/spends.
+    public static let legacyUnboundedAllowance = UInt64.max
 
     public var schemaVersion: String
     public var layerID: BASMotherboardLayer14
@@ -85,6 +118,11 @@ public struct BASLayerSlice: BASSchemaVersioned, Sendable {
     public var decodeTokenAllowance: Int
     public var loopAllowance: Int
     public var observabilityOnly: Bool
+    public var bytesAllowance: UInt64
+    public var costMicrounitsAllowance: UInt64
+    public var branchAllowance: UInt64
+    public var remandRoundAllowance: UInt64
+    public var hopAllowance: UInt64
 
     public init(
         schemaVersion: String = BASLayerSlice.currentSchemaVersion,
@@ -93,7 +131,14 @@ public struct BASLayerSlice: BASSchemaVersioned, Sendable {
         hardCapMs: Double,
         decodeTokenAllowance: Int = 0,
         loopAllowance: Int = 1,
-        observabilityOnly: Bool = false
+        observabilityOnly: Bool = false,
+        bytesAllowance: UInt64 = BASLayerSlice.legacyUnboundedAllowance,
+        costMicrounitsAllowance: UInt64
+            = BASLayerSlice.legacyUnboundedAllowance,
+        branchAllowance: UInt64 = BASLayerSlice.legacyUnboundedAllowance,
+        remandRoundAllowance: UInt64
+            = BASLayerSlice.legacyUnboundedAllowance,
+        hopAllowance: UInt64 = BASLayerSlice.legacyUnboundedAllowance
     ) {
         self.schemaVersion = schemaVersion
         self.layerID = layerID
@@ -104,6 +149,204 @@ public struct BASLayerSlice: BASSchemaVersioned, Sendable {
         self.decodeTokenAllowance = max(0, decodeTokenAllowance)
         self.loopAllowance = max(1, loopAllowance)
         self.observabilityOnly = observabilityOnly
+        self.bytesAllowance = bytesAllowance
+        self.costMicrounitsAllowance = costMicrounitsAllowance
+        self.branchAllowance = branchAllowance
+        self.remandRoundAllowance = remandRoundAllowance
+        self.hopAllowance = hopAllowance
+    }
+
+    /// Derive a display/planning slice whose every ceiling is equal to or
+    /// narrower than this slice. This method never subtracts, reserves,
+    /// spends, recovers, or proves remaining budget.
+    public func attenuated(
+        allocatedMs: Double? = nil,
+        hardCapMs: Double? = nil,
+        decodeTokenAllowance: Int? = nil,
+        loopAllowance: Int? = nil,
+        bytesAllowance: UInt64? = nil,
+        costMicrounitsAllowance: UInt64? = nil,
+        branchAllowance: UInt64? = nil,
+        remandRoundAllowance: UInt64? = nil,
+        hopAllowance: UInt64? = nil,
+        observabilityOnly: Bool? = nil
+    ) throws -> BASLayerSlice {
+        let childAllocatedMs = allocatedMs ?? self.allocatedMs
+        let childHardCapMs = hardCapMs ?? self.hardCapMs
+        let childDecodeTokenAllowance = decodeTokenAllowance
+            ?? self.decodeTokenAllowance
+        let childLoopAllowance = loopAllowance ?? self.loopAllowance
+        let childBytesAllowance = bytesAllowance ?? self.bytesAllowance
+        let childCostMicrounitsAllowance = costMicrounitsAllowance
+            ?? self.costMicrounitsAllowance
+        let childBranchAllowance = branchAllowance ?? self.branchAllowance
+        let childRemandRoundAllowance = remandRoundAllowance
+            ?? self.remandRoundAllowance
+        let childHopAllowance = hopAllowance ?? self.hopAllowance
+        let childObservabilityOnly = observabilityOnly
+            ?? self.observabilityOnly
+
+        guard childAllocatedMs.isFinite,
+              childAllocatedMs >= 0
+        else {
+            throw BASLayerSliceAttenuationError.allocatedMsInvalid
+        }
+        guard childHardCapMs.isFinite,
+              childHardCapMs >= 0
+        else {
+            throw BASLayerSliceAttenuationError.hardCapMsInvalid
+        }
+        guard childDecodeTokenAllowance >= 0 else {
+            throw BASLayerSliceAttenuationError
+                .decodeTokenAllowanceInvalid
+        }
+        guard childLoopAllowance >= 1 else {
+            throw BASLayerSliceAttenuationError.loopAllowanceInvalid
+        }
+        guard childHardCapMs >= childAllocatedMs else {
+            throw BASLayerSliceAttenuationError.hardCapBelowAllocated
+        }
+        guard childAllocatedMs <= self.allocatedMs else {
+            throw BASLayerSliceAttenuationError.allocatedMsBroadened
+        }
+        guard childHardCapMs <= self.hardCapMs else {
+            throw BASLayerSliceAttenuationError.hardCapMsBroadened
+        }
+        guard childDecodeTokenAllowance <= self.decodeTokenAllowance else {
+            throw BASLayerSliceAttenuationError
+                .decodeTokenAllowanceBroadened
+        }
+        guard childLoopAllowance <= self.loopAllowance else {
+            throw BASLayerSliceAttenuationError.loopAllowanceBroadened
+        }
+        guard childBytesAllowance <= self.bytesAllowance else {
+            throw BASLayerSliceAttenuationError.bytesAllowanceBroadened
+        }
+        guard childCostMicrounitsAllowance
+                <= self.costMicrounitsAllowance
+        else {
+            throw BASLayerSliceAttenuationError
+                .costMicrounitsAllowanceBroadened
+        }
+        guard childBranchAllowance <= self.branchAllowance else {
+            throw BASLayerSliceAttenuationError.branchAllowanceBroadened
+        }
+        guard childRemandRoundAllowance <= self.remandRoundAllowance else {
+            throw BASLayerSliceAttenuationError
+                .remandRoundAllowanceBroadened
+        }
+        guard childHopAllowance <= self.hopAllowance else {
+            throw BASLayerSliceAttenuationError.hopAllowanceBroadened
+        }
+        guard !self.observabilityOnly || childObservabilityOnly else {
+            throw BASLayerSliceAttenuationError.observabilityOnlyRelaxed
+        }
+
+        return BASLayerSlice(
+            schemaVersion: schemaVersion,
+            layerID: layerID,
+            allocatedMs: childAllocatedMs,
+            hardCapMs: childHardCapMs,
+            decodeTokenAllowance: childDecodeTokenAllowance,
+            loopAllowance: childLoopAllowance,
+            observabilityOnly: childObservabilityOnly,
+            bytesAllowance: childBytesAllowance,
+            costMicrounitsAllowance: childCostMicrounitsAllowance,
+            branchAllowance: childBranchAllowance,
+            remandRoundAllowance: childRemandRoundAllowance,
+            hopAllowance: childHopAllowance)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case layerID
+        case allocatedMs
+        case hardCapMs
+        case decodeTokenAllowance
+        case loopAllowance
+        case observabilityOnly
+        case bytesAllowance
+        case costMicrounitsAllowance
+        case branchAllowance
+        case remandRoundAllowance
+        case hopAllowance
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(
+            String.self,
+            forKey: .schemaVersion)
+        layerID = try container.decode(
+            BASMotherboardLayer14.self,
+            forKey: .layerID)
+        allocatedMs = try container.decode(
+            Double.self,
+            forKey: .allocatedMs)
+        hardCapMs = try container.decode(
+            Double.self,
+            forKey: .hardCapMs)
+        decodeTokenAllowance = try container.decode(
+            Int.self,
+            forKey: .decodeTokenAllowance)
+        loopAllowance = try container.decode(
+            Int.self,
+            forKey: .loopAllowance)
+        observabilityOnly = try container.decode(
+            Bool.self,
+            forKey: .observabilityOnly)
+        bytesAllowance = try container.decodeIfPresent(
+            UInt64.self,
+            forKey: .bytesAllowance)
+            ?? Self.legacyUnboundedAllowance
+        costMicrounitsAllowance = try container.decodeIfPresent(
+            UInt64.self,
+            forKey: .costMicrounitsAllowance)
+            ?? Self.legacyUnboundedAllowance
+        branchAllowance = try container.decodeIfPresent(
+            UInt64.self,
+            forKey: .branchAllowance)
+            ?? Self.legacyUnboundedAllowance
+        remandRoundAllowance = try container.decodeIfPresent(
+            UInt64.self,
+            forKey: .remandRoundAllowance)
+            ?? Self.legacyUnboundedAllowance
+        hopAllowance = try container.decodeIfPresent(
+            UInt64.self,
+            forKey: .hopAllowance)
+            ?? Self.legacyUnboundedAllowance
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(layerID, forKey: .layerID)
+        try container.encode(allocatedMs, forKey: .allocatedMs)
+        try container.encode(hardCapMs, forKey: .hardCapMs)
+        try container.encode(
+            decodeTokenAllowance,
+            forKey: .decodeTokenAllowance)
+        try container.encode(loopAllowance, forKey: .loopAllowance)
+        try container.encode(observabilityOnly, forKey: .observabilityOnly)
+        if bytesAllowance != Self.legacyUnboundedAllowance {
+            try container.encode(bytesAllowance, forKey: .bytesAllowance)
+        }
+        if costMicrounitsAllowance != Self.legacyUnboundedAllowance {
+            try container.encode(
+                costMicrounitsAllowance,
+                forKey: .costMicrounitsAllowance)
+        }
+        if branchAllowance != Self.legacyUnboundedAllowance {
+            try container.encode(branchAllowance, forKey: .branchAllowance)
+        }
+        if remandRoundAllowance != Self.legacyUnboundedAllowance {
+            try container.encode(
+                remandRoundAllowance,
+                forKey: .remandRoundAllowance)
+        }
+        if hopAllowance != Self.legacyUnboundedAllowance {
+            try container.encode(hopAllowance, forKey: .hopAllowance)
+        }
     }
 }
 
