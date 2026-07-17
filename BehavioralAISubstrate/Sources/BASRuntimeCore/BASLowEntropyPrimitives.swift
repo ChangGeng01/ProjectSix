@@ -485,6 +485,262 @@ public enum BASTurnBranchRefError: Error, Sendable, Equatable {
     case nonCanonicalProjection
 }
 
+// MARK: - Provider execution vocabulary
+
+/// The policy-owned semantic purpose of one Provider branch.
+public enum BASProviderStepPurpose:
+    String, Codable, Sendable, Hashable, CaseIterable
+{
+    case groundingProposal
+    case turnStep
+    case verifierProposal
+}
+
+/// Whether a Provider branch is an internal proposal or the one answer
+/// candidate eligible for terminal-source designation.
+public enum BASProviderOutputRole:
+    String, Codable, Sendable, Hashable, CaseIterable
+{
+    case internalProposal
+    case terminalAnswerCandidate
+}
+
+/// The policy-frozen mode controlling when verified Provider bytes may become
+/// visible.
+public enum BASProviderVisibilityMode:
+    String, Codable, Sendable, Hashable, CaseIterable
+{
+    case incrementalVerified
+    case bufferedUntilVerified
+}
+
+private struct BASProviderExecutionRefWireCodingKey: CodingKey {
+    let stringValue: String
+    let intValue: Int?
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = nil
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = String(intValue)
+        self.intValue = intValue
+    }
+}
+
+/// The complete branch-bound identity echoed by one Provider execution.
+/// Sequence zero is the allocation/claim base. Trusted local construction of
+/// a nonzero event uses only `withRequestSequence(_:)`. Codable accepts a
+/// structurally valid nonzero wire value without granting it authority; the
+/// outer owner must still match the K3 base, next sequence, and event digest.
+public struct BASProviderExecutionRef: Codable, Sendable, Hashable {
+    public let turnOperationRef: BASTurnOperationRef
+    public let providerEgressBranchRef: BASTurnBranchRef
+    public let attemptRef: BASArtifactID
+    public let leaseID: BASArtifactID
+    public let providerExecutionID: String
+    public let acceptanceGeneration: UInt64
+    public let requestSequence: UInt64
+
+    /// Creates the canonical allocation/claim identity. Public callers cannot
+    /// mint an event sequence directly.
+    public init(
+        turnOperationRef: BASTurnOperationRef,
+        providerEgressBranchRef: BASTurnBranchRef,
+        attemptRef: BASArtifactID,
+        leaseID: BASArtifactID,
+        providerExecutionID: String,
+        acceptanceGeneration: UInt64
+    ) throws {
+        try Self.validate(
+            turnOperationRef: turnOperationRef,
+            providerEgressBranchRef: providerEgressBranchRef,
+            attemptRef: attemptRef,
+            leaseID: leaseID,
+            providerExecutionID: providerExecutionID)
+        self.turnOperationRef = turnOperationRef
+        self.providerEgressBranchRef = providerEgressBranchRef
+        self.attemptRef = attemptRef
+        self.leaseID = leaseID
+        self.providerExecutionID = providerExecutionID
+        self.acceptanceGeneration = acceptanceGeneration
+        self.requestSequence = 0
+    }
+
+    private init(
+        validating turnOperationRef: BASTurnOperationRef,
+        providerEgressBranchRef: BASTurnBranchRef,
+        attemptRef: BASArtifactID,
+        leaseID: BASArtifactID,
+        providerExecutionID: String,
+        acceptanceGeneration: UInt64,
+        requestSequence: UInt64
+    ) throws {
+        try Self.validate(
+            turnOperationRef: turnOperationRef,
+            providerEgressBranchRef: providerEgressBranchRef,
+            attemptRef: attemptRef,
+            leaseID: leaseID,
+            providerExecutionID: providerExecutionID)
+        self.turnOperationRef = turnOperationRef
+        self.providerEgressBranchRef = providerEgressBranchRef
+        self.attemptRef = attemptRef
+        self.leaseID = leaseID
+        self.providerExecutionID = providerExecutionID
+        self.acceptanceGeneration = acceptanceGeneration
+        self.requestSequence = requestSequence
+    }
+
+    private init(canonicalSequenceZeroFrom validated: Self) {
+        self.turnOperationRef = validated.turnOperationRef
+        self.providerEgressBranchRef = validated.providerEgressBranchRef
+        self.attemptRef = validated.attemptRef
+        self.leaseID = validated.leaseID
+        self.providerExecutionID = validated.providerExecutionID
+        self.acceptanceGeneration = validated.acceptanceGeneration
+        self.requestSequence = 0
+    }
+
+    /// Derives one event identity from the canonical sequence-zero base.
+    public func withRequestSequence(
+        _ requestSequence: UInt64
+    ) throws -> Self {
+        guard self.requestSequence == 0 else {
+            throw BASProviderExecutionRefError.noncanonicalSequenceBase(
+                found: self.requestSequence)
+        }
+        guard requestSequence > 0 else {
+            throw BASProviderExecutionRefError.invalidRequestSequence
+        }
+        return try Self(
+            validating: turnOperationRef,
+            providerEgressBranchRef: providerEgressBranchRef,
+            attemptRef: attemptRef,
+            leaseID: leaseID,
+            providerExecutionID: providerExecutionID,
+            acceptanceGeneration: acceptanceGeneration,
+            requestSequence: requestSequence)
+    }
+
+    /// Returns the exact six-field stable base for structural comparison.
+    public func canonicalSequenceZeroBase() -> Self {
+        requestSequence == 0
+            ? self
+            : Self(canonicalSequenceZeroFrom: self)
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.turnOperationRef == rhs.turnOperationRef
+            && lhs.providerEgressBranchRef == rhs.providerEgressBranchRef
+            && lhs.attemptRef == rhs.attemptRef
+            && lhs.leaseID == rhs.leaseID
+            && lhs.providerExecutionID.utf8.elementsEqual(
+                rhs.providerExecutionID.utf8)
+            && lhs.acceptanceGeneration == rhs.acceptanceGeneration
+            && lhs.requestSequence == rhs.requestSequence
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(turnOperationRef)
+        hasher.combine(providerEgressBranchRef)
+        hasher.combine(attemptRef)
+        hasher.combine(leaseID)
+        hasher.combine(providerExecutionID.utf8.count)
+        for byte in providerExecutionID.utf8 {
+            hasher.combine(byte)
+        }
+        hasher.combine(acceptanceGeneration)
+        hasher.combine(requestSequence)
+    }
+
+    private static func validate(
+        turnOperationRef: BASTurnOperationRef,
+        providerEgressBranchRef: BASTurnBranchRef,
+        attemptRef: BASArtifactID,
+        leaseID: BASArtifactID,
+        providerExecutionID: String
+    ) throws {
+        guard providerEgressBranchRef.turnOperationRef == turnOperationRef else {
+            throw BASProviderExecutionRefError.branchParentMismatch
+        }
+        guard providerEgressBranchRef.kind == .providerEgress else {
+            throw BASProviderExecutionRefError.invalidBranchKind(
+                found: providerEgressBranchRef.kind)
+        }
+        do {
+            _ = try attemptRef.storageScalar
+        } catch {
+            throw BASProviderExecutionRefError.invalidArtifactID(
+                field: "attemptRef")
+        }
+        do {
+            _ = try leaseID.storageScalar
+        } catch {
+            throw BASProviderExecutionRefError.invalidArtifactID(
+                field: "leaseID")
+        }
+        guard !providerExecutionID.isEmpty else {
+            throw BASProviderExecutionRefError.invalidProviderExecutionID
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case turnOperationRef
+        case providerEgressBranchRef
+        case attemptRef
+        case leaseID
+        case providerExecutionID
+        case acceptanceGeneration
+        case requestSequence
+    }
+
+    public init(from decoder: Decoder) throws {
+        let wireContainer = try decoder.container(
+            keyedBy: BASProviderExecutionRefWireCodingKey.self)
+        let foundKeys = Set(wireContainer.allKeys.map(\.stringValue))
+        let expectedKeys = Set(CodingKeys.allCases.map(\.rawValue))
+        guard foundKeys == expectedKeys else {
+            throw DecodingError.dataCorrupted(.init(
+                codingPath: decoder.codingPath,
+                debugDescription:
+                    "BASProviderExecutionRef requires exactly seven keys"))
+        }
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            validating: container.decode(
+                BASTurnOperationRef.self,
+                forKey: .turnOperationRef),
+            providerEgressBranchRef: container.decode(
+                BASTurnBranchRef.self,
+                forKey: .providerEgressBranchRef),
+            attemptRef: container.decode(
+                BASArtifactID.self,
+                forKey: .attemptRef),
+            leaseID: container.decode(
+                BASArtifactID.self,
+                forKey: .leaseID),
+            providerExecutionID: container.decode(
+                String.self,
+                forKey: .providerExecutionID),
+            acceptanceGeneration: container.decode(
+                UInt64.self,
+                forKey: .acceptanceGeneration),
+            requestSequence: container.decode(
+                UInt64.self,
+                forKey: .requestSequence))
+    }
+}
+
+public enum BASProviderExecutionRefError: Error, Sendable, Equatable {
+    case branchParentMismatch
+    case invalidBranchKind(found: BASTurnBranchKind)
+    case invalidArtifactID(field: String)
+    case invalidProviderExecutionID
+    case invalidRequestSequence
+    case noncanonicalSequenceBase(found: UInt64)
+}
+
 private enum BASTurnLegacyProjectionDecodeError: Error {
     case malformedProjection
     case nonCanonicalProjection

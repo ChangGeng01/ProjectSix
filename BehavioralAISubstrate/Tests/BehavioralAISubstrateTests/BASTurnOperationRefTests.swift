@@ -360,6 +360,494 @@ final class BASTurnOperationRefTests: XCTestCase {
             for: future))
     }
 
+    func testProviderVocabularyHasExactFrozenCasesAndJSONWire() throws {
+        XCTAssertEqual(
+            BASProviderStepPurpose.allCases.map(\.rawValue),
+            ["groundingProposal", "turnStep", "verifierProposal"])
+        XCTAssertEqual(
+            BASProviderOutputRole.allCases.map(\.rawValue),
+            ["internalProposal", "terminalAnswerCandidate"])
+        XCTAssertEqual(
+            BASProviderVisibilityMode.allCases.map(\.rawValue),
+            ["incrementalVerified", "bufferedUntilVerified"])
+
+        XCTAssertEqual(
+            String(decoding: try JSONEncoder().encode(
+                BASProviderStepPurpose.groundingProposal), as: UTF8.self),
+            "\"groundingProposal\"")
+        XCTAssertEqual(
+            String(decoding: try JSONEncoder().encode(
+                BASProviderOutputRole.terminalAnswerCandidate), as: UTF8.self),
+            "\"terminalAnswerCandidate\"")
+        XCTAssertEqual(
+            String(decoding: try JSONEncoder().encode(
+                BASProviderVisibilityMode.bufferedUntilVerified),
+                as: UTF8.self),
+            "\"bufferedUntilVerified\"")
+        XCTAssertThrowsError(try JSONDecoder().decode(
+            BASProviderStepPurpose.self,
+            from: Data("\"unknown\"".utf8)))
+        XCTAssertThrowsError(try JSONDecoder().decode(
+            BASProviderOutputRole.self,
+            from: Data("\"unknown\"".utf8)))
+        XCTAssertThrowsError(try JSONDecoder().decode(
+            BASProviderVisibilityMode.self,
+            from: Data("\"unknown\"".utf8)))
+    }
+
+    func testProviderExecutionRefHasExactFieldOrderAndSequenceZeroBase()
+        throws
+    {
+        let value = try providerExecutionBase()
+
+        XCTAssertEqual(
+            Mirror(reflecting: value).children.compactMap(\.label),
+            [
+                "turnOperationRef", "providerEgressBranchRef",
+                "attemptRef", "leaseID", "providerExecutionID",
+                "acceptanceGeneration", "requestSequence",
+            ])
+        XCTAssertEqual(value.requestSequence, 0)
+        XCTAssertEqual(Set([value, value]).count, 1)
+
+        let baseBytes = try JSONEncoder().encode(value)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: baseBytes) as? [String: Any])
+        XCTAssertEqual(Set(object.keys), [
+            "turnOperationRef", "providerEgressBranchRef", "attemptRef",
+            "leaseID", "providerExecutionID", "acceptanceGeneration",
+            "requestSequence",
+        ])
+        let decoded = try JSONDecoder().decode(
+            BASProviderExecutionRef.self,
+            from: baseBytes)
+        XCTAssertEqual(decoded, value)
+
+        let event = try value.withRequestSequence(17)
+        XCTAssertEqual(
+            try JSONDecoder().decode(
+                BASProviderExecutionRef.self,
+                from: JSONEncoder().encode(event)),
+            event)
+    }
+
+    func testProviderExecutionRefRejectsWrongParentKindAndInvalidIDs()
+        throws
+    {
+        let root = try makeOperation(40)
+        let foreignRoot = try makeOperation(41)
+        let correctBranch = try BASTurnBranchRef(
+            turnOperationRef: root,
+            kind: .providerEgress,
+            ordinal: 3)
+        let foreignBranch = try BASTurnBranchRef(
+            turnOperationRef: foreignRoot,
+            kind: .providerEgress,
+            ordinal: 3)
+        let effectBranch = try BASTurnBranchRef(
+            turnOperationRef: root,
+            kind: .effect,
+            ordinal: 3)
+        let invalidID = BASArtifactID(
+            integrityAlgorithm: "HMAC-SHA256",
+            commitmentKeyEpoch: 1,
+            commitmentHex: "AB")
+
+        XCTAssertThrowsError(try BASProviderExecutionRef(
+            turnOperationRef: root,
+            providerEgressBranchRef: foreignBranch,
+            attemptRef: artifactID(42),
+            leaseID: artifactID(43),
+            providerExecutionID: "provider-execution",
+            acceptanceGeneration: 44))
+        XCTAssertThrowsError(try BASProviderExecutionRef(
+            turnOperationRef: root,
+            providerEgressBranchRef: effectBranch,
+            attemptRef: artifactID(42),
+            leaseID: artifactID(43),
+            providerExecutionID: "provider-execution",
+            acceptanceGeneration: 44))
+        XCTAssertThrowsError(try BASProviderExecutionRef(
+            turnOperationRef: root,
+            providerEgressBranchRef: correctBranch,
+            attemptRef: invalidID,
+            leaseID: artifactID(43),
+            providerExecutionID: "provider-execution",
+            acceptanceGeneration: 44))
+        XCTAssertThrowsError(try BASProviderExecutionRef(
+            turnOperationRef: root,
+            providerEgressBranchRef: correctBranch,
+            attemptRef: artifactID(42),
+            leaseID: invalidID,
+            providerExecutionID: "provider-execution",
+            acceptanceGeneration: 44))
+    }
+
+    func testProviderExecutionIDIsNonemptyOpaqueExactUTF8() throws {
+        let root = try makeOperation(45)
+        let branch = try BASTurnBranchRef(
+            turnOperationRef: root,
+            kind: .providerEgress,
+            ordinal: 0)
+
+        XCTAssertThrowsError(try BASProviderExecutionRef(
+            turnOperationRef: root,
+            providerEgressBranchRef: branch,
+            attemptRef: artifactID(46),
+            leaseID: artifactID(47),
+            providerExecutionID: "",
+            acceptanceGeneration: 48))
+        for exact in [
+            " provider-execution ", "provider-execution\n",
+            "\tprovider-execution", String(repeating: "p", count: 4_096),
+        ] {
+            let value = try BASProviderExecutionRef(
+                turnOperationRef: root,
+                providerEgressBranchRef: branch,
+                attemptRef: artifactID(46),
+                leaseID: artifactID(47),
+                providerExecutionID: exact,
+                acceptanceGeneration: 48)
+            XCTAssertEqual(value.providerExecutionID, exact)
+        }
+    }
+
+    func testProviderExecutionIDEqualityAndHashingAreRawUTF8Exact()
+        throws
+    {
+        let composedID = "\u{00E9}"
+        let decomposedID = "e\u{0301}"
+        XCTAssertNotEqual(Array(composedID.utf8), Array(decomposedID.utf8))
+
+        let composed = try providerExecutionBase(
+            providerExecutionID: composedID)
+        let decomposed = try providerExecutionBase(
+            providerExecutionID: decomposedID)
+        XCTAssertNotEqual(composed, decomposed)
+        XCTAssertEqual(Set([composed, decomposed]).count, 2)
+
+        for base in [composed, decomposed] {
+            let event = try base.withRequestSequence(5)
+            XCTAssertEqual(
+                Array(event.providerExecutionID.utf8),
+                Array(base.providerExecutionID.utf8))
+            XCTAssertEqual(event.canonicalSequenceZeroBase(), base)
+            let decoded = try JSONDecoder().decode(
+                BASProviderExecutionRef.self,
+                from: JSONEncoder().encode(event))
+            XCTAssertEqual(decoded, event)
+            XCTAssertEqual(
+                Array(decoded.providerExecutionID.utf8),
+                Array(base.providerExecutionID.utf8))
+        }
+    }
+
+    func testOnlyCanonicalZeroBaseCanDerivePositiveEventSequence()
+        throws
+    {
+        let base = try providerExecutionBase()
+
+        XCTAssertThrowsError(try base.withRequestSequence(0))
+        let event = try base.withRequestSequence(7)
+        XCTAssertEqual(event.requestSequence, 7)
+        XCTAssertThrowsError(try event.withRequestSequence(8))
+        XCTAssertEqual(event.canonicalSequenceZeroBase(), base)
+    }
+
+    func testSequenceDerivationPreservesAllSixStableFields() throws {
+        let base = try providerExecutionBase()
+        let event = try base.withRequestSequence(UInt64.max)
+        let canonical = event.canonicalSequenceZeroBase()
+
+        XCTAssertEqual(event.turnOperationRef, base.turnOperationRef)
+        XCTAssertEqual(
+            event.providerEgressBranchRef,
+            base.providerEgressBranchRef)
+        XCTAssertEqual(event.attemptRef, base.attemptRef)
+        XCTAssertEqual(event.leaseID, base.leaseID)
+        XCTAssertEqual(event.providerExecutionID, base.providerExecutionID)
+        XCTAssertEqual(
+            event.acceptanceGeneration,
+            base.acceptanceGeneration)
+        XCTAssertEqual(canonical, base)
+        XCTAssertEqual(canonical.requestSequence, 0)
+    }
+
+    func testDecodedEventCanCanonicalizeButCannotDeriveAgain() throws {
+        let event = try providerExecutionBase().withRequestSequence(9)
+        let decoded = try JSONDecoder().decode(
+            BASProviderExecutionRef.self,
+            from: JSONEncoder().encode(event))
+
+        XCTAssertEqual(decoded, event)
+        XCTAssertEqual(
+            decoded.canonicalSequenceZeroBase(),
+            try providerExecutionBase())
+        XCTAssertThrowsError(try decoded.withRequestSequence(10))
+    }
+
+    func testProviderExecutionRefDecodeCannotBypassValidation() throws {
+        let base = try providerExecutionBase()
+        let encoded = try JSONEncoder().encode(base)
+        let validObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        let foreignBranchObject = try branchObject(
+            rootSeed: 70, kind: .providerEgress, ordinal: 3)
+        let effectBranchObject = try branchObject(
+            rootSeed: 40, kind: .effect, ordinal: 3)
+
+        func rejects(_ mutation: (inout [String: Any]) -> Void) {
+            var object = validObject
+            mutation(&object)
+            XCTAssertThrowsError(try JSONDecoder().decode(
+                BASProviderExecutionRef.self,
+                from: JSONSerialization.data(withJSONObject: object)))
+        }
+
+        rejects { object in
+            object["providerEgressBranchRef"] = foreignBranchObject
+        }
+        rejects { object in
+            object["providerEgressBranchRef"] = effectBranchObject
+        }
+        rejects { object in
+            object["attemptRef"] = self.invalidArtifactIDObject()
+        }
+        rejects { object in
+            object["leaseID"] = self.invalidArtifactIDObject()
+        }
+        rejects { object in
+            object["providerExecutionID"] = ""
+        }
+    }
+
+    func testProviderExecutionRefDecodeRejectsUnknownTopLevelKey() throws {
+        let encoded = try JSONEncoder().encode(providerExecutionBase())
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object["unexpectedEighthKey"] = true
+
+        XCTAssertThrowsError(try JSONDecoder().decode(
+            BASProviderExecutionRef.self,
+            from: JSONSerialization.data(withJSONObject: object)))
+    }
+
+    func testEachStableFieldMutationFailsBaseEquality() throws {
+        let base = try providerExecutionBase()
+        let otherRoot = try makeOperation(80)
+        let otherRootBranch = try BASTurnBranchRef(
+            turnOperationRef: otherRoot,
+            kind: .providerEgress,
+            ordinal: base.providerEgressBranchRef.ordinal)
+        let otherBranch = try BASTurnBranchRef(
+            turnOperationRef: base.turnOperationRef,
+            kind: .providerEgress,
+            ordinal: base.providerEgressBranchRef.ordinal + 1)
+        let mutatedBases = [
+            try providerExecutionBase(
+                turnOperationRef: otherRoot,
+                providerEgressBranchRef: otherRootBranch),
+            try providerExecutionBase(providerEgressBranchRef: otherBranch),
+            try providerExecutionBase(attemptRef: artifactID(81)),
+            try providerExecutionBase(leaseID: artifactID(82)),
+            try providerExecutionBase(providerExecutionID: "mutated"),
+            try providerExecutionBase(acceptanceGeneration: 83),
+        ]
+
+        XCTAssertEqual(mutatedBases.count, 6)
+        for mutated in mutatedBases {
+            let event = try mutated.withRequestSequence(1)
+            XCTAssertNotEqual(event.canonicalSequenceZeroBase(), base)
+        }
+    }
+
+    func testProviderExecutionRefHasOneSequenceAPIAndNoEventRefSibling()
+        throws
+    {
+        let sources = try allProductSwiftSources()
+        let source = sources.map(\.text).joined(separator: "\n")
+        let declarationPrefix = #"(?m)^[\t ]*(?:(?:@[A-Za-z_][A-Za-z0-9_]*(?:\([^{}\r\n]*\))?|[A-Za-z_][A-Za-z0-9_]*)[\t \r\n]+)*"#
+        let refDeclarationKinds =
+            #"(?:struct|enum|class|actor|protocol|typealias)[\t \r\n]+BASProviderExecutionRef\b"#
+        XCTAssertEqual(
+            matchCount(declarationPrefix + refDeclarationKinds, in: source),
+            1)
+        XCTAssertEqual(
+            matchCount(
+                declarationPrefix
+                    + #"struct[\t \r\n]+BASProviderExecutionRef\b"#,
+                in: source),
+            1)
+        for enumName in [
+            "BASProviderStepPurpose", "BASProviderOutputRole",
+            "BASProviderVisibilityMode",
+        ] {
+            XCTAssertEqual(
+                source.components(
+                    separatedBy: "public enum \(enumName)").count - 1,
+                1,
+                enumName)
+        }
+        XCTAssertEqual(
+            matchCount(
+                declarationPrefix
+                    + #"(?:struct|enum|class|actor|protocol|typealias)[\t \r\n]+BAS[A-Za-z0-9_]*Provider[A-Za-z0-9_]*(?:Event|Execution)[A-Za-z0-9_]*Ref\b"#,
+                in: source),
+            1)
+        XCTAssertEqual(
+            matchCount(
+                declarationPrefix
+                    + #"extension[\t \r\n]+BASProviderExecutionRef\b"#,
+                in: source),
+            0)
+        XCTAssertEqual(
+            matchCount(
+                declarationPrefix
+                    + #"(?:struct|enum|class|actor|protocol|typealias)[\t \r\n]+BAS[A-Za-z0-9_]*Provider[A-Za-z0-9_]*(?:Event|Execution)[A-Za-z0-9_]*Codec\b"#,
+                in: source),
+            0)
+        for forbidden in [
+            "BASProviderEventRef", "BASProviderEventExecutionRef",
+            "BASProviderExecutionEventRef", "BASProviderEventRefCodec",
+            "BASProviderExecutionRefCodec",
+            "BASProviderExecutionEventCodec",
+        ] {
+            XCTAssertFalse(source.contains(forbidden), forbidden)
+        }
+        XCTAssertFalse(matches(
+            #"\bBAS\w*Provider\w*Event\w*Ref(?:Codec)?\b"#,
+            in: source))
+        let registry = try XCTUnwrap(sources.first {
+            $0.url.lastPathComponent ==
+                "EBrainSchemaGovernanceRegistry.swift"
+        }).text
+        for forbiddenRegistryEntry in [
+            "BASProviderExecutionRef", "BASProviderStepPurpose",
+            "BASProviderOutputRole", "BASProviderVisibilityMode",
+        ] {
+            XCTAssertFalse(
+                registry.contains(forbiddenRegistryEntry),
+                forbiddenRegistryEntry)
+        }
+    }
+
+    func testProviderExecutionRefConstructionSurfaceIsExact() throws {
+        let source = try lowEntropySource()
+        let structStart = try XCTUnwrap(source.range(
+            of: "public struct BASProviderExecutionRef"))
+        let structEnd = try XCTUnwrap(source.range(
+            of: "public enum BASProviderExecutionRefError",
+            range: structStart.upperBound..<source.endIndex))
+        let declaration = String(
+            source[structStart.lowerBound..<structEnd.lowerBound])
+        let members = directMemberSurface(of: declaration)
+        let initPattern = #"\binit[!?]?\s*\("#
+        XCTAssertEqual(matchCount(initPattern, in: members), 4)
+        for expectedInitializer in [
+            #"\bpublic\b[\t \r\n]+init[\t \r\n]*\([\t \r\n]*turnOperationRef\b"#,
+            #"\bprivate\b[\t \r\n]+init[\t \r\n]*\([\t \r\n]*validating\b"#,
+            #"\bprivate\b[\t \r\n]+init[\t \r\n]*\([\t \r\n]*canonicalSequenceZeroFrom\b"#,
+            #"\bpublic\b[\t \r\n]+init[\t \r\n]*\([\t \r\n]*from\b"#,
+        ] {
+            XCTAssertEqual(matchCount(expectedInitializer, in: members), 1)
+        }
+
+        let functionNames = matchedCaptures(
+            #"\bfunc\s+(==|[A-Za-z_][A-Za-z0-9_]*)\s*\("#,
+            capture: 1,
+            in: members)
+        XCTAssertEqual(matchCount(#"\bfunc\b"#, in: members), 5)
+        XCTAssertEqual(
+            functionNames.sorted(),
+            [
+                "==", "canonicalSequenceZeroBase", "hash", "validate",
+                "withRequestSequence",
+            ])
+
+        let uncommentedDeclaration = declaration.split(
+            separator: "\n",
+            omittingEmptySubsequences: false).map { line in
+                line.split(
+                    separator: "//",
+                    maxSplits: 1,
+                    omittingEmptySubsequences: false).first.map(String.init)
+                    ?? ""
+            }.joined(separator: "\n")
+        let arbitraryModifiers = #"(?:(?:@[A-Za-z_][A-Za-z0-9_]*(?:\([^{}\r\n]*\))?|[A-Za-z_][A-Za-z0-9_]*(?:\([^{}\r\n]*\))?)\s+)*"#
+        XCTAssertEqual(
+            matchCount(
+                #"(?m)^[\t ]*"# + arbitraryModifiers
+                    + #"init[!?]?\s*\("#,
+                in: uncommentedDeclaration),
+            4)
+        XCTAssertEqual(
+            matchedCaptures(
+                #"(?m)^[\t ]*"# + arbitraryModifiers
+                    + #"func\s+(==|[A-Za-z_][A-Za-z0-9_]*)\s*\("#,
+                capture: 1,
+                in: uncommentedDeclaration).sorted(),
+            [
+                "==", "canonicalSequenceZeroBase", "hash", "validate",
+                "withRequestSequence",
+            ])
+        XCTAssertEqual(
+            matchCount(#"\bfunc\b"#, in: uncommentedDeclaration),
+            5)
+        let allTypeDeclarations = #"(?m)^[\t ]*"#
+            + arbitraryModifiers
+            + #"(?:struct|enum|class|actor|protocol|typealias)\s+[A-Za-z_][A-Za-z0-9_]*\b"#
+        XCTAssertEqual(
+            matchCount(allTypeDeclarations, in: uncommentedDeclaration),
+            2)
+        XCTAssertEqual(
+            matchCount(
+                #"\bprivate\b\s+enum\s+CodingKeys\b"#,
+                in: uncommentedDeclaration),
+            1)
+
+        let letNames = matchedCaptures(
+            #"\blet\s+([A-Za-z_][A-Za-z0-9_]*)\s*:"#,
+            capture: 1,
+            in: members)
+        XCTAssertEqual(letNames, [
+            "turnOperationRef", "providerEgressBranchRef", "attemptRef",
+            "leaseID", "providerExecutionID", "acceptanceGeneration",
+            "requestSequence",
+        ])
+        XCTAssertEqual(
+            matchCount(
+                #"\b(?:var|subscript)\b"#,
+                in: members),
+            0)
+        XCTAssertEqual(
+            matchCount(
+                #"\bstatic\s+let\b"#,
+                in: members),
+            0)
+        XCTAssertEqual(
+            matchCount(
+                #"return\s+try\s+Self\s*\(\s*validating\s*:"#,
+                in: declaration),
+            1)
+        XCTAssertEqual(
+            matchCount(
+                #"try\s+self\.init\s*\(\s*validating\s*:"#,
+                in: declaration),
+            1)
+        XCTAssertEqual(
+            matchCount(#"\bvalidating\s*:"#, in: declaration),
+            2)
+        XCTAssertEqual(
+            matchCount(
+                #"Self\s*\(\s*canonicalSequenceZeroFrom\s*:\s*self\s*\)"#,
+                in: declaration),
+            1)
+        XCTAssertEqual(
+            declaration.components(
+                separatedBy: "self.requestSequence = 0").count - 1,
+            2)
+    }
+
     private func makeOperation(_ seed: UInt64) throws
         -> BASTurnOperationRef
     {
@@ -380,6 +868,164 @@ final class BASTurnOperationRefTests: XCTestCase {
     private func frame(_ fields: [String]) -> String {
         BASSovereignCanonicalBytes.lengthPrefixed(fields)
             .base64EncodedString()
+    }
+
+    private func providerExecutionBase(
+        turnOperationRef: BASTurnOperationRef? = nil,
+        providerEgressBranchRef: BASTurnBranchRef? = nil,
+        attemptRef: BASArtifactID? = nil,
+        leaseID: BASArtifactID? = nil,
+        providerExecutionID: String = "provider-execution-40",
+        acceptanceGeneration: UInt64 = 44
+    ) throws -> BASProviderExecutionRef {
+        let root = try turnOperationRef ?? makeOperation(40)
+        let branch = try providerEgressBranchRef ?? BASTurnBranchRef(
+            turnOperationRef: root,
+            kind: .providerEgress,
+            ordinal: 3)
+        return try BASProviderExecutionRef(
+            turnOperationRef: root,
+            providerEgressBranchRef: branch,
+            attemptRef: attemptRef ?? artifactID(42),
+            leaseID: leaseID ?? artifactID(43),
+            providerExecutionID: providerExecutionID,
+            acceptanceGeneration: acceptanceGeneration)
+    }
+
+    private func branchObject(
+        rootSeed: UInt64,
+        kind: BASTurnBranchKind,
+        ordinal: UInt64
+    ) throws -> Any {
+        let branch = try BASTurnBranchRef(
+            turnOperationRef: makeOperation(rootSeed),
+            kind: kind,
+            ordinal: ordinal)
+        return try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(branch))
+    }
+
+    private func invalidArtifactIDObject() -> [String: Any] {
+        [
+            "integrityAlgorithm": "HMAC-SHA256",
+            "commitmentKeyEpoch": 1,
+            "commitmentHex": "AB",
+        ]
+    }
+
+    private func lowEntropySource() throws -> String {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try String(
+            contentsOf: packageRoot.appendingPathComponent(
+                "Sources/BASRuntimeCore/BASLowEntropyPrimitives.swift"),
+            encoding: .utf8)
+    }
+
+    private func allProductSwiftSources() throws
+        -> [(url: URL, text: String)]
+    {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourcesRoot = packageRoot.appendingPathComponent("Sources")
+        let enumerator = try XCTUnwrap(FileManager.default.enumerator(
+            at: sourcesRoot,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]))
+        var sourceURLs: [URL] = []
+        for case let url as URL in enumerator
+        where url.pathExtension == "swift" {
+            sourceURLs.append(url)
+        }
+        return try sourceURLs
+            .sorted { $0.path < $1.path }
+            .map { url in
+                (url, try String(contentsOf: url, encoding: .utf8))
+            }
+    }
+
+    private func matches(_ pattern: String, in text: String) -> Bool {
+        matchCount(pattern, in: text) > 0
+    }
+
+    private func directMemberSurface(of declaration: String) -> String {
+        var depth = 0
+        var enteredDeclaration = false
+        var surface = ""
+        for rawLine in declaration.split(
+            separator: "\n",
+            omittingEmptySubsequences: false)
+        {
+            let line = String(rawLine)
+            let code = line.split(
+                separator: "//",
+                maxSplits: 1,
+                omittingEmptySubsequences: false).first.map(String.init) ?? ""
+            if enteredDeclaration, depth == 1 {
+                surface += code + "\n"
+            }
+            let openingCount = code.filter { $0 == "{" }.count
+            let closingCount = code.filter { $0 == "}" }.count
+            if !enteredDeclaration, openingCount > 0 {
+                enteredDeclaration = true
+            }
+            depth += openingCount - closingCount
+        }
+        return surface
+    }
+
+    private func matchCount(_ pattern: String, in text: String) -> Int {
+        matchedStrings(pattern, in: text).count
+    }
+
+    private func matchedStrings(
+        _ pattern: String,
+        in text: String
+    ) -> [String] {
+        guard let expression = try? NSRegularExpression(
+            pattern: pattern,
+            options: [.dotMatchesLineSeparators])
+        else {
+            XCTFail("invalid source-gate regex: \(pattern)")
+            return []
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return expression.matches(in: text, range: range).compactMap { match in
+            guard let swiftRange = Range(match.range, in: text) else {
+                return nil
+            }
+            return String(text[swiftRange])
+        }
+    }
+
+    private func matchedCaptures(
+        _ pattern: String,
+        capture: Int,
+        in text: String
+    ) -> [String] {
+        guard let expression = try? NSRegularExpression(
+            pattern: pattern,
+            options: [.dotMatchesLineSeparators])
+        else {
+            XCTFail("invalid source-gate regex: \(pattern)")
+            return []
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return expression.matches(in: text, range: range).compactMap { match in
+            guard capture < match.numberOfRanges,
+                  match.range(at: capture).location != NSNotFound,
+                  let swiftRange = Range(
+                    match.range(at: capture),
+                    in: text)
+            else {
+                return nil
+            }
+            return String(text[swiftRange])
+        }
     }
 
     private func turnPayload(
