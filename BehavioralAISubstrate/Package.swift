@@ -101,6 +101,9 @@ let package = Package(
         // no duplicate (byte-equal build). Mirrors the swift-crypto MED-3 fix.
         .package(path: "Vendor/mlx-swift"),
         .package(path: "Vendor/mlx-swift-lm"),
+        // Test-only AST audits use the already-vendored Swift parser directly
+        // instead of maintaining a second, partial Swift lexer in regexes.
+        .package(path: "Vendor/swift-syntax"),
         .package(path: "Vendor/swift-transformers"),
         .package(path: "Vendor/swift-huggingface")
     ],
@@ -750,6 +753,8 @@ let package = Package(
             "BASMPSGraphExecutableCacheCxx",
             "BASCSystemBridge",
             "BASAppleLifecycleKit", "BASAppleEdgeWiring",
+            .product(name: "SwiftParser", package: "swift-syntax"),
+            .product(name: "SwiftSyntax", package: "swift-syntax"),
         ]),
         // Universal Draft Layer — XCTest-ONLY target (no swift-testing), so these run in their OWN .xctest bundle
         // and are not blocked by the swift-testing/XCTest co-bundle load crash in BehavioralAISubstrateTests.

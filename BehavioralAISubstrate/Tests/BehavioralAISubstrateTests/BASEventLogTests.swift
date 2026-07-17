@@ -12,13 +12,94 @@
 //     per-session order
 
 import XCTest
+import BASAdmin
 @testable import BASRuntimeCore
+
+private func isSchemaVersioned<T>(_: T.Type) -> Bool { false }
+
+private func isSchemaVersioned<T: BASSchemaVersioned>(_: T.Type) -> Bool {
+    true
+}
 
 final class BASEventLogTests: XCTestCase {
 
     // MARK: - Test fixtures
 
     private var tempURL: URL?
+
+    private func removingSwiftLineComments(
+        _ source: String
+    ) -> String {
+        source
+            .split(
+                separator: "\n",
+                omittingEmptySubsequences: false)
+            .map { line -> String in
+                let line = String(line)
+                guard let comment = line.range(of: "//") else {
+                    return line
+                }
+                return String(line[..<comment.lowerBound])
+            }
+            .joined(separator: "\n")
+    }
+
+    private func regexCaptures(
+        _ pattern: String,
+        in source: String,
+        group: Int = 1,
+        options: NSRegularExpression.Options = []
+    ) throws -> [String] {
+        let expression = try NSRegularExpression(
+            pattern: pattern,
+            options: options)
+        let range = NSRange(
+            source.startIndex..<source.endIndex,
+            in: source)
+        return expression.matches(
+            in: source,
+            range: range
+        ).compactMap { match in
+            guard group < match.numberOfRanges,
+                  let range = Range(match.range(at: group), in: source)
+            else {
+                return nil
+            }
+            return String(source[range])
+        }
+    }
+
+    private func regexMatchCount(
+        _ pattern: String,
+        in source: String,
+        options: NSRegularExpression.Options = []
+    ) throws -> Int {
+        return try regexCaptures(
+            pattern,
+            in: source,
+            group: 0,
+            options: options).count
+    }
+
+    private func eventLogHeadDeclarationKinds(
+        in source: String
+    ) throws -> [String] {
+        BASEventLogHeadSyntaxAudit.parse(source).declarationKinds
+    }
+
+    private func eventLogHeadExtensionCount(
+        in source: String
+    ) throws -> Int {
+        BASEventLogHeadSyntaxAudit.extensionCount(
+            in: [BASEventLogHeadSyntaxAudit.parse(source)])
+    }
+
+    private func normalizedWhitespace(_ source: String) -> String {
+        source
+            .split(whereSeparator: \Character.isWhitespace)
+            .map(String.init)
+            .joined(separator: " ")
+    }
 
     override func setUpWithError() throws {
         tempURL = FileManager.default
@@ -117,6 +198,411 @@ final class BASEventLogTests: XCTestCase {
             BASEventLogRiskBand.high.rawValue, "high")
         XCTAssertEqual(
             BASEventLogRiskBand.unknown.rawValue, "unknown")
+    }
+
+    // MARK: - BASEventLogHead value projection
+
+    func testEventLogHeadGenesisUsesExactSentinelShape() {
+        let head = BASEventLogHead.genesis(
+            sessionID: "turn-operation-root")
+
+        XCTAssertEqual(head.sessionID, "turn-operation-root")
+        XCTAssertEqual(head.sequenceNumber, -1)
+        XCTAssertEqual(head.eventID, "")
+        XCTAssertEqual(
+            head.integrityDigest,
+            String(repeating: "0", count: 64))
+        XCTAssertEqual(
+            Mirror(reflecting: head).children.compactMap(\.label),
+            [
+                "sessionID", "sequenceNumber", "eventID",
+                "integrityDigest",
+            ])
+    }
+
+    func testEventLogHeadCodableHashableAndExactJSONKeys() throws {
+        let head = BASEventLogHead(
+            sessionID: "turn-operation-root",
+            sequenceNumber: 7,
+            eventID: "event-7",
+            integrityDigest: String(repeating: "a", count: 64))
+
+        func requireSendable<T: Sendable>(_: T) {}
+        requireSendable(head)
+
+        let data = try JSONEncoder().encode(head)
+        let decoded = try JSONDecoder().decode(
+            BASEventLogHead.self,
+            from: data)
+        XCTAssertEqual(decoded, head)
+        XCTAssertEqual(Set([head, decoded]).count, 1)
+
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data)
+                as? [String: Any])
+        XCTAssertEqual(Set(object.keys), [
+            "sessionID", "sequenceNumber", "eventID",
+            "integrityDigest",
+        ])
+        XCTAssertNil(object["schemaVersion"])
+    }
+
+    func testEventLogHeadPreservesRawNoncanonicalProjectionValues()
+        throws
+    {
+        let rawSessionID = " \t\n "
+        let rawEventID = " event \t"
+        let rawDigest = " arbitrary digest \t"
+        let constructed = BASEventLogHead(
+            sessionID: rawSessionID,
+            sequenceNumber: Int64.min,
+            eventID: rawEventID,
+            integrityDigest: rawDigest)
+        XCTAssertEqual(constructed.sessionID, rawSessionID)
+        XCTAssertEqual(constructed.sequenceNumber, Int64.min)
+        XCTAssertEqual(constructed.eventID, rawEventID)
+        XCTAssertEqual(constructed.integrityDigest, rawDigest)
+
+        let rawJSON = Data(
+            #"{"eventID":" event \t","integrityDigest":" arbitrary digest \t","sequenceNumber":-9223372036854775808,"sessionID":" \t\n "}"#.utf8)
+        let decoded = try JSONDecoder().decode(
+            BASEventLogHead.self,
+            from: rawJSON)
+        XCTAssertEqual(decoded, constructed)
+
+        let emptyJSON = Data(
+            #"{"eventID":"","integrityDigest":"","sequenceNumber":-9223372036854775808,"sessionID":""}"#.utf8)
+        let empty = try JSONDecoder().decode(
+            BASEventLogHead.self,
+            from: emptyJSON)
+        XCTAssertEqual(empty.sessionID, "")
+        XCTAssertEqual(empty.sequenceNumber, Int64.min)
+        XCTAssertEqual(empty.eventID, "")
+        XCTAssertEqual(empty.integrityDigest, "")
+        XCTAssertEqual(
+            BASEventLogHead.genesis(sessionID: "raw").sequenceNumber,
+            -1)
+    }
+
+    func testEventLogHeadHasOneSourceOwnerAndNoGovernanceEntry()
+        throws
+    {
+        let packageRoot = URL(
+            fileURLWithPath: BASSourceTreeAudit.repoRoot)
+        let sourcesURL = packageRoot.appendingPathComponent("Sources")
+        let enumerator = try XCTUnwrap(
+            FileManager.default.enumerator(
+                at: sourcesURL,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]))
+        var declarations: [(kind: String, path: String)] = []
+        var syntaxFacts: [(
+            path: String,
+            facts: BASEventLogHeadSyntaxFacts
+        )] = []
+        for case let sourceURL as URL in enumerator
+        where sourceURL.pathExtension == "swift" {
+            let source = try String(
+                contentsOf: sourceURL,
+                encoding: .utf8)
+            // Sound under the zero-alias policy below: every cross-file
+            // alias chain has a first RHS that spells the target, and that
+            // first edge fails before any later alias or extension matters.
+            guard source.contains(BASEventLogHeadSyntaxAudit.targetName)
+            else {
+                continue
+            }
+            let facts = BASEventLogHeadSyntaxAudit.parse(source)
+            syntaxFacts.append((sourceURL.path, facts))
+            for kind in facts.declarationKinds {
+                declarations.append((kind, sourceURL.path))
+            }
+        }
+
+        let headMentioningAliasNames = BASEventLogHeadSyntaxAudit
+            .namesMentioningHeadThroughAliases(
+                in: syntaxFacts.map(\.facts))
+        let extensionPaths = syntaxFacts.compactMap { item in
+            item.facts.extendedTypeNames.contains(
+                where: headMentioningAliasNames.contains) ? item.path : nil
+        }
+
+        XCTAssertEqual(declarations.count, 1)
+        XCTAssertEqual(declarations.first?.kind, "struct")
+        XCTAssertTrue(
+            try XCTUnwrap(declarations.first?.path).hasSuffix(
+                "/Sources/BASRuntimeCore/BASEventLog.swift"))
+        XCTAssertEqual(
+            headMentioningAliasNames,
+            [BASEventLogHeadSyntaxAudit.targetName],
+            "Aliases mentioning BASEventLogHead are forbidden")
+        XCTAssertTrue(extensionPaths.isEmpty, "\(extensionPaths)")
+        XCTAssertFalse(isSchemaVersioned(BASEventLogHead.self))
+
+        let registryURL = packageRoot.appendingPathComponent(
+            "Sources/BASAdmin/EBrainSchemaGovernanceRegistry.swift")
+        let registrySource = try String(
+            contentsOf: registryURL,
+            encoding: .utf8)
+        let registryIdentifiers = BASEventLogHeadSyntaxAudit
+            .parse(registrySource).identifierNames
+        XCTAssertTrue(
+            registryIdentifiers.isDisjoint(
+                with: headMentioningAliasNames),
+            "\(registryIdentifiers.intersection(headMentioningAliasNames))")
+
+        for forbiddenObjectID in ["BASEventLogHead", "EventLogHead"] {
+            XCTAssertNil(
+                BASEBrainSchemaGovernanceRegistry.entry(
+                    for: forbiddenObjectID))
+            XCTAssertFalse(
+                BASEBrainSchemaGovernanceRegistry.governedSchemas.contains {
+                    $0.objectID == forbiddenObjectID
+                })
+        }
+    }
+
+    func testEventLogHeadOwnerGateRecognizesEveryDeclarationKind()
+        throws
+    {
+        let fixtures: [(source: String, kind: String)] = [
+            ("@frozen public struct BASEventLogHead {}", "struct"),
+            ("private\nenum\n BASEventLogHead {}", "enum"),
+            ("@available(*, deprecated) final class BASEventLogHead {}", "class"),
+            (
+                #"@available(*, deprecated, message: "{") public struct BASEventLogHead {}"#,
+                "struct"),
+            ("actor\nBASEventLogHead {}", "actor"),
+            ("package protocol BASEventLogHead: Sendable {}", "protocol"),
+            ("typealias\nBASEventLogHead = Int", "typealias"),
+            ("public struct `BASEventLogHead` {}", "struct"),
+        ]
+        for fixture in fixtures {
+            XCTAssertEqual(
+                try eventLogHeadDeclarationKinds(in: fixture.source),
+                [fixture.kind],
+                fixture.source)
+        }
+        XCTAssertEqual(
+            try eventLogHeadDeclarationKinds(
+                in: "// public struct BASEventLogHead {}"),
+            [])
+        XCTAssertEqual(
+            try eventLogHeadDeclarationKinds(
+                in: #"let text = "public struct BASEventLogHead {}""#),
+            [])
+        XCTAssertEqual(
+            try eventLogHeadDeclarationKinds(
+                in: "public /* split */ struct BASEventLogHead {}"),
+            ["struct"])
+        XCTAssertEqual(
+            try eventLogHeadDeclarationKinds(in: """
+                /*
+                public struct BASEventLogHead {}
+                */
+                """),
+            [])
+        XCTAssertEqual(
+            try eventLogHeadDeclarationKinds(in: #"""
+                let text = """
+                public struct BASEventLogHead {}
+                """
+                """#),
+            [])
+        XCTAssertEqual(
+            try eventLogHeadExtensionCount(
+                in: "extension\n BASEventLogHead {}"),
+            1)
+        XCTAssertEqual(
+            try eventLogHeadExtensionCount(
+                in: "extension /* split */ BASEventLogHead {}"),
+            1)
+        XCTAssertEqual(
+            try eventLogHeadExtensionCount(
+                in: "extension `BASEventLogHead` {}"),
+            1)
+        XCTAssertEqual(
+            try eventLogHeadExtensionCount(
+                in: "extension (BASEventLogHead) {}"),
+            1)
+        XCTAssertEqual(
+            try eventLogHeadExtensionCount(
+                in: "extension ((BASEventLogHead,)) {}"),
+            1)
+        XCTAssertEqual(
+            try eventLogHeadExtensionCount(in: """
+                typealias GovernedHead = BASEventLogHead
+                extension GovernedHead: BASSchemaVersioned {}
+                """),
+            1)
+        XCTAssertEqual(
+            try eventLogHeadExtensionCount(in: """
+                typealias FirstHead = (BASEventLogHead)
+                typealias SecondHead = FirstHead
+                extension SecondHead: BASSchemaVersioned {}
+                """),
+            1)
+        XCTAssertEqual(
+            try eventLogHeadExtensionCount(in: """
+                typealias EscapedHead = `BASEventLogHead`
+                extension (EscapedHead): BASSchemaVersioned {}
+                """),
+            1)
+        XCTAssertEqual(
+            try eventLogHeadExtensionCount(in: """
+                /* extension BASEventLogHead {} */
+                let text = "extension BASEventLogHead {}"
+                """),
+            0)
+
+        let proseOnly = BASEventLogHeadSyntaxAudit.parse("""
+            // BASEventLogHead
+            let prose = "BASEventLogHead"
+            """)
+        XCTAssertFalse(
+            proseOnly.identifierNames.contains(
+                BASEventLogHeadSyntaxAudit.targetName))
+        let escapedReference = BASEventLogHeadSyntaxAudit.parse(
+            "let type = `BASEventLogHead`.self")
+        XCTAssertTrue(
+            escapedReference.identifierNames.contains(
+                BASEventLogHeadSyntaxAudit.targetName))
+    }
+
+    func testEventLogHeadDeclarationSurfaceIsExactAndValueOnly()
+        throws
+    {
+        let packageRoot = URL(
+            fileURLWithPath: BASSourceTreeAudit.repoRoot)
+        let sourceURL = packageRoot.appendingPathComponent(
+            "Sources/BASRuntimeCore/BASEventLog.swift")
+        let source = try String(
+            contentsOf: sourceURL,
+            encoding: .utf8)
+        let start = try XCTUnwrap(
+            source.range(of: "public struct BASEventLogHead:"))
+        let end = try XCTUnwrap(source.range(
+            of: "// MARK: - Storage protocol",
+            range: start.upperBound..<source.endIndex))
+        let declaration = String(
+            source[start.lowerBound..<end.lowerBound])
+        let code = removingSwiftLineComments(declaration)
+        let normalized = normalizedWhitespace(code)
+
+        let fieldPattern =
+            #"\bpublic\s+let\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z_][A-Za-z0-9_.<>?]*)\b"#
+        XCTAssertEqual(
+            try regexCaptures(fieldPattern, in: code, group: 1),
+            [
+                "sessionID", "sequenceNumber", "eventID",
+                "integrityDigest",
+            ])
+        XCTAssertEqual(
+            try regexCaptures(fieldPattern, in: code, group: 2),
+            ["String", "Int64", "String", "String"])
+
+        let exactInit = normalizedWhitespace("""
+            public init(
+                sessionID: String,
+                sequenceNumber: Int64,
+                eventID: String,
+                integrityDigest: String
+            ) {
+                self.sessionID = sessionID
+                self.sequenceNumber = sequenceNumber
+                self.eventID = eventID
+                self.integrityDigest = integrityDigest
+            }
+            """)
+        XCTAssertEqual(
+            normalized.components(separatedBy: exactInit).count - 1,
+            1)
+        XCTAssertEqual(
+            try regexMatchCount(#"\binit\s*\("#, in: code),
+            1)
+
+        let exactGenesis = normalizedWhitespace("""
+            public static func genesis(sessionID: String) -> Self {
+                Self(
+                    sessionID: sessionID,
+                    sequenceNumber: -1,
+                    eventID: "",
+                    integrityDigest: String(repeating: "0", count: 64)
+                )
+            }
+            """)
+        XCTAssertEqual(
+            normalized.components(separatedBy: exactGenesis).count - 1,
+            1)
+        XCTAssertEqual(
+            try regexCaptures(
+                #"\bfunc\s+([A-Za-z_][A-Za-z0-9_]*)"#,
+                in: code),
+            ["genesis"])
+        XCTAssertEqual(
+            try regexMatchCount(#"\bstatic\b"#, in: code),
+            1)
+        XCTAssertEqual(
+            try regexCaptures(
+                #"\b(struct|enum|class|actor|protocol|typealias)\b"#,
+                in: code),
+            ["struct"])
+        XCTAssertEqual(
+            try regexMatchCount(#"\bvar\s+"#, in: code),
+            0)
+        XCTAssertEqual(
+            try regexMatchCount(#"\bstatic\s+let\b"#, in: code),
+            0)
+
+        let exactDeclaration = normalizedWhitespace("""
+            public struct BASEventLogHead: Codable, Sendable, Equatable, Hashable {
+                public let sessionID: String
+                public let sequenceNumber: Int64
+                public let eventID: String
+                public let integrityDigest: String
+
+                public init(
+                    sessionID: String,
+                    sequenceNumber: Int64,
+                    eventID: String,
+                    integrityDigest: String
+                ) {
+                    self.sessionID = sessionID
+                    self.sequenceNumber = sequenceNumber
+                    self.eventID = eventID
+                    self.integrityDigest = integrityDigest
+                }
+
+                public static func genesis(sessionID: String) -> Self {
+                    Self(
+                        sessionID: sessionID,
+                        sequenceNumber: -1,
+                        eventID: "",
+                        integrityDigest: String(repeating: "0", count: 64)
+                    )
+                }
+            }
+            """)
+        XCTAssertEqual(normalized, exactDeclaration)
+
+        for forbidden in [
+            "CodingKeys", "init(from:", "encode(to:",
+            "BASSchemaVersioned", "currentSchemaVersion", "schemaVersion",
+        ] {
+            XCTAssertFalse(code.contains(forbidden), forbidden)
+        }
+        for forbiddenPattern in [
+            #"\bthrows?\b"#, #"\bguard\b"#,
+            #"\bvalidation\b"#, #"\berror\b"#,
+        ] {
+            XCTAssertEqual(
+                try regexMatchCount(
+                    forbiddenPattern,
+                    in: code,
+                    options: [.caseInsensitive]),
+                0,
+                forbiddenPattern)
+        }
     }
 
     // MARK: - BASInMemoryEventLogStorage

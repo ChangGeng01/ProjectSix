@@ -267,6 +267,42 @@ public struct BASEventLogEntry: Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - Event log head value projection
+
+/// Immutable projection of one session's integrity-bound EventLog
+/// position. This value carries evidence but grants no append, CAS,
+/// sequencing, or integrity authority; only the selected EventLog
+/// storage owner can establish or validate a current head.
+public struct BASEventLogHead: Codable, Sendable, Equatable, Hashable {
+    public let sessionID: String
+    public let sequenceNumber: Int64
+    public let eventID: String
+    public let integrityDigest: String
+
+    public init(
+        sessionID: String,
+        sequenceNumber: Int64,
+        eventID: String,
+        integrityDigest: String
+    ) {
+        self.sessionID = sessionID
+        self.sequenceNumber = sequenceNumber
+        self.eventID = eventID
+        self.integrityDigest = integrityDigest
+    }
+
+    /// Structural no-event head sentinel. Its all-zero digest is a
+    /// head/CAS sentinel, not the first integrity row's `prevHash`.
+    public static func genesis(sessionID: String) -> Self {
+        Self(
+            sessionID: sessionID,
+            sequenceNumber: -1,
+            eventID: "",
+            integrityDigest: String(repeating: "0", count: 64)
+        )
+    }
+}
+
 // MARK: - Storage protocol
 
 /// Append-only typed event log storage。
