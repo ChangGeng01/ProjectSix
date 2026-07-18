@@ -10,7 +10,7 @@
 
 **Normative precedence:** This addendum supersedes only conflicting target-state wording in the 2026-07-14 architecture design and the 2026-07-15 domain plans concerning the final local production backend, the approved main/sub-Agent portfolio, independent context windows, RSI interpretation, and `NextQuestionProjection`. The 2026-07-17 K3 budget and Provider contract addendum remains authoritative for exact K3 budget, allocation, claim, lineage, and recovery protocols. Every unchanged authority, durability, security, effect, erasure, and `14 / 4 / 4 / 7` rule in the 2026-07-14 design remains in force.
 
-This is a normative design addendum, not an eighth Owner Ledger controlled document. Until the seven controlled documents, implementation gates, and release evidence are reconciled atomically with this decision, this document does not directly authorize a new production owner or a production cutover.
+This is a normative design addendum, not an eighth Owner Ledger controlled document. Before W1, W0 must atomically merge every adopted decision into the architecture master and six domain plans, regenerate the Owner Ledger provenance/digests/required terms, and run the non-empty owner/create/shape/iOS-floor gates. Until that seven-document convergence and its independent receipts exist, this document does not directly authorize a new production owner or a production cutover. The in-flight corruption-recovery companion remains non-normative unless each proposed lifecycle and monotonic floor is mapped to an existing physical/operator authority; anything that would decide write eligibility outside those roots must pass CreateGate and an Owner Ledger amendment first.
 
 ## Executive Decision
 
@@ -23,25 +23,25 @@ The target local production backend for workspace- or host-managed model weights
 - after the sealed Core AI-only production cutover, MLX may remain only in a non-Release lab or a separately sealed non-authoritative shadow build/cohort; production Release source, link, factory, and reachability gates reject every MLX Provider/runtime path;
 - a failed Core AI candidate yields `deny`, `unavailable`, `quarantine`, or an explicit newly authorized model change—not weaker gates or a hidden backend change.
 
-Core AI-only does not mean ANE-only. A certified Core AI execution plan may use CPU, GPU, Neural Engine, or custom Metal kernels according to measured phase-specific evidence. OS placement requests are not treated as physical-placement receipts.
+Core AI-only does not mean ANE-only. A certified Core AI execution plan may use CPU, GPU, Neural Engine, or a digested custom operation reached through a public Core AI/coreai-torch extension point according to measured phase-specific evidence. The neural graph and mutable neural-state transition remain Core AI functions; an independent Metal trunk, head, KV/cache, or neural scheduler is a second backend and is prohibited after cutover. Host tokenization, deterministic sampling, and non-neural data processing may remain on CPU. OS placement requests are not treated as physical-placement receipts.
 
 The approved model portfolio is:
 
 | Role | Approved model family | Production representation | Authority status |
 |---|---|---|---|
-| selectable main Agent | Qwen3.5-4B | self-converted, signed, certified Core AI assets | external Provider; proposal-only |
+| selectable main Agent | Qwen3.5-4B, first candidate `textOnly` | self-converted, signed, certified Core AI assets | external Provider; proposal-only; `vision=false` initially |
 | selectable main Agent | Apple Foundation Model (AFM) | system FoundationModels Provider | external Provider; proposal-only; not a conversion target |
 | text specialist | MiniCPM5-1B | self-converted, signed, certified Core AI assets | external sub-Agent Provider; proposal-only |
 | vision specialist | MiniCPM-V 4.6 | self-converted, signed, certified Core AI assets | external sub-Agent Provider; proposal-only |
 | retrieval embedding mechanism | Granite Embedding 97M multilingual r2 | self-converted, signed, certified Core AI assets | L8 embedding Provider mechanism; not an Agent |
 
-The current intended host default is Qwen3.5-4B. AFM is an explicit user-selectable alternative when its exact device, locale, language, availability, and task-capability profile is certified. This preference is host policy, not an SDK constant.
+The current intended host default is `Qwen3.5-4B/textOnly`. The family name does not inherit the upstream VLM or MTP capabilities: vision is false and native MTP is false until the exact signed tensors, functions, StateABI, acceptance verifier, and rollback path are separately certified. A future full-vision Qwen profile is a different candidate. AFM is an explicit user-selectable alternative when its exact device, locale, language, availability, and task-capability profile is certified. This preference is host policy, not an SDK constant.
 
 Names alone never identify production material. Every workspace/host-managed Core AI asset use binds exact source digest, tokenizer/template, conversion recipe, quantization, function graph, custom operation set, StateABI, toolchain, OS/runtime cohort, and certified execution profile.
 
 That full material tuple applies to workspace/host-managed Core AI Provider assets. AFM weights and internal StateABI are opaque: an AFM use instead binds the exact OS/runtime cohort, FoundationModels capability and availability profile, locale/language, input/output schema, safety/tool contract, and Qinao request/profile identities. AFM has no KV, prefix, continuation, or StateABI compatibility with Qwen or another host-managed model.
 
-For workspace/host-managed learned microheads, this addendum also supersedes the old target allowance for a separate Core ML production microhead lane: after the sealed cutover they are certified Core AI assets or absent. Core ML may remain only for unrelated platform/application mechanisms outside this Provider portfolio, never as a hidden learned-model fallback.
+The Core AI-only rule applies to the Qwen/MiniCPM/Granite Provider portfolio, not to every learned mechanism in the host. Existing Core ML microheads remain on an exact purpose-and-digest allowlist while their role-specific evidence favors the incumbent. That allowlist is only a derived immutable projection of the signed host profile, exact execution plan, and certification evidence; it has no independent store, registry, environment switch, or runtime editor, and a change creates a new profile/tree identity. A microhead migrates only after a fresh Pareto verdict wins on parity, latency, memory, energy, and integration cost. An allowlisted Core ML microhead may not impersonate or silently replace any of the five portfolio roles.
 
 The architecture keeps exactly fourteen semantic LayerCores, four Physical Kernels, four bounded ControlRings, and seven orthogonal planes. Agents, context windows, StateLake lanes, Core AI functions, next-question projection, and RSI iterations do not add members to those sets.
 
@@ -66,8 +66,10 @@ The most recent Core AI evidence supports only a candidate mechanism, not produc
 - one iPhone Air probe demonstrated the fused-state GDN mechanism and top-5 agreement for its recorded T=32 chain case against the MLX golden path; it is not broad full-chain parity evidence;
 - the large vocabulary head exceeded the tested ANE width and therefore used a GPU-stage split;
 - the sequential multi-asset chain was roughly 10 token/s in the recorded experiment, not 40/30;
-- the multi-asset residency and approximately 4.2 GB asset footprint do not yet close the active hard-cap plan;
-- sustained power/thermal benefit, two-device evidence, representative quality, cancellation, recovery, and release certification remain open.
+- the approximately 4.2 GB figure is a candidate file/package total, not a resident-memory claim; multi-asset residency, specialization/cache peak, install/update peak disk use, and the active hard-cap plan remain open;
+- repository Qwen/Core AI probes that produced `.aimodel` material with `coreai-torch 0.4.0` are historical mechanism evidence only: Apple's v0.4.1 compatibility note says 0.4.0 artifacts fail to load/specialize from OS 27 beta 2 onward. `knownIssueSet` therefore denies those assets; an exact compatible 0.4.1-or-newer coreai-torch/coreai-core/Xcode/Metal toolchain must reconvert/AOT and rerun numeric, StateABI, device, cache, thermal, and recovery certification;
+- the existing context-classifier campaign is decisive evidence *against* migrating that microhead today: 112/112 parity on two iPhone Air devices, but Core AI measured about 0.71 ms versus Core ML 0.14 ms and about 2.6× the sampled memory, so its recorded verdict remains `doNotMigrate`;
+- for the Qwen/portfolio candidates, sustained power/thermal benefit, two-device evidence, representative quality, cancellation, recovery, and release certification remain open.
 
 MiniCPM5-1B, MiniCPM-V 4.6, and Granite 97M Core AI conversions are approved targets and spikes, not completed conversions. AFM is already system-managed through FoundationModels but still requires a Qinao capability profile and the same proposal/adoption discipline.
 
@@ -152,16 +154,16 @@ A successful token stream cannot turn `unresolved` into `verified`. A timeout do
 
 **Multi-constraint logic and ordering problems**
 
-1. L6 normalizes entities, variables, domains, quantifiers, negation, and the question target.
-2. L7 creates the exact ConstraintLedger and rejects ambiguous aliases or hidden domain assumptions.
+1. L6 normalizes entities, variables, domains, quantifiers, negation, and the question target while preserving every originating raw span.
+2. L7 creates the exact ConstraintLedger and rejects ambiguous aliases or hidden domain assumptions. Every constraint binds the raw span, canonical AST, normalized interpretation, source, and epistemic modality; the deterministic solver proves only that ledger, never that the natural-language formalization was correct.
 3. L9 or the text specialist proposes one or more assignments with an explicit constraint-to-step map.
 4. A deterministic checker evaluates every hard constraint and searches for a counterexample or alternate solution.
-5. L10 returns `verifiedUnique`, `verifiedMultiple`, `inconsistentPremises`, or `unresolved`; only the first may be presented as a unique answer.
+5. L10 checks premise coverage, unresolved terms, aliases, quantifiers, negation, and interpretation ambiguity, then returns `verifiedUnique`, `verifiedMultiple`, `inconsistentPremises`, or `unresolved`; only the first may be presented as a unique answer. Mutation tests must catch `not`, `exactly one`, `unless`, `immediately`, and reversed-order mistranslations.
 
 **Long-text extraction and transformation**
 
-1. L3 partitions by structure and token budget without losing stable byte offsets.
-2. L8 retrieves exact spans before dense paraphrase candidates.
+1. Ingestion/Adapter and L8 establish structural blocks and stable raw-byte spans; L3 only budgets already selected spans.
+2. L8 retrieves exact raw spans before dense paraphrase candidates. Every normalized artifact binds its raw parent, normalization recipe/version, and a reversible byte-offset map; citations always resolve back to the raw span.
 3. The specialist emits span-bound facts; no uncited extracted fact enters the join.
 4. L7 deduplicates, preserves conflicting versions, and checks temporal/entity scope.
 5. L10 performs claim-to-source coverage and transformation-loss checks before presentation.
@@ -176,10 +178,10 @@ A successful token stream cannot turn `unresolved` into `verified`. A timeout do
 
 **Lateral puzzles and “sea-turtle soup” questions**
 
-1. Facts stated by the user are immutable constraints; unstated narrative conventions remain hypotheses.
+1. L6/L7 preserve every clue's speech act, source, and epistemic modality. Only propositions explicitly established as world ground truth become immutable constraints; observations, reports, beliefs, and narrative conventions remain typed hypotheses.
 2. L9 maintains a small discriminative hypothesis portfolio rather than one story.
-3. Each follow-up question is selected for expected information gain and answerability, not theatrical novelty.
-4. Contradicted hypotheses are retired with receipts; a solved hypothesis must explain all fixed clues.
+3. Each follow-up question is selected by deterministic partition quality, worst-case hypothesis elimination, and answerability—not model probability or theatrical novelty.
+4. Contradicted hypotheses are retired with receipts; a solved hypothesis must explain all fixed clues, and multiple admissible hypotheses may never be presented as a unique answer.
 
 **Overthinking and local loops**
 
@@ -198,13 +200,13 @@ Qwen3.5-4B and AFM may serve as the main terminal-answer Provider only when thei
 
 MiniCPM5-1B is a bounded text specialist for extraction, constraint normalization, critique, compact transformation, and other certified tasks. MiniCPM-V 4.6 is a bounded visual specialist for image/video observations. Their outputs are internal proposals and cannot directly become visible terminal output or state truth.
 
-Granite 97M is not an Agent. It implements the existing L8 embedding Provider seam for conditional dense retrieval. It does not critique, delegate, select evidence, or generate a user response.
+Granite 97M is not an Agent. It implements the existing `BASMemory.BASEmbeddingProvider` seam, which is the sole production L8 embedding seam, for conditional dense retrieval. The homonymous `BASRuntimeCore.BASEmbeddingProvider` declaration is compatibility-only and must be adapted to or removed behind an explicit reachability gate before production; it may not create a second capability/model identity. Granite does not critique, delegate, select evidence, or generate a user response.
 
 ### 3.2 Delegation rules
 
 Delegation exists only on a pre-terminal branch whose frozen `BASProviderBranchPolicy` rule permits output role `.internalProposal`. A main-model invocation acting in that internal role may emit a typed `DelegationProposal` specifying purpose, required inputs, expected output schema, BudgetLease reference, deadline, and causal parents. The unique `.turnStep/.terminalAnswerCandidate` branch is `answerOnly`, exposes no delegation/tool/effect/continuation schema, and therefore cannot delegate.
 
-L5/L6/L7/L9 semantic decisions plus the installed branch policy and execution-plan owner determine whether the proposed work is authorized; the Turn Runtime only checks graph membership, causal readiness, and receipts. Before terminal-source pin, K1 may reserve resources and K3 may allocate a separately authorized specialist branch. The adapter then materializes the exact request; any required W5 dormant fence completes; only a fresh K3 claim permit can reach K2's at-most-once supervised invocation. After terminal-source pin, no ordinary specialist branch may be allocated; only a purpose `.verifierProposal` branch with output role `.internalProposal`, preauthorized by buffered policy and permitted by the exact K3 addendum state, may follow. A returned specialist artifact enters L7/L9/L10 like any other untrusted proposal.
+L5/L6/L7/L9 semantic decisions plus the installed branch policy and execution-plan owner determine whether the proposed work is authorized; the Turn Runtime only checks graph membership, causal readiness, and receipts. L3 compiles a fresh minimal required-input projection for that exact Provider step—never the entire parent capsule. Evidence, OCR, visual observations, and prior model proposals enter an inert, escaped data channel with explicit authority labels and cannot introduce system instructions, tool schemas, capabilities, or output policy. Before terminal-source pin, K1 may reserve resources and K3 may allocate a separately authorized specialist branch. The adapter then materializes the exact request; any required W5 dormant fence completes; only a fresh K3 claim permit can reach K2's at-most-once supervised invocation. After terminal-source pin, no ordinary specialist branch may be allocated; only a purpose `.verifierProposal` branch with output role `.internalProposal`, preauthorized by buffered policy and permitted by the exact K3 addendum state, may follow. A returned specialist artifact enters L7/L9/L10 like any other untrusted proposal.
 
 There is no majority vote for truth. Conflicting outputs remain separate until evidence, authority, deterministic constraints, and L10 verification resolve them. Model confidence is never authority.
 
@@ -220,29 +222,58 @@ All workspace/host-managed Provider weights outside Qinao SDK and intended for l
 
 The project must not rebuild PyTorch, SQLite, tokenizers, attention kernels, or runtime facilities already supplied and verified by the chosen stack. Rust is preferred for existing deterministic fusion/canonical hot logic behind narrow C ABIs; SQL owns indexed durability within the established stores; C/C++ is limited to required runtime bridges; Metal is limited to measured kernels unavailable or materially inadequate in public Core AI mechanisms.
 
-Large model assets are signed, architecture-specific, downloadable packages rather than blindly app-bundled blobs. A model asset manifest binds:
+Large model assets are signed, content-addressed downloadable packages rather than blindly app-bundled blobs. Identity has three non-circular levels:
+
+- `ModelMaterialManifestArtifactID` is the sole Core AI realization/evolution of the master's canonical `bundleDigest`, not a second identity. For Core AI, every profile, plan, fallback edge, cache key, lease, and receipt uses that one Artifact ID/digest; any old separately computed `bundleDigest` is migration input only and must be converted or rejected before activation;
+- a precomputable `SpecializationKey` binds the exact material and selected-variant digest, immutable source URL, device architecture, OS/runtime, `SpecializationOptions`, and cache namespace. A later `CacheHandleReceipt` carries cache policy, opaque bookmark, creation state, and invalidation state; the bookmark is only a fallible locator and never enters the key/hash;
+- `CertifiedBackendProfile` references the material-manifest digest and separately binds exact SKU, OS build/runtime, plan/cohort, evidence references, thresholds, verdict, and revocation/erasure compatibility. The material manifest never references that profile or a verdict.
+
+Every profile/plan binds an exact selected variant digest, `sourceSpecialization | AOT` path, and `SpecializationOptions`. An AOT miss may use the same portable `.aimodel` only when the frozen pre-allocation plan contains a separately certified source-specialization arm with its own exact evidence; otherwise the result is unavailable. It never reuses AOT evidence for a different path or silently switches after allocation. The existing owners execute one fail-closed install transaction—no new manager or store:
+
+```text
+disk-space reservation for retained old + temporary download + new source/AOT + worst cache/specialization scratch + margin
+→ temporary download
+→ package Merkle root + signature + license verification
+→ K1 HeavyPhase lease + specialization and smoke-test receipt
+→ single active-pointer compare-and-swap
+→ bounded certified rollback retention
+→ old asset/cache cleanup only after zero reader leases
+```
+
+`provider.package-boundary` owns only private bytes, immutable content directories, reader leases, cache/bookmark mechanism, and the pointer CAS. The pointer resolves the exact digest already selected by `model.manifest-invocation` and `execution.plan-provider-router`; it never selects a model/profile. K2 pins the immutable URL, material/variant digest, `SpecializationKey`, options, and current `CacheHandleReceipt` for the Attempt, never loads through a content-changing alias, and a stale/missing bookmark, purged cache, moved/deleted source, or OS-invalidated specialization may only rebuild the same frozen material arm or return unavailable. Pointer swap affects new readers; it cannot invalidate or retarget an in-flight reader.
+
+Security monotonicity remains with existing sovereign owners: L14 decides exact material admission/revocation; `sovereign.k4-durable-lifecycle` records the signed minimum material-authorization epoch and revocation in its helper-private `synchronous=FULL` lifecycle, anchors the exact K3 source root, and recovers through its existing monotonic-root/query protocol. Admission, claim, chunk, and adoption revalidate generation and that floor. Rollback retention keeps inert bytes only; use of older material requires a new higher deployment/authorization epoch, an exact current certification/release join, and never lowers the security floor. If this mapping cannot be proven without a new write-eligibility root, CreateGate and an Owner Ledger amendment are mandatory.
+
+Background Assets may download and report installation only. Specialization/smoke is a K1 HeavyPhase and runs in foreground or under a separately proven iOS 27 continued-processing inference entitlement; otherwise it defers. Crash, cancellation, ENOSPC, corrupted chunk, signature mismatch, specialization failure, pointer-CAS loss, cache purge, OS update, source move/delete, bookmark invalidation, cleanup failure, and revocation during use are fault-injected; none may expose partial material or silently reactivate an older epoch. The package's signed envelope directly covers `ModelMaterialManifestArtifactID`; verification recomputes that ID and every referenced resource root before install. Its canonical tagged/versioned payload binds:
 
 ```text
 source weight digest
 license and provenance
+QualityIdentity + supported generation-semantics contract
+config + RoPE + adapters/LoRA + certified fallback graph digest
 tokenizer/template digest
 conversion source/toolchain digest
 precision and calibration corpus digest
 function graph and custom-op digest
 input/output names, dtypes, shapes, and dynamic bounds
-StateABI and cache-scope version
-supported device/OS/runtime cohorts
-quality, memory, energy, thermal, and recovery evidence profile
-revocation and erasure policy
+platform + staticMaxContext + prefill/decode/verify bucket + batch/K + mask/position geometry
+StateABI, ProcessorABI, and cache-scope version
+backend/runtime build identity
+portable .aimodel resource Merkle root + sorted auxiliary-resource roots
+sorted AOT variants: architecture/platform/minimum-OS/toolchain/options + byte digest + auxiliary-resource roots
 ```
 
 Generic “first output value” behavior is forbidden in production. Every Core AI function has exact named tensors, dtypes, shapes, state count/layout, and bounded dynamic dimensions. Bridges prove contiguity or perform an explicit ledgered copy.
+
+`ProcessorABI` is role-specific. Granite fixes 384 dimensions, CLS pooling, L2 normalization, tokenizer, and static sequence buckets; a model, pooling, normalization, or ABI change rebuilds the vector index, and mixed embeddings are forbidden. MiniCPM-V fixes orientation, color space, resize/crop/normalization, resolution buckets, frame sampling, and vision-encoder/projector/decoder digests; image and video are separate certified profiles. Visual ingestion requests permission only in user context, strips EXIF/location unless explicitly authorized, and discloses raw pixels only to the exact visual profile. The text-only main Agent receives a typed `VisualObservationArtifact`, not raw pixels.
+
+The recorded int8/full-causal Qwen path is a fidelity anchor, not a final compression decision. A sensitivity-guided `coreai-opt` search may evaluate mixed 4/8-bit palettization, group sizes such as 8/32, and selective 8-bit embedding/head retention. Every candidate is a new QualityIdentity and reruns numeric, long-sequence, end-task, memory, energy, thermal, cancellation, and recovery gates; an Apple reference Qwen recipe is a platform control, not replacement product evidence.
 
 ### 3.4 SDK boundary
 
 Qinao SDK declares model-neutral value contracts and deterministic adoption logic. It does not import concrete Qwen, MiniCPM, Granite, MLX, Core AI, or FoundationModels implementations and does not package model weights. External Provider packages depend inward on Qinao contracts.
 
-AFM uses a FoundationModels Provider package. Qwen, MiniCPM, and Granite use external Core AI Provider packages. A Core AI model may be surfaced through compatible system executor facilities where useful, but that does not move the model or FoundationModels runtime into Qinao SDK.
+AFM uses a FoundationModels Provider package. Qwen, MiniCPM, and Granite use external Core AI Provider packages. Production Qwen/MiniCPM/Granite execution has exactly one raw Core AI Provider session/cache owner. A FoundationModels `LanguageModelExecutor` surface is either non-authoritative demonstration code or a stateless facade over that same executor; it may not own a second KV, prefix, cancellation, retry, or result truth.
 
 Cross-model change—Qwen to AFM, AFM to Qwen, or either to another lineage—always creates a new Attempt, recompiles context, and obtains explicit host/user consent when policy requires it. It is never a mid-turn or silent fallback.
 
@@ -252,20 +283,30 @@ Qinao supports many independent logical context windows without pretending the d
 
 ### 4.1 ContextCapsule
 
-Each admitted WorkUnit Attempt and exact Provider step receives an immutable `ContextCapsule` containing only:
+`ContextCapsule` is a strictly tagged value contract, never one optional all-fields bag. The `attemptFrame` variant exists at WorkUnit admission and contains only:
 
 ```text
 TurnOperationRef + AttemptRef
-workspace/window/session generations and epoch vector
-task purpose and expected output schema
-authorized compiled context sections
+WorkspaceReadSnapshot root + canonical generation-vector Artifact ID
+task purpose + expected output schema
 constraint/evidence/artifact references
-model/profile/plan identity
-BudgetLease Artifact reference + latest committed K3 budget-use receipt reference
-capability attenuation and disclosure class
+BudgetLease Artifact reference
+CapabilityGrant + capability attenuation + disclosure/visibility compartment
 ```
 
-ContextCapsules do not copy lease ceilings, cumulative counters, or a mutable “remaining budget.” A bounded display/diagnostic projection may be derived from the referenced K3 state but is never authority. ContextCapsules also do not contain mutable shared prompts, ambient credentials, database handles, tool handles, another Agent's private scratch state, or raw chain-of-thought.
+The `providerStep` variant may be constructed only from a reopened K3 allocation receipt and contains:
+
+```text
+one canonical BASProviderExecutionRef (root/branch/Attempt/lease derive only from it)
+step rule + output role + Provider policy/binding IDs
+exact model/profile/BASExecutionPlan identity
+either R5 reservoir + grounding-request references
+or R6 CompiledContextDescriptor + authorized minimal context sections
+latest committed K3 budget-use receipt required by the exact policy state
+the inherited attemptFrame reference + attenuated CapabilityGrant
+```
+
+The variants use an exhaustive presence matrix: no future ID is guessed, no loose `BASTurnBranchRef` or epoch tuple is copied beside its canonical parent, and an R5 grounder cannot carry an R6 descriptor. Every input and output validates producer scope, intended consumer scope, branch/step identity, snapshot/generation currentness, visibility compartment, and the canonical generation-vector epochs before use. ContextCapsules do not copy lease ceilings, cumulative counters, or a mutable “remaining budget.” A bounded display/diagnostic projection may be derived from the referenced K3 state but is never authority. ContextCapsules also do not contain mutable shared prompts, ambient credentials, database handles, tool handles, another Agent's private scratch state, or raw chain-of-thought.
 
 Logical windows may reuse the same immutable model weights and compiled functions. Their KV/state, prefix identity, prompt history, generation, RNG/sampler state, grammar state, cancellation, budgets, and artifacts remain isolated. Cross-model KV sharing is forbidden. Same-model prefix reuse is allowed only through the exact cache-scope contract and never because two prompts “look similar.”
 
@@ -285,7 +326,7 @@ Mission
    └─ WorkUnit (bounded repeat)
 ```
 
-Every node has one purpose, bounded inputs, explicit parents, completion predicates, a BudgetLease reference, and terminal status. Large tasks split into independent WorkUnits only where the join semantics are known. A child cannot inherit broader authority than its parent. A failed child cannot poison unrelated completed siblings.
+Every node has one purpose, bounded inputs, explicit parents, completion predicates, a BudgetLease reference, and terminal status. Large tasks split into independent WorkUnits only where the join semantics are known. A join binds the exact task-graph root, expected child heads/generations, each child's current terminal `AttemptRef`, and the completion predicate. An immutable result from a superseded child Attempt cannot satisfy the join. A required failed/unresolved child blocks or remands the parent while already completed siblings remain independently valid. Quorum expresses completeness only; it never turns model majority into truth. A child cannot inherit broader authority than its parent.
 
 ### 4.3 Collaboration and timing
 
@@ -311,7 +352,7 @@ Observe → Diagnose → Propose → Simulate/Compare
 → Authorize → Act → Verify → Consolidate
 ```
 
-Each iteration is immutable and binds its parent digest, Attempt/snapshot/epoch vector, exact ring, declared edge, BudgetLease Artifact ID, prior committed budget-use receipt when applicable, deadline, capability, and progress witness. It never carries a caller-computed mutable remaining value. The four modes are:
+Each iteration is immutable and binds its parent digest, Attempt/snapshot/epoch vector, exact ring, declared edge, BudgetLease Artifact ID, prior committed budget-use receipt when applicable, deadline, capability, fixed obligation set, and progress witness. It never carries a caller-computed mutable remaining value. The four modes are:
 
 | Ring | Improvement scope | May not change |
 |---|---|---|
@@ -320,7 +361,7 @@ Each iteration is immutable and binds its parent digest, Attempt/snapshot/epoch 
 | ΩD Deliberation | create/revise a bounded candidate or critique branch | commit truth, call a model directly, loop without progress |
 | ΩE Effect/Evolution | reconcile an existing saga or produce shadow evolution evidence | replay an indeterminate effect or self-promote a version |
 
-Valid progress is one or more of:
+Progress uses a ring- and edge-specific lexicographic potential over frozen root obligations. A new material conflict/counterexample may extend that set only through an L7/L10 verification receipt: the extension advances an append-only obligation generation, never deletes/weakens an earlier obligation, and never replenishes any budget. Evidence coverage counts only once per canonical claim and only above its required authority; only a verifier receipt may close a constraint. The governed canonicalization factory under the existing `runtime.semantic-dag` contract computes each cycle digest from obligation generation, deduped coverage, conflicts, counterexamples, and semantic state; it sorts exchangeable sets and excludes time, iteration/random IDs, random seeds, prose wording, and irrelevant artifact IDs. K3 reopens the witness inputs and equality-checks the digest instead of trusting caller bytes. Progress in one ring cannot replenish another ring's iteration, token, time, or effect budget. Valid progress is one or more of:
 
 - increased coverage of a required evidence claim;
 - fewer unresolved constraints or material conflicts;
@@ -330,17 +371,17 @@ Valid progress is one or more of:
 
 Longer prose, a different random seed, self-reported confidence, repeated state digest, or a cosmetically revised answer is not progress.
 
-Only a terminal payload whose pair is `converged + convergedVerified` and whose committed K3 budget-use receipt is present may feed authoritative downstream adoption. `cycle_detected`, `no_progress`, `budget_exhausted`, `degraded_with_coverage`, `needs_confirmation`, and `indeterminate_needs_reconciliation` remain typed non-authoritative outcomes.
+Only a terminal payload whose pair is `converged + convergedVerified` and whose committed K3 budget-use receipt is present may feed authoritative downstream adoption. `cycle_detected`, `no_progress`, `budget_exhausted`, `degraded_with_coverage`, `needs_confirmation`, and `indeterminate_needs_reconciliation` remain typed non-authoritative outcomes. L10/L11/L14 may nevertheless authorize a user-visible report containing only an independently verified subset plus an explicit unresolved-scope manifest; it does not adopt the unresolved remainder as fact. A one-pass task that was verified without entering a ControlRing needs its normal verification receipt, not a fabricated RSI receipt.
 
-Self-repair may rebuild projections, indexes, caches, compiled specialization, or replayable material from authoritative events. It may emit quarantine evidence or a quarantine request, but only the existing signed profile/certification authority decides quarantine or promotion. Self-evolution is shadow/offline: it may propose future policy, prompt, conversion, model, or component changes, but cannot rewrite running code, weights, schema, security policy, authority mappings, current LayerCores, or its own certification status.
+Self-repair may rebuild projections, indexes, caches, compiled specialization, or replayable material from authoritative events. It may emit quarantine evidence or a quarantine request, but only the existing signed profile/certification authority decides quarantine or promotion. Self-evolution is shadow/offline and uses only consented, purpose-limited, redacted artifacts; raw user content, raw CoT, credentials, and undeclared Provider derivatives are never exported as an improvement corpus. It may propose future policy, prompt, conversion, model, or component changes, but cannot rewrite running code, weights, schema, security policy, authority mappings, current LayerCores, or its own certification status.
 
 ## 6. StateLake Memory and Context Compilation
 
 ### 6.1 One truth and rebuildable horizons
 
-K3's one `synchronous=FULL` EventLog/control nucleus remains the durable command, ordering, and recovery truth. It does not own the semantic meaning of those commands. One encrypted content-addressed Artifact owner stores canonical content exactly once. Current/day/week/month/archive views are rebuildable projections over the same event history, not separately writable memories.
+K3's one `synchronous=FULL` EventLog/control nucleus remains the durable command, ordering, and recovery truth. It does not own the semantic meaning of those commands. One encrypted content-addressed Artifact owner stores canonical content once **within an authorized sharing domain**, not once globally. Content identity binds bytes plus authority scope, visibility compartment, key epoch, and erasure domain; physical deduplication is allowed only when every reference shares one explicit erase-together fate. Public/explicitly shared content with independent deletion fate uses a different erasure domain/DEK even when bytes match. Independent provenance retains an independent wrapped reference so deletion and existence cannot leak across compartments. Current/day/week/month/archive views are rebuildable projections over the same event history, not separately writable memories.
 
-Persisting canonical raw content as an encrypted content-addressed artifact is an explicit approved change from the earlier ephemeral-content-cache posture. The EventLog stores metadata and the artifact reference; cold replay must not depend on an actor cache. Erasure destroys or retires the key/blob and closes every projection, cache, Provider derivative, backup obligation, and rescan before completion is reported.
+Persisting canonical raw content as an encrypted content-addressed artifact is an explicit approved change from the earlier ephemeral-content-cache posture. The EventLog stores metadata and the artifact reference; cold replay must not depend on an actor cache. Erasure requires scoped cryptographic key destruction plus deletion or proven unreachability of every live blob, backup, quarantine copy, projection, cache, and Provider derivative. A receipt distinguishes provenance/reference detachment from cryptographic destruction of underlying bytes and may claim the latter only after the final erase-together reference closes. “Retired” counts only when recovery is cryptographically impossible and a post-erasure rescan closes every obligation. A Provider profile that cannot establish its retention and purge boundary may not receive data whose policy requires physical erasure.
 
 Every fact uses one bitemporal interval:
 
@@ -349,7 +390,7 @@ validTime: when the fact applies in the represented world
 transactionTime: when Qinao learned or changed its record
 ```
 
-Corrections append supersession or retraction. They do not edit history in place.
+`validAt(worldTime, snapshotHWM)` constrains both the valid-time interval and the transaction-time high-water mark, so a later correction cannot leak into an earlier snapshot. A correction explicitly names `targetFactArtifactID` and proves the same stable `claimKey`/slot, matching authority scope, and correction permission; its replacement value may differ. Only that edge may close the target interval. Ordinary contradiction remains co-visible in the `ConflictManifest`; a lower-authority proposal cannot supersede a higher-authority fact. Retraction (“the earlier claim was never true”) is distinct from valid-time cessation (“it stopped being true later”). Corrections append supersession, cessation, or retraction and never edit history in place.
 
 ### 6.2 Structured memory skeleton
 
@@ -378,7 +419,7 @@ UTF-8 span
 → evidence, conflict, and authority links
 ```
 
-Stable annotation identity is normalized text artifact ID + UTF-8 byte range + annotation kind. Tokenizer indices are model-specific projections and cannot be stable memory identity.
+Stable annotation identity is normalized text artifact ID + UTF-8 byte range + annotation kind, and the normalized artifact binds the raw parent, normalization recipe/version, and reversible byte-offset map. Presented citations always resolve to raw bytes. Tokenizer indices are model-specific projections and cannot be stable memory identity.
 
 ### 6.4 Multi-lane retrieval
 
@@ -390,11 +431,12 @@ Retrieval proceeds in this order:
 4. temporal/episode retrieval;
 5. entity/relation retrieval;
 6. conditional Granite dense retrieval only when lexical/structural coverage is insufficient or semantic paraphrase is required;
-7. optional small-model grounding proposals from the existing certified Core AI NLI/microhead seam or a task-bounded MiniCPM5 branch, with exact entailment/contradiction/unknown schemas and source-span parents;
-8. lane-local dedupe, source caps, and candidate receipts;
-9. L7 cross-lane eligibility, fusion, grounding, conflict preservation, coverage, diversity, and final State Market.
+7. lane-local canonical dedupe, source caps, and candidate receipts;
+8. bounded cross-lane fusion plus a coverage-preserving reservoir that cannot discard the sole candidate for a required claim or material contradiction;
+9. optional small-model grounding proposals over the bounded fused set;
+10. L7 final hard-eligibility revalidation, conflict preservation, coverage, diversity, and State Market.
 
-Granite and the grounding model never see a broader corpus than the hard eligibility partition. Dense similarity or a grounding label cannot override authority, freshness, deletion, confidentiality, exact contradiction, deterministic constraints, or token cost. A small-model label is an untrusted proposal; L7 validates its exact inputs and L10 may verify the resulting claim map. The final State Market balances relevance, authority, freshness, utility, diversity, source concentration, conflict coverage, and token cost only after hard eligibility has passed. Existing FTS, vector, temporal, entity, NLI, and Rust fusion mechanisms are extended behind current owners; no second retrieval engine is created.
+Granite and the grounding model never see a broader corpus than the hard eligibility partition. Granite is the pure L8 embedding mechanism under a K1 reservation, K2 supervision, and usage receipts; it is not a K3 generative branch. A MiniCPM grounder uses the existing `.groundingProposal/.internalProposal` allocate/materialize/claim path. A grounding request binds the exact sentence, minimal structural context, qualifier/negation/coreference closure, and an omission flag; missing or ambiguous closure forces `unknown`. Dense similarity or a grounding label cannot override authority, freshness, deletion, confidentiality, exact contradiction, deterministic constraints, or token cost. A small-model label is an untrusted proposal; L7 validates its exact inputs and L10 may verify the resulting claim map. The State Market uses a versioned deterministic objective and tie-break over relevance, authority, freshness, utility, diversity, source concentration, conflict coverage, and token cost only after hard eligibility has passed. Existing FTS, vector, temporal, entity, NLI, and Rust fusion mechanisms are extended behind current owners; no second retrieval engine is created.
 
 ### 6.5 Context is compiled, not concatenated
 
@@ -403,6 +445,7 @@ The Context Budget Allocator gives each required section an explicit byte/token 
 - includes the task contract, hard constraints, exact high-authority evidence, material conflicts, selected history, tool schema only when authorized, and output/verification contract;
 - tokenizes canonical sections once for the selected model/tokenizer identity;
 - emits exact section digests, offsets, provenance, authority labels, and an omission ledger;
+- renders evidence/model output as escaped inert data distinct from system instructions and tool/output schemas;
 - distinguishes full prefill, same-Attempt suffix continuation, exact prefix-cache reuse, and full rebuild;
 - never truncates a hard constraint, conflict qualifier, negation, source span, or output schema silently.
 
@@ -423,16 +466,25 @@ Thermal or memory pressure may:
 - checkpoint and resume;
 - evict rebuildable cache or specialization;
 - before K3 allocation, request selection of a pre-certified same-quality, same-StateABI compatible plan;
-- after allocation, defer, checkpoint, cancel, or recover the exact branch without changing its plan, Provider, materialized request, or call identity;
+- after allocation but before claim, defer or continue that allocation to its first claim without changing plan, Provider, request, or call identity;
+- while the same claimed invocation is demonstrably live, join, pause, or continue that invocation only; after owner/process loss, handoff, or `sent_or_unknown`, query/reconcile/seal only and never recreate a call permit or physical call;
 - stop admitting new heavy work.
 
 Pressure may not silently change model, quantization, context, sampling, tool contract, or answer quality identity.
 
+iOS lifecycle callbacks, background launches, and termination notifications are resource hints, never correctness boundaries. Before claim the runtime may defer or checkpoint when the exact profile permits. After claim, only the same live invocation may pause/resume; owner/process loss follows the query/reconcile/terminalize rule above. The existing background-task owner may request bounded time, but no keepalive, `willTerminate`, or background callback is required for safety.
+
 ### 7.2 Core AI function portfolio
 
-A certified Qwen Core AI package may expose separate embedding, trunk, LM-head, prefill, decode, native MTP, and state-management functions. The current multi-asset chain remains one physical Provider invocation with one K3 branch and one terminal observation; its internal asset stages do not become new authority branches.
+A certified Qwen Core AI package may expose separate embedding, trunk, LM-head, prefill, decode, optional native MTP, and state-management functions. The first `Qwen3.5-4B/textOnly` profile exposes no vision and no native MTP until those exact functions are certified. The current multi-asset chain remains one physical Provider invocation with one K3 branch and one terminal observation; its internal asset stages do not become new authority branches.
 
-MiniCPM5 loads on demand for admitted text-specialist work. MiniCPM-V loads only for an admitted visual WorkUnit. Granite may remain warm only when its measured footprint/energy and expected reuse fit K1 policy. AFM remains system-managed, but its latency, cancellation, availability, and semantic capability still enter the Qinao plan and receipts.
+For iOS, `platform + staticMaxContext + prefill/decode/verify bucket + batch/K + attention-mask/position geometry` is part of asset identity, execution-profile identity, and StateABI. An over-limit request is recompiled into certified chunks/buckets or rejected; it never dynamically expands mutable geometry. Every mutable Core AI session is per Attempt and wrapped by an actor or noncopyable single-driver lease. Shared compiled immutable functions are reusable, but KV/state, `MutableViews`, counters, cancellation fences, and checkpoints are not.
+
+Any function-stage fault, cancellation, timeout, or unknown completion poisons the whole mutable Provider-state lease. It is rebuilt from the last certified checkpoint; partially advanced `MutableViews` are never treated as valid. Checkpoint resume is allowed only when the exact profile proves an atomic bounded snapshot/restore protocol. Release tests inject faults at every function boundary and race `step/prefill/reset/cancel/restore`, eight windows, and late completions.
+
+MiniCPM5 loads on demand for admitted text-specialist work. MiniCPM-V loads only for an admitted visual WorkUnit and exact image/video ProcessorABI. Granite may remain warm only when its measured footprint/energy and expected reuse fit K1 policy. AFM remains system-managed, but its latency, cancellation, availability, and semantic capability still enter the Qinao plan and receipts.
+
+An AFM Attempt owns an independent `LanguageModelSession`, frozen transcript, and empty tool set. From prewarm/request until terminal completion or observed cancellation quiescence, it holds an opaque local-heavy lease; Qinao does not start another local Core AI heavy phase concurrently and receipts record placement as observed/unknown rather than claiming an execution unit. An OS/system-model update creates a new cohort. Historical replay consumes the recorded AFM output artifact instead of rerunning AFM. If the certified platform profile cannot prove the required no-durable-derivative or purge semantics, AFM is ineligible for data requiring physical erasure.
 
 Placement is empirical per phase. A Qwen body may favor Neural Engine while a vocabulary head favors GPU; Granite or vision may have different profiles. Production claims require runtime/energy evidence, not a `.neuralEngine` preference or architecture label.
 
@@ -468,7 +520,7 @@ Certification uses at least two physical devices and a 1,800-second sustained ru
 
 Qinao may anticipate the user's most useful next question, but it does so as a small L12 presentation projection—not a new Agent, router, store, market, notification system, or durable preference learner.
 
-The projection considers three to five internal candidates drawn only from:
+The projection considers zero to five process-local transient candidates drawn only from:
 
 - the finalized answer and its existing artifacts;
 - the current task graph's next declared WorkUnit;
@@ -476,9 +528,9 @@ The projection considers three to five internal candidates drawn only from:
 - one high-value clarification;
 - an already authorized unresolved horizon thread.
 
-It scores relevance, utility, grounding, authority, freshness, continuity, answerability, cognitive cost, risk, novelty, and diversity. Hard policy, privacy, confirmation, and unresolved-conflict gates run before scoring. A close tie, weak grounding, low utility, or uncertain authorization yields abstention.
+It scores relevance, utility, grounding, authority, freshness, continuity, answerability, cognitive cost, risk, novelty, and diversity with a versioned deterministic objective, tie-break, and minimum winning margin. It never trusts model-reported confidence. Hard policy, privacy, confirmation, and unresolved-conflict gates run before scoring. A close tie, weak grounding, low utility, or uncertain authorization yields abstention.
 
-At most one compact in-app card appears, only after the answer has ended, the input is blank, no confirmation is pending, and confidence is high. It performs no new tool call, network call, retrieval, Agent invocation, memory write, or speculative external work before a tap. It does not use notifications, Siri, Spotlight, or App Intents.
+At most one compact in-app card appears, only after the answer has ended, the input is blank, no confirmation is pending, and the deterministic margin passes. At render time a single compare-and-swap must still match the same spool/release, `ContextWorkspaceRef`, Attempt/window/session, visibility compartment, and current authority/policy/deletion epochs. Focus, input, generation, release, or epoch change discards the pool. Candidate text and scores never enter Artifact Mesh, EventLog, analytics, logs, or telemetry. The card performs no new tool call, network call, retrieval, Agent invocation, memory write, or speculative external work before a tap; it supports Dynamic Type and VoiceOver and does not use notifications, Siri, Spotlight, or App Intents.
 
 A tap creates a new Input Event and new Attempt under normal admission. Dismissal or non-click is ephemeral UI state and cannot become a durable negative preference. The objective is user usefulness, not click-through rate.
 
@@ -511,35 +563,61 @@ Input Normalizer remains Adapter/IO and cannot become L15.
 Input Event
 → Input Normalizer
 → L14 admission preflight
+→ Artifact Mesh put of the immutable TurnOperation root
+→ same K3 transaction: active Attempt head + zero-spend BudgetLease row
 → TurnOperationRef + active Attempt/ContextWorkspace identity
 → L1 life/resource policy + L5 constitution + L6 situation
 → L4 prior + L7 StateRequirementPlan and hard semantic eligibility predicate
 → K3/L8 snapshot open + materialized hard physical eligibility partition
-→ L8 SQL/exact/FTS/BM25/temporal/entity/dense lanes inside that partition
-→ L7 post-retrieval hard-eligibility revalidation, dedupe, grounding, conflict and State Market
+→ L8 SQL/exact/FTS/BM25/temporal/entity lanes inside that partition
+→ conditional Granite dense: K1 phase reservation → K2 embedding mechanism → usage receipt
+→ L7 lane-local dedupe/source caps → bounded fusion + coverage reservoir
+→ optional MiniCPM grounding: R5 reservoir-bound plan → K1 reserve → committed K3 use
+  → .groundingProposal/.internalProposal allocate/materialize/claim → K2 → grounding proposal
+→ L7 final hard-eligibility revalidation, conflict/coverage and deterministic State Market
+→ bounded preterminal ΩG/ΩD evidence/candidate remands; any accepted change re-enters L7 before context compile
 → host-selected certified model capability admission
-→ L3 context budget + State Compiler
+→ L2 exact neural requirement + eligible plan template
+→ L3 context budget + State Compiler + CompiledContextDescriptor
+→ L2 freeze exact BASExecutionPlan bound to that descriptor
 → K1 heavy-resource reservation
-→ K3 typed Provider branch allocation
-→ exact materialized Provider request
+→ committed K3 budget-use authorization
+→ K3 typed Provider branch allocation + allocation reopen A
+→ exact materialized Provider request + materialization reopen M
 → terminal answer-only source pin
 → isolated/remote only: dormant W5 prepare/anchor/arm fence
-→ incremental mode only: K3 zero-byte logical visibility row
+→ incremental only: L11 provisional eligibility → L14 bounded stream grant → K4 one-shot provisionalStream claim
+→ incremental mode only: K3 zero-byte logical visibility row (authorizes zero bytes)
 → fresh K3 claim permit
 → K2 external Provider at-most-once prefill/decode supervision
+   ├─ incremental only: reconstruct/reopen ProviderVisibilityReceipt before any stream permit
+   └─ each releasable chunk: L10 receipt → K3 batch permit → K4 anchor → K3 arm → Adapter/IO sink under L12 provisional semantics
+→ Provider/executor terminal result
+→ isolated/remote supervisor observation + attestation when required
+→ K3 terminal event-head seal
 → L9 candidate portfolio/selection
-→ bounded ΩG/ΩD remands when justified
-→ L12 exact presentation spool
+→ L12 exact non-visible presentation spool
 → L10 exact-output verification and convergence
 → L11 final risk/confirmation decision
 → L14 exact release authorization
-→ K3/K4 publication fence and L12 final response
+→ K3 opens/reopens policy-selected visibility (buffered Vrow/V now; incremental exact V already exists)
+→ BASExactReleasePreparationPayload + throughVisibility chain
+→ Artifact Mesh put of complete self-ID-free pre-publication manifest
+→ K3 reopens spool/preparation/manifest/visibility and installs non-usable prepared row
+→ publication journal reserve
+→ outer composition proves reservation; K3 revalidates its tuple/epochs and issues publication permit
+→ K4 claim + boundary anchor → K3 arm
+→ Adapter/IO BASResponseReleaseCoordinator once-only sink under L12 release semantics
+→ publication journal finalization
+→ K3 closes only its publication-boundary row
 → optional L12 NextQuestionProjection
 ```
 
 Prefill routing distinguishes full prefill, same-Attempt suffix continuation, exact prefix cache, and full rebuild. Decode planning distinguishes plain, prompt lookup, native MTP, and same-invocation strategy collapse. Both choices are frozen before branch allocation; neither router owns model identity, truth, authorization, or post-claim route replacement.
 
-The diagram shows the incremental pre-claim visibility row explicitly. Buffered mode omits that row before claim and opens visibility only after terminal seal, the complete authorized verifier suffix, exact spool, and passed L10 exact-output verification. The 2026-07-17 K3 addendum's exact allocate/materialize/pin/fence/claim/seal/visibility ordering governs whenever this high-level diagram is less specific.
+The diagram shows the incremental pre-claim visibility row explicitly, but that row alone authorizes zero bytes. Nothing may occur between its commit and the fresh Provider claim; its immutable receipt is reconstructed only afterward and before the first stream permit. Buffered mode omits that row before claim and opens visibility only after terminal seal, the complete authorized verifier suffix, exact spool, and passed L10 exact-output verification. Ordinary ΩG/ΩD evidence or candidate remands end before terminal-source pin. After pin, only pure deterministic checks and the exact preauthorized buffered `.verifierProposal/.internalProposal` suffix are legal; a need for new evidence, a new candidate, or recompiled context creates a new Attempt. The independent publication journal alone owns reservation/finalization; K3 installs and later closes only its own boundary row, never opens the journal, and K3/K4 may not infer sink success. The 2026-07-17 K3 addendum's exact allocate/materialize/pin/fence/claim/seal/visibility ordering governs whenever this high-level diagram is less specific.
+
+Recovery never means “call the branch again.” An unclaimed allocation may continue to its first claim. A live claimed invocation may only be joined or continued under its existing call identity. After owner/process loss, handoff, or a possible send, recovery is query/reconcile/seal-only; it cannot recreate a call permit, request, publication, or Provider invocation.
 
 ### 9.2 Tool, effect, and state path
 
@@ -548,19 +626,25 @@ Provider proposal
 → L10 semantic/exact verification
 → L11 risk and confirmation
 → L13 prepare intent
-→ K3 EventLog + outbox prepare
+→ K3 EventLog + outbox prepare/handed_to_zone_c
 → L14 exact effect authorization
-→ K4 capability claim/anchor
+→ K4 durable issue/reserve
+→ Zone C dispatch_pending
+→ K4 capability claim
+→ Zone C dispatch_ready
+→ K3 pending effect permit
+→ K4 boundary anchor
 → K3 arm
-→ Zone C durable boundary dispatch/reconcile under the approved idempotency and indeterminate-effect protocol
+→ Zone C consumes permit/anchor/arm once as dispatch_boundary_armed
+→ Zone C external call/reconcile and terminal/indeterminate receipt + child signature attestation
 → L13 receipt interpretation + StateCommitIntent
 → K3 invisible staging
-→ L14 terminal seal
-→ K4 attestation/anchor
+→ L14 terminal-seal decision
+→ K4 terminal-seal signature
 → K3 activation or append
 ```
 
-Models never receive Zone-C call capability. A terminal-answer branch exposes no tool/effect schema. Response and effect branches remain siblings with independent grants and terminal truth. An indeterminate external effect cannot cause the response or effect to be regenerated and dispatched again.
+Models never receive Zone-C call capability. A terminal-answer branch exposes no tool/effect schema. Response and effect branches remain siblings with independent grants and terminal truth. The post-seal K4 operation is a terminal-seal signature, not a second boundary anchor. An indeterminate external effect cannot cause the response or effect to be regenerated and dispatched again.
 
 ### 9.3 Collaboration boundaries
 
@@ -597,21 +681,37 @@ These rules close the known “armed but never fired” candidate checker, zero-
 The integrated candidate must close all of these domains:
 
 1. **Authority/ownership:** exact `14 / 4 / 4 / 7`, owner-ledger parity, no duplicate writer/router/scheduler/store, value-only Provider boundary.
-2. **Contracts:** governed schema/version/canonicalization, task/context/Agent artifacts, exact Core AI function/StateABI manifests, backward fixtures only for real historical wire versions.
-3. **Core AI conversion:** source lock, oracle parity, op inventory, compression, host parity, AOT, device fidelity, placement evidence, task quality, memory, energy, thermal, cancellation, recovery.
-4. **Agent isolation:** ContextCapsule scope, branch/capability attenuation, no direct calls, no cross-window state or KV leak, no raw CoT exchange.
-5. **Reasoning:** structured oracles for constraints, long-text spans, subjective perspective preservation, lateral hypotheses, cycle/no-progress termination.
-6. **Retrieval/context:** hard physical eligibility before ranking, exact/FTS/BM25/dense parity, conflict/coverage, omission ledger, tokenizer/model rebuild rules.
-7. **Memory/privacy:** cold replay, bitemporal correction, deletion epoch/tombstone, artifact key/blob purge, projection/cache/Provider derivative rescan closure.
-8. **RSI:** progress witnesses, visited digests, BudgetLease/K3-use accounting, adoption only for `converged + convergedVerified` with the committed use receipt, shadow-only evolution.
-9. **Effects/recovery:** failure injection at every durable boundary, no duplicate external call/publication, honest indeterminate state, K3/K4/Zone-C restart recovery.
-10. **Silicon/release:** two-device identity, load/prefill/decode/cache routes, one HeavyPhase owner, footprint, UI responsiveness, power/thermal run, exact Release-tree seal.
+2. **Contracts:** governed schema/version/canonicalization, task/context/Agent artifacts, exact Core AI function/StateABI/ProcessorABI manifests, backward fixtures only for real historical wire versions.
+3. **Core AI conversion/assets:** source/license lock, portable resource identity, compression search, host parity, cohort AOT, atomic install/update/rollback/revocation, device fidelity, placement evidence, task quality, memory, energy, thermal, cancellation, recovery.
+4. **Agent isolation:** exact Provider-step capsule identity, minimum disclosure, inert data/instruction separation, branch/capability attenuation, no direct calls, no cross-window state/KV leak, no raw CoT exchange.
+5. **Reasoning:** raw-span-to-AST coverage and mutation oracles, long-text reversible spans, subjective perspective preservation, lateral epistemic modalities, cycle/no-progress termination.
+6. **Retrieval/context:** hard physical eligibility before ranking, pre-grounding dedupe/fusion/reservoir, exact/FTS/BM25/dense parity, qualifier closure, conflict/coverage, omission ledger, tokenizer/model/index rebuild rules.
+7. **Memory/privacy:** scoped artifact identity, cold replay, bitemporal as-of correction, deletion epoch/tombstone, cryptographic key destruction, blob/backup/quarantine/projection/cache/Provider-derivative rescan closure.
+8. **RSI:** ring-specific potentials, canonical visited digests, fixed obligations, BudgetLease/K3-use accounting, adoption only for `converged + convergedVerified` with the committed use receipt, shadow-only consented/redacted evolution.
+9. **Effects/recovery:** failure injection at every durable boundary, no duplicate external call/publication, honest indeterminate state, independent publication-journal reserve/finalize recovery, K3/K4/Zone-C restart recovery.
+10. **Silicon/release:** two-device identity, fixed context geometry, poison-on-partial-stage-fault, Release single-driver races, load/prefill/decode/cache routes, one HeavyPhase owner including AFM opaque leases, footprint, UI responsiveness, power/thermal run, exact Release-tree seal.
 
-Next-question tests additionally prove one-card maximum, deterministic abstention, no pre-tap work/write, no cross-window disclosure, no durable dismissal learning, and tap-as-new-input semantics.
+Next-question tests additionally prove zero-to-five transient candidates, one-card maximum, deterministic abstention, render-time CAS, no pre-tap work/write or candidate telemetry, no cross-window disclosure, no durable dismissal learning, accessibility, and tap-as-new-input semantics.
+
+The crash matrix must include publication-journal corruption/restart/lost reply/indeterminate sink; K3 database corruption, quarantine, cold reopen, and monotonic-floor rollback; every Core AI function boundary and partial `MutableViews` mutation; asset download/specialization/active-pointer/reader/revocation boundaries plus OS-update invalidation, cache purge, stale bookmark, and source move/delete; AFM cancellation quiescence; and iOS suspension/termination before and after claim. Every expected failure is fail-closed and proves that no second Provider call, external effect, byte release, or authority writer was created.
+
+The cross-boundary simulation oracle is:
+
+| Fault window | Only legal closure |
+|---|---|
+| eligibility or admission denies | zero payload query, model load, cache lookup, materialization, or external call |
+| allocated but not claimed | same allocation may reach its first claim, or closes unused |
+| claimed and live | join/continue the same physical invocation only |
+| claimed and owner/process/completion unknown | query/reconcile/seal; never create another call permit |
+| Core AI stage partially mutated state | poison the whole lease and rebuild from the last certified checkpoint |
+| response sink succeeded but reply was lost | publication-journal lookup/finalization only; K3/K4 do not re-arm or resend |
+| Zone C is indeterminate | reconcile the same saga; never regenerate or redispatch the effect |
+| policy/deletion/revocation epoch changes | block new use and adoption, close or quarantine the exact in-flight identity, and complete purge obligations without fallback |
+| window/focus changes before next-question render | discard the transient candidate pool with zero durable trace |
 
 ### 10.3 Promotion is a projection of existing certification
 
-The following lifecycle is a readable projection of the existing `runtime.certification` / `CertifiedBackendProfile` authority and E0–E5 evidence grades. It is not a new ModelPromotionStore or registry:
+The following lifecycle is a readable projection of the existing `runtime.certification` / `CertifiedBackendProfile` authority through E4. It ends in immutable evidence and is not a deployment state machine, ModelPromotionStore, or registry:
 
 ```text
 absent
@@ -619,13 +719,23 @@ absent
 → hostParity             # bounded host oracle evidence
 → deviceShadow           # E3, non-authoritative device evidence
 → certifiedCandidate     # E4 complete profile evidence
-→ canary                 # E5 controlled production canary
-→ production             # sealed Release/cutover receipt also required
 ```
 
-At any point, evidence may quarantine, demote, or retract the profile. A new source weight, tokenizer/template, conversion toolchain, quantization/calibration, function graph, custom operation, StateABI, OS/runtime cohort, or material execution plan creates a new identity and returns to the appropriate unproven state.
+Canary and full production are two separate immutable joins, never mutable certification transitions:
 
-Quarantine or demotion is enacted through the existing signed profile/release authority. It cannot mutate an already sealed Release tree, reactivate a retired path inside that tree, or silently restore MLX as production fallback.
+```text
+exact immutable E4 verdict
++ sealed canary Release manifest/tree/cohort under production.cutover
+→ controlled canary deployment → immutable E5 verdict
+
+exact immutable E5 verdict
++ separately sealed full Release manifest/tree under production.cutover
+→ one full production-authoritative route
+```
+
+A new source weight, tokenizer/template, conversion toolchain, quantization/calibration, function graph, custom operation, StateABI/ProcessorABI/geometry, OS/runtime cohort, or material execution plan creates a new identity and returns to the appropriate unproven evidence grade.
+
+Quarantine/retraction creates new immutable evidence and prevents the affected identity from satisfying a future join. It cannot rewrite an old verdict or mutate an already sealed Release tree. An urgent runtime stop uses existing authority only: `L14 decision → K3 RevocationFenceReceipt → K4 revoke`, and ingress, queue, chunk, claim, and seal boundaries revalidate the exact generation/epochs so no new use or adoption escapes. Runtime rollback then deploys another separately certified and sealed tree through `production.cutover`; it never selects a hidden in-process route or silently restores MLX.
 
 The Core AI gate order is:
 
@@ -634,15 +744,17 @@ source/license lock
 → reference oracle
 → export and op inventory
 → uncompressed numeric baseline
-→ compression/calibration
+→ sensitivity-guided compression/calibration identities
 → host parity
-→ AOT compilation
+→ portable resource verification + optional exact-cohort AOT
+→ install/update/rollback/revocation fault matrix
 → physical-device function/state fidelity
 → phase placement profile
 → end-task quality
 → memory/energy/thermal
-→ cancellation/recovery/fault injection
-→ canary and sealed release
+→ cancellation/recovery/fault injection → immutable E4 verdict
+→ sealed canary cohort + E5 evidence
+→ separately sealed full release
 ```
 
 Public Apple references and common conversion components are proven first. Then Granite establishes the smallest embedding path, MiniCPM5 establishes specialist text generation, Qwen3.5 is productionized against the existing evidence, and MiniCPM-V adds the multimodal path. This order is a research dependency order, not permission to activate a later wave early. AFM enters through the same Qinao capability/adoption/release contracts without a weight conversion stage.
@@ -653,13 +765,13 @@ This addendum does not create W7 or a parallel “Agent project.” Its work is 
 
 | Wave | Addendum responsibilities |
 |---|---|
-| W0 | freeze owners/writers and legacy bypasses; repair non-vacuous gates/CI; converge iOS 27 floors; perform and independently verify the K4 public-framework/entitlement/lifecycle/IPC/helper-private `WAL + FULL` platform spike |
+| W0 | freeze owners/writers and legacy bypasses; repair non-vacuous gates/CI; converge iOS 27 floors; perform and independently verify the K4 public-framework/entitlement/lifecycle/IPC/helper-private `WAL + FULL` platform spike; atomically merge this addendum into the seven controlled documents and map or reject every recovery lifecycle/floor authority |
 | W1 | immutable model-neutral Agent, ContextCapsule, reasoning, Provider-asset identity/reference, retrieval, memory, RSI, semantic-DAG, and NextQuestion value contracts only; no concrete `BASStateABI`, execution behavior, or production activation |
-| W2 | one K3 `FULL` nucleus, canonical task/Attempt roots, branch control, encrypted content owner, memory/erasure convergence; production model allocation still disabled |
+| W2 | one K3 `FULL` nucleus, canonical task/Attempt roots, branch control, encrypted content owner, memory/erasure convergence, plus crash/corruption/quarantine/cold-reopen and monotonic-floor closure; production model allocation still disabled |
 | W3 | snapshot projections, SQL/exact/FTS/BM25/temporal/entity/dense retrieval, grounding, State Market, context compiler, structured reasoning fixtures; Provider paths remain shadow-only |
-| W4 | external Core AI/AFM Provider packages, execution plans, concrete `BASStateABI`, K1/K2/K3 handoff, and prefill/decode/cache mechanisms through test, shadow, and device-validation seams; no authoritative semantic executor, canary, or production cutover |
-| W5 | durable K4, Provider egress, Zone C, publication/effect/recovery, erasure closure, and direct/legacy path retirement |
-| W6 | authoritative semantic-DAG executor integration, replay, full E4 certification, shadow-to-E5-canary promotion, sealed Core AI production cutover, legacy production retirement, multi-device certification and optional 40/30 claim |
+| W4 | external Core AI/AFM Provider packages, execution plans, concrete `BASStateABI`/ProcessorABI, K1/K2/K3 handoff, and prefill/decode/cache mechanisms; the unique physical owner/claim/actuation seam and planned production R5→R6-context handoff become authoritative under existing owners, with the current incumbent MLX baseline as the only production caller if required; new Core AI/AFM candidates remain shadow/device-validation only—no authoritative semantic executor, canary, or Core AI model-release cutover |
+| W5 | implement durable K4, Provider egress, Zone C, independent publication journal, effect/publication recovery, and erasure mechanisms; prove them with non-zero fixtures and fault injection while production publication remains disabled; retire only direct/synthetic effect paths whose replacement is already closed; K3 nucleus corruption recovery was already a W2 gate |
+| W6 | integrate the authoritative semantic-DAG executor and complete replay manifest; activate the W5 publication path only after that manifest exists; obtain E4, deploy the sealed canary cohort, obtain E5, then join E5 with a separately sealed full Core AI Release tree; retire the legacy response/production route, complete multi-device certification, and optionally earn the 40/30 claim |
 
 Offline conversion spikes may start earlier when they do not change production authority. Production wiring cannot cross the listed W4/W6 gates.
 
@@ -689,7 +801,7 @@ This addendum is implemented only when:
 - structured reasoning and RSI gates reject unsupported certainty and non-progress loops;
 - StateLake, encrypted artifacts, projections, context compilation, and erasure close from cold replay;
 - tools, publication, memory commit, and model outputs cannot bypass L10/L11/L13/L14 and K3/K4/Zone-C boundaries;
-- the exact Release tree reaches E4, E5 canary, and a sealed production cutover with rollback/revocation evidence;
+- the exact profile earns immutable E4/E5 evidence and only the exact E5-verdict + separately sealed Release-tree join reaches production cutover, with rollback/revocation evidence;
 - all anti-vacuity and fault-injection tests prove their own failure sensitivity.
 
 Success may honestly end in `promote`, `deny`, `quarantine`, or `model unavailable`. The architecture can be complete while the 40/30 performance claim remains denied. Performance evidence never waives quality, security, state, or recovery evidence.
@@ -701,6 +813,8 @@ This design must not be interpreted as permission to:
 - call the current Core AI Qwen experiment production-ready;
 - treat the recorded 10 token/s chain as evidence for 40/30;
 - force every Core AI phase onto ANE or infer actual placement from a preference;
+- use an independent Metal neural trunk/head/KV/cache while describing the route as Core AI-only;
+- migrate an allowlisted Core ML microhead without role-specific Pareto evidence, or use it as a portfolio fallback;
 - copy AFM weights, convert them, or treat FoundationModels as Qinao-owned state;
 - let the main model spawn sub-Agents or let sub-Agents call one another;
 - persist/share raw CoT, mutable prompt buffers, cross-model KV, or ambient tool handles;
@@ -710,6 +824,8 @@ This design must not be interpreted as permission to:
 - silently fall back from a selected Qwen Attempt to AFM/MLX or from AFM to Qwen;
 - use thermal pressure to lower model quality identity;
 - claim erasure while a content key/blob, projection, cache, Provider derivative, or reachable backup remains;
+- globally deduplicate private content across visibility, key, authority, or erasure domains;
+- treat a certification evidence grade as permission to mutate or select the deployed production tree;
 - accept a gate that matched zero candidates, tests, fixtures, or source files.
 
 ## Source Grounding and Companion Documents
@@ -720,6 +836,7 @@ Normative and committed repository evidence used by this addendum:
 - [`2026-07-17-k3-budget-provider-contract-addendum-design.md`](./2026-07-17-k3-budget-provider-contract-addendum-design.md)
 - [`qinao-owner-ledger-v1.json`](./qinao-owner-ledger-v1.json)
 - [`COREAI_CONVERSION_NEXT_STEPS.md`](../../../BehavioralAISubstrate/Docs/COREAI_CONVERSION_NEXT_STEPS.md)
+- [`COREAI_RUNCERT_BACKLOG.md`](../../../BehavioralAISubstrate/Docs/COREAI_RUNCERT_BACKLOG.md)
 - [`2026-07-15-iphone-air-architecture-convergence-master.md`](../plans/2026-07-15-iphone-air-architecture-convergence-master.md)
 - [`2026-07-15-iphone-air-contracts-layercell.md`](../plans/2026-07-15-iphone-air-contracts-layercell.md)
 - [`2026-07-15-iphone-air-semantic-statelake-context.md`](../plans/2026-07-15-iphone-air-semantic-statelake-context.md)
@@ -736,7 +853,10 @@ External Apple platform facts already catalogued in Section 40 of the 2026-07-14
 
 - [Apple Core AI](https://developer.apple.com/documentation/coreai)
 - [Apple Core AI Models](https://github.com/apple/coreai-models)
+- [Apple Core AI ahead-of-time compilation](https://developer.apple.com/documentation/coreai/compiling-core-ai-models-ahead-of-time)
+- [Apple Core AI specialization and caching](https://developer.apple.com/documentation/coreai/managing-model-specialization-and-caching)
 - [Apple coreai-torch](https://github.com/apple/coreai-torch)
+- [Apple coreai-torch v0.4.1 compatibility note](https://github.com/apple/coreai-torch/releases/tag/v0.4.1)
 - [Apple coreai-optimization](https://github.com/apple/coreai-optimization)
 - [Apple LanguageModelExecutor](https://developer.apple.com/documentation/foundationmodels/languagemodelexecutor)
 - [Qwen3.5-4B model card](https://huggingface.co/Qwen/Qwen3.5-4B)
