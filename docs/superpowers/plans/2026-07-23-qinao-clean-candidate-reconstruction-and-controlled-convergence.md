@@ -1,688 +1,749 @@
-# Qinao Clean Candidate Reconstruction and Controlled Convergence Implementation Plan
+# Qinao Clean Candidate Reconstruction and Controlled Convergence Program Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** This file is the program-order authority, not a code task list. Execute the linked child implementation plans with `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans`. Never execute two child steps that write the same candidate tree at the same time.
 
-**Goal:** Reconstruct the useful Qinao W0/W1 work into a clean, provenance-bound candidate; atomically converge the controlled documents and gates; then resume W1-W6 only from non-vacuous predecessor-authorized evidence.
+**Goal:** Preserve every existing byte, reconstruct one non-circular clean candidate, admit preW0 through W6 through predecessor-derived gates, and hand off one verified model-independent Qinao SDK without creating duplicate authority.
 
-**Architecture:** The implementation is split into reconstruction batches C0-C5 rather than another runtime architecture. C0 establishes an immutable base and externally reviewed admission bootstrap; C1/C2 atomically correct authority text, ledgers, contracts, checkers, provenance, and evidence; C3/C4 admit W0 freezes and real K4 platform proof; C5 resumes the existing domain waves in dependency order. Each wave uses the non-circular `Pw → Cw → Sw` lineage: payload, evidence-only child, receipt-only seal.
+**Architecture:** Five executable child plans own focused, independently reviewable subsystems: forensic provenance/import, bootstrap verification/admission, controlled authority and evidence, W0/K4 safety, and Artifact Mesh W1 Task 0. This program plan owns only their dependency graph, immutable handoff types, wave ordering, terminal states, and the exact mapping back to the five incumbent owner/domain plans.
 
-**Tech Stack:** Git worktrees and object database, Python 3 standard-library checkers/tests, Swift 6 and SwiftPM, Xcode 27/iOS 27, JSON Schema, SQLite, Rust/C/C++/Metal where already assigned by the controlled domain plans, GitHub Actions pinned by commit SHA, signed external evidence bundles.
+**Tech Stack:** Git object/index/ref transactions, Python 3 standard-library `unittest`, canonical JSON and JSON Schema, Swift 6 and SwiftPM, Xcode 27/iOS 27, SQLite, Security/Keychain, `xcodebuild`, structured `xcrun devicectl`, and externally anchored immutable evidence/admission services.
 
 ## Global Constraints
 
-- The authoritative semantic shape remains exactly fourteen LayerCores, four Physical Kernels, four bounded ControlRings, and seven orthogonal planes.
-- Minimum deployment target is iOS 27 for packages, generated projects, build scripts, XCFramework slices, test hosts, and release artifacts.
-- No new mutable owner, scheduler, store, compiler, State Market, EventLog, K3 WAL, K4 ledger, publication journal, recovery authority, release mouth, promotion mouth, or retry truth may be introduced.
-- Models remain outside Qinao SDK behind value-only Provider/Proposal interfaces and cannot mutate authority state.
-- Artifact Mesh, K3, K4, Zone C, publication, and StateLake retain the ownership boundaries fixed by the approved design.
-- The exact two new immutable value-contract families are `BASContentIntakeProfilePayload`/`BASContentIntakeReceiptPayload` and `BASAuthorizedInputEffectPredecessorPayload`; neither creates an owner.
-- V1 production visibility is exactly `bufferedUntilVerified`; incremental/provisional behavior remains V2-quarantined.
-- Unknown external state is query/reconcile-only and is never blindly replayed.
-- Raw secrets, raw device identifiers, archives, Mach-O files, signing material, profiles, model packages, link maps, build plans, and physical traces never enter Git.
-- 40 cold tok/s and 30 sustained tok/s are optional measured targets, never unconditional completion gates.
-- Candidate code, candidate tests, and candidate manifests cannot select or activate the verifier that admits their own wave.
-- Preserve all existing dirty-tree bytes. Do not reset, overwrite, normalize, delete, or bulk-commit them.
-- Every test filter must prove non-zero discovery before execution.
-- Every named path gate must fail on a missing path before scanning its content.
-- C1 and C2 form one indivisible authority payload; no C1-only tree is admissible.
+- The approved design commit is exactly `59c26f508262d7c25869faac0ec0abf968ec1e02`.
+- The approved design path is `docs/superpowers/specs/2026-07-23-qinao-convergence-correction-and-clean-candidate-design.md`.
+- The approved design SHA-256 is `3af1067ad2c3d37c36d7613ad19d1dd035bb6f1c60f06b75d5d71de22874d1b4`.
+- The architecture remains exactly 14 Semantic LayerCores, 4 Physical Kernels, 4 bounded ControlRings, and 7 orthogonal planes.
+- The minimum deployment target is iOS 27 for every package, project, generated project, script, test host, XCFramework slice, archive, and selected release profile.
+- Models and APIs remain outside Qinao SDK behind value-only Provider/Proposal boundaries and have equal authority ceilings.
+- Qwen 3.5 4B and AFM may be Main Providers; MiniCPM5-1B, MiniCPM-V 4.6, Granite 97M, or later local/API models may be bounded Sub Providers. Provider capability never becomes App-Agent identity or state authority.
+- One Session has one App Agent, one logical Main Agent, independently budgeted Sub-Agent contexts, read-only shared compartments, and no peer calls or shared scratchpad.
+- No step may add a mutable owner, manager, scheduler, compiler, State Market, EventLog, K3 WAL, K4 ledger, publication journal, recovery registry, release mouth, promotion mouth, retry truth, ring, kernel, or plane.
+- The exact two new immutable value-contract families are `BASContentIntakeProfilePayload`/`BASContentIntakeReceiptPayload` and `BASAuthorizedInputEffectPredecessorPayload`.
+- V1 visible output is exactly `bufferedUntilVerified`; incremental/provisional visibility and cross-process heavy Provider execution remain V2-quarantined.
+- One K3-allocated Provider branch performs at most one physical invocation. Unknown external state is query/reconcile-only and is never blindly replayed.
+- Candidate code, tests, manifests, workflows, and checkers cannot select or activate the verifier or gate module that judges their own wave.
+- Protected evaluation starts from an externally pinned exact `Pw`, never a prebuilt `Sw`; current-run gate results are validated before the external service deterministically assembles/imports `Cw` and `Sw`.
+- `wave`, repository, protected ref, verifier, gate module, release profile, Team identity, and protection policy are predecessor/authority derived; they are never caller CLI, environment, branch-name, worktree-name, or candidate-manifest inputs.
+- `Pw` contains source, authority, schema, checker, test, fixture, and build-input bytes but no result that claims `Pw`.
+- `Cw` is the one-parent evidence-only child of `Pw`. It may add only schema-allowlisted privacy-clean evidence and one self-excluding evidence manifest.
+- `Sw` is the one-parent child of `Cw` and adds exactly one regular mode-`100644` receipt at the wave's fixed path.
+- The post-CAS admission attestation and through-admission chain digest remain outside `Pw`, `Cw`, and `Sw`.
+- C1 and C2 are one indivisible preW0 admission payload. Preparation commits are not authority and cannot be admitted separately.
+- The bootstrap commit `B0` has the approved design base as its sole parent and differs from it by exactly the externally reviewed bootstrap path set.
+- The preW0 `Pw` has `B0` as its sole parent and has a tree byte-identical to the final reviewed preparation tree.
+- No merge parent, graft, replace object, ambiguous ancestry, current-wave verifier, or current-wave gate module is admissible.
+- Raw secrets, device identifiers, archives, Mach-O files, CMS/signing chains, profiles, model packages, link maps, build plans, symbol/index stores, and privacy-bearing traces never enter Git.
+- 40 cold tok/s and 30 sustained tok/s are optional profile-qualified claims, never unconditional architecture completion gates.
+- When no performance claim is requested, W6 records the closed `.notRequested` disposition. Only a separately requested claim executes the complete two-device protocol.
+- Every filtered test proves positive discovery before execution. Every named scan first proves the exact path is a readable regular file. Exit 2 is failure.
+- Every child plan begins by proving the exact clean-candidate root and branch; no relative command may run from the preserved dirty source worktree. Before P4 the Root Guard must report `prebootstrapPreparation`; after P4 it must report `reparentedProgram`, and the consuming child must additionally verify the signed bootstrap/predecessor handoff appropriate to its wave.
+- Never reset, clean, checkout-overwrite, normalize, delete, stage, or commit the preserved dirty source worktree.
+- Never use broad `git add`. Stage only literal reviewed paths and compare the staged set before each commit.
+- Do not push, create a pull request, update a protected ref, or claim a wave complete without separate user authorization and fresh required evidence.
 
 ---
 
-## File Map
+## Current Reality
 
-### Reconstruction and evidence
+| Role | Exact value | Current disposition |
+|---|---|---|
+| Preserved source worktree | `/Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0` | Dirty forensic/source material; never mutate |
+| Preserved source branch | `codex/qinao-w1` | Holds approved design/plan commits and existing staged, unstaged, untracked work |
+| Approved design base | `59c26f508262d7c25869faac0ec0abf968ec1e02` | Immutable reconstruction base |
+| Adopted candidate worktree | `/Users/changgeng/.codex/worktrees/e4d7/Project06` | Sole clean candidate; do not create another |
+| Adopted candidate branch | `codex/qinao-w1-clean-candidate` | Unadmitted preparation lineage |
+| Audited candidate tip | `486e1ec5983ad4390c5b07f04607f1345b912c4c` | 22 preparation commits after approved base |
+| Candidate worktree delta | `scripts/check_qinao_owner_ledger.py` | One deterministic symlink-diagnostic failure |
+| Wave-admission tests | 20 discovered, 20 passed | Local preflight only |
+| Owner-Ledger tests | 101 discovered, 100 passed, 1 failed | First local blocker |
+| External bootstrap | Absent | `BLOCKED_EXTERNAL_BOOTSTRAP` |
+| K4 production proof | Absent | `BLOCKED_K4` |
 
-- Create: `scripts/capture_qinao_candidate_inventory.py` — captures HEAD/index/worktree/untracked strata without mutation.
-- Create: `scripts/test_capture_qinao_candidate_inventory.py` — proves capture completeness and non-mutation.
-- Create: `scripts/build_qinao_import_map.py` — produces one explicit source-stratum selection per dirty path.
-- Create: `scripts/check_qinao_import_map.py` — proves inventory/map exact-set equality and legal batch assignment.
-- Create: `docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json` — immutable HEAD/index/worktree/untracked provenance.
-- Create: `docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json` — maps every imported blob to source stratum and destination commit.
-- Create: `docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/payload-manifest.json` — exact `Pw` build/source identity.
-- Create: `docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/evidence-manifest.json` — exact evidence-only `Cw` leaves.
-- Create externally, never in Git: encrypted K4/release/device evidence bundle and destruction obligation.
+The 22 preparation commits are repairable unadmitted scaffold. Preserve their original tip under a create-once forensic ref before replacing the candidate ancestry. Do not discard them and do not mistake their existence for C0, preW0, or W0 admission.
 
-### Admission bootstrap
+## Executable Child Plans
 
-- Create: `.github/workflows/qinao-wave-admission.yml`
-- Create: `scripts/check_qinao_wave_admission.py`
-- Create: `scripts/test_check_qinao_wave_admission.py`
-- Create: `scripts/qinao_gate_modules/` — bootstrap-pinned preW0-through-W6 gate modules and contracts.
-- Create: `scripts/qinao_gate_corpora/` — positive, negative, and mutation vectors for every gate module.
+Execute code only from these child plans:
 
-### Controlled authority and ledgers
+1. `docs/superpowers/plans/2026-07-23-qinao-c0-provenance-and-safe-import.md`
+2. `docs/superpowers/plans/2026-07-23-qinao-bootstrap-verifier-and-admission-lineage.md`
+3. `docs/superpowers/plans/2026-07-23-qinao-authority-ledger-and-cw-evidence.md`
+4. `docs/superpowers/plans/2026-07-23-qinao-w0-safety-and-k4-proof.md`
+5. `docs/superpowers/plans/2026-07-23-qinao-artifact-mesh-w1-task0.md`
 
-- Modify: `docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md`
-- Modify: `docs/superpowers/specs/2026-07-17-k3-budget-provider-contract-addendum-design.md`
-- Modify: `docs/superpowers/specs/2026-07-19-qinao-coreai-agent-context-memory-rsi-design.md`
-- Modify: `docs/superpowers/specs/2026-07-22-qinao-model-independent-app-agent-self-design.md`
-- Modify: `docs/superpowers/specs/2026-07-23-qinao-governed-learning-plane-data-flywheel-thinking-design.md`
-- Modify: `docs/superpowers/plans/2026-07-15-iphone-air-architecture-convergence-master.md`
-- Modify: `docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md`
-- Modify: `docs/superpowers/plans/2026-07-15-iphone-air-runtime-replay-certification.md`
-- Modify: `docs/superpowers/plans/2026-07-15-iphone-air-semantic-statelake-context.md`
-- Modify: `docs/superpowers/plans/2026-07-15-iphone-air-silicon-execution-spine.md`
-- Modify: `docs/superpowers/plans/2026-07-15-iphone-air-sovereign-release-effects.md`
-- Modify: `docs/superpowers/specs/qinao-owner-ledger-v1.json`
-- Modify: `docs/superpowers/specs/qinao-authority-corruption-recovery-v1.md`
-- Modify: `docs/superpowers/plans/2026-07-19-qinao-coreai-agent-controlled-document-convergence.md`
+The five incumbent W1-W6 owner/domain plans remain executable after the authority child corrects and digest-pins them:
 
-### Contract and reachability verification
+1. `docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md`
+2. `docs/superpowers/plans/2026-07-15-iphone-air-semantic-statelake-context.md`
+3. `docs/superpowers/plans/2026-07-15-iphone-air-silicon-execution-spine.md`
+4. `docs/superpowers/plans/2026-07-15-iphone-air-sovereign-release-effects.md`
+5. `docs/superpowers/plans/2026-07-15-iphone-air-runtime-replay-certification.md`
 
-- Modify: `scripts/check_qinao_owner_ledger.py`
-- Modify: `scripts/test_check_qinao_owner_ledger.py`
-- Create: `docs/superpowers/specs/qinao-production-reachability-v1.schema.json`
-- Create: `docs/superpowers/specs/qinao-architecture-closure-report-v1.schema.json`
-- Create: `docs/superpowers/specs/qinao-v2-quarantine-v1.schema.json`
-- Create: `docs/superpowers/specs/qinao-wave-admission-receipt-v1.schema.json`
-- Create: `scripts/generate_qinao_production_reachability.py`
-- Create: `scripts/check_qinao_production_reachability.py`
-- Create: `scripts/test_check_qinao_production_reachability.py`
-- Create: `scripts/generate_qinao_architecture_closure.py`
-- Create: `scripts/check_qinao_architecture_closure.py`
-- Create: `scripts/test_check_qinao_architecture_closure.py`
+`docs/superpowers/plans/2026-07-19-qinao-coreai-agent-controlled-document-convergence.md` becomes non-executable traceability after correction. It cannot run its old Task 0, gateway, candidate, certification, raw-content, or Decision-Gate flow and is not a sixth owner/domain implementation plan.
 
-### Existing gate slice to import and repair
+## Immutable Cross-Plan Handoff Types
 
-- Modify/import: `.github/workflows/test.yml`
-- Modify/import: `scripts/check_qinao_review_candidate.py`
-- Modify/import: `scripts/test_check_qinao_review_candidate.py`
-- Modify/import: `scripts/test_qinao_review_closure.py`
-- Modify/import: `scripts/check_w0_expected_open_set.py`
-- Modify/import: `scripts/test_check_w0_expected_open_set.py`
-- Modify/import: `scripts/check_k4_platform_proof.py`
-- Modify/import: `scripts/test_check_k4_platform_proof.py`
-- Modify/import: `scripts/check_xcode27_toolchain.sh`
-- Modify/import: `scripts/test_check_xcode27_toolchain.py`
-- Modify/import: `scripts/run_nonempty_swift_filter.py`
-- Modify/import: `scripts/test_run_nonempty_swift_filter.py`
-- Modify/import: `scripts/check_bas_organ_descriptor_constructors.py`
-- Modify/import: `scripts/test_check_bas_organ_descriptor_constructors.py`
+Every handoff is canonical JSON with sorted keys, compact separators, UTF-8, no duplicate keys, and a trailing LF only where its schema explicitly requires one.
 
----
+### `SourceProvenanceV1`
 
-### Task 1: Freeze the forensic source inventory
-
-**Files:**
-- Create outside the dirty worktree first: `/private/tmp/qinao-clean-candidate-2026-07-23-c0/source-inventory.json`
-- Create after C0 exists: `docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json`
-
-**Interfaces:**
-- Consumes: dirty branch `codex/qinao-w1`, base commit `20fc52ea0e8a367dc4ebe4d73717a1e2e24fb9d0`.
-- Produces: canonical inventory containing `head`, `index_tree`, staged/unstaged patch SHA-256, and sorted untracked blob identities.
-
-- [ ] **Step 1: Assert the expected repository and base exist**
-
-```bash
-test "$(git rev-parse --show-toplevel)" = "/Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0"
-git cat-file -e 20fc52ea0e8a367dc4ebe4d73717a1e2e24fb9d0^{commit}
-```
-
-Expected: both commands exit 0.
-
-- [ ] **Step 2: Capture strata without changing the index or worktree**
-
-```bash
-python3 scripts/capture_qinao_candidate_inventory.py \
-  --root . \
-  --base 20fc52ea0e8a367dc4ebe4d73717a1e2e24fb9d0 \
-  --output /private/tmp/qinao-clean-candidate-2026-07-23-c0/source-inventory.json
-```
-
-The implementation must use `git rev-parse HEAD`, `git write-tree`, `git diff --cached --binary`, `git diff --binary`, and `git ls-files --others --exclude-standard -z`. It hashes bytes but does not call `git add`, `git checkout`, `git reset`, or `git clean`.
-
-Expected: `inventory_status=complete`, with non-negative counts for all four strata.
-
-- [ ] **Step 3: Prove capture is non-mutating**
-
-```bash
-python3 scripts/capture_qinao_candidate_inventory.py \
-  --root . \
-  --base 20fc52ea0e8a367dc4ebe4d73717a1e2e24fb9d0 \
-  --verify /private/tmp/qinao-clean-candidate-2026-07-23-c0/source-inventory.json
-```
-
-Expected: `inventory_match=true` and no changed status lines.
-
-- [ ] **Step 4: Commit only the capture utility and its tests on the reconstruction branch**
-
-```bash
-python3 -m unittest -v scripts.test_capture_qinao_candidate_inventory
-git add scripts/capture_qinao_candidate_inventory.py scripts/test_capture_qinao_candidate_inventory.py
-git commit -m "build: capture qinao candidate provenance"
-```
-
-Expected: tests cover staged/worktree divergence, empty and non-empty untracked files, unusual filenames, missing base, and a mutation attempt; commit contains exactly two files.
-
----
-
-### Task 2: Materialize C0 and bind the import map
-
-**Files:**
-- Create: clean worktree at `/Users/changgeng/Project/Project06/Project06/.worktrees/qinao-clean-candidate`
-- Create: `docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json`
-
-**Interfaces:**
-- Consumes: Task 1 inventory.
-- Produces: zero-dirty C0 base plus a map whose rows are `{path, source_stratum, source_blob_sha256, destination_batch}`.
-
-- [ ] **Step 1: Create a clean reconstruction branch from the approved base**
-
-```bash
-git worktree add -b codex/qinao-clean-candidate \
-  /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-clean-candidate \
-  20fc52ea0e8a367dc4ebe4d73717a1e2e24fb9d0
-```
-
-Expected: new worktree HEAD equals the base commit.
-
-- [ ] **Step 2: Prove C0 is clean**
-
-```bash
-git -C /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-clean-candidate status --porcelain=v1
-```
-
-Expected: zero output.
-
-- [ ] **Step 3: Generate the import map from the frozen inventory**
-
-```bash
-python3 scripts/build_qinao_import_map.py \
-  --inventory /private/tmp/qinao-clean-candidate-2026-07-23-c0/source-inventory.json \
-  --output /private/tmp/qinao-clean-candidate-2026-07-23-c0/import-map.json
-```
-
-Expected: every dirty/untracked path appears once; each row selects exactly one of `head`, `index`, `worktree`, or `untracked`; no row selects “latest” or an implicit filesystem value.
-
-- [ ] **Step 4: Review classification before importing bytes**
-
-```bash
-python3 scripts/check_qinao_import_map.py \
-  --inventory /private/tmp/qinao-clean-candidate-2026-07-23-c0/source-inventory.json \
-  --map /private/tmp/qinao-clean-candidate-2026-07-23-c0/import-map.json \
-  --allowed-batches C1,C2,C3,C4,hold
-```
-
-Expected: exact path-set equality, no duplicate destinations, and all production changes classified `hold` until an owning batch test names them.
-
----
-
-### Task 3: Establish the externally anchored admission bootstrap
-
-**Files:**
-- Create: `.github/workflows/qinao-wave-admission.yml`
-- Create: `scripts/check_qinao_wave_admission.py`
-- Create: `scripts/test_check_qinao_wave_admission.py`
-- Create: `scripts/qinao_gate_modules/**`
-- Create: `scripts/qinao_gate_corpora/**`
-
-**Interfaces:**
-- Consumes: clean C0, complete gate catalog required from `preW0` through `W6`.
-- Produces: bootstrap commit `B0`, external signed bootstrap attestation, and protected canonical-ref policy.
-
-- [ ] **Step 1: Write failing unit tests for predecessor-only activation**
-
-Tests must reject candidate-selected modules, current-wave modules, absent active-through-wave contracts, contract/module/corpus digest mismatch, missing or extra required gates, non-contiguous seals, and a receipt that does not bind exact `Pw` input and result.
-
-```bash
-python3 -m unittest -v scripts.test_check_qinao_wave_admission
-```
-
-Expected: FAIL because the checker/modules do not yet exist.
-
-- [ ] **Step 2: Implement the minimal bootstrap verifier**
-
-`check_qinao_wave_admission.py` must accept only:
+Its exact Git path is:
 
 ```text
---bootstrap-attestation
---prior-seal
---candidate-payload-commit
---candidate-evidence-commit
---wave
---output-receipt
+docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-provenance-v1.json
 ```
-
-It must derive the active verifier and gate contracts from the bootstrap/prior seal, never from candidate bytes. It must validate the exact `required_gates_by_wave[{gate_id, gate_contract_digest}]` set and bind each result to contract, module, corpus, `Pw`, command identity, exit status, and canonical result digest.
-
-- [ ] **Step 3: Run positive and mutation corpora**
-
-```bash
-python3 -m unittest -v scripts.test_check_qinao_wave_admission
-python3 scripts/check_qinao_wave_admission.py --self-test-corpus scripts/qinao_gate_corpora
-```
-
-Expected: all positive cases pass; every mutation fails with a stable reason code.
-
-- [ ] **Step 4: Pin workflow actions and least privilege**
-
-The workflow must use full 40-hex Action SHAs, `permissions: contents: read`, no pull-request write token, no candidate-controlled `uses`, no mutable ref checkout for admission, and artifact upload only for privacy-clean receipts.
-
-```bash
-python3 scripts/check_qinao_wave_admission.py \
-  --lint-workflow .github/workflows/qinao-wave-admission.yml
-```
-
-Expected: `workflow_policy=pass`.
-
-- [ ] **Step 5: Commit bootstrap bytes alone**
-
-```bash
-git add .github/workflows/qinao-wave-admission.yml \
-  scripts/check_qinao_wave_admission.py \
-  scripts/test_check_qinao_wave_admission.py \
-  scripts/qinao_gate_modules \
-  scripts/qinao_gate_corpora
-git commit -m "build: bootstrap qinao wave admission"
-```
-
-Expected: commit contains only the listed bootstrap paths.
-
-- [ ] **Step 6: Complete the external bootstrap ceremony**
-
-An independent reviewer must record the exact bootstrap commit/tree, verifier/module/corpus digests, repository/OIDC identity, protected canonical ref, required-status policy, and pinned Action SHAs in an external signed attestation. If protected-ref CAS or external attestation infrastructure is absent, record `BLOCKED_BOOTSTRAP`; do not self-host.
-
----
-
-### Task 4: Atomically converge authority text and Owner Ledger schema v2
-
-**Files:**
-- Modify all four governing addenda, exact seven controlled documents, Owner Ledger, recovery companion, and non-authoritative CoreAI convergence plan listed in File Map.
-- Modify: `scripts/check_qinao_owner_ledger.py`
-- Modify: `scripts/test_check_qinao_owner_ledger.py`
-
-**Interfaces:**
-- Consumes: approved correction spec and predecessor-authorized bootstrap.
-- Produces: one C1+C2 payload slice with seven controlled documents, four governing addenda, exact contract catalog, release profiles, wave admission policy, and 113 finding identities.
-
-- [ ] **Step 1: Add RED tests for the controlled schema-v2 cardinalities**
-
-Tests must assert:
 
 ```text
-controlled_documents == 7
-governing_addenda_v1 == 4
-admitted_findings == 113
-legacy_qrm_findings == 74
-source_review_findings == 39
-reported_external_count == 45
-reported_external_identity == "unverified_external_identity"
+schema_version
+approved_base_commit
+source_head_commit
+source_head_tree
+source_index_tree
+source_status_sha256
+staged_patch_sha256
+unstaged_patch_sha256
+inventory_sha256
+approved_import_map_sha256
+candidate_destination_tip
+candidate_destination_tree
 ```
 
-They must also reject same-version contract mutation, missing reciprocal references, orphan catalog/profile rows, more than one active required profile version, and any attempt to count the external 45 inside `findings[]`.
+The file's one-path metadata commit has sole parent
+`candidate_destination_tip`; that parent's tree is
+`candidate_destination_tree`. This avoids self-reference while making the C0
+handoff durable. Authority Task 1 must reopen and byte-verify this exact
+parent/diff/field relation before changing the import map.
 
-```bash
-python3 -m unittest -v scripts.test_check_qinao_owner_ledger
-```
+Each approved import row binds source stratum/blob/mode, destination preimage tree/blob/mode, intended postimage blob/mode, destination batch, and human-review identity. Destination drift invalidates the row.
 
-Expected: FAIL on schema v1.
+### `AuthorityDraftHandoffV1`
 
-- [ ] **Step 2: Apply the approved canonical wording atomically**
-
-Update every affected authority with the identical:
+The exact Git path is:
 
 ```text
-L7/R0 → L8 LaneQuery → R1-R4 → L8 LaneResult → R5 → R6
+docs/superpowers/evidence/qinao-authority-convergence-draft-v1.json
 ```
 
-and the corrected ownership for K3 semantic currentness, coordinator publication handoff, Provider permit Artifact versus K3 boundary row, L1 consumption versus K1 observation, `BASContextCompiler`, `needs-confirmation`, idle/post-answer NextQuestion, root/Session CAS, recovery facets, one-call Provider branches, V1 buffered visibility, and signed raw-content Decision Gate.
-
-- [ ] **Step 3: Demote the recovery companion**
-
-`qinao-authority-corruption-recovery-v1.md` must state it is non-authoritative. Every adopted recovery rule must exist in an incumbent owner/domain document. No checker may count the companion as a controlled document or governing addendum.
-
-- [ ] **Step 4: Add the exact contract/profile deltas**
-
-Resolve existing `contract_id` values before writing vNext rows. Add one new stable ID for `BASAuthorizedInputEffectPredecessorPayload`; retain IDs and increment versions for affected StatePrepare/outbox and remote credential contracts. Add the content-intake profile/receipt family under existing E/A owners. Do not add a mutable owner.
-
-- [ ] **Step 5: Run authority consistency and stale-language scans**
-
-```bash
-python3 -m unittest -v scripts.test_check_qinao_owner_ledger
-python3 scripts/check_qinao_owner_ledger.py \
-  --root . \
-  --ledger docs/superpowers/specs/qinao-owner-ledger-v1.json \
-  --candidate-manifest /private/tmp/qinao-clean-candidate-2026-07-23-c0/import-map.json
-rg -n 'executeExactlyOnce|rg -L|QinaoRuntimeTests|Tools/mamba3_statelake.py|surviving external recovery registry' \
-  docs/superpowers/specs docs/superpowers/plans
-```
-
-Expected: checker passes with non-zero candidates; stale scan returns zero.
-
-- [ ] **Step 6: Commit the indivisible authority payload**
-
-```bash
-git add docs/superpowers/specs docs/superpowers/plans \
-  scripts/check_qinao_owner_ledger.py \
-  scripts/test_check_qinao_owner_ledger.py
-git diff --cached --check
-git commit -m "docs: converge qinao controlled authority"
-```
-
-Expected: no production source in the commit; controlled membership remains 7+4.
-
----
-
-### Task 5: Make review, W0, iOS-floor, and CI gates non-vacuous
-
-**Files:**
-- Import/modify the existing gate slice listed in File Map.
-- Modify: `.github/workflows/test.yml`
-
-**Interfaces:**
-- Consumes: frozen source strata and schema-v2 authority.
-- Produces: executable checkers whose documented and CI calls exercise candidate creation, discovery, and tests.
-
-- [ ] **Step 1: Add RED tests for every vacuity class**
-
-Cover: omitted `--candidate-manifest`, zero candidates, zero Swift test matches, missing named files, glob matching zero files, `rg` exit 2, absent pytest dependency, checker absent from CI, renamed test target, and future-wave API referenced by an earlier-wave baseline.
-
-- [ ] **Step 2: Repair documented and CI invocations**
-
-The owner-ledger invocation must include the candidate manifest. CI must run all checker unit suites with `python3 -m unittest`; it must not require third-party `pytest`. Every Swift filter must run through `scripts/run_nonempty_swift_filter.py`.
-
-- [ ] **Step 3: Replace unsafe content scans**
-
-Before every `rg` scan, assert each named path exists. Replace `rg -L` misuse with an explicit per-file missing-match loop that distinguishes “no match” from read error. Replace `*LayerCore.swift` with a manifest-derived exact file set. Anchor model-boundary scans to imports/declarations rather than comments and string literals.
-
-- [ ] **Step 4: Run the complete checker suite**
-
-```bash
-python3 -m unittest -v \
-  scripts.test_check_qinao_owner_ledger \
-  scripts.test_check_qinao_review_candidate \
-  scripts.test_qinao_review_closure \
-  scripts.test_check_w0_expected_open_set \
-  scripts.test_check_k4_platform_proof \
-  scripts.test_check_xcode27_toolchain \
-  scripts.test_run_nonempty_swift_filter \
-  scripts.test_check_bas_organ_descriptor_constructors \
-  scripts.test_test_workflow_owner_ledger
-```
-
-Expected: all tests pass and output reports positive discovery counts.
-
-- [ ] **Step 5: Commit gate repairs as a coherent candidate slice**
-
-```bash
-git add .github/workflows/test.yml scripts
-git diff --cached --check
-git commit -m "build: make qinao convergence gates non-vacuous"
-```
-
-Expected: no unrelated production source.
-
----
-
-### Task 6: Add production reachability, closure report, and V2 quarantine
-
-**Files:**
-- Create the four schemas and six generator/checker/test files in File Map.
-
-**Interfaces:**
-- Consumes: schema-v2 Owner Ledger, exact release profiles, candidate-index tree.
-- Produces: deterministic non-authoritative reachability and closure projections plus an exact seven-feature/21-rule V2 quarantine result.
-
-- [ ] **Step 1: Write RED schema and mutation tests**
-
-Tests must reject missing/renamed package/Xcode/XcodeGen roots, unclassified projects, caller-selected roots, stale generated projects, floating shipping dependencies, missing `Package.resolved`, unclassified flags/configurations/architectures, indirect factory edges, and candidate-generated expected output.
-
-- [ ] **Step 2: Implement temporary-output generators**
-
-Both generators must write to a temporary path, canonicalize there, and byte-compare to the candidate-index expected file. They must never overwrite the expected file before comparison.
-
-- [ ] **Step 3: Encode exact governed roots**
-
-The production graph begins with:
+Its fields are exactly:
 
 ```text
-BehavioralAISubstrate/Package.swift
-QinaoRuntimeSDK/Package.swift
-SampleHost/Package.swift
+schema_version
+authority_bundle_digest
+owner_ledger_draft_digest
+controlled_contract_catalog_digest
+document_digests[11]
+wave_admission_contract_digest
+required_gate_contracts_digest
 ```
 
-It must classify `BehavioralAISubstrate/DeviceTestApp/project.yml`, its `.xcodeproj`, every governed Xcode project/workspace/configuration/scheme, and the future ArtifactMeshDeviceLab as shipping, lab, or evidence with proof.
+It contains no predicted B0 OID, bootstrap attestation, Pw identity, or gate result.
 
-- [ ] **Step 4: Encode the exact V2 quarantine**
+### `BootstrapRootV1`
 
-The manifest must contain exactly seven stable feature IDs and exactly 21 stable rule IDs from the approved design. Every predicate must execute, and direct, alias, indirect-link, conditional-compilation, and manifest-shrink mutations must fail.
-
-- [ ] **Step 5: Run tests and deterministic compare**
-
-```bash
-python3 -m unittest -v \
-  scripts.test_check_qinao_production_reachability \
-  scripts.test_check_qinao_architecture_closure
-python3 scripts/check_qinao_production_reachability.py --root . --compare-index
-python3 scripts/check_qinao_architecture_closure.py --root . --compare-index
-```
-
-Expected: non-zero entrypoints and tests; complete exact-set equality; no report grants authority.
-
-- [ ] **Step 6: Commit schemas and verifier code**
-
-```bash
-git add docs/superpowers/specs/qinao-*-v1.schema.json \
-  scripts/generate_qinao_production_reachability.py \
-  scripts/check_qinao_production_reachability.py \
-  scripts/test_check_qinao_production_reachability.py \
-  scripts/generate_qinao_architecture_closure.py \
-  scripts/check_qinao_architecture_closure.py \
-  scripts/test_check_qinao_architecture_closure.py
-git commit -m "build: close qinao production reachability"
-```
-
----
-
-### Task 7: Form and admit the C1+C2 `Pw → Cw → Sw` chain
-
-**Files:**
-- Create: payload and evidence manifests under `docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/`.
-- Create externally: signed wave seal and protected-ref CAS attestation.
-
-**Interfaces:**
-- Consumes: Tasks 3-6.
-- Produces: exactly three commits: payload `Pw`, evidence-only child `Cw`, receipt-only seal `Sw`.
-
-- [ ] **Step 1: Freeze `Pw`**
-
-```bash
-git status --porcelain=v1
-git rev-parse HEAD
-git rev-parse HEAD^{tree}
-```
-
-Expected: the clean candidate contains only reviewed C1+C2 commits; capture exact commit/tree/build identity.
-
-- [ ] **Step 2: Run predecessor-authorized gates against `Pw`**
-
-Use only the bootstrap-derived verifier/modules. Candidate-local checker execution is preflight, not admission.
-
-Expected: each active gate yields a contract/module/corpus/input/result-bound receipt.
-
-- [ ] **Step 3: Create evidence-only `Cw`**
-
-Only schema-frozen privacy-clean evidence leaves and one manifest may change. Each leaf binds `Pw`; none may claim `Cw` itself.
-
-```bash
-git diff --name-only HEAD^..HEAD
-python3 scripts/check_qinao_wave_admission.py \
-  --bootstrap-attestation /private/tmp/qinao-bootstrap-attestation.json \
-  --candidate-payload-commit Pw \
-  --candidate-evidence-commit HEAD \
-  --wave preW0 \
-  --output-receipt /private/tmp/qinao-prew0-receipt.json
-```
-
-Expected: verifier proves `Cw = Pw + evidence-only diff`.
-
-- [ ] **Step 4: Create receipt-only `Sw`**
-
-`Sw` may contain only the signed admission receipt and manifest binding the already-existing `Cw` tree. It cannot change source, authority, tests, schemas, or gate code.
-
-- [ ] **Step 5: CAS the protected canonical ref**
-
-If live branch protection, external attestation, expected prior ref, or CAS fails, retain the commits as non-authoritative evidence and report `BLOCKED_ADMISSION`. Never force-update.
-
----
-
-### Task 8: Admit C3 W0 freezes without later-wave dependencies
-
-**Files:**
-- Import only the W0 source/test slice selected by `import-map.json`.
-- Test: `QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoEffectFacadeFreezeTests.swift`
-- Test: W0 silicon/provider freeze tests in their existing declared test targets.
-
-**Interfaces:**
-- Consumes: admitted C1+C2 seal.
-- Produces: W0 freeze payload that compiles using only APIs present at W0.
-
-- [ ] **Step 1: Verify every filter discovers tests**
-
-```bash
-python3 scripts/run_nonempty_swift_filter.py \
-  --package QinaoRuntimeSDK \
-  --filter QinaoEffectFacadeFreezeTests
-```
-
-Expected: discovery count greater than zero.
-
-- [ ] **Step 2: Remove future-wave dependencies from W0 baselines**
-
-W0 tests may inspect current API shape and freeze prohibited paths. They must not call `adapter(providerID:)`, `operation.stream().final()`, spool fields, or any W1-W5 API not present in `Pw`.
-
-- [ ] **Step 3: Verify the iOS 27 floor everywhere**
-
-```bash
-python3 -m unittest -v scripts.test_check_xcode27_toolchain
-sh BehavioralAISubstrate/scripts/check-ios27-floor.sh
-```
-
-Expected: all Package.swift files, Xcode projects, scripts, and XCFramework build settings resolve to iOS 27 or later; `build-rust-xcframework.sh` contains no iOS 18 declaration/comment.
-
-- [ ] **Step 4: Run package tests**
-
-```bash
-swift test --package-path QinaoRuntimeSDK
-swift test --package-path BehavioralAISubstrate
-```
-
-Expected: all W0 suites compile and pass; zero-match filters are impossible.
-
-- [ ] **Step 5: Admit C3 through a new `Pw/Cw/Sw` chain**
-
-Use the preW0 seal to derive active W0 modules. Repeat Task 7 with `--wave W0`.
-
----
-
-### Task 9: Complete C4 K4 platform proof or remain blocked
-
-**Files:**
-- Import/review: `docs/superpowers/evidence/qinao-k4-platform-spike/**`
-- Modify only if evidence semantics require it: `scripts/check_k4_platform_proof.py`
-- External only: archive/device/raw proof bundle.
-
-**Interfaces:**
-- Consumes: admitted W0 payload, actual signed archive, physical iOS 27 device, verifier challenge.
-- Produces: privacy-clean K4 attestation or explicit blocked status.
-
-- [ ] **Step 1: Preserve the checker unit baseline**
-
-```bash
-python3 -m unittest -v scripts.test_check_k4_platform_proof
-```
-
-Expected: 25 tests pass. This is checker validation, not K4 production proof.
-
-- [ ] **Step 2: Run a verifier-driven physical-device proof**
-
-The verifier—not the app or caller—must generate the fresh challenge and bind actual archive, Mach-O, CDHash, profile, entitlement, `Pw`, device pseudonym, and runtime result. Synthetic logs, source-shaped fixtures, and caller-supplied challenges fail.
-
-- [ ] **Step 3: Store sensitive bytes externally**
-
-Write the raw evidence only to the bootstrap-pinned encrypted immutable store. Git receives the signed privacy-clean attestation, Merkle root, coverage map, destruction-obligation ID, and verifier receipt.
-
-- [ ] **Step 4: Reopen and independently verify**
-
-Before retention expiry, obtain a purpose-bound short-lived grant, reopen exact object versions, recompute the Merkle root and semantic proof, and destroy temporary plaintext.
-
-- [ ] **Step 5: Decide C4**
-
-If any archive/device/external-storage/reopen/destruction field is missing, set `overall_gate=blocked` and do not admit C4. If all pass, form and admit a C4 `Pw/Cw/Sw` chain using predecessor-derived K4 modules.
-
----
-
-### Task 10: Resume C5/W1-W6 in dependency order
-
-**Files:**
-- Execute the corrected convergence master and five domain plans.
-- Do not import `hold` production bytes until their owning task is active.
-
-**Interfaces:**
-- Consumes: admitted C4 seal or an explicit policy proving a wave has no K4 dependency.
-- Produces: one admitted `Pw/Cw/Sw` chain per W1-W6 wave.
-
-- [ ] **Step 1: Start W1 with Artifact Mesh Task 0**
-
-Run the exact non-empty Artifact Mesh store suite before any consumer. Prove first-create/reopen identity, FULL-equivalent durability, Keychain anchor/host assembly, floor state machine, DB/WAL/SHM quarantine, CAS/lost-reply/corruption recovery, and the exact 13-operation/14-fault/40-row matrix. If reboot-before-first-unlock proof is unavailable, Artifact Mesh remains blocked.
-
-- [ ] **Step 2: Enforce dependency-valid wave tests**
-
-No RED test may reference a later-wave type. The three-fixture rule applies only where real backward material exists; it must not violate exact migration/governed-object cardinalities. Every `--filter` is wrapped by the non-empty runner.
-
-- [ ] **Step 3: Execute W1-W6 with predecessor gate activation**
-
-For each wave:
+This is the canonical `wave_admission_v1` projection. It is authenticated by
+a separate bootstrap attestation plus transparency-inclusion/export envelope
+and contains exactly:
 
 ```text
-derive active contracts/modules from prior Sw
-build Pw
-run exact gates over Pw
-build evidence-only Cw
-verify Cw = Pw + allowlisted evidence
-build receipt-only Sw
-CAS protected canonical ref
-record post-CAS attestation
+schema_version
+repository_identity
+protected_ref
+approved_base_oid
+bootstrap_commit_oid
+bootstrap_tree_oid
+bootstrap_paths_digest
+runner_ref
+run_ref_prefix
+payload_proposal_ref_prefix
+runner_workflow_identity
+runner_bundle_digest
+runner_oidc_issuer
+runner_oidc_subject
+runner_oidc_audience
+runner_environment
+runner_group
+runner_label
+runner_attestation_identity_digest
+runner_isolation_profile_digest
+admission_service_identity
+admission_service_origin
+admission_service_tls_identity_digest
+admission_service_signing_identity_digest
+gate_catalog
+required_gates_by_wave
+verification_toolchain_profile
+build_evidence_storage_profile
+bootstrap_attestation_policy
+evaluation_dispatch_contract_digest
+external_physical_gate_contract_digest
+physical_evidence_request_contract_digest
+physical_evidence_projection_receipt_contract_digest
+payload_proposal_contract_digest
+evidence_assembly_contract_digest
+git_object_import_contract_digest
+bootstrap_object_import_contract_digest
+expected_protection_policy_digest
 ```
 
-- [ ] **Step 4: Keep structural and performance gates separate**
+`build_evidence_storage_profile` has one canonical copy here. Catalog and Owner-Ledger projections bind its digest; they never contain a divergent second authority copy.
 
-Architecture cutover may require the routing, lease, fairness, memory accounting, and measurement machinery. It must not require universal cold40/sustained30. Performance certification requires exact workload/archive/entitlement/two-device trace evidence and passes only for the certified profile.
+It contains no bootstrap attestation digest, identifier, status, signature, or
+transparency entry. `BootstrapExportV1` is separate and binds exactly:
 
-- [ ] **Step 5: Run final release closure**
-
-```bash
-python3 scripts/check_qinao_owner_ledger.py \
-  --root . \
-  --ledger docs/superpowers/specs/qinao-owner-ledger-v1.json \
-  --candidate-manifest docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/payload-manifest.json
-python3 scripts/check_qinao_production_reachability.py --root . --compare-index
-python3 scripts/check_qinao_architecture_closure.py --root . --compare-index
-swift test --package-path BehavioralAISubstrate
-swift test --package-path QinaoRuntimeSDK
-swift test --package-path SampleHost
+```text
+wave_admission_projection_sha256
+bootstrap_attestation_sha256
+bootstrap_bundle_manifest_sha256
+operator_approvals_sha256
+transparency_entry_id
+transparency_checkpoint_digest
+transparency_inclusion_proof_digest
+export_envelope_signature
 ```
 
-Expected: positive candidate, entrypoint, and test counts; exact owner/contract/profile/reachability equality; no unresolved known true finding; no shipping V2 reachability; all package tests pass.
+The attestation is signed before append and therefore does not contain its
+future transparency-entry identity. The export envelope authenticates the
+post-append inclusion tuple without creating a digest fixed point. The older
+aliases `b0_commit_oid`, `b0_tree_oid`, `runner_digest`, and
+`bootstrap_attestation_digest` are forbidden.
 
-- [ ] **Step 6: Finalize only from the W6 protected-ref CAS**
+### Payload identity has no standalone handoff
 
-The final report must name exact `Pw`, `Cw`, `Sw`, protected ref, toolchain, archive/profile, active contract set, unresolved blocked optional claims, and external evidence expiry. A generated closure report is evidence projection, never authority.
+Do not create a `PayloadIdentityV1` file, schema, parser, or second payload
+authority. The Bootstrap-owned `PayloadProposalReceiptV1` and
+`EvaluationLease` carry the authenticated read-only payload/predecessor/build/
+authority/profile projections through the exact opaque client boundary. For
+preW0, the service proves `payload_commit_oid` has exactly one parent,
+`BootstrapRootV1.bootstrap_commit_oid`. Every consumer validates those two
+service envelopes; no consumer reconstructs a lookalike payload JSON.
 
----
+### `AdmittedWaveV1`
 
-## Plan Self-Review Checklist
+```text
+schema_version
+repository_id
+derived_wave
+predecessor_seal_oid
+predecessor_chain_digest
+payload_commit_oid
+payload_tree_oid
+evidence_commit_oid
+evidence_tree_oid
+seal_commit_oid
+seal_tree_oid
+receipt_blob_sha256
+admission_intent_id
+cas_transaction_id
+finalized_attestation_digest
+admission_chain_digest
+source_import_review_audit_root_digest
+active_verifier_bundle_digest
+active_gate_module_set_digest
+selected_release_build_set_digest
+envelope
+```
 
-- [ ] Every approved correction requirement maps to C1/C2, C3, C4, or C5.
-- [ ] Exactly seven controlled documents and four governing addenda remain.
-- [ ] Exactly two new immutable value-contract families are introduced.
-- [ ] All 113 admitted findings and the non-counting external 45 are kept distinct.
-- [ ] No task instructs an engineer to bulk-import the dirty tree.
-- [ ] No current-wave candidate selects its own verifier or active gate module.
-- [ ] Every filter and file scan has a non-vacuity rule.
-- [ ] K4 cannot pass on synthetic or privacy-clean projection-only evidence.
-- [ ] Artifact Mesh cannot become implemented without physical durability/recovery proof.
-- [ ] 40/30 is never an unconditional architecture completion gate.
-- [ ] V1 visibility remains buffered and one-invocation.
-- [ ] Unknown external state remains query/reconcile-only.
-- [ ] No placeholder implementation authority is hidden in this plan.
+`source_import_review_audit_root_digest` is the Bootstrap-service-derived,
+privacy-clean root for the exact review records eligible at that wave:
+sorted C1+C2 for preW0 and sorted C1+C2+C3 for W0 and later. No domain
+consumer may reconstruct or replace it from map prose. The tuple is
+authoritative for ordering only when the protected ref equals
+`seal_commit_oid` and the external attestation validates the same CAS
+transaction.
+
+### `ArtifactMeshW1Task0HandoffV1`
+
+```text
+schema_version
+admitted_w0_chain_digest
+pretransition_task0_commit_oid
+pretransition_task0_tree_oid
+status_transition_commit_oid
+task0_code_tree_oid
+ea_manifest_blob_sha256
+unit_preflight_receipt_sha256
+device_preflight_disposition
+migration_disposition
+historical_create_evidence_set_digest
+artifact_mesh_owner_row_sha256
+artifact_mesh_status_transition_sha256
+status_transition_from
+status_transition_to
+```
+
+The only allowed status tuple is
+`artifact.mesh / converging / implemented`; `migration_disposition` is
+exactly `anchorlessV1QuarantineRollForwardOnly`. The handoff is emitted only after
+the candidate preflight passes, that proposed transition is indexed, and the
+complete Phase-A gate set passes again over the resulting tree. It unlocks
+later W1 compilation but does not admit W1: the indexed `implemented` byte is
+a proposal until the final W1 `Pw` passes predecessor-derived B0 validation
+and W1 admission finalizes.
+
+## Program State Machine
+
+### P0 — Repair and freeze C0 provenance
+
+Execute the C0 child plan.
+
+Required output:
+
+- candidate baseline green;
+- source unchanged;
+- canonical all-`hold` import map with review-record digest slots still null;
+- import apply tool green;
+- durable `SourceProvenanceV1` whose one-path commit binds its exact parent
+  candidate tip/tree plus the source inventory and all-hold map digests;
+- no B0, authority, K4, or production import claim.
+
+Failure terminal: `BLOCKED_SOURCE_DRIFT`, `BLOCKED_DESTINATION_DRIFT`, or `BLOCKED_IMPORT_REVIEW`.
+
+### P1 — Prepare authority text, then freeze the bootstrap contracts
+
+Use this exact cross-plan order:
+
+1. After P0 has committed the all-hold inventory/map and
+   `SourceProvenanceV1`, execute Bootstrap Task 1 and Task 1A Steps 1-4. They
+   freeze the protocol plus the preparation-only signed `ImportReviewV1`
+   verifier; they must not claim to run before C0 and must not yet freeze a C1
+   live candidate context.
+2. Execute Authority Task 1. It discovers the unique immutable
+   `SourceProvenanceV1` creation commit, proves it is an unchanged ancestor
+   across the scheduled Bootstrap commits, verifies the handoff, then commits
+   only its authority-checker slice.
+3. From that exact post-Authority-Task-1 clean HEAD/tree/index/status, execute
+   Bootstrap Task 1A Steps 5-6 to obtain and reopen the external service's
+   authenticated C1 `ImportReviewV1`, binding the exact ten proposed map-row
+   postimages, human principal/time, approval policy, and immutable external
+   reopen receipt. Only then execute Authority Task 2 to
+   apply that exact reviewed C1 slice, correct the exact seven controlled
+   documents and four governing addenda, demote the recovery companion,
+   reverse the durable-raw-content/Decision-Gate contradictions, and make the
+   CoreAI plan traceability-only. Before advancing, all six files in this
+   executable program-plan set must be regular indexed C1 postimages whose
+   raw digests equal the signed review rows; a master without any child is
+   incomplete.
+4. From the clean post-Authority-Task-2 tip, execute Bootstrap Task 1A Step 7
+   to freeze, externally sign, persist, reopen, and verify the exact 32-path
+   C2 helper/test closure. Then execute Authority Task 2A: materialize the
+   unique signed C2 map postimage, commit only that map path, reopen its
+   first-parent transition, import/commit exactly those 32 paths, then apply
+   the exact three-path helper/test hardening child without relabeling its
+   parent. C1 and C2 are now one indivisible preW0 payload; no preparation
+   commit is authority and none may be admitted alone.
+5. Execute Bootstrap Tasks 2 and 4 as `Preparation Z`. They freeze the
+   protocol grammar, self-contained Owner-Ledger-v2 gate semantics, all 19
+   through-W6 gate contracts/modules/corpora, and the closed bootstrap schema.
+   They create no B0, profile value, evidence, result, or authority.
+6. Return to Authority Task 3. It computes
+   `wave_admission_contract_digest` and `required_gate_contracts_digest` from
+   those exact indexed Preparation-Z bytes, then emits
+   `AuthorityDraftHandoffV1`.
+
+This order is mandatory: Input A cannot contain the digest of a gate catalog
+that is supposedly built only after Input A. The draft and Preparation-Z bytes
+remain unadmitted and may not activate schema v2 or wave admission. The signed
+C1 review binds the post-Authority-Task-1 pre-map context; the distinct C2
+review binds the clean post-Authority-Task-2 pre-map context. Each freezes
+only its own exact permitted map-only postimage, so adding either record
+digest creates no HEAD/map self-reference.
+
+### P2 — Construct, import, and externally attest B0
+
+Reopen the exact `AuthorityDraftHandoffV1`, prove its two bootstrap-contract
+digests byte-match Preparation Z, then execute Bootstrap Tasks 3 and 5-7,
+the pre-ceremony lineage-tool freeze in Bootstrap Task 7A, and Bootstrap
+Task 8 in that order. Enter Bootstrap
+Task 9 only through Step 2 and stop at Hold C; Steps 3-4 necessarily consume
+the later authority-finalization handoff.
+
+Required properties:
+
+- `parents(B0) = [approved design base]`;
+- `diffPaths(approved design base, B0)` equals the bootstrap path manifest;
+- every through-W6 gate has an executable V0 module and positive/negative/mutation corpus in B0;
+- after separate user authorization, the external service imports the exact
+  B0 object closure into a host quarantine namespace, reopens its
+  commit/tree/parent/path bytes, and signs one
+  `BootstrapObjectImportReceiptV1` before either protected ref is created;
+- the signed bootstrap projection freezes one non-shipping Xcode 27/iOS 27 verification-toolchain profile, distinct from the initially empty active product-release set;
+- the projection freezes the controller-side external physical-gate broker
+  protocol required by K4 and Artifact Mesh; the isolated evaluator retains no
+  broker credential or network route;
+- the protected workflow authenticates to the external admission service with least privilege;
+- the external service owns intent persistence, live-policy observation, CAS, Git-host audit query, and final attestation;
+- two operators only sign the same immutable bootstrap intent; one service
+  principal reconciles create-or-reopen ref/policy/log effects and initializes
+  the canonical and runner refs to B0;
+- candidate/local code cannot produce `admitted`.
+
+Failure terminal: `BLOCKED_EXTERNAL_BOOTSTRAP` (including the narrower pre-ceremony `BLOCKED_EXTERNAL_SERVICE_BINDING` reason).
+
+### P3 — Finalize authority bytes against the attested bootstrap
+
+Return to the authority child plan:
+
+- insert `wave_admission_v1` that byte-matches the canonical Output-B
+  `BootstrapRootV1` projection, while separately authenticating its
+  attestation and transparency inclusion through `BootstrapExportV1`;
+- bind the one canonical evidence-storage profile digest;
+- finish all schema-v2 validators and reciprocal references;
+- keep finding results, reachability results, release results, and gate results absent;
+- run all candidate-local structure tests and actual CLIs;
+- freeze one clean final preparation tree.
+
+Any mismatch between the draft, B0 contracts, external attestation, or final Owner Ledger returns to P1/P2 review. It cannot be patched after preW0 admission.
+
+### P4 — Form the single-parent preW0 Pw
+
+Return to the bootstrap child plan.
+
+First execute Bootstrap Task 9 Steps 3-4 with the now-frozen authority
+handoff. The lineage verifier and transaction implementation were already
+committed in Task 7A, before P3 froze the preparation tree; no source commit is
+legal between that freeze and the following transaction.
+
+The lineage transaction:
+
+1. creates one previously absent fixed forensic ref at original adopted-candidate tip `486e1ec5983ad4390c5b07f04607f1345b912c4c`;
+2. creates a second previously absent content-addressed forensic ref at the final preparation tip;
+3. creates `Pw` with the final preparation tree and B0 as its sole parent;
+4. atomically moves only `codex/qinao-w1-clean-candidate` from the final preparation tip to `Pw`;
+5. leaves the protected ref, source branch, source worktree, index bytes, and worktree bytes unchanged;
+6. accepts only exact already-applied state after a crash; every partial or divergent state quarantines.
+
+The same atomic transition changes the permanent Root Guard disposition from `prebootstrapPreparation` to `reparentedProgram`; it must never create a moment in which old-tip ancestry and forensic refs are simultaneously accepted.
+
+After that transaction, while both protected refs still resolve to B0 and
+before any real preW0 evaluation, execute Authority Task 10 Steps 7-8 to
+consume the one transaction return and verify exact `Pw` topology, bytes, and
+purity. Then execute Bootstrap Task 11's complete
+verification matrix. Its `final-verification-v1` summary is local readiness
+evidence only: it cannot select a payload, create Cw/Sw, mutate a protected
+ref, or claim admission. A missing/failed Task-11 row stops P4.
+
+Failure terminal: `BLOCKED_LINEAGE_TRANSACTION`.
+
+### P5 — Evaluate preW0 Pw, then externally assemble Cw/Sw and admit
+
+Return to the authority child for evidence generation and the bootstrap child for protected admission.
+
+After separate user authorization for the external object write, the admission service pins exact preW0 `Pw/PwTree` under its immutable content-addressed proposal ref and returns a signed payload-proposal receipt. The protected B0 runner starts from that `Pw`—never from a prebuilt seal—and active B0 modules produce the gate/evidence bundle. The service validates the B0-frozen output allowlist and deterministically assembles `Cw`, which adds:
+
+- the two migrated schema-v2 finding ledgers;
+- exact 74 QRM plus 39 source-review proof leaves;
+- no itemized synthetic representation of the unverified external 45;
+- release projections;
+- production reachability;
+- ArchitectureClosureReport;
+- V2 quarantine projection;
+- gate evidence;
+- one self-excluding evidence manifest.
+
+The service canonicalizes the receipt from its lease/result values and builds `Sw`, which adds only `docs/superpowers/evidence/qinao-wave-admission/preW0.json`.
+
+The service imports and reopens the Cw/Sw objects at the Git host, persists the object-import receipt, and only then executes intent/CAS/finalize. Candidate-side Cw/Sw builders are parity tools only. Only the finalized `AdmittedWaveV1` output unlocks W0.
+
+Evaluation launch is not `workflow_dispatch`. The workflow exists only in B0,
+so the service persists an append-only dispatch intent and creates one
+create-once immutable branch
+`refs/heads/qinao-admission-runs/<opaque-service-request-id>` at B0. Its `push`
+event starts the B0 workflow with no caller inputs. The service maps the
+authenticated OIDC ref/run tuple back to the intent and derives the payload
+OID from its signed proposal receipt. Candidate, branch spelling, and workflow
+event data cannot select wave, payload, profile, verifier, or gate.
+
+### P6 — Form W0 Pw before K4
+
+Execute the W0 child plan:
+
+- obtain and verify the separate fixed-path, externally signed C3
+  `ImportReviewV1` by executing Bootstrap Task 1A Step 8 for exactly the 20
+  K4 public-source postimages, bind its record digest into those rows, prove
+  the unique map-only postimage commit by history reopen, and import only
+  that reviewed C3 slice with destination CAS; the earlier C1 and C2 records
+  remain independently bound to their ten- and thirty-two-row sets;
+- freeze Provider, effect, memory, App-Agent, recognition, learning, RSI, Main/Sub, and split-brain hazards;
+- add the exact 12-row transitive legacy-learning reachability manifest;
+- prove the full causal-root, split, evaluator firewall, holdout, canary, field, and adoption order;
+- prove one K3 invalidation CAS and complete fanout;
+- reopen the B0-self-contained 13-suite/16-safety-ID W0 program, run every
+  exact non-empty suite, and emit no legacy successor receipt or probe log;
+- commit and freeze immutable W0 `Pw/PwTree/build`.
+
+K4 has not yet passed at this point. W0 is not admitted.
+
+### P7 — Run K4 against W0 Pw, then admit W0
+
+Continue the W0 child plan.
+
+The production K4 driver derives release profile, Team, archive, product, and entitlement expectations from the admitted predecessor plus indexed Owner Ledger. It binds the archive and physical iOS 27 device before generating its unpredictable challenge, drives structured `devicectl`, publishes raw evidence only to the encrypted immutable external bundle, reopens it under an independent short-lived grant, and emits only a privacy-clean W0-Pw-bound projection.
+
+If the platform, device, signing, custody, evidence store, or re-open path is absent, the exact terminal is `BLOCKED_K4`.
+
+Only after K4 passes may the external service assemble/import W0 `Cw`, build one-receipt `Sw`, perform protected CAS, and finalize the attestation.
+After independently reopening that finalized `AdmittedWaveV1`, fast-forward
+only `codex/qinao-w1-clean-candidate` from the exact W0 `Pw` to its
+authenticated W0 `Sw`; require a clean tree, no merge commit, and a second
+byte-identical service reopen. Artifact Phase A cannot begin from the earlier
+W0 `Pw`.
+
+### P8 — Execute Artifact Mesh W1 Task 0 preflight
+
+Execute the first phase of the Artifact Mesh child plan immediately after admitted W0:
+
+- repair the existing three M paths without extending the historical M manifest;
+- add exactly four payload-index-bound E/A slices;
+- exclude `ArtifactMeshDeviceLab` from `SampleHost/Package.swift`;
+- implement owner-private SQLite/Keychain durability;
+- run unit/crash tests and a candidate-local device preflight to a full pass;
+- commit the sole reviewed `artifact.mesh` owner-row proposal
+  `converging → implemented`, then rerun the complete Phase-A gate set over
+  that new tree;
+- produce `ArtifactMeshW1Task0HandoffV1`.
+
+Only that post-transition handoff permits later W1 consumers to compile
+against the repaired mechanism. Phase A does not admit W1 or make the
+proposed `implemented` row authoritative. A typed device/preflight block
+produces no transition and no handoff.
+
+### P9 — Execute W1 owner work and rebind Artifact Mesh to final W1 Pw
+
+Execute the corrected W1 slices in the exact mapping below. Freeze final W1 `Pw`.
+
+Return to the Artifact Mesh child plan and rerun:
+
+- all 26 no-fault rows from 13 operations times two cuts;
+- exactly 14 named fault rows;
+- the production device controller;
+- external raw evidence reopen;
+- shipping reachability and lab exclusion;
+- the four-row E/A manifest gate.
+
+All evidence binds final W1 `Pw`, not the earlier Task-0 tree. The active B0
+Owner-Ledger gate revalidates the already-indexed
+`artifact.mesh / converging → implemented` proposal and the Artifact Mesh
+gate revalidates its physical evidence. No Ledger or status byte may change
+after final `Pw` is frozen. Only successful W1 admission makes the proposed
+row authoritative; the external service then assembles/imports W1 `Cw/Sw`
+and finalizes the protected transition without a post-`Pw` mutation.
+
+Failure terminal: `BLOCKED_ARTIFACT_MESH_DEVICE_RECOVERY`.
+
+### P10 — Execute W2 through W6
+
+Before W2 and before every later wave, synchronize the implementation branch
+to the prior admitted seal before writing that wave:
+
+1. call `ProtectedAdmissionClient.reopen_admitted_predecessor()` and
+   authenticate the prior `AdmittedWaveV1`, its finalized attestation, and
+   `refs/heads/qinao-admitted == prior.seal_commit_oid`;
+2. require a clean candidate tree and no in-progress merge, rebase, or
+   cherry-pick;
+3. if candidate `HEAD == prior.payload_commit_oid`, fast-forward only to
+   `prior.seal_commit_oid`; if `HEAD == prior.seal_commit_oid`, treat the step
+   as an idempotent re-entry; every other `HEAD` is
+   `BLOCKED_LINEAGE_TRANSACTION`;
+4. reject a wrong expected-old OID, wrong target OID, merge commit,
+   non-fast-forward, dirty tree, or prior seal not descended from the exact
+   prior payload; and
+5. reopen the predecessor a second time and require a byte-identical
+   `AdmittedWaveV1` whose seal is now candidate `HEAD`.
+
+This is the mandatory W1→W2, W2→W3, W3→W4, W4→W5, and W5→W6 handoff. The
+branch may also be synchronized immediately after each admission, but the next
+wave still executes the same idempotent Step 0. Tests cover exact-old success,
+already-at-seal re-entry, wrong-old refusal, wrong-new refusal, divergence,
+dirty state, and a forged or changed reopen. No wave begins from its prior
+`Pw`.
+
+After that Step 0, each wave repeats:
+
+1. derive wave and active modules from the protected predecessor;
+2. execute only the exact mapped domain slices;
+3. freeze immutable `Pw`;
+4. obtain separately authorized service-side payload-object pinning and a signed proposal receipt;
+5. run predecessor-derived active modules over exact `Pw`;
+6. let the external service validate the frozen evidence-output allowlist and deterministically assemble/import evidence-only `Cw` plus one fixed-receipt `Sw`;
+7. persist/reopen the Git-host object-import receipt, then run fresh live-policy observation, intent, CAS, audit, and final attestation;
+8. stop on any unresolved true finding, later-wave dependency, missing recovery proof, object-availability/import uncertainty, or external unknown.
+
+## Correct W1-W6 Owner/Domain Mapping
+
+### W1 — Contracts, values, TurnOperation, Provider inversion
+
+Execute in this order:
+
+1. Artifact Mesh W1 Task 0 from P8, including the passing candidate
+   preflight, indexed proposed owner-row transition, post-transition rerun,
+   and handoff; no later W1 task starts before that handoff.
+2. Contracts Tasks 1, 2, 2A, 3, 4, and 5.
+3. Semantic Task 1 value-contract slice only.
+4. Silicon Task 1.
+5. Silicon Task 7 Step 0 plus its W1 portions of Steps 1, 2, 4, 5, 7, and 7A.
+6. Runtime Task 1 Part A immutable semantic-DAG and typed boundary declarations only.
+7. Freeze final W1 `Pw`.
+8. Run Artifact Mesh final-W1-Pw device/reachability rebind from P9.
+9. Form W1 `Cw/Sw` and admit.
+
+W1 must include the content-intake family's two `semantics.layercell` schema/value `E` slices and one `artifact.mesh` storage `A` slice, plus Artifact Mesh Task 0's separate exact four-slice E/A manifest and every other W1-owned E/A slice. These are singular records under the generic E/A manifest schema; they cannot be merged across owners. W1 activates no W2-W6 intake mechanism, policy, or profile-selection behavior.
+
+### W2 — K3, memory, erasure, authorized-input state
+
+Execute in this order:
+
+1. Semantic Task 2.
+2. Semantic Task 4A immediately after Task 2 and before Task 3.
+3. Sovereign Task 4 K3 control-nucleus slice only.
+4. Content intake's two `runtime.turn-operation` `A` slices for Host parser/containment and receipt production.
+5. Authorized-input and remote-contract K3 E/A slices assigned to W2.
+
+No process MemoryLedger, StateABI, production grounding Provider, K4 helper, release, effect broker, or runtime executor is enabled in W2.
+
+### W3 — StateLake, retrieval, grounding contract, context
+
+Execute in dependency order:
+
+1. Semantic Task 3.
+2. Semantic Task 4 snapshot/barrier work.
+3. Semantic Task 4B pure cache-contract and mutation slice.
+4. Semantic Task 5 Steps 3A and 3C.
+5. Semantic Task 6 Step 3A.
+6. Semantic Task 7.
+
+The exact flow is L7/R0 eligibility → L8 LaneQuery → R1-R4 mechanisms → L8 LaneResult → R5 bounded proposal → R6 validation/revalidation, conflict resolution, and one State Market → sole `BASContextCompiler`.
+
+W3 uses a bounded test-injected grounding proposal port and performs no physical Provider call.
+
+### W4 — Silicon actuation and production grounding
+
+Execute in this order:
+
+1. Silicon Task 2 `BASStateABI`.
+2. Silicon Task 3 evidence adapters.
+3. Silicon Task 4 capability/thermal `HardCapDerivationSource`.
+4. Silicon Task 5 `BASProcessMemoryLedger`.
+5. Silicon Task 6.
+6. Silicon Task 7 Step 4 K3 production wiring, Step 5B, then Steps 3, 6, 8, and 9.
+7. Atomically install/reopen one Contracts `BASProviderBranchPolicy` and one Silicon binding that references it.
+8. Semantic Task 4B MLX/cache production wiring gate.
+9. Semantic Task 5 Step 3B.
+10. Semantic Task 6 Step 3B.
+
+W4 creates no response spool, W5 effect/release behavior, content-intake L14 authorization, final intake profile selection, or W6 certification. Foreground fairness uses the one K1 finite-delay admission rule and one host HeavyPhase.
+
+### W5 — K4, exact release, Zone C
+
+Execute in this order:
+
+1. Sovereign Task 6 pre-W5 platform proof gate.
+2. Sovereign Task 2.
+3. Sovereign Task 3.
+4. Sovereign Task 1.
+5. Sovereign Task 5.
+6. Remaining Sovereign Task 6 integration.
+7. Silicon Task 7 Step 5C.
+8. Silicon Task 7 Step 10 spool/release handoff.
+9. Runtime Task 5 Steps 5A and 5B direct/synthetic-effect retirement.
+10. Content intake's one `semantics.layercell` `E` slice for L14/current-policy authorization.
+
+The generic boundary order remains permit → anchor → arm → one crossing. Unknown state remains query/reconcile-only. No W4 spool back-reference is legal, and content intake remains production-dark until W6 selects the exact release profile.
+
+### W6 — Runtime, replay, certification, cutover
+
+Execute in this order:
+
+1. Runtime Task 2 value-declaration prelude.
+2. Semantic Task 8 audit-value/schema prelude.
+3. Runtime Task 1 Part B outcome contract and final audit-envelope freeze.
+4. Semantic Task 8 coordinator outcome behavior.
+5. Runtime Tasks 2, 3, 4, and Task 5 remainder.
+6. Runtime Task 6 aggregate certification.
+7. Content intake's one `production.cutover` `A` slice that freezes the exact release-selected profile Artifact ID.
+8. Prove final all-seven-slice content-intake production reachability while visibility remains dark.
+9. Runtime Task 7 authoritative outcome cutover.
+
+Task 6 records `.notRequested` when no 40/30 claim was requested. A requested claim must pass its complete two-device, two-block, two-sustained-run, rational-rank, 450-bin `phys_footprint`, and checked-integer-slope protocol before it may be reported.
+
+## Cross-Domain Completion Gates
+
+Every final W6 closure must prove:
+
+| Area | Required terminal |
+|---|---|
+| Architecture | exactly 14 LayerCores, 4 Kernels, 4 ControlRings, 7 planes; no duplicate owner |
+| Admission | exact predecessor-derived `Pw → Cw → Sw → CAS → attestation` chain through W6 |
+| Owner Ledger | 7 controlled docs, 4 addenda, reciprocal anchors, append-only lifecycle, declared/active cumulative equality |
+| Findings | exactly 74 QRM plus 39 source-review closures in Cw; external 45 remains unverified and non-counting |
+| Retrieval | hard prephysical eligibility, snapshot-bound lanes, one R6 Market, one context compiler |
+| Grounding | small-model proposal-only with deterministic validation and complete A/C/S/P/R lineage |
+| Context | Provider/profile selection before exact compilation; adaptive local/API budgets; independent windows and epoch fences |
+| Publication | buffered spool, full verifier suffix, pinned source, sink query/reconcile, once-only handoff |
+| Effects | separate model/compensation and authorized-input causality; K3-only branch/ordinal/instance |
+| State | prepare, optional effect continuation, invisible stage, L14/K4 attestation, expected-parent activation |
+| Provider egress | nonsecret materialization, content-free credential version, one post-handoff resolution, unknown query/reconcile |
+| App Agent | root/Session CAS, one App Agent and one logical Main per Session, model-independent identity |
+| Recognition | exact guest-only mechanical enforcement or fully governed recognition; no middle state |
+| Multi-agent | purpose-minimal capsules, no peer calls/shared scratchpad, correlated evidence not independent consensus |
+| NextQuestion | closed source union, zero to five candidates, at most one card, explicit tap only |
+| Studio/publication | Provider-backed Studio disabled; fixed deterministic Studio uses non-answer mini-release; zero-Provider output cannot become visible final publication |
+| Web/intake | minimum disclosure, untrusted-source isolation, provenance/citation binding, bounded parser/containment receipt |
+| Reasoning | information-sufficiency phases, minimum clarification, deterministic cycle/budget termination |
+| Learning/RSI | complete split/holdout/canary/field/adoption order, 12 legacy retirements, one K3 invalidation CAS, no self-adoption |
+| Recovery | owner-private state facet plus boundary facet, no blind replay, no recovery super-owner |
+| Artifact Mesh | exact four E/A slices, final-W1-Pw-bound 40-row device matrix, lab exclusion, honest status |
+| Heavy work | one host HeavyPhase, finite delay, exact memory graph accounted once |
+| V2 | exactly seven features and 21 rules; zero shipping reachability; every rule executes and mutates |
+| Rollback | expand/contract round trip or explicit roll-forward-only operator contract |
+| Performance | `.notRequested` or separately authorized complete claim protocol; never an unconditional gate |
+
+## Terminal-State Rules
+
+- `BLOCKED_SOURCE_DRIFT`: source changes during forensic capture.
+- `BLOCKED_DESTINATION_DRIFT`: candidate destination preimage differs from a reviewed import row.
+- `BLOCKED_IMPORT_REVIEW`: one production row remains unreviewed or ambiguous; `BLOCKED_C3_REVIEW` is a reason code beneath this terminal, never a new top-level terminal.
+- `BLOCKED_EXTERNAL_BOOTSTRAP`: protected root, external service, catalog, profile, policy, or attestation is absent; `BLOCKED_EXTERNAL_SERVICE_BINDING`, `BLOCKED_BOOTSTRAP_CONTRACT_HANDOFF`, and `BLOCKED_NON_LITERAL_GATE_PROGRAM` are reason codes beneath this terminal, never new top-level terminals.
+- `BLOCKED_LINEAGE_TRANSACTION`: candidate tree, parent, forensic ref, or atomic ref state differs.
+- `BLOCKED_PAYLOAD_OBJECT_AVAILABILITY`: the immutable Pw object is not externally pinned and host-reopened under the signed proposal contract.
+- `BLOCKED_PREW0_EVIDENCE`: one of 113 closures, release projections, reachability, closure, V2, or gate evidence is missing.
+- `BLOCKED_K4`: real release/device/challenge/external-reopen proof is absent or invalid.
+- `BLOCKED_ARTIFACT_MESH_DEVICE_RECOVERY`: any mandatory device matrix row is unexecuted, including protected-data unavailability.
+- `pendingAdmission`: protected ref equals `Sw` but final attestation is absent; no next wave derives.
+- `quarantinedAdmission`: ref, intent, CAS audit, attestation, or supersession lineage disagrees.
+- `admitted`: protected ref equals `Sw`, receipt validates, and the same successful CAS has a valid finalized external attestation.
+
+The external service's internal `finalized` state maps only to the program
+terminal `admitted` and returns an authenticated `AdmittedWaveV1`.
+Every nonfinal result raises the Bootstrap-owned
+`AdmissionTerminalError`: `pendingAdmission` and `quarantinedAdmission`
+remain those exact typed terminals, while internal `blocked` maps to one of
+the exact `BLOCKED_*` terminals above plus one required closed reason code.
+`quarantinedAdmission` also requires one closed reason; only
+`pendingAdmission` carries null. The error cannot widen the four-method return
+type or escape as a fifth spelling.
+`EvidenceAssemblyResult` is service-internal and is never a runner-visible
+success or terminal.
+
+No blocked, pending, quarantined, local-preflight, unit-test, simulator, projection-only, or candidate-authored result may be relabeled admitted.
+
+## Program Self-Review
+
+- [x] The existing clean candidate is adopted; no second candidate worktree is created.
+- [x] Dirty source preservation and destination-preimage CAS are assigned to the C0 child.
+- [x] B0 is minimal, externally attested, and the sole parent of preW0 Pw.
+- [x] The authority/bootstrap dependency is explicitly interleaved and non-circular.
+- [x] `Pw` contains no self-claiming result; all 113 and reachability/closure/V2 result evidence is in `Cw`.
+- [x] W0 Pw is frozen before K4 runs.
+- [x] K4 derives release identity from authority, never an environment variable.
+- [x] Artifact Mesh has separate Task-0 preflight and final-W1-Pw proof phases.
+- [x] `SampleHost/Package.swift` exclusion and the exact 26+14 matrix belong to the Artifact child.
+- [x] CoreAI convergence is non-executable traceability, not a sixth domain plan.
+- [x] The W1-W6 task/step mapping follows the incumbent plan schedules.
+- [x] Semantic Task 1 W1, Task 4B W3/W4, and Task 8 W6 slices are present.
+- [x] Sovereign Task 4 W2 and the W5 pre-gate/2→3→1→5→6 order are present.
+- [x] Runtime W6 prelude and final-envelope order is present.
+- [x] The C3 learning/RSI/Main-Sub safety freeze is a W0 gate.
+- [x] Provider-backed Studio and zero-Provider publication remain dark.
+- [x] Performance is optional through a closed `.notRequested | requested` decision.
+- [x] Five executable child plans own code-level TDD; this program file does not duplicate their implementation.
