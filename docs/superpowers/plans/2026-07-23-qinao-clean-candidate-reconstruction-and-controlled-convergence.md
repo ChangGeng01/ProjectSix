@@ -13,6 +13,7 @@
 - The approved design commit is exactly `59c26f508262d7c25869faac0ec0abf968ec1e02`.
 - The approved design path is `docs/superpowers/specs/2026-07-23-qinao-convergence-correction-and-clean-candidate-design.md`.
 - The approved design SHA-256 is `3af1067ad2c3d37c36d7613ad19d1dd035bb6f1c60f06b75d5d71de22874d1b4`.
+- The approved dynamic-graph amendment is commit `9d484befb4a4593d93789457ebddfd7cde358e3b`, path `docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md`, Git blob `e2c59656f9eb184efc3ab933fe442c9dd0b7d507`, SHA-256 `5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5`.
 - The architecture remains exactly 14 Semantic LayerCores, 4 Physical Kernels, 4 bounded ControlRings, and 7 orthogonal planes.
 - The minimum deployment target is iOS 27 for every package, project, generated project, script, test host, XCFramework slice, archive, and selected release profile.
 - Models and APIs remain outside Qinao SDK behind value-only Provider/Proposal boundaries and have equal authority ceilings.
@@ -43,6 +44,66 @@
 - Do not push, create a pull request, update a protected ref, or claim a wave complete without separate user authorization and fresh required evidence.
 
 ---
+
+## Approved Dynamic Graph Program Amendment
+
+This amendment changes the work performed inside the existing five children
+and five incumbent W1-W6 plans. It does not create a sixth child, W7, gate 20,
+graph authority document, graph owner, graph store, fifth ring, fifth kernel,
+or eighth plane. If graph language conflicts with the pinned 2026-07-24
+specification, the pinned specification controls only the graph delta; the
+2026-07-23 correction design continues to control reconstruction, provenance,
+admission, and evidence.
+
+The program must preserve five distinct projections:
+
+| Projection | Authority and mutability |
+|---|---|
+| G0 capability graph | Derived, read-only authority/capability view |
+| G1 semantic execution graph | Immutable per semantic Attempt; one stored `BASSemanticTurnDAG` root plus eight embedded topology values |
+| G2 context/dataflow graph | Immutable root replacement through CAS; exactly two stored roots plus twelve embedded values; never in-place mutation |
+| G3 control projection | Receipt projection of the four incumbent `ControlRing`s; never a fifth ring |
+| G4 observability graph | Read-only trace projection; never scheduling or state authority |
+
+The fixed architecture is exactly 14 Semantic LayerCores, 4 Physical Kernels,
+4 bounded ControlRings, 7 orthogonal planes, and waves W0-W6. G1 has
+`executionShape = pureDAG | controlRing`; source zero-join requires `pureDAG`,
+while `controlRing` requires a nonempty real join. Reverse consumer-keyed
+absence queries, direct peer calls, shared scratchpads, mutable graph edits,
+and a second graph writer are forbidden.
+
+### Wave placement
+
+| Wave | Graph work admitted by the existing owner/domain plan |
+|---|---|
+| W0 | Freeze reachable split-brain graph writers and legacy loop authority only; no future graph behavior |
+| W1 | Create G1 values under `runtime.semantic-dag`; bind Attempt/edge refs under `runtime.turn-operation`; no production executor |
+| W2 | G2 retrieval, grounding, context budgeting/compilation, independent contexts, and continuity values |
+| W3 | App-Agent identity/persona/session isolation and governed delegation over the immutable graph |
+| W4 | Physical Provider rows, CAS bindings, and pre-call/completion/recovery discipline; no graph executor wiring, shadow, or cutover |
+| W5 | Authorized tool/effect execution and successor-Attempt recovery; no blind retry |
+| W6 | Audit values, replay/recovery certification, intake/reachability-dark proof, and sealed cutover |
+
+W6 executes in this exact dependency order:
+Runtime Task 2 value prelude → Semantic Task 8 audit-value/schema prelude →
+Runtime Task 1B outcome/final-audit-envelope → Semantic Task 8 behavior →
+Runtime Tasks 2/3/4/5 remainder → Runtime Task 6 → intake A and
+reachability-dark → Runtime Task 7 sealed cutover. Cold 40/s and sustained
+30/s remain optional profile-qualified claims, never structural completion
+gates.
+
+The terminal semantics are closed: a WorkUnit is complete only when the exact
+current semantic-Attempt disposition is `completed`; terminal non-adoptable
+sink receipts bind `designatedTerminalNoProgress` with a deadlocked basis.
+Task-cancellation `JoinEvidence` binds the parent terminal outcome and parent
+attempt basis `notApplicable | neverAdmitted | terminalAttempt`, where
+`terminalAttempt` excludes `completed`. Aggregate bounds are 1,018 terminal
+dispositions and 1,024 parent/input references.
+
+All graph contracts, tests, fixtures, mutations, reachability results, and
+cutover proof must flow through the existing child plans and existing gate
+IDs. The five executable children and all existing terminal/handoff types
+remain unchanged.
 
 ## Current Reality
 

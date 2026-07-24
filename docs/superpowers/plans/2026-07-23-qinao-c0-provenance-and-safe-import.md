@@ -13,6 +13,7 @@
 - Approved design commit: `59c26f508262d7c25869faac0ec0abf968ec1e02`.
 - Approved design path: `docs/superpowers/specs/2026-07-23-qinao-convergence-correction-and-clean-candidate-design.md`.
 - Approved design SHA-256: `3af1067ad2c3d37c36d7613ad19d1dd035bb6f1c60f06b75d5d71de22874d1b4`.
+- Approved dynamic-graph inventory input: commit `9d484befb4a4593d93789457ebddfd7cde358e3b`, path `docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md`, blob `e2c59656f9eb184efc3ab933fe442c9dd0b7d507`, SHA-256 `5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5`.
 - Preserved source root: `/Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0`.
 - Preserved source branch: `codex/qinao-w1`.
 - Adopted candidate root: `/Users/changgeng/.codex/worktrees/e4d7/Project06`.
@@ -34,6 +35,26 @@
 - Apply uses a temporary index to construct a full-index binary patch and `git apply --index --binary`; it never copies a directory, chooses “latest,” follows a symlink, or overwrites a mismatched preimage.
 - No C0 tool creates or changes B0/admission authority, controlled authority text, K4 evidence, Artifact Mesh, production code, a protected ref, or an external attestation.
 - Stage exact paths only. Each commit step compares the staged path set before committing.
+
+## Approved Dynamic Graph C0 Amendment
+
+C0 receives the graph design only as held inventory/provenance input. It
+changes no C0 schema, selector, import-map semantics, review protocol, batch
+cardinality, or authority. The graph specification is not an import bypass.
+
+The mandatory order is:
+
+1. commit all six 2026-07-23 plan amendments, including this file, in the
+   preserved source lineage;
+2. capture C0 from that exact committed source state;
+3. perform the sole fixed ten-row C1 context/review/apply ceremony already
+   defined by Bootstrap and Authority.
+
+Never add the graph design as an eleventh C1 row, change a frozen ten-row C1
+context after review, or refreeze C1 because these plan amendments exist.
+Inventory verifies the pinned graph commit/path/blob/SHA tuple; C1 continues
+to select exactly its existing ten rows. Any mismatch is source drift, not
+permission to regenerate a context or choose “latest.”
 
 ## File Responsibility Map
 

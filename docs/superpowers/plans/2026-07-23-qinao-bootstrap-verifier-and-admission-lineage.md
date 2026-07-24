@@ -13,6 +13,7 @@
 - Implement in the existing clean candidate worktree `/Users/changgeng/.codex/worktrees/e4d7/Project06`; do not create a second clean worktree.
 - Preserve branch `codex/qinao-w1-clean-candidate`, its 22 commits from approved base through baseline tip `486e1ec5983ad4390c5b07f04607f1345b912c4c`, and the pre-existing unstaged `scripts/check_qinao_owner_ledger.py` change.
 - Approved base is exactly `59c26f508262d7c25869faac0ec0abf968ec1e02`; approved design SHA-256 is exactly `3af1067ad2c3d37c36d7613ad19d1dd035bb6f1c60f06b75d5d71de22874d1b4`.
+- Approved dynamic-graph amendment is commit `9d484befb4a4593d93789457ebddfd7cde358e3b`, path `docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md`, blob `e2c59656f9eb184efc3ab933fe442c9dd0b7d507`, SHA-256 `5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5`.
 - `B0` has exactly one parent, the approved base. Its diff from that base equals the canonical bootstrap-path manifest exactly; no plan, test harness, lineage builder, candidate evidence, authority draft, result, receipt, or external attestation enters `B0`.
 - The bootstrap gate catalog is complete at genesis for `preW0,W0…W6`; no gate may first acquire executable semantics from the candidate it judges.
 - `wave`, canonical ref, release profile, active verifier, active gate module, repository identity, and protection policy are derived from the external bootstrap/prior finalized tuple. They are never CLI flags, workflow inputs, environment overrides, candidate-manifest fields, or caller assertions.
@@ -64,6 +65,51 @@
 - This plan does not implement C0 source-inventory/import-map internals, edit the 7+4 authority prose, implement W0/K4, or implement Artifact Mesh.
 - Every code change follows RED → focused GREEN → full relevant suite → isolated commit. Never use a zero-match test/filter or a command whose missing path is treated as success.
 - All repository edits use exact paths. All external ceremony artifacts remain outside Git under `/private/tmp/qinao-bootstrap-ceremony-v1/export` and in the authenticated external transparency store.
+
+## Approved Dynamic Graph Bootstrap Amendment
+
+Bootstrap retains exactly 19 gate contracts/modules/corpora and the existing
+152-cell matrix. There is no gate 20. The predecessor-derived active module
+and verifier judge the candidate; candidate bytes cannot select or implement
+the module that judges their wave. Every graph check has positive discovery,
+nonempty fixtures, at least one valid specimen, and at least one rejecting
+mutant.
+
+| Existing gate ID | Graph coverage |
+|---|---|
+| `qinao.owner-ledger` | Existing-owner pins, reciprocal catalog closure, no graph owner |
+| `qinao.production-reachability` | Production graph writers/executors/peer paths/scratchpads and shipping entrypoints |
+| `qinao.architecture-closure` | G0-G4 plus exact 14/4/4/7 topology |
+| `qinao.w0-open-set` | Closed W0 shared-agent-state hazard extension |
+| `qinao.contracts-layercell` | Immutable wires, execution shape, joins, terminal bases and bounds |
+| `qinao.semantic-statelake-context` | G1/G2, retrieval, grounding, independent context and compiler ownership |
+| `qinao.silicon-execution-spine` | Physical Provider rows/CAS/envelopes only |
+| `qinao.sovereign-release-effects` | Authorization, effects, remand boundaries and no blind retry |
+| `qinao.runtime-replay-certification` | Replay/recovery, retirement, W6 ordering and cutover proof |
+
+Bootstrap owns the authoritative B0 contracts, modules, corpora, verifier,
+fixed module selection, anti-vacuity, evidence admission, and independent
+`production_graph_reachability`. Authority owns only candidate-side evidence
+classification and parity helpers. Each incumbent domain plan owns its own
+suite, fixtures, output schema, and mutations.
+
+`production_graph_reachability` must start from authority-selected
+Package.swift, Xcode, XcodeGen, workspace, product and entrypoint roots; walk
+source membership, imports, AST/SIL/index and linked-symbol closure; classify
+every discovered writer/executor and indirect edge; and fail on zero roots,
+unclassified projects/edges, a second G1/G2 writer, direct peer calls, shared
+scratchpads, legacy loop authority, lab/shadow leakage, or an unclassified
+`BASAppleTaskGraphLifecycleExecutor.refresh`. Candidate paths and candidate
+reports are inputs to classification only, never authority.
+
+The fixed corpora must reject at least: fifth ring/kernel/plane, mutable G1 or
+G2, reverse absence query, invalid execution shape, zero-join ControlRing,
+nonzero source join in pure DAG, graph owner/manager/store, blind Provider
+retry, self-adoption, completed parent used as cancellation basis, completion
+without the current semantic Attempt, over-1,018 dispositions, over-1,024
+parent/input refs, W4 executor/cutover wiring, and reordered W6 cutover.
+These mutations are added to existing gate corpora and matrix rows; the
+catalog cardinalities remain 19 modules and 152 cells.
 
 ### Program terminal envelope
 

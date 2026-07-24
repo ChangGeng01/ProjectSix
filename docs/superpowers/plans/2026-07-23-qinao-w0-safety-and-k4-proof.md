@@ -13,6 +13,7 @@
 - Approved design commit: `59c26f508262d7c25869faac0ec0abf968ec1e02`.
 - Approved design path: `docs/superpowers/specs/2026-07-23-qinao-convergence-correction-and-clean-candidate-design.md`.
 - Approved design SHA-256: `3af1067ad2c3d37c36d7613ad19d1dd035bb6f1c60f06b75d5d71de22874d1b4`.
+- Approved dynamic-graph amendment: commit `9d484befb4a4593d93789457ebddfd7cde358e3b`, path `docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md`, blob `e2c59656f9eb184efc3ab933fe442c9dd0b7d507`, SHA-256 `5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5`.
 - Governed-learning source: `docs/superpowers/specs/2026-07-23-qinao-governed-learning-plane-data-flywheel-thinking-design.md`, especially §3, §4.12, and §5.
 - Governed-learning source SHA-256: `e14375de67f7baf9bfe9c4e466b1182fbe906f849da0e260a37bd8bbd6554079`.
 - Adopted candidate root: `/Users/changgeng/.codex/worktrees/e4d7/Project06`.
@@ -40,6 +41,36 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/
 - Every Swift filter runs through `scripts/run_nonempty_swift_filter.py`; zero discovered tests is failure.
 - Every commit stages an exact path list, compares that list before commit, and leaves a clean worktree. Never use broad `git add .`, `git add -A`, reset, checkout, restore, clean, amend, rebase, squash, or force-update.
 - Every checkbox below is one 2–5 minute action. Stop at the first unexpected output; do not reinterpret a RED or blocker as success.
+
+## Approved Dynamic Graph W0 Freeze Amendment
+
+The authoritative W0 hazard set remains closed at exactly 16 IDs. Do not add
+a graph hazard ID and do not implement any future graph contract or behavior.
+Extend only the incumbent `runtime.untyped-shared-agent-state` hazard across
+its existing source, production-reachability, fixture, and negative-token
+coverage.
+
+That one hazard must reject every currently reachable form of:
+
+- a second G1 or G2 graph writer, mutable graph patcher, graph manager,
+  graph scheduler, or graph store;
+- a Main-Agent/Sub-Agent direct peer call or writable shared scratchpad;
+- legacy loop authority that can schedule, retry, remand, or commit outside
+  the four existing ControlRings and governed Attempt boundary;
+- graph-shaped production entrypoints that bypass App-Agent/session identity,
+  Context Compiler, K3 allocation, authorization/effect gates, or receipts.
+
+The W0 fixture set contains one positive incumbent shape and one negative
+fixture per category above. Its source scan first proves each selected file is
+a readable regular file; missing/renamed input exits 2. Its reachability proof
+must classify `BASAppleTaskGraphLifecycleExecutor.refresh` as either
+demonstrably read-only or production-unreachable. “Name sounds lifecycle”,
+test-only reachability, and an unclassified edge are failures.
+
+W0 freezes these seams only. It does not create `BASSemanticTurnDAG`, G1/G2
+wires, graph execution, shadow comparison, cutover, or future-wave tests. The
+existing `qinao.w0-open-set` module and closed 16-ID manifest remain the sole
+authoritative gate.
 
 ### Session and interruption re-entry
 

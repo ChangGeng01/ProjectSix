@@ -10,6 +10,7 @@
 
 ## Global Constraints
 
+- Approved dynamic-graph non-delta pin: commit `9d484befb4a4593d93789457ebddfd7cde358e3b`, path `docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md`, blob `e2c59656f9eb184efc3ab933fe442c9dd0b7d507`, SHA-256 `5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5`.
 - Start Phase A from the exact finalized admitted-W0 seal. Start Phase B from the exact immutable final W1 `Pw`; neither phase accepts a caller-supplied wave.
 - Import, without redeclaration, the bootstrap-owned opaque `ExternalPhysicalGateBinding`, `PayloadProposalReceiptV1`, `EvaluationLease`, `AuthenticatedGateResultBundle`, `ImportedCommit`, `AdmittedWaveV1`, and `ProtectedAdmissionClient`. If the active bootstrap does not expose their signed service binding and exact client surface, stop at `BLOCKED_EXTERNAL_BOOTSTRAP`; no repository helper may emulate them.
 - Phase A starts only after `ProtectedAdmissionClient.reopen_admitted_predecessor()` returns a service-envelope-verified finalized W0 whose seal equals clean `HEAD`. An unsigned path, cached JSON, candidate parser result, or caller assertion is not an admitted predecessor.
@@ -61,6 +62,26 @@ python3 scripts/check_qinao_ea_extensions.py \
 ```
 
   It has no `--wave`.
+
+## Approved Dynamic Graph Artifact-Mesh Non-Delta
+
+The graph amendment adds no Artifact-Mesh schema, owner, field, store,
+handoff, admission leaf, or special recovery route. Graph contracts,
+bindings, roots, cursors, and receipts use the incumbent ordinary
+put/read/reopen, durability, quarantine, and crash-recovery mechanisms exactly
+like every other authorized artifact.
+
+The Task-0 owner transition remains exactly
+`artifact.mesh / converging → implemented`, with the same three historical
+M/Create paths and four E/A slices. Phase A/Phase B boundaries, physical
+proof, handoff, admission ownership, and migration disposition are unchanged.
+No graph term may expand the M/Create set or make Artifact Mesh a scheduler,
+graph writer, context compiler, retry authority, or control ring.
+
+During Task 10, the exact owner-row comparison and generic E/A checker must
+also prove that no graph-specific Artifact-Mesh owner/schema/field/handoff was
+introduced. This is a negative closure assertion inside the existing checks,
+not a new gate or manifest.
 
 ## Execution-Root Guard
 

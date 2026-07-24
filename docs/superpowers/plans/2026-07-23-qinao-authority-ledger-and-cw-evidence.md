@@ -13,6 +13,7 @@
 - Execute in the clean candidate worktree `/Users/changgeng/.codex/worktrees/e4d7/Project06`, never in the dirty forensic worktree.
 - Approved design base is exactly `59c26f508262d7c25869faac0ec0abf968ec1e02`.
 - Approved correction design is `docs/superpowers/specs/2026-07-23-qinao-convergence-correction-and-clean-candidate-design.md` with SHA-256 `3af1067ad2c3d37c36d7613ad19d1dd035bb6f1c60f06b75d5d71de22874d1b4`.
+- Approved dynamic-graph amendment: commit `9d484befb4a4593d93789457ebddfd7cde358e3b`, path `docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md`, blob `e2c59656f9eb184efc3ab933fe442c9dd0b7d507`, SHA-256 `5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5`.
 - The minimum deployment target is iOS 27 for every package, project, generated project, build script, test host, archive, and selected-release profile.
 - preW0 has zero active shipping-release profiles. Its Xcode 27/iOS 27
   evaluation uses only the separately signed, non-shipping
@@ -53,6 +54,73 @@
   committed or treated as GREEN.
 - Preparation commits are review conveniences only. They are not protected ancestry. Final `Pw` is formed from the reviewed preparation tree with sole parent `B0`.
 - Do not cover C0/bootstrap internals, C3 W0 freezes, K4 platform proof, or Artifact Mesh W1 implementation in this plan. Use the named sibling plans at the handoff points.
+
+## Approved Dynamic Graph Authority Amendment
+
+Task 1 must merge the pinned graph vocabulary and invariants into the existing
+seven controlled documents and four governing addenda. It must not create a
+twelfth authority document or a graph owner. The exact responsibility map is:
+
+| Existing authority | Graph responsibility |
+|---|---|
+| Architecture | G0-G4 and exact 14/4/4/7 topology |
+| Master | W0-W6 placement, dependency/cutover order, proof order |
+| Contracts | Immutable graph wires, enums, bounds, canonical fixtures |
+| Runtime | Readiness, barriers, replay, recovery, retirement, terminal seal inputs |
+| Semantic | Retrieval, grounding, context and logical semantic execution |
+| Silicon | Provider physical execution and envelopes only; no graph authority |
+| Sovereign | Authorization, effects, recovery boundaries, terminal seal |
+| K3/Provider addendum | Attempt roots, CAS, physical bindings, branch identity, unknown effects |
+| Agent/Context/RSI addendum | Delegation, independent contexts, continuity, bounded loops |
+| App-Agent Session addendum | App identity, persona, writable-state isolation |
+| Governed Learning addendum | Evidence flywheel, candidate strategies, operator adoption |
+
+Task 1 also carries forward graph contracts that exist only in the
+2026-07-19 controlled-convergence source, but rehomes each contract into the
+table above and renders that source non-executable traceability. No text may
+name it as graph authority.
+
+### Existing-owner pins
+
+- `runtime.semantic-dag` is the sole G1 topology owner. Its one M/Create root
+  is `BASSemanticTurnDAG` at
+  `BehavioralAISubstrate/Sources/BASRuntimeCore/BASSemanticTurnDAG.swift`.
+  It owns graph input/applicability/join/delegation, semantic-Attempt terminal
+  receipt, and complete G2 values. There is no `TaskNode`, patch, join, or
+  graph-manager owner.
+- `runtime.turn-operation` owns Attempt references and
+  `BASSemanticTurnEdgeBinding`.
+- `state.snapshot-contracts` owns continuity; `state.context-compiler` owns
+  compilation. K3 owns only physical execution rows and CAS.
+- G0 is derived read-only; G1 is immutable per Attempt; G2 changes only by
+  immutable root replacement/CAS; G3 is a receipt projection of the four
+  existing ControlRings; G4 is read-only trace projection.
+
+Task 3's Owner-Ledger draft must encode the `runtime.semantic-dag` M/Create
+transition and reciprocal catalog references under these incumbent owners,
+without changing the 29-owner cardinality. Task 4's source/entrypoint
+classifier and Task 5's reachability closure must identify every production
+graph writer, executor, direct peer path, shared scratchpad, legacy loop
+authority, and graph-shaped Swift source. Task 7's incumbent convergence
+checker must enforce the root path, owner pins, G0-G4 mutability, exact
+14/4/4/7/W0-W6 counts, and absence of duplicate authority. Its mutant corpus
+must include second writer, reverse absence query, mutable G2 update, fifth
+ring, peer call, shared scratchpad, wrong execution shape, invalid
+source-zero-join, missing control-ring join, and unauthorized graph owner.
+
+These checks extend `scripts/check_qinao_owner_ledger.py`,
+`scripts/test_check_qinao_owner_ledger.py`, the existing candidate-side
+production-reachability/parity helpers, and their existing corpora. They do
+not create a graph checker. Candidate-side results remain non-authoritative;
+Bootstrap independently evaluates the corresponding existing gate IDs.
+
+Required graph contract tests cover: one logical Main Agent with independent
+model/provider contexts; no code/weight/schema/policy self-adoption; fixed
+Provider pre-call/completion/recovery order; no blind retry; pure-DAG remand
+only to a successor Attempt; ControlRing remand only through a real ring
+invocation; exact completion and cancellation bases; the 1,018/1,024 bounds;
+and W6's pinned dependency order. Run them through the existing nonempty
+`unittest` and Swift-filter mechanisms already specified in Tasks 7-9.
 
 ## Interleaved Plan Interfaces
 
