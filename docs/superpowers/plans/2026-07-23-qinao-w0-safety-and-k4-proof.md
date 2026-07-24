@@ -4,7 +4,7 @@
 
 **Goal:** Starting only from the admitted `preW0` seal and the C0-reviewed `C3` import rows, form an immutable W0 payload that freezes every currently reachable Provider/runtime/effect/App-Agent/persona/memory/recognition/learning split-brain hazard, then obtain a real iOS 27 physical-device K4 proof before the protected bootstrap lineage is allowed to create W0 `Cw`, `Sw`, or admission.
 
-**Architecture:** W0 is a fail-closed safety boundary, not an early implementation of W1-W6. It imports reviewed source bytes through C0's destination CAS, adds source/reachability/fixture gates that use only APIs present at W0, and records no result inside `Pw`. The complete W0 source, schema, checker, test, fixture, probe source, and build-input bytes are committed and frozen as one immutable `Pw` commit/tree before K4 begins. The candidate supplies only that exact commit OID to the Bootstrap-owned `ProtectedAdmissionClient`; Bootstrap pins and independently reopens the object before issuing a signed lease. K4 is a controller-side `ExternalPhysicalGate` ceremony: a lease-bound broker selects Xcode/profile/team, archive, physical iOS 27 device, encrypted custody, and two distinct producer/attester principals; the broker binds archive and device before creating a fresh challenge, drives structured `devicectl`, transfers the raw bundle to external encrypted custody, and requires an independent short-lived reopen. The B0 primitive consumes only the broker's signed privacy-clean projection. Starting from the authenticated gate-result bundle, one generic Bootstrap service call deterministically assembles/imports evidence-only `Cw` and one-receipt `Sw`, performs protected CAS, and finalizes admission. Candidate code creates none of those current-run objects, refs, leaves, commit identities, or authority messages.
+**Architecture:** W0 is a fail-closed safety boundary, not an early implementation of W1-W6. It imports reviewed source bytes through C0's destination CAS, adds source/reachability/fixture gates that use only APIs present at W0, and records no result inside `Pw`. The complete W0 source, schema, checker, test, fixture, probe source, and build-input bytes are committed and frozen as one immutable `Pw` commit/tree before K4 begins. The candidate supplies only that exact commit OID to the Bootstrap-owned `ProtectedAdmissionClient`; after a fresh `PayloadDispatchAuthorizationV1`, Bootstrap pins and independently reopens the object before issuing a signed lease. K4 is a controller-side `ExternalPhysicalGate` ceremony: a lease-bound broker selects Xcode/profile/team, archive, physical iOS 27 device, encrypted custody, and two distinct producer/attester principals; the broker binds archive and device before creating a fresh challenge, drives structured `devicectl`, transfers the raw bundle to external encrypted custody, and requires an independent short-lived reopen. The B0 primitive consumes only the broker's signed privacy-clean projection. Starting from the authenticated gate-result bundle, one idempotent Bootstrap operation first derives evidence-only `Cw` and one-receipt `Sw` in a non-host quarantine, stops for a fresh `ProtectedRefAdvanceAuthorizationV1`, and only on the same-key post-authorization invocation imports/reopens those exact objects at the target Git host, performs protected CAS, and finalizes admission. Candidate code creates none of those current-run objects, refs, leaves, commit identities, or authority messages.
 
 **Tech Stack:** Python 3 standard library and `unittest`; Swift 6/XCTest/Swift Testing; Git object/index/ref plumbing; canonical JSON and SHA-256; Xcode 27 release toolchain; ExtensionFoundation/ExtensionKit/XPC public SDK; `xcodebuild`, `codesign`, `security cms`, `xcrun devicectl` JSON output; externally authenticated encrypted evidence custody; no new dependency, package install, private framework, or network search.
 
@@ -22,6 +22,7 @@
 - Every W0 or K4 candidate-root entry begins with the literal root command below. It must print exactly one canonical JSON line with exactly the sorted keys `candidate_lineage`, `head_commit`, `head_tree`, `schema_version`; `candidate_lineage` is `reparentedProgram`; `schema_version` is integer `1`; mismatch exits `2`.
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 ```
 
@@ -31,7 +32,13 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/
 - W0 uses only APIs present in W0. It does not call or test future `executeAtMostOnce`, `TurnOperation.stream().final()`, `spool`, App-Agent root/session, Artifact Mesh, K3/K4 production-owner, W5 helper, W6 certification, or cutover APIs.
 - W0 may make an unsafe current production seam unreachable, internal, test/lab/shadow-only, or deterministically fail closed. It may not declare a future capability implemented.
 - `Pw` contains source, schemas, checkers, tests, fixtures, candidate parity/preflight K4 producer/attester/state-machine bytes, K4 probe source, exact build inputs, and policy manifests. Candidate K4 tools exercise contract compatibility only; they are never active producer, attester, broker, verifier, or authority. The authoritative W0 open set is the self-contained B0 `w0_open_set_v1_exact_set` program over exact indexed `Pw`; candidate receipt series and raw probe logs are never emitted or consumed. The two imported sequence-zero JSON files remain non-authoritative parser fixtures only, and the separately locked superseded non-series silicon baseline remains immutable historical input rather than current authority. Exact preW0 Cw/Sw/admission evidence may remain only as byte-identical inherited predecessor state proven by the authenticated seal. `Pw` contains no current-W0 result claiming itself, reachability/K4 result, archive, device trace, external bundle receipt, release projection, W0 `Cw`/`Sw`, or W0 admission claim.
-- `Cw` is an evidence-only one-parent child of exact W0 `Pw`. `Sw` is a one-receipt one-parent child of `Cw`. Only the externally bootstrapped admission service deterministically assembles and imports either.
+- `Cw` is an evidence-only one-parent child of exact W0 `Pw`. `Sw` is a
+  one-receipt one-parent child of `Cw`. Only the externally bootstrapped
+  admission service may first derive and close their exact bytes in non-host
+  quarantine, publish the bound advance-authorization request, stop until a
+  fresh `ProtectedRefAdvanceAuthorizationV1` is persisted and reopened, and
+  only then import/reopen those exact objects at the target host. No step may
+  combine non-host construction with a target-host effect.
 - Raw archive/IPA/app/appex/Mach-O, embedded profile/CMS, entitlements dump, signing certificate chain, raw CDHash, Team ID, profile UUID, device identifier, challenge, `devicectl` JSON/logs, app container, XPC trace, custody token, encryption key, or reopen grant never enters Git.
 - The preliminary `docs/superpowers/evidence/qinao-k4-platform-spike/` is not production evidence. Its source mechanisms may be migrated only through reviewed C3 rows; its logs, local signatures, beta-toolchain result, blocked device run, and marker text are never copied into an approved proof.
 - The 2026-07-19 CoreAI convergence plan is non-authoritative. Its corrected mechanics may guide implementation only after re-deriving them from the approved design and this plan. It is never named as an executable prerequisite, authority, gate source, or evidence source.
@@ -41,6 +48,29 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/
 - Every Swift filter runs through `scripts/run_nonempty_swift_filter.py`; zero discovered tests is failure.
 - Every commit stages an exact path list, compares that list before commit, and leaves a clean worktree. Never use broad `git add .`, `git add -A`, reset, checkout, restore, clean, amend, rebase, squash, or force-update.
 - Every checkbox below is one 2–5 minute action. Stop at the first unexpected output; do not reinterpret a RED or blocker as success.
+- Every multi-line fenced Bash block, including a single command split across
+  continuation lines, begins with `set -euo pipefail`. An expected nonzero
+  command uses only a tightly bounded `set +e`, captures its exact return code
+  and output, and immediately restores `set -euo pipefail`. In those blocks,
+  `git status`, `git diff`, and `git rev-list` output is never
+  tested directly through command substitution: first capture and validate the
+  Git return code, then test the captured bytes.
+
+### Mandatory graph-spec re-entry
+
+Tasks 2, 4, 11, and 12 are graph-bearing entry/freeze points. At every fresh
+session or restart, each task runs these commands after its Root Guard and
+before reading or changing a graph-bearing byte:
+
+```bash
+set -euo pipefail
+test "$(git rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+test "$(git show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
+```
+
+A missing object, wrong blob, wrong digest, replacement object, or nonzero
+exit is `BLOCKED_SOURCE_DRIFT`. A prose pin in this header is not execution
+evidence.
 
 ## Approved Dynamic Graph W0 Freeze Amendment
 
@@ -178,6 +208,7 @@ Task 2 runs the ten methods by fully qualified name, so a renamed or absent
 method is a load error rather than a passing module with old tests:
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id \
   scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_keeps_exact_sixteen_ids \
@@ -203,6 +234,7 @@ may be recorded as `BLOCKED_K4`.
 No task relies on shell variables surviving an old session. At every new shell, after the exact root guard and applied-lineage verifier, rederive the local comparison values:
 
 ```bash
+set -euo pipefail
 PREW0_PW="$(python3 -c 'import json; print(json.load(open("/private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json"))["new_payload_oid"])')"
 PREW0_PW_TREE="$(git rev-parse "$PREW0_PW^{tree}")"
 PREW0_SW="$(git rev-parse refs/heads/qinao-admitted)"
@@ -211,9 +243,15 @@ PREW0_SW="$(git rev-parse refs/heads/qinao-admitted)"
 Before Task 12, call `ProtectedAdmissionClient.reopen_admitted_predecessor()` immediately and replace the provisional `PREW0_SW` value only with the service-envelope-verified `seal_commit_oid`; compare its independently authenticated payload commit/tree/seal to all three values and then require the protected ref equals it. After Task 12, never rederive `PREW0_SW` from the mutable canonical ref. Retain the originally reopened opaque `AdmittedWaveV1`, rederive the candidate-local payload only from the clean frozen `HEAD`, and verify it against the service-envelope-verified lease:
 
 ```bash
+set -euo pipefail
 W0_PW="$(git rev-parse HEAD)"
 W0_PW_TREE="$(git rev-parse "$W0_PW^{tree}")"
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_REENTRY_STATUS="$(git status --porcelain=v1)"
+W0_REENTRY_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_REENTRY_STATUS_RC" = 0
+test -z "$W0_REENTRY_STATUS"
 ```
 
 The candidate never creates a payload ref. Bootstrap's separately authorized content-addressed pin and lease carry the authoritative payload commit/tree and predecessor binding. A missing candidate object, failed external pin, failed host reopen, absent service authentication, or inconsistent object/tree terminates as `BLOCKED_PAYLOAD_OBJECT_AVAILABILITY`; it is never reclassified as K4 absence. A crash before a candidate commit restarts the current task from its first guard. A crash after Bootstrap may have pinned or finalized asks the owning service to inspect exact already-applied state; it never repeats a write from memory, chooses “latest,” deletes an output, or manufactures a recovery receipt.
@@ -251,6 +289,10 @@ ProtectedAdmissionClient.assemble_import_and_finalize(
 `AdmittedWaveV1`, `PayloadProposalReceiptV1`, `EvaluationLease`,
 `ExternalPhysicalGateBinding`, and `AuthenticatedGateResultBundle` are opaque
 Bootstrap imports.
+`PayloadDispatchAuthorizationV1` and
+`ProtectedRefAdvanceAuthorizationV1` are separately signed, short-lived,
+append-only Bootstrap-service records. They are not client arguments or
+candidate JSON, and W0 never receives authority by copying their projections.
 W0 may compare documented read-only projections, but cannot define, mirror,
 subclass, serialize, or construct any of them. `AuthenticatedGateResultBundle`
 is emitted only by the protected B0 runner and binds the lease, immutable
@@ -268,13 +310,20 @@ logical pin already exists. The verification adapter proves those values bind
 the service's existing record before `run_active_gates(lease)` performs only
 query/resume. This is neither a new lease nor permission to repeat an effect.
 
-`assemble_import_and_finalize` is one indivisible generic service operation.
-It derives every Cw/Sw leaf and commit identity from the authenticated bundle
-and B0-frozen output contracts; constructs, imports, and reopens both commits;
-creates the import receipts and admission intent; performs the protected CAS;
-and finalizes the external attestation. Candidate code supplies no evidence
-leaf, commit message, author, committer, timestamp, parent, path, mode, blob,
-object pack, Cw/Sw OID, receipt, intent, CAS input, or final-attestation field.
+`assemble_import_and_finalize` is one idempotent generic service operation with
+one assembly identity, even when authorization separates its invocations. Its
+first invocation may derive every Cw/Sw leaf and exact Git object in a
+non-host quarantine, then stop before target-host import with
+`BLOCKED_EXTERNAL_BOOTSTRAP/CEREMONY_UNAVAILABLE` while the service control
+plane obtains a fresh `ProtectedRefAdvanceAuthorizationV1`. A later invocation
+with the same lease and byte-identical bundle reopens the same assembly
+identity and authorization; only then may it import/reopen the bound objects at
+the target Git host, create the one import receipt and admission intent,
+perform the protected CAS, and finalize the external attestation. It never
+constructs a second Cw/Sw or exposes a fifth client method. Candidate code
+supplies no evidence leaf, commit message, author, committer, timestamp,
+parent, path, mode, blob, object pack, Cw/Sw OID, receipt, intent, CAS input,
+authorization record, or final-attestation field.
 
 These are the only service operations visible to W0. If the client surface or
 signed service binding is absent/incomplete, stop with
@@ -528,6 +577,7 @@ Rules:
 Run from `/Users/changgeng/.codex/worktrees/e4d7/Project06`:
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 ```
 
@@ -536,6 +586,7 @@ Expected: one canonical JSON line whose exact sorted key set is `candidate_linea
 - [ ] **Step 2: Reopen B0 and the applied reparent transaction**
 
 ```bash
+set -euo pipefail
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-proposal /private/tmp/qinao-bootstrap-ceremony-v1/b0-proposal-v1.json
 python3 scripts/verify_qinao_bootstrap_export.py \
@@ -551,6 +602,7 @@ Expected: all three commands exit `0`; the first reports the exact B0 commit/tre
 - [ ] **Step 3: Prove the forensic refs and reparented `preW0 Pw` independently**
 
 ```bash
+set -euo pipefail
 test "$(git rev-parse refs/qinao-forensics/clean-candidate-22-commit-tip-20260723)" = 486e1ec5983ad4390c5b07f04607f1345b912c4c
 test "$(git for-each-ref --format='%(refname) %(objectname)' refs/qinao-forensics/prew0-preparation/ | wc -l | tr -d ' ')" = 1
 git for-each-ref --format='%(refname:strip=3) %(objectname)' refs/qinao-forensics/prew0-preparation/ |
@@ -558,7 +610,12 @@ git for-each-ref --format='%(refname:strip=3) %(objectname)' refs/qinao-forensic
 PREW0_PW="$(python3 -c 'import json; print(json.load(open("/private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json"))["new_payload_oid"])')"
 PREW0_PW_TREE="$(git rev-parse "$PREW0_PW^{tree}")"
 B0="$(python3 -c 'import json; print(json.load(open("/private/tmp/qinao-bootstrap-ceremony-v1/b0-proposal-v1.json"))["b0_oid"])')"
-test "$(git rev-list --parents -n 1 "$PREW0_PW")" = "$PREW0_PW $B0"
+set +e
+PREW0_PW_PARENT_LINE="$(git rev-list --parents -n 1 "$PREW0_PW")"
+PREW0_PW_PARENT_LINE_RC="$?"
+set -euo pipefail
+test "$PREW0_PW_PARENT_LINE_RC" = 0
+test "$PREW0_PW_PARENT_LINE" = "$PREW0_PW $B0"
 PREP="$(git for-each-ref --format='%(objectname)' refs/qinao-forensics/prew0-preparation/)"
 test "$(git rev-parse "$PREP^{tree}")" = "$PREW0_PW_TREE"
 ```
@@ -568,6 +625,7 @@ Expected: every assertion exits `0`.
 - [ ] **Step 4: Reopen the admitted receipt from the protected ref**
 
 ```bash
+set -euo pipefail
 PREW0_SW="$(git rev-parse refs/heads/qinao-admitted)"
 git show "$PREW0_SW:docs/superpowers/evidence/qinao-wave-admission/preW0.json" \
   > /private/tmp/qinao-prew0-admitted-receipt.json
@@ -597,6 +655,7 @@ Expected: one authenticated `AdmittedWaveV1`. If the service, attestation, or eq
 The current branch must derive W0 from the admitted seal, not from the earlier reparented payload. Run:
 
 ```bash
+set -euo pipefail
 CURRENT="$(git rev-parse HEAD)"
 if test "$CURRENT" = "$PREW0_PW"; then
   git merge --ff-only "$PREW0_SW"
@@ -607,7 +666,12 @@ else
   exit 2
 fi
 test "$(git rev-parse HEAD)" = "$PREW0_SW"
-test -z "$(git status --porcelain=v1)"
+set +e
+PREW0_FAST_FORWARD_STATUS="$(git status --porcelain=v1)"
+PREW0_FAST_FORWARD_STATUS_RC="$?"
+set -euo pipefail
+test "$PREW0_FAST_FORWARD_STATUS_RC" = 0
+test -z "$PREW0_FAST_FORWARD_STATUS"
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 ```
 
@@ -621,7 +685,7 @@ Then reopen `AdmittedWaveV1` again and require its seal equals current `HEAD`. E
 - Read: C0 inventory.
 - Modify and commit before import:
   `docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json`.
-- Create outside Git: `/private/tmp/qinao-c3-apply-plan.json`.
+- Create outside Git: `/private/tmp/qinao-c3-source-import-plan.json`.
 - Modify/create: only exact rows whose map `decision` is `import` and `destination_batch` is `C3`.
 
 **Interfaces:**
@@ -631,6 +695,7 @@ Then reopen `AdmittedWaveV1` again and require its seal equals current `HEAD`. E
 - [ ] **Step 1: Re-run root and predecessor guards**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
@@ -650,7 +715,13 @@ obtain the external two-person record, persist/reopen its append-only object,
 and authenticate its immutable receipt. Then require:
 
 ```bash
-test -z "$(git status --porcelain=v1)"
+set -euo pipefail
+set +e
+C3_PRE_REVIEW_STATUS="$(git status --porcelain=v1)"
+C3_PRE_REVIEW_STATUS_RC="$?"
+set -euo pipefail
+test "$C3_PRE_REVIEW_STATUS_RC" = 0
+test -z "$C3_PRE_REVIEW_STATUS"
 python3 scripts/qinao_import_review_v1.py --verify-fixed-export C3
 ```
 
@@ -706,19 +777,32 @@ archive, profile, runtime result, or device identity. Validate and commit only
 the reviewed map:
 
 ```bash
+set -euo pipefail
 python3 scripts/qinao_import_review_v1.py --apply-fixed-map-postimage C3
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_qinao_import_map.py \
+  --operation-batch C3 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
 git add docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
-test "$(git diff --cached --name-only)" = \
+set +e
+C3_MAP_CACHED_PATHS="$(git diff --cached --name-only)"
+C3_MAP_CACHED_PATHS_RC="$?"
+set -euo pipefail
+test "$C3_MAP_CACHED_PATHS_RC" = 0
+test "$C3_MAP_CACHED_PATHS" = \
   docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
 git commit -m "docs(qinao): review exact w0 c3 source slice"
 python3 scripts/qinao_import_review_v1.py --verify-fixed-export C3
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_qinao_import_map.py \
+  --operation-batch C3 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
-test -z "$(git status --porcelain=v1)"
+set +e
+C3_MAP_COMMIT_STATUS="$(git status --porcelain=v1)"
+C3_MAP_COMMIT_STATUS_RC="$?"
+set -euo pipefail
+test "$C3_MAP_COMMIT_STATUS_RC" = 0
+test -z "$C3_MAP_COMMIT_STATUS"
 ```
 
 A missing path/stratum, changed source byte, unauthenticated review, or set
@@ -732,11 +816,14 @@ different stratum.
 - [ ] **Step 3: Validate inventory and reviewed map**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/capture_qinao_candidate_inventory.py \
+  --operation-batch C3 \
   --root /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 \
   --verify \
   docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_qinao_import_map.py \
+  --operation-batch C3 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
 python3 - <<'PY'
@@ -774,6 +861,7 @@ Expected: both tools pass and the final line is exactly
 - [ ] **Step 4: Reject private preliminary K4 bytes**
 
 ```bash
+set -euo pipefail
 python3 -c 'import base64,json; d=json.load(open("docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json")); bad=[]; forbidden=("docs/superpowers/evidence/qinao-k4-platform-spike/spike/logs/","pre-w5-host-signed-entitlements.plist","pre-w5-extension-signed-entitlements.plist"); \
 [(bad.append(base64.b64decode(r["path_b64"],validate=True).decode("utf-8","strict"))) for r in d["rows"] if r["decision"]=="import" and r["destination_batch"]=="C3" and any(x in base64.b64decode(r["path_b64"],validate=True).decode("utf-8","strict") for x in forbidden)]; assert not bad,bad'
 ```
@@ -783,13 +871,14 @@ Expected: exit `0`; no raw log or signed dump is selected.
 - [ ] **Step 5: Prepare the destination-CAS plan**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/apply_qinao_import_map.py \
   --candidate-root /Users/changgeng/.codex/worktrees/e4d7/Project06 \
   --source-root /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json \
   --prepare-batch C3 \
-  --output-plan /private/tmp/qinao-c3-apply-plan.json
+  --output-plan /private/tmp/qinao-c3-source-import-plan.json
 ```
 
 Expected: `apply_plan_status=prepared batch=C3 rows=20`; candidate
@@ -798,6 +887,7 @@ index/worktree remains clean.
 - [ ] **Step 6: Apply the exact plan**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 test "$(git rev-parse refs/heads/qinao-admitted)" = "$PREW0_SW"
 git merge-base --is-ancestor "$PREW0_SW" HEAD
@@ -806,7 +896,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/apply_qinao_import_map.py \
   --source-root /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json \
-  --apply-plan /private/tmp/qinao-c3-apply-plan.json
+  --apply-plan /private/tmp/qinao-c3-source-import-plan.json
 ```
 
 Between the root/ancestry assertions and apply, independently reopen the signed admitted predecessor through the service. Expected: destination-CAS apply passes; every selected postimage/mode equals the reviewed source stratum and only those paths are staged.
@@ -814,9 +904,21 @@ Between the root/ancestry assertions and apply, independently reopen the signed 
 - [ ] **Step 7: Commit only the selected C3 paths**
 
 ```bash
-python3 -c 'import base64,json,subprocess; d=json.load(open("/private/tmp/qinao-c3-apply-plan.json")); expected=b"".join(base64.b64decode(r["path_b64"],validate=True)+b"\0" for r in d["rows"]); actual=subprocess.check_output(["git","diff","--cached","--name-only","-z"]); assert actual==expected,(expected,actual)'
+set -euo pipefail
+python3 -c 'import base64,json,subprocess; d=json.load(open("/private/tmp/qinao-c3-source-import-plan.json")); expected=b"".join(base64.b64decode(r["path_b64"],validate=True)+b"\0" for r in d["rows"]); actual=subprocess.check_output(["git","diff","--cached","--name-only","-z"]); assert actual==expected,(expected,actual)'
 git commit -m "build(qinao): import reviewed W0 safety slice"
-test -z "$(git status --porcelain=v1)"
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/apply_qinao_import_map.py \
+  --candidate-root /Users/changgeng/.codex/worktrees/e4d7/Project06 \
+  --source-root /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 \
+  --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
+  --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json \
+  --finalize-plan /private/tmp/qinao-c3-source-import-plan.json
+set +e
+C3_IMPORT_COMMIT_STATUS="$(git status --porcelain=v1)"
+C3_IMPORT_COMMIT_STATUS_RC="$?"
+set -euo pipefail
+test "$C3_IMPORT_COMMIT_STATUS_RC" = 0
+test -z "$C3_IMPORT_COMMIT_STATUS"
 git merge-base --is-ancestor "$PREW0_SW" HEAD
 ```
 
@@ -890,12 +992,15 @@ this task's staging set.
 - [ ] **Step 0: Re-enter through the permanent guard**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
   /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json
 test "$(git rev-parse refs/heads/qinao-admitted)" = "$PREW0_SW"
 test "$(git rev-parse "$PREW0_PW^{tree}")" = "$PREW0_PW_TREE"
+test "$(git rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+test "$(git show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
 ```
 
 Then independently call `ProtectedAdmissionClient.reopen_admitted_predecessor()` and require the exact `PREW0_PW/PREW0_PW_TREE/PREW0_SW` tuple. Expected: all checks pass before a file is created.
@@ -928,6 +1033,7 @@ final closed arguments and raises the same diagnostic. Syntax, import,
 attribute, or zero-discovery failure is invalid RED.
 
 ```bash
+set -euo pipefail
 set +e
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id \
@@ -942,7 +1048,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_future_graph_contract_is_rejected_at_w0 \
   >/private/tmp/qinao-w0-graph-red.txt 2>&1
 GRAPH_RED_RC="$?"
-set -e
+set -euo pipefail
 test "$GRAPH_RED_RC" = 1
 python3 - <<'PY'
 from pathlib import Path
@@ -969,12 +1075,13 @@ PY
 Then run the complete module once:
 
 ```bash
+set -euo pipefail
 set +e
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_w0_safety \
   >/private/tmp/qinao-w0-safety-full-red.txt 2>&1
 FULL_RED_RC="$?"
-set -e
+set -euo pipefail
 test "$FULL_RED_RC" = 1
 python3 - <<'PY'
 import re
@@ -1025,14 +1132,25 @@ Qinao shipping products do not contain concrete Provider runtimes
 Run:
 
 ```bash
+set -euo pipefail
+set +e
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path BehavioralAISubstrate \
   --filter BASW0SafetyFreezeTests \
-  --require-suite BehavioralAISubstrateTests.BASW0SafetyFreezeTests
+  --require-suite BehavioralAISubstrateTests.BASW0SafetyFreezeTests \
+  >/private/tmp/qinao-w0-bas-safety-red.txt 2>&1
+W0_BAS_SAFETY_RED_RC="$?"
+set -euo pipefail
+test "$W0_BAS_SAFETY_RED_RC" = 1
+set +e
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path QinaoRuntimeSDK \
   --filter QinaoW0SafetyFreezeTests \
-  --require-suite QinaoRuntimeSDKTests.QinaoW0SafetyFreezeTests
+  --require-suite QinaoRuntimeSDKTests.QinaoW0SafetyFreezeTests \
+  >/private/tmp/qinao-w0-qinao-safety-red.txt 2>&1
+W0_QINAO_SAFETY_RED_RC="$?"
+set -euo pipefail
+test "$W0_QINAO_SAFETY_RED_RC" = 1
 ```
 
 Expected: each suite is discovered and fails on at least one real current hazard; compilation succeeds without a future API.
@@ -1052,6 +1170,7 @@ transitive source/build/link graph and must be exactly `readOnly` or
 The two mutually exclusive invocation shapes are exactly:
 
 ```bash
+set -euo pipefail
 python3 scripts/check_qinao_w0_safety.py \
   --root . \
   --contract docs/superpowers/specs/qinao-w0-safety-freeze-v1.json \
@@ -1070,6 +1189,7 @@ python3 scripts/check_qinao_w0_safety.py \
 - [ ] **Step 4: Make checker tests green**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id \
   scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_keeps_exact_sixteen_ids \
@@ -1094,20 +1214,31 @@ negative all execute.
 - [ ] **Step 5: Commit the contract/checker/test slice**
 
 ```bash
+set -euo pipefail
 git add \
   docs/superpowers/specs/qinao-w0-safety-freeze-v1.json \
   scripts/check_qinao_w0_safety.py \
   scripts/test_check_qinao_w0_safety.py \
   BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASW0SafetyFreezeTests.swift \
   QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoW0SafetyFreezeTests.swift
-test "$(git diff --cached --name-only | LC_ALL=C sort)" = "$(printf '%s\n' \
+set +e
+W0_CONTRACT_CACHED_PATHS="$(git diff --cached --name-only)"
+W0_CONTRACT_CACHED_PATHS_RC="$?"
+set -euo pipefail
+test "$W0_CONTRACT_CACHED_PATHS_RC" = 0
+test "$(printf '%s\n' "$W0_CONTRACT_CACHED_PATHS" | LC_ALL=C sort)" = "$(printf '%s\n' \
   BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASW0SafetyFreezeTests.swift \
   QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoW0SafetyFreezeTests.swift \
   docs/superpowers/specs/qinao-w0-safety-freeze-v1.json \
   scripts/check_qinao_w0_safety.py \
   scripts/test_check_qinao_w0_safety.py | LC_ALL=C sort)"
 git commit -m "test(qinao): freeze W0 safety boundaries"
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_CONTRACT_COMMIT_STATUS="$(git status --porcelain=v1)"
+W0_CONTRACT_COMMIT_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_CONTRACT_COMMIT_STATUS_RC" = 0
+test -z "$W0_CONTRACT_COMMIT_STATUS"
 ```
 
 Expected: exact five-path commit.
@@ -1128,6 +1259,7 @@ Expected: exact five-path commit.
 - [ ] **Step 0: Re-enter through the permanent guard**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
@@ -1143,15 +1275,17 @@ Then independently reopen the signed admitted predecessor through the service. E
 On the clean index, run:
 
 ```bash
+set -euo pipefail
 set +e
 python3 scripts/check_qinao_w0_safety.py \
   --root . \
   --contract docs/superpowers/specs/qinao-w0-safety-freeze-v1.json \
   --diagnostic-staged \
-  --output /private/tmp/qinao-w0-runtime-preedit.json
-STATUS="$?"
-set -e
-test "$STATUS" = 1
+  --output /private/tmp/qinao-w0-runtime-preedit.json \
+  >/private/tmp/qinao-w0-runtime-preedit-command.txt 2>&1
+W0_RUNTIME_PREEDIT_RC="$?"
+set -euo pipefail
+test "$W0_RUNTIME_PREEDIT_RC" = 1
 python3 -c 'import base64,json; d=json.load(open("/private/tmp/qinao-w0-runtime-preedit.json")); rows=d["reviewed_change_paths_b64"]; assert rows==sorted(set(rows)); assert rows; open("/private/tmp/qinao-w0-runtime-reviewed-paths.z","wb").write(b"".join(base64.b64decode(x,validate=True)+b"\0" for x in rows))'
 ```
 
@@ -1160,6 +1294,7 @@ Expected: all predicates execute, the diagnostic result says `status = preflight
 - [ ] **Step 1: Run the exact imported Provider suites**
 
 ```bash
+set -euo pipefail
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path BehavioralAISubstrate \
   --filter BASProviderBoundaryTests \
@@ -1175,6 +1310,7 @@ Expected: BAS discovers at least 2 tests; Qinao discovers at least 3; inventory 
 - [ ] **Step 2: Run the exact imported BAS runtime suites**
 
 ```bash
+set -euo pipefail
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path BehavioralAISubstrate \
   --filter 'BASNativeStageExecutorTests|BASTurnRuntimeNativeV2DispatchTests|BASSyntheticExecutionReceiptFreezeTests|BASSovereignReceiptHonestyTests|BASRoutedMemoryFlipTests' \
@@ -1191,6 +1327,7 @@ including every test in the existing routed-memory flip suite.
 - [ ] **Step 3: Run the exact imported Qinao runtime/effect suites**
 
 ```bash
+set -euo pipefail
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path QinaoRuntimeSDK \
   --filter 'QinaoRuntimeGateTests|QinaoTokenSigningTests|QinaoSovereignHostAssemblyTests|QinaoEffectFacadeFreezeTests' \
@@ -1265,10 +1402,16 @@ diagnostics.
 Use the exact pre-edit `/private/tmp/qinao-w0-runtime-reviewed-paths.z` from Step 0A. Require every changed path to be in that frozen set and every frozen path to have its prescribed postcondition; then:
 
 ```bash
+set -euo pipefail
 git add --pathspec-from-file=/private/tmp/qinao-w0-runtime-reviewed-paths.z --pathspec-file-nul
 python3 -c 'import subprocess; expected=open("/private/tmp/qinao-w0-runtime-reviewed-paths.z","rb").read(); actual=subprocess.check_output(["git","diff","--cached","--name-only","-z"]); assert actual==expected,(expected,actual)'
 git commit -m "fix(qinao): fail closed at W0 runtime boundaries"
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_RUNTIME_COMMIT_STATUS="$(git status --porcelain=v1)"
+W0_RUNTIME_COMMIT_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_RUNTIME_COMMIT_STATUS_RC" = 0
+test -z "$W0_RUNTIME_COMMIT_STATUS"
 ```
 
 Expected: one byte-exact reviewable correction commit; no unknown path and no evidence/result file.
@@ -1296,12 +1439,15 @@ Expected: one byte-exact reviewable correction commit; no unknown path and no ev
 - [ ] **Step 0: Re-enter through the permanent guard**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
   /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json
 test "$(git rev-parse refs/heads/qinao-admitted)" = "$PREW0_SW"
 test "$(git rev-parse "$PREW0_PW^{tree}")" = "$PREW0_PW_TREE"
+test "$(git rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+test "$(git show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
 ```
 
 Then independently reopen the signed admitted predecessor through the service. Expected: exact tuple equality.
@@ -1312,10 +1458,18 @@ First prove this task did not edit its input contracts and run all ten exact
 focused tests:
 
 ```bash
-test -z "$(git diff --name-only -- \
+set -euo pipefail
+set +e
+W0_GRAPH_INPUT_DIFF="$(
+  git diff --name-only -- \
   docs/superpowers/specs/qinao-w0-safety-freeze-v1.json \
   scripts/check_qinao_w0_safety.py \
-  scripts/test_check_qinao_w0_safety.py)"
+  scripts/test_check_qinao_w0_safety.py
+)"
+W0_GRAPH_INPUT_DIFF_RC="$?"
+set -euo pipefail
+test "$W0_GRAPH_INPUT_DIFF_RC" = 0
+test -z "$W0_GRAPH_INPUT_DIFF"
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id \
   scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_keeps_exact_sixteen_ids \
@@ -1405,6 +1559,7 @@ Scan current production factories, singletons, actors, registries, SQLite writer
 - [ ] **Step 6: Run and commit**
 
 ```bash
+set -euo pipefail
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path BehavioralAISubstrate \
   --filter BASW0SafetyFreezeTests \
@@ -1413,12 +1568,23 @@ python3 scripts/run_nonempty_swift_filter.py \
   --package-path QinaoRuntimeSDK \
   --filter QinaoW0SafetyFreezeTests \
   --require-suite QinaoRuntimeSDKTests.QinaoW0SafetyFreezeTests
-git diff --name-only | LC_ALL=C sort \
+set +e
+W0_APP_AGENT_REVIEWED_PATHS="$(git diff --name-only)"
+W0_APP_AGENT_REVIEWED_PATHS_RC="$?"
+set -euo pipefail
+test "$W0_APP_AGENT_REVIEWED_PATHS_RC" = 0
+test -n "$W0_APP_AGENT_REVIEWED_PATHS"
+printf '%s\n' "$W0_APP_AGENT_REVIEWED_PATHS" | LC_ALL=C sort \
   > /private/tmp/qinao-w0-app-agent-reviewed-paths.txt
 test -s /private/tmp/qinao-w0-app-agent-reviewed-paths.txt
 python3 -c 'from pathlib import Path; rows=Path("/private/tmp/qinao-w0-app-agent-reviewed-paths.txt").read_text().splitlines(); roots=("BehavioralAISubstrate/Sources/","QinaoRuntimeSDK/Sources/"); assert rows==sorted(set(rows)); assert all(any(row.startswith(root) for root in roots) for row in rows)'
 git add --pathspec-from-file=/private/tmp/qinao-w0-app-agent-reviewed-paths.txt
-git diff --cached --name-only | LC_ALL=C sort \
+set +e
+W0_APP_AGENT_CACHED_PATHS="$(git diff --cached --name-only)"
+W0_APP_AGENT_CACHED_PATHS_RC="$?"
+set -euo pipefail
+test "$W0_APP_AGENT_CACHED_PATHS_RC" = 0
+printf '%s\n' "$W0_APP_AGENT_CACHED_PATHS" | LC_ALL=C sort \
   > /private/tmp/qinao-w0-app-agent-staged.txt
 cmp /private/tmp/qinao-w0-app-agent-reviewed-paths.txt \
   /private/tmp/qinao-w0-app-agent-staged.txt
@@ -1428,7 +1594,12 @@ python3 scripts/check_qinao_w0_safety.py \
   --diagnostic-staged \
   --output /private/tmp/qinao-w0-app-agent-precommit.json
 git commit -m "fix(qinao): isolate W0 agent identity and persona"
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_APP_AGENT_COMMIT_STATUS="$(git status --porcelain=v1)"
+W0_APP_AGENT_COMMIT_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_APP_AGENT_COMMIT_STATUS_RC" = 0
+test -z "$W0_APP_AGENT_COMMIT_STATUS"
 ```
 
 Expected: suites pass, the checker reports one legal `refresh`
@@ -1490,6 +1661,7 @@ def analyze_payload(
 - [ ] **Step 0: Re-enter through the permanent guard**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
@@ -1526,15 +1698,17 @@ Each planted shipping edge fails; the same edge under an exact non-shipping fixt
 Run the compare-only analyzer against the clean worktree's complete checked-in release graph:
 
 ```bash
+set -euo pipefail
 set +e
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_qinao_learning_legacy_reachability.py \
   --root . \
   --policy docs/superpowers/specs/qinao-learning-legacy-disposition-v1.json \
   --diagnostic-worktree \
-  --output /private/tmp/qinao-learning-legacy-preedit.json
-STATUS="$?"
-set -e
-test "$STATUS" = 1
+  --output /private/tmp/qinao-learning-legacy-preedit.json \
+  >/private/tmp/qinao-learning-legacy-preedit-command.txt 2>&1
+W0_LEARNING_PREEDIT_RC="$?"
+set -euo pipefail
+test "$W0_LEARNING_PREEDIT_RC" = 1
 python3 -c 'import base64,json; d=json.load(open("/private/tmp/qinao-learning-legacy-preedit.json")); rows=d["required_source_fence_paths_b64"]; assert rows==sorted(set(rows)); assert rows; base=b"docs/superpowers/specs/qinao-learning-legacy-disposition-v1.json\0docs/superpowers/specs/qinao-learning-legacy-reachability-v1.schema.json\0scripts/check_qinao_learning_legacy_reachability.py\0scripts/test_check_qinao_learning_legacy_reachability.py\0"; paths=sorted(set(base.split(b"\0")[:-1]+[base64.b64decode(x,validate=True) for x in rows])); open("/private/tmp/qinao-learning-legacy-reviewed-paths.z","wb").write(b"".join(x+b"\0" for x in paths))'
 ```
 
@@ -1543,8 +1717,14 @@ Expected: `status = preflight`, failed disposition verdict, exact nonempty sorte
 - [ ] **Step 3: Run RED**
 
 ```bash
+set -euo pipefail
+set +e
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_check_qinao_learning_legacy_reachability
+  scripts.test_check_qinao_learning_legacy_reachability \
+  >/private/tmp/qinao-learning-legacy-red.txt 2>&1
+W0_LEARNING_RED_RC="$?"
+set -euo pipefail
+test "$W0_LEARNING_RED_RC" = 1
 ```
 
 Expected: at least 24 tests discovered and import/behavior RED.
@@ -1575,6 +1755,7 @@ Do not create the future K3 lifecycle, dataset owner, trainer owner, certificati
 - [ ] **Step 6: Make tests green**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_learning_legacy_reachability
 ```
@@ -1586,10 +1767,16 @@ Expected: at least 24 tests pass; all 12 policy rows exercised; every negative d
 Build `/private/tmp/qinao-learning-legacy-reviewed-paths.z` from the four contract/tool paths plus the analyzer's exact sorted `required_source_fence_paths_b64`; compare it to the complete changed set, then:
 
 ```bash
+set -euo pipefail
 git add --pathspec-from-file=/private/tmp/qinao-learning-legacy-reviewed-paths.z --pathspec-file-nul
 python3 -c 'import subprocess; expected=open("/private/tmp/qinao-learning-legacy-reviewed-paths.z","rb").read(); actual=subprocess.check_output(["git","diff","--cached","--name-only","-z"]); assert actual==expected,(expected,actual)'
 git commit -m "fix(qinao): fence legacy learning mouths at W0"
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_LEARNING_COMMIT_STATUS="$(git status --porcelain=v1)"
+W0_LEARNING_COMMIT_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_LEARNING_COMMIT_STATUS_RC" = 0
+test -z "$W0_LEARNING_COMMIT_STATUS"
 ```
 
 Expected: no generated reachability result in the commit.
@@ -1630,6 +1817,7 @@ def validate_fixture_set(root: Path) -> tuple[CausalFixture, ...]
 - [ ] **Step 0: Re-enter through the permanent guard**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
@@ -1677,8 +1865,14 @@ Each differs from positive by one semantic mutation and names one exact diagnost
 - [ ] **Step 3: Write and run RED tests**
 
 ```bash
+set -euo pipefail
+set +e
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_check_qinao_learning_causal_fixtures
+  scripts.test_check_qinao_learning_causal_fixtures \
+  >/private/tmp/qinao-learning-causal-red.txt 2>&1
+W0_CAUSAL_RED_RC="$?"
+set -euo pipefail
+test "$W0_CAUSAL_RED_RC" = 1
 ```
 
 Expected: at least 25 tests discovered and behavior RED.
@@ -1690,6 +1884,7 @@ Reject unknown keys, duplicate stages/fanouts, out-of-order stages, multiple spl
 - [ ] **Step 5: Make tests green and commit**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_learning_causal_fixtures
 git add \
@@ -1698,7 +1893,12 @@ git add \
   scripts/test_check_qinao_learning_causal_fixtures.py \
   scripts/fixtures/qinao-learning-causal-v1
 git commit -m "test(qinao): freeze governed learning causal order"
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_CAUSAL_COMMIT_STATUS="$(git status --porcelain=v1)"
+W0_CAUSAL_COMMIT_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_CAUSAL_COMMIT_STATUS_RC" = 0
+test -z "$W0_CAUSAL_COMMIT_STATUS"
 ```
 
 Expected: all tests pass; exact fixture set committed.
@@ -1742,6 +1942,7 @@ def independent_support_count(rows: tuple[AgentEnvelope, ...]) -> int
 - [ ] **Step 0: Re-enter through the permanent guard**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
@@ -1786,22 +1987,45 @@ cross-workspace-artifact
 - [ ] **Step 3: Write/run RED and implement**
 
 ```bash
+set -euo pipefail
+set +e
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_check_qinao_main_sub_envelopes \
+  >/private/tmp/qinao-main-sub-envelope-red.txt 2>&1
+W0_ENVELOPE_RED_RC="$?"
+set -euo pipefail
+test "$W0_ENVELOPE_RED_RC" = 1
+```
+
+Expected RED before implementation. Implement the parser and validator, then
+rerun under strict mode:
+
+```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_main_sub_envelopes
 ```
 
-Expected RED before implementation; after implementation at least 42 tests pass. Parser has a 64 KiB document cap, rejects duplicate JSON keys, requires canonical bytes, uses UTC timestamps, bounds every string/array, and never logs rejected raw values.
+Expected: at least 42 tests pass. Parser has a 64 KiB document cap, rejects
+duplicate JSON keys, requires canonical bytes, uses UTC timestamps, bounds
+every string/array, and never logs rejected raw values.
 
 - [ ] **Step 4: Commit**
 
 ```bash
+set -euo pipefail
 git add \
   docs/superpowers/specs/qinao-main-sub-envelope-fixture-v1.schema.json \
   scripts/check_qinao_main_sub_envelopes.py \
   scripts/test_check_qinao_main_sub_envelopes.py \
   scripts/fixtures/qinao-main-sub-envelope-v1
 git commit -m "test(qinao): freeze independent agent envelopes"
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_ENVELOPE_COMMIT_STATUS="$(git status --porcelain=v1)"
+W0_ENVELOPE_COMMIT_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_ENVELOPE_COMMIT_STATUS_RC" = 0
+test -z "$W0_ENVELOPE_COMMIT_STATUS"
 ```
 
 Expected: exact four responsibility groups committed; no runtime multi-agent scheduler created.
@@ -2087,6 +2311,7 @@ encrypted-ephemeral-cleanup
 - [ ] **Step 0: Re-enter through the permanent guard**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
@@ -2108,8 +2333,14 @@ projection without reopen, projection before cleanup, wrong cleanup terminal,
 and any import/construction of an opaque Bootstrap binding.
 
 ```bash
+set -euo pipefail
+set +e
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_qinao_k4_protocol_v1
+  scripts.test_qinao_k4_protocol_v1 \
+  >/private/tmp/qinao-k4-protocol-red.txt 2>&1
+K4_PROTOCOL_RED_RC="$?"
+set -euo pipefail
+test "$K4_PROTOCOL_RED_RC" = 1
 ```
 
 Expected: at least 36 tests discovered and the forbidden opaque-binding
@@ -2122,6 +2353,7 @@ Use frozen dataclasses, exact field-name sets, duplicate-key rejection, canonica
 - [ ] **Step 3: Make protocol tests green**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_k4_protocol_v1
 ```
@@ -2173,6 +2405,7 @@ root, post-destroy read, destruction-before-retention, cleanup-terminal
 mismatch, and a fake capability field.
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_k4_custody_v1
 ```
@@ -2182,6 +2415,7 @@ Expected: at least 20 tests pass; no external service is falsely claimed.
 - [ ] **Step 6: Commit schemas/protocol/custody**
 
 ```bash
+set -euo pipefail
 git add \
   docs/superpowers/specs/qinao-k4-production-run-v1.schema.json \
   docs/superpowers/specs/qinao-k4-private-bundle-manifest-v1.schema.json \
@@ -2190,8 +2424,32 @@ git add \
   scripts/test_qinao_k4_protocol_v1.py \
   scripts/qinao_k4_custody_v1.py \
   scripts/test_qinao_k4_custody_v1.py
+set +e
+K4_CONTRACT_CACHED_PATHS="$(git diff --cached --name-only)"
+K4_CONTRACT_CACHED_PATHS_RC="$?"
+set -euo pipefail
+test "$K4_CONTRACT_CACHED_PATHS_RC" = 0
+test "$(
+  printf '%s\n' "$K4_CONTRACT_CACHED_PATHS" |
+    LC_ALL=C sort
+)" = "$(
+  printf '%s\n' \
+    docs/superpowers/specs/qinao-k4-private-bundle-manifest-v1.schema.json \
+    docs/superpowers/specs/qinao-k4-production-run-v1.schema.json \
+    docs/superpowers/specs/qinao-k4-public-projection-v1.schema.json \
+    scripts/qinao_k4_custody_v1.py \
+    scripts/qinao_k4_protocol_v1.py \
+    scripts/test_qinao_k4_custody_v1.py \
+    scripts/test_qinao_k4_protocol_v1.py |
+    LC_ALL=C sort
+)"
 git commit -m "test(qinao): define fail-closed K4 parity contract"
-test -z "$(git status --porcelain=v1)"
+set +e
+K4_CONTRACT_COMMIT_STATUS="$(git status --porcelain=v1)"
+K4_CONTRACT_COMMIT_STATUS_RC="$?"
+set -euo pipefail
+test "$K4_CONTRACT_COMMIT_STATUS_RC" = 0
+test -z "$K4_CONTRACT_COMMIT_STATUS"
 ```
 
 Expected: exact seven-path commit.
@@ -2215,6 +2473,7 @@ Expected: exact seven-path commit.
 - [ ] **Step 0: Re-enter through the permanent guard**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
@@ -2256,8 +2515,14 @@ manifest source-provenance mismatch
 Run:
 
 ```bash
+set -euo pipefail
+set +e
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_qinao_k4_probe_source
+  scripts.test_qinao_k4_probe_source \
+  >/private/tmp/qinao-k4-probe-source-red.txt 2>&1
+K4_PROBE_SOURCE_RED_RC="$?"
+set -euo pipefail
+test "$K4_PROBE_SOURCE_RED_RC" = 1
 ```
 
 Expected: at least 18 tests are discovered and fail before adaptation.
@@ -2308,6 +2573,7 @@ Generate `source-manifest-v1.json` only after all 20 target postimages are final
 Run:
 
 ```bash
+set -euo pipefail
 find scripts/fixtures/qinao-k4-platform-probe -type f -print | LC_ALL=C sort \
   > /private/tmp/qinao-k4-probe-actual.txt
 python3 -c 'from pathlib import Path; from scripts.qinao_k4_protocol_v1 import K4_PROBE_PATHS_V1; rows=Path("/private/tmp/qinao-k4-probe-actual.txt").read_text().splitlines(); assert tuple(rows)==K4_PROBE_PATHS_V1; assert len(rows)==21'
@@ -2335,8 +2601,15 @@ The source must:
 `source-manifest-v1.json` binds the exact 20 other final paths and their C3 source provenance, excludes itself, has `authority = "none"` and `proof_status = "source_only"`, and contains no absolute path/account/device/profile/certificate identifier.
 
 ```bash
+set -euo pipefail
+set +e
 rg -n '/Users/|UDID|TeamIdentifier|ProvisionedDevices|DeveloperCertificates|BEGIN (RSA |EC )?PRIVATE KEY|K4SPIKE PASS|ARCHIVE SUCCEEDED|valid on disk' \
-  scripts/fixtures/qinao-k4-platform-probe
+  scripts/fixtures/qinao-k4-platform-probe \
+  >/private/tmp/qinao-k4-probe-privacy-scan.txt 2>&1
+K4_PRIVACY_SCAN_RC="$?"
+set -euo pipefail
+test "$K4_PRIVACY_SCAN_RC" = 1
+test ! -s /private/tmp/qinao-k4-probe-privacy-scan.txt
 ```
 
 Expected: exit `1` with zero matches. Exit `2` is failure.
@@ -2344,6 +2617,7 @@ Expected: exit `1` with zero matches. Exit `2` is failure.
 - [ ] **Step 7: Make source tests green**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_k4_probe_source
 ```
@@ -2353,12 +2627,29 @@ Expected: at least 18 tests pass, exact 21-path/source-provenance checks include
 - [ ] **Step 8: Unsigned public-API build is only a fixture test**
 
 Before `Pw`, the candidate parity harness clears inherited Xcode selectors,
-discovers one local Xcode installation, and requires its observed major version
-to be 27 before setting parity-local `SELECTED_DEVELOPER_DIR`. This is compile
-coverage only: it neither consumes a Bootstrap binding nor selects a W0
-release. Run:
+reads the host's one active `xcode-select` developer directory, and requires
+its observed major version to be 27 before setting parity-local
+`SELECTED_DEVELOPER_DIR`. It does not scan for or choose among installations.
+This is compile coverage only: it neither consumes a Bootstrap binding nor
+selects a W0 release. Run:
 
 ```bash
+set -euo pipefail
+unset DEVELOPER_DIR TOOLCHAINS SDKROOT
+SELECTED_DEVELOPER_DIR="$(/usr/bin/xcode-select --print-path)"
+test -n "$SELECTED_DEVELOPER_DIR"
+test -x "$SELECTED_DEVELOPER_DIR/usr/bin/xcodebuild"
+test -x /usr/bin/xcrun
+XCODE_VERSION="$("$SELECTED_DEVELOPER_DIR/usr/bin/xcodebuild" -version)"
+case "$XCODE_VERSION" in
+  "Xcode 27."*) ;;
+  *) printf '%s\n' "$XCODE_VERSION" >&2; exit 1 ;;
+esac
+test "$(
+  env -u TOOLCHAINS -u SDKROOT \
+    DEVELOPER_DIR="$SELECTED_DEVELOPER_DIR" \
+    /usr/bin/xcrun --find xcodebuild
+)" = "$SELECTED_DEVELOPER_DIR/usr/bin/xcodebuild"
 "$SELECTED_DEVELOPER_DIR/usr/bin/xcodebuild" \
   -project scripts/fixtures/qinao-k4-platform-probe/K4PlatformSpike.xcodeproj \
   -scheme K4SpikeHost \
@@ -2367,24 +2658,75 @@ release. Run:
   -derivedDataPath /private/tmp/qinao-k4-probe-unsigned-derived \
   CODE_SIGNING_ALLOWED=NO \
   clean build
-"$SELECTED_DEVELOPER_DIR/usr/bin/xcrun" --sdk iphoneos swiftc -typecheck \
+env -u TOOLCHAINS -u SDKROOT \
+  DEVELOPER_DIR="$SELECTED_DEVELOPER_DIR" \
+  /usr/bin/xcrun --sdk iphoneos swiftc -typecheck \
   -target arm64-apple-ios27.0 \
   scripts/fixtures/qinao-k4-platform-probe/fixtures/EnhancedSecurityInitializerShapes.swift \
   scripts/fixtures/qinao-k4-platform-probe/fixtures/XPCReplyShapes.swift
+set +e
+env -u TOOLCHAINS -u SDKROOT \
+  DEVELOPER_DIR="$SELECTED_DEVELOPER_DIR" \
+  /usr/bin/xcrun --sdk iphoneos swiftc -typecheck \
+  -target arm64-apple-ios27.0 \
+  scripts/fixtures/qinao-k4-platform-probe/fixtures/NoGeneratedProtocol.swift \
+  >/private/tmp/qinao-k4-no-generated-protocol.txt 2>&1
+NO_GENERATED_PROTOCOL_RC="$?"
+set -euo pipefail
+test "$NO_GENERATED_PROTOCOL_RC" = 1
+set +e
+K4_EXPECTED_PRIMARY_COUNT="$(
+  rg -c \
+    "^[^:]+:[0-9]+:[0-9]+: error: cannot find type 'SovereignK4' in scope$" \
+    /private/tmp/qinao-k4-no-generated-protocol.txt
+)"
+K4_EXPECTED_PRIMARY_RG_RC="$?"
+K4_ALL_PRIMARY_COUNT="$(
+  rg -c \
+    "^[^:]+:[0-9]+:[0-9]+: (error|warning): .+$" \
+    /private/tmp/qinao-k4-no-generated-protocol.txt
+)"
+K4_ALL_PRIMARY_RG_RC="$?"
+set -euo pipefail
+test "$K4_EXPECTED_PRIMARY_RG_RC" = 0
+test "$K4_ALL_PRIMARY_RG_RC" = 0
+test "$K4_EXPECTED_PRIMARY_COUNT" = 1
+test "$K4_ALL_PRIMARY_COUNT" = 1
 ```
 
-Expected: both pass. This is API/source coverage only and cannot satisfy K4.
+Expected: selector/version/resolution checks and both builds pass. The source
+tests execute the selector block against a fake Xcode 27, a wrong-major
+installation, a missing `xcodebuild`, an inherited-selector attempt, and an
+`xcrun` resolution mismatch; only the first passes. The negative fixture must
+exit exactly `1` for the one missing `SovereignK4` type diagnostic; exit `2`,
+a missing file, a tool failure, or another compiler diagnostic is not the
+expected negative. This is API/source coverage only and cannot satisfy K4.
 
 - [ ] **Step 9: Remove temporary preliminary inputs and commit the adapted source**
 
 Delete only the exact 20 C3-imported preliminary input paths after the manifest/test have verified their provenance and the final 20 postimages. Do not delete a pre-existing preliminary path outside that exact set. Build a reviewed NUL-delimited pathspec containing the 20 deletions, the 21 final probe paths, and `scripts/test_qinao_k4_probe_source.py`; compare it byte-for-byte to the staged set, then:
 
 ```bash
+set -euo pipefail
 python3 -c 'from scripts.qinao_k4_protocol_v1 import K4_PROBE_PATHS_V1; tp="scripts/fixtures/qinao-k4-platform-probe/"; sp="docs/superpowers/evidence/qinao-k4-platform-spike/spike/"; targets=list(K4_PROBE_PATHS_V1); sources=[sp+p[len(tp):] for p in targets if not p.endswith("/source-manifest-v1.json")]; paths=sorted(set(sources+targets+["scripts/test_qinao_k4_probe_source.py"])); assert len(sources)==20 and len(targets)==21 and len(paths)==42; open("/private/tmp/qinao-k4-probe-reviewed-paths.z","wb").write(b"".join(p.encode("utf-8")+b"\0" for p in paths))'
 git add --pathspec-from-file=/private/tmp/qinao-k4-probe-reviewed-paths.z --pathspec-file-nul
+set +e
+K4_PROBE_CACHED_PATHS="$(git diff --cached --name-only)"
+K4_PROBE_CACHED_PATHS_RC="$?"
+set -euo pipefail
+test "$K4_PROBE_CACHED_PATHS_RC" = 0
+test "$(
+  printf '%s\n' "$K4_PROBE_CACHED_PATHS" |
+    awk 'NF { count += 1 } END { print count + 0 }'
+)" = 42
 python3 -c 'import subprocess; expected=open("/private/tmp/qinao-k4-probe-reviewed-paths.z","rb").read(); actual=subprocess.check_output(["git","diff","--cached","--name-only","-z"]); assert actual==expected,(expected,actual)'
 git commit -m "feat(qinao): adapt reviewed K4 source into production probe"
-test -z "$(git status --porcelain=v1)"
+set +e
+K4_PROBE_COMMIT_STATUS="$(git status --porcelain=v1)"
+K4_PROBE_COMMIT_STATUS_RC="$?"
+set -euo pipefail
+test "$K4_PROBE_COMMIT_STATUS_RC" = 0
+test -z "$K4_PROBE_COMMIT_STATUS"
 ```
 
 Expected: one exact migration commit; the final W0 tree contains the 21 production-probe paths and test module, no preliminary K4 source/log/status/signature dump, and no result or proof claim.
@@ -2450,6 +2792,7 @@ projection are created only by Bootstrap's controller-side broker in Task 13.
 - [ ] **Step 0: Re-enter through the permanent guard**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
@@ -2467,6 +2810,7 @@ Preserve pure fixture parser tests, but delete any assertion that a repository d
 The fixture and broker-private compare-only command shapes are exactly:
 
 ```bash
+set -euo pipefail
 python3 scripts/check_k4_platform_proof.py \
   --fixture \
   --bundle scripts/fixtures/qinao-k4-checker-v1/valid-synthetic-test-only.json
@@ -2489,8 +2833,14 @@ marker/log mode.
 - [ ] **Step 2: Run checker RED**
 
 ```bash
+set -euo pipefail
+set +e
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_check_k4_platform_proof
+  scripts.test_check_k4_platform_proof \
+  >/private/tmp/qinao-k4-checker-red.txt 2>&1
+K4_CHECKER_RED_RC="$?"
+set -euo pipefail
+test "$K4_CHECKER_RED_RC" = 1
 ```
 
 Expected: at least 30 tests discovered; legacy-acceptance tests fail until checker is replaced.
@@ -2521,6 +2871,7 @@ and runs the B0-owned validators.
 - [ ] **Step 4: Make checker tests green**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_k4_platform_proof
 ```
@@ -2612,12 +2963,17 @@ Any mismatch is `FAILED`.
 
 - [ ] **Step 7: Implement physical-device transcript parity before challenge**
 
-Validate that every recorded `devicectl` invocation uses
-`SELECTED_DEVELOPER_DIR/usr/bin/xcrun`, never ambient `/usr/bin/xcrun` or
-inherited `DEVELOPER_DIR`, and that device discovery has structured output:
+Validate that every recorded `devicectl` invocation uses executable
+`/usr/bin/xcrun` with a separate exact environment binding
+`DEVELOPER_DIR=SELECTED_DEVELOPER_DIR`, cleared `TOOLCHAINS`/`SDKROOT`, and
+an `xcrun --find xcodebuild` result equal to
+`SELECTED_DEVELOPER_DIR/usr/bin/xcodebuild`. Reject unbound ambient
+`/usr/bin/xcrun`, inherited `DEVELOPER_DIR`, a caller path, or an
+Xcode-internal `usr/bin/xcrun` assumption. Device discovery uses structured
+output:
 
 ```text
-SELECTED_DEVELOPER_DIR/usr/bin/xcrun devicectl list devices
+env -u TOOLCHAINS -u SDKROOT DEVELOPER_DIR=SELECTED_DEVELOPER_DIR /usr/bin/xcrun devicectl list devices
 --json-output PRIVATE_RUN_ROOT/device-list.json
 --log-output PRIVATE_RUN_ROOT/device-list.log
 ```
@@ -2635,15 +2991,15 @@ require `--json-output` and `--log-output`, and treat JSON as the only
 scripting input:
 
 ```text
-SELECTED_DEVELOPER_DIR/usr/bin/xcrun devicectl device install app --device DEVICE_ID HOST_APP --json-output INSTALL_JSON --log-output INSTALL_LOG
-SELECTED_DEVELOPER_DIR/usr/bin/xcrun devicectl device process launch --device DEVICE_ID --terminate-existing HOST_BUNDLE_ID CHALLENGE_ARGUMENT --json-output LAUNCH_JSON --log-output LAUNCH_LOG
-SELECTED_DEVELOPER_DIR/usr/bin/xcrun devicectl device info processes --device DEVICE_ID --json-output PROCESS_JSON --log-output PROCESS_LOG
-SELECTED_DEVELOPER_DIR/usr/bin/xcrun devicectl device copy from --device DEVICE_ID --source Library/Application Support/QinaoK4/trace.json --destination FIRST_TRACE --domain-type appDataContainer --domain-identifier HOST_BUNDLE_ID --json-output FIRST_COPY_JSON --log-output FIRST_COPY_LOG
-SELECTED_DEVELOPER_DIR/usr/bin/xcrun devicectl device uninstall app --device DEVICE_ID HOST_BUNDLE_ID --json-output UNINSTALL_JSON --log-output UNINSTALL_LOG
-SELECTED_DEVELOPER_DIR/usr/bin/xcrun devicectl device install app --device DEVICE_ID HOST_APP --json-output REINSTALL_JSON --log-output REINSTALL_LOG
-SELECTED_DEVELOPER_DIR/usr/bin/xcrun devicectl device process launch --device DEVICE_ID --terminate-existing HOST_BUNDLE_ID CHALLENGE_ARGUMENT --json-output RELAUNCH_JSON --log-output RELAUNCH_LOG
-SELECTED_DEVELOPER_DIR/usr/bin/xcrun devicectl device info processes --device DEVICE_ID --json-output REOPEN_PROCESS_JSON --log-output REOPEN_PROCESS_LOG
-SELECTED_DEVELOPER_DIR/usr/bin/xcrun devicectl device copy from --device DEVICE_ID --source Library/Application Support/QinaoK4/trace.json --destination REOPEN_TRACE --domain-type appDataContainer --domain-identifier HOST_BUNDLE_ID --json-output REOPEN_COPY_JSON --log-output REOPEN_COPY_LOG
+env -u TOOLCHAINS -u SDKROOT DEVELOPER_DIR=SELECTED_DEVELOPER_DIR /usr/bin/xcrun devicectl device install app --device DEVICE_ID HOST_APP --json-output INSTALL_JSON --log-output INSTALL_LOG
+env -u TOOLCHAINS -u SDKROOT DEVELOPER_DIR=SELECTED_DEVELOPER_DIR /usr/bin/xcrun devicectl device process launch --device DEVICE_ID --terminate-existing HOST_BUNDLE_ID CHALLENGE_ARGUMENT --json-output LAUNCH_JSON --log-output LAUNCH_LOG
+env -u TOOLCHAINS -u SDKROOT DEVELOPER_DIR=SELECTED_DEVELOPER_DIR /usr/bin/xcrun devicectl device info processes --device DEVICE_ID --json-output PROCESS_JSON --log-output PROCESS_LOG
+env -u TOOLCHAINS -u SDKROOT DEVELOPER_DIR=SELECTED_DEVELOPER_DIR /usr/bin/xcrun devicectl device copy from --device DEVICE_ID --source Library/Application Support/QinaoK4/trace.json --destination FIRST_TRACE --domain-type appDataContainer --domain-identifier HOST_BUNDLE_ID --json-output FIRST_COPY_JSON --log-output FIRST_COPY_LOG
+env -u TOOLCHAINS -u SDKROOT DEVELOPER_DIR=SELECTED_DEVELOPER_DIR /usr/bin/xcrun devicectl device uninstall app --device DEVICE_ID HOST_BUNDLE_ID --json-output UNINSTALL_JSON --log-output UNINSTALL_LOG
+env -u TOOLCHAINS -u SDKROOT DEVELOPER_DIR=SELECTED_DEVELOPER_DIR /usr/bin/xcrun devicectl device install app --device DEVICE_ID HOST_APP --json-output REINSTALL_JSON --log-output REINSTALL_LOG
+env -u TOOLCHAINS -u SDKROOT DEVELOPER_DIR=SELECTED_DEVELOPER_DIR /usr/bin/xcrun devicectl device process launch --device DEVICE_ID --terminate-existing HOST_BUNDLE_ID CHALLENGE_ARGUMENT --json-output RELAUNCH_JSON --log-output RELAUNCH_LOG
+env -u TOOLCHAINS -u SDKROOT DEVELOPER_DIR=SELECTED_DEVELOPER_DIR /usr/bin/xcrun devicectl device info processes --device DEVICE_ID --json-output REOPEN_PROCESS_JSON --log-output REOPEN_PROCESS_LOG
+env -u TOOLCHAINS -u SDKROOT DEVELOPER_DIR=SELECTED_DEVELOPER_DIR /usr/bin/xcrun devicectl device copy from --device DEVICE_ID --source Library/Application Support/QinaoK4/trace.json --destination REOPEN_TRACE --domain-type appDataContainer --domain-identifier HOST_BUNDLE_ID --json-output REOPEN_COPY_JSON --log-output REOPEN_COPY_LOG
 ```
 
 `DEVICE_ID`, `HOST_APP`, `HOST_BUNDLE_ID`, `CHALLENGE_ARGUMENT`, and private
@@ -2736,6 +3092,7 @@ read/write; and no candidate authority output.
 - [ ] **Step 12: Run all K4 unit tests**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_k4_protocol_v1 \
   scripts.test_qinao_k4_custody_v1 \
@@ -2751,6 +3108,7 @@ Expected: at least 140 tests pass, zero skips. Fake processes/custody prove mech
 - [ ] **Step 13: Commit the candidate K4 parity/preflight tooling**
 
 ```bash
+set -euo pipefail
 git add \
   scripts/capture_k4_platform_proof.py \
   scripts/test_capture_k4_platform_proof.py \
@@ -2761,9 +3119,22 @@ git add \
   scripts/check_k4_platform_proof.py \
   scripts/test_check_k4_platform_proof.py \
   scripts/fixtures/qinao-k4-checker-v1/valid-synthetic-test-only.json
-test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = 9
+set +e
+K4_CACHED_PATHS="$(git diff --cached --name-only)"
+K4_CACHED_PATHS_RC="$?"
+set -euo pipefail
+test "$K4_CACHED_PATHS_RC" = 0
+test "$(
+  printf '%s\n' "$K4_CACHED_PATHS" |
+    awk 'NF { count += 1 } END { print count + 0 }'
+)" = 9
 git commit -m "test(qinao): freeze iOS 27 K4 broker parity"
-test -z "$(git status --porcelain=v1)"
+set +e
+K4_COMMIT_STATUS="$(git status --porcelain=v1)"
+K4_COMMIT_STATUS_RC="$?"
+set -euo pipefail
+test "$K4_COMMIT_STATUS_RC" = 0
+test -z "$K4_COMMIT_STATUS"
 ```
 
 Expected: exact nine-path commit. Protocol/custody files were committed in
@@ -2788,11 +3159,14 @@ module as a producer, attester, broker, or authority.
 - [ ] **Step 1: Run root and admitted predecessor guards**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
   /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json
 test "$(git rev-parse refs/heads/qinao-admitted)" = "$PREW0_SW"
+test "$(git rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+test "$(git show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
 ```
 
 Then independently reopen the signed admitted predecessor through `ProtectedAdmissionClient.reopen_admitted_predecessor()`. Expected: root/lineage/predecessor unchanged and exact tuple equality.
@@ -2800,6 +3174,8 @@ Then independently reopen the signed admitted predecessor through `ProtectedAdmi
 - [ ] **Step 2: Run all Python unit suites**
 
 ```bash
+set -euo pipefail
+set +e
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_execution_root \
   scripts.test_apply_qinao_import_map \
@@ -2815,7 +3191,40 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_capture_k4_platform_proof \
   scripts.test_attest_k4_external_artifact \
   scripts.test_run_k4_platform_proof \
-  scripts.test_check_k4_platform_proof
+  scripts.test_check_k4_platform_proof \
+  >/private/tmp/qinao-w0-python-closure.txt 2>&1
+W0_PYTHON_RC="$?"
+set -euo pipefail
+test "$W0_PYTHON_RC" = 0
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+text = Path("/private/tmp/qinao-w0-python-closure.txt").read_text(
+    encoding="utf-8",
+    errors="strict",
+)
+runs = re.findall(r"^Ran ([0-9]+) tests? in ", text, flags=re.MULTILINE)
+assert len(runs) == 1, runs
+assert int(runs[0]) >= 296, runs[0]
+assert "skipped=" not in text, text[-2000:]
+assert text.rstrip().endswith("OK"), text[-2000:]
+required = (
+    "test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id",
+    "test_graph_freeze_keeps_exact_sixteen_ids",
+    "test_second_g1_writer_is_rejected",
+    "test_second_g2_writer_is_rejected",
+    "test_main_sub_peer_call_is_rejected",
+    "test_sub_sub_peer_call_is_rejected",
+    "test_shared_mutable_scratchpad_is_rejected",
+    "test_legacy_loop_authority_is_rejected",
+    "test_refresh_must_be_read_only_or_production_unreachable",
+    "test_future_graph_contract_is_rejected_at_w0",
+)
+assert all(name in text for name in required), [
+    name for name in required if name not in text
+]
+PY
 ```
 
 Expected: every named module exists, at least 296 total tests pass, zero
@@ -2848,7 +3257,7 @@ comparison is not enforcement. Expected observation:
 BASProviderBoundaryTests: 2
 QinaoProviderBoundaryTests: 3
 BAS five-suite group, including BASRoutedMemoryFlipTests: 18
-Qinao four-suite group: 26
+Qinao four-suite group: >=26 (current baseline 27)
 BASW0SafetyFreezeTests: 5
 QinaoW0SafetyFreezeTests: 6
 ```
@@ -2863,6 +3272,7 @@ open-set failure.
 - [ ] **Step 4: Run the iOS 27 floor gate**
 
 ```bash
+set -euo pipefail
 bash BehavioralAISubstrate/scripts/check-ios27-floor.sh
 ```
 
@@ -2873,6 +3283,7 @@ Expected: exit `0`; all three `Package.swift`, all governed Xcode settings, and 
 Run the actual Swift-package Xcode scheme from `SampleHost/`:
 
 ```bash
+set -euo pipefail
 (cd SampleHost &&
 xcodebuild test \
   -scheme SampleHost \
@@ -2885,8 +3296,20 @@ Expected: iOS scheme tests pass. `swift test --package-path SampleHost` on macOS
 - [ ] **Step 6: Commit any final source/test correction before the final closure proof**
 
 ```bash
-test -z "$(git status --porcelain=v1)" ||
-  { git diff --name-only > /private/tmp/qinao-w0-final-correction-paths.txt; exit 1; }
+set -euo pipefail
+set +e
+W0_FINAL_STATUS="$(git status --porcelain=v1)"
+W0_FINAL_STATUS_RC="$?"
+W0_FINAL_DIFF_PATHS="$(git diff --name-only)"
+W0_FINAL_DIFF_PATHS_RC="$?"
+set -euo pipefail
+test "$W0_FINAL_STATUS_RC" = 0
+test "$W0_FINAL_DIFF_PATHS_RC" = 0
+if test -n "$W0_FINAL_STATUS"; then
+  printf '%s\n' "$W0_FINAL_DIFF_PATHS" \
+    > /private/tmp/qinao-w0-final-correction-paths.txt
+  exit 1
+fi
 ```
 
 Expected: clean. If dirty, review, test, and make an exact-path commit first;
@@ -2953,10 +3376,19 @@ transcript is a payload-purity failure, not evidence.
 - [ ] **Step 10: Run pre-Pw purity and execution-root checks**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
-test -z "$(git rev-list --min-parents=2 "$PREW0_SW..HEAD")"
+set +e
+W0_PREPW_MERGES="$(git rev-list --min-parents=2 "$PREW0_SW..HEAD")"
+W0_PREPW_MERGES_RC="$?"
+W0_PREPW_STATUS="$(git status --porcelain=v1)"
+W0_PREPW_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_PREPW_MERGES_RC" = 0
+test "$W0_PREPW_STATUS_RC" = 0
+test -z "$W0_PREPW_MERGES"
+test -z "$W0_PREPW_STATUS"
 git merge-base --is-ancestor "$PREW0_SW" HEAD
-test -z "$(git status --porcelain=v1)"
 ```
 
 In the same authenticated controller-side harness that retained Step 1's
@@ -2985,12 +3417,14 @@ receipt, no Artifact Mesh/W1 path, and no unclassified source path. The clean
 
 **Files:**
 - Create no candidate file, Git object, or Git ref.
-- Create only in Bootstrap-owned external storage: an immutable
-  content-addressed payload pin and signed `EvaluationLease`.
+- Create only in Bootstrap-owned external storage: one fresh
+  `PayloadDispatchAuthorizationV1`, an immutable content-addressed payload pin,
+  signed proposal receipt, and signed `EvaluationLease`.
 
 **Interfaces:**
 - Consumes: clean candidate `HEAD` OID and the already reopened opaque
-  `AdmittedWaveV1` predecessor.
+  `AdmittedWaveV1` predecessor plus one externally signed, short-lived
+  `PayloadDispatchAuthorizationV1`.
 - Produces: one opaque signed `EvaluationLease` whose service-owned payload
   object and tree were independently reopened.
 - No source/index/worktree mutation is legal after this point.
@@ -2998,11 +3432,14 @@ receipt, no Artifact Mesh/W1 path, and no unclassified source path. The clean
 - [ ] **Step 1: Re-run root and predecessor identity**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-applied-lineage \
   /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json
 test "$(git rev-parse refs/heads/qinao-admitted)" = "$PREW0_SW"
+test "$(git rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+test "$(git show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
 ```
 
 Then call
@@ -3014,9 +3451,15 @@ or competing protected state.
 - [ ] **Step 2: Freeze the candidate payload only as clean `HEAD` OID/tree**
 
 ```bash
+set -euo pipefail
 W0_PW="$(git rev-parse HEAD)"
 W0_PW_TREE="$(git rev-parse "$W0_PW^{tree}")"
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_FREEZE_STATUS="$(git status --porcelain=v1)"
+W0_FREEZE_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_FREEZE_STATUS_RC" = 0
+test -z "$W0_FREEZE_STATUS"
 git cat-file -e "$W0_PW^{commit}"
 git cat-file -e "$W0_PW_TREE^{tree}"
 git merge-base --is-ancestor "$PREW0_SW" "$W0_PW"
@@ -3027,9 +3470,19 @@ candidate-local ref is created. From this point, every re-entry derives
 `W0_PW/W0_PW_TREE` from unchanged clean `HEAD` and byte-compares them to the
 signed lease.
 
-- [ ] **Step 3: Obtain separate authorization and ask Bootstrap to pin/reopen**
+- [ ] **Step 3: Obtain fresh payload-dispatch authorization, then ask Bootstrap to pin/reopen**
 
-After the operator separately authorizes the external object write, call only:
+Through Bootstrap's external append-only control plane, obtain and
+service-reopen one fresh `PayloadDispatchAuthorizationV1` that binds the exact
+repository, authenticated `PREW0_SW` chain digest, `W0_PW/W0_PW_TREE`,
+proposal-object-set digest and immutable proposal ref, one create-once dispatch
+intent/run ref, active B0 verifier-bundle digest, authorized operator
+principal/role, issue/expiry instants, nonce, and signature. It authorizes only
+the target-host payload-object import/reopen, immutable proposal pin, and that
+one evaluation dispatch. Candidate JSON, environment, CLI values, an earlier
+authorization, or process memory cannot supply it.
+
+Only after the protected adapter authenticates that fresh record, call:
 
 ```text
 proposal_receipt, lease =
@@ -3040,25 +3493,34 @@ The Bootstrap verification adapter authenticates both envelopes and requires
 `proposal_receipt.payload_commit_oid == lease.payload_commit_oid == W0_PW`,
 the receipt/lease tree equals `W0_PW_TREE`, and the receipt's immutable
 service-owned ref plus host-reopen observation validate before reading any
-lease projection.
+lease projection. It also requires the receipt, lease, proposal object-set,
+dispatch intent, run ref, and active-verifier digest to equal the authenticated
+`PayloadDispatchAuthorizationV1`; the authorization record itself is never
+passed as a fifth client argument.
 
 `W0_PW` is the sole candidate-supplied admission value. The service:
 
 ```text
-authenticates the caller and separate pin authorization
+authenticates the caller and freshly reopens PayloadDispatchAuthorizationV1
 derives W0 and the predecessor from finalized canonical state
-copies/pins the exact commit in Bootstrap-owned content-addressed storage
+imports/reopens and pins the exact authorized commit in Bootstrap-owned
+  content-addressed storage at the bound immutable proposal ref
 reopens commit bytes, tree bytes, sole ancestry, and every referenced object
+creates or reopens the one authorized dispatch intent/run ref
 derives payload tree, authority/catalog/Owner-Ledger bindings, and gate set
 issues a signed lease only after host-side reopen succeeds
 ```
 
-The candidate never supplies payload tree, predecessor, wave, ref, gate list,
-profile, build identity, ExternalPhysicalGate binding, or object-host
-identity. Missing/expired authorization, absent object, incomplete transfer,
-wrong commit/tree/parent, failed host reopen, or ambiguous external state
-terminates exactly as `BLOCKED_PAYLOAD_OBJECT_AVAILABILITY`. It is not a K4
-blocker and cannot fall back to local objects.
+The candidate never supplies payload tree, predecessor, wave, ref, dispatch
+intent, gate list, profile, build identity, ExternalPhysicalGate binding, or
+object-host identity. Missing/expired/replayed authorization, absent object,
+incomplete transfer, wrong commit/tree/parent, failed host reopen, or ambiguous
+external state terminates without a proposal receipt or lease as
+`AdmissionTerminalError(
+terminal = BLOCKED_PAYLOAD_OBJECT_AVAILABILITY,
+reason_code = PAYLOAD_OBJECT_NOT_HOST_REOPENED
+)`. It is not a K4 blocker and cannot fall back to local objects or mint a
+replacement authorization.
 
 - [ ] **Step 4: Verify the opaque lease's read-only projections**
 
@@ -3100,15 +3562,23 @@ bundle, W0 Sw receipt, intent, finalized attestation, and returned
 - [ ] **Step 5: Prove immutability**
 
 ```bash
+set -euo pipefail
 test "$(git rev-parse HEAD)" = "$W0_PW"
 test "$(git rev-parse "HEAD^{tree}")" = "$W0_PW_TREE"
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_IMMUTABLE_STATUS="$(git status --porcelain=v1)"
+W0_IMMUTABLE_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_IMMUTABLE_STATUS_RC" = 0
+test -z "$W0_IMMUTABLE_STATUS"
 ```
 
 From this line onward, every K4 entry repeats the exact root guard and these
 three assertions, then verifies the same values through the opaque lease. No
 candidate commit/ref/object write occurs after freeze. Bootstrap alone may
-create and import `Cw`/`Sw` during the final generic operation.
+construct `Cw`/`Sw` in non-host quarantine and, only after the separately
+authorized boundary, import them to the target Git host while resuming the
+same final generic operation.
 
 ---
 
@@ -3129,10 +3599,16 @@ create and import `Cw`/`Sw` during the final generic operation.
 - [ ] **Step 1: Run the immutable-entry guards**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 test "$(git rev-parse HEAD)" = "$W0_PW"
 test "$(git rev-parse "HEAD^{tree}")" = "$W0_PW_TREE"
-test -z "$(git status --porcelain=v1)"
+set +e
+K4_ENTRY_STATUS="$(git status --porcelain=v1)"
+K4_ENTRY_STATUS_RC="$?"
+set -euo pipefail
+test "$K4_ENTRY_STATUS_RC" = 0
+test -z "$K4_ENTRY_STATUS"
 test "$(git rev-parse refs/heads/qinao-admitted)" = "$PREW0_SW"
 ```
 
@@ -3231,9 +3707,15 @@ RAW_CLEANUP_UNVERIFIED
 Then assert:
 
 ```bash
+set -euo pipefail
 test ! -e docs/superpowers/evidence/qinao-k4-platform-proof-W0.json
 test "$(git rev-parse refs/heads/qinao-admitted)" = "$PREW0_SW"
-test -z "$(git status --porcelain=v1)"
+set +e
+K4_BLOCKED_STATUS="$(git status --porcelain=v1)"
+K4_BLOCKED_STATUS_RC="$?"
+set -euo pipefail
+test "$K4_BLOCKED_STATUS_RC" = 0
+test -z "$K4_BLOCKED_STATUS"
 ```
 
 Require the service evaluation state to contain no authenticated gate-result
@@ -3298,16 +3780,21 @@ cache.
 
 ---
 
-### Task 14: Have the External Bootstrap Service Assemble, Import, and Admit W0
+### Task 14: Have Bootstrap Assemble in Quarantine, Authorize Import, and Admit W0
 
 **Files:**
-- Create only in Cw: the two named W0 projections, the 13 literal active
-  gate-result files, and the exact self-excluding Cw manifest.
-- Create only in Sw: `docs/superpowers/evidence/qinao-wave-admission/W0.json`.
+- Construct only in the Bootstrap service's non-host quarantine, then import
+  to the target Git host only after fresh protected-ref authorization: Cw with
+  the two named W0 projections, 13 literal active gate-result files, and exact
+  self-excluding manifest; Sw with only
+  `docs/superpowers/evidence/qinao-wave-admission/W0.json`.
 
 **Interfaces:**
 - Consumes: opaque `EvaluationLease` and the exact opaque
   `AuthenticatedGateResultBundle` returned once in Task 13.
+- Consumes only through Bootstrap's append-only control plane after exact
+  non-host object derivation: one fresh
+  `ProtectedRefAdvanceAuthorizationV1`; it is not a fifth client argument.
 - Produces: one opaque service-envelope-verified `AdmittedWaveV1`.
 - Candidate output: no leaf, manifest, Cw/Sw tree or commit, receipt, commit
   identity, object pack, admission intent, CAS input, or attestation.
@@ -3315,10 +3802,16 @@ cache.
 - [ ] **Step 1: Run immutable-entry and predecessor guards**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 test "$(git rev-parse HEAD)" = "$W0_PW"
 test "$(git rev-parse "HEAD^{tree}")" = "$W0_PW_TREE"
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_ADMISSION_ENTRY_STATUS="$(git status --porcelain=v1)"
+W0_ADMISSION_ENTRY_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_ADMISSION_ENTRY_STATUS_RC" = 0
+test -z "$W0_ADMISSION_ENTRY_STATUS"
 ```
 
 Before asserting an expected-old protected ref, call
@@ -3327,7 +3820,9 @@ closed recovery oracle:
 
 1. if the authenticated current seal is exact `PREW0_SW`, execute Task 13
    Step 5's full re-entry sequence and use only its service-recovered original
-   lease and byte-identical bundle;
+   lease and byte-identical bundle; the service may then resume only the same
+   assembly identity in its pre-authorization, authorized, import-pending, or
+   finalization-pending state;
 2. if the authenticated current result is already `derived_wave == W0`,
    `payload_commit_oid == W0_PW`, and its seal/CAS/finalized attestation all
    verify, treat the same operation as completed, bind `admittedW0` to that
@@ -3400,11 +3895,67 @@ the schema-valid privacy-clean projection; it contains commitments, active
 retention/destruction obligation, independent-reopen digest, and cleanup
 terminal digest, never a raw private class.
 
-- [ ] **Step 4: Perform one generic assembly/import/finalize operation**
+- [ ] **Step 4: Resume one idempotent operation across the protected-ref authorization boundary**
 
 Execute this step only for recovery-oracle branch 1.
 
-Call:
+The one logical operation is keyed by repository, lease, authenticated bundle
+digest, assembly-contract digest, deterministic `W0 Cw/Sw` identities,
+evidence-object-set digest, intended target-host import key, and immutable
+admission-intent key. Repeating the method with the same opaque arguments is
+query/resume of that identity, never a second assembly or admission.
+
+Before a `ProtectedRefAdvanceAuthorizationV1` exists, call the existing method
+once:
+
+```text
+ProtectedAdmissionClient.assemble_import_and_finalize(
+    lease,
+    authenticatedGateResults
+)
+```
+
+This pre-authorization invocation may only:
+
+```text
+validates the exact 16-path/mode Cw allowlist and self-exclusion
+derives every leaf without accepting caller bytes
+constructs deterministic one-parent Cw over W0 Pw in non-host quarantine
+constructs deterministic one-parent Sw adding only W0.json mode 100644
+  in that same non-host quarantine
+derives every author/committer/timestamp/parent/tree/blob/commit identity
+derives the closed evidence-object-set digest, intended target-host import key,
+  immutable admission-intent key, and exact Pw/Cw/Sw topology
+obtains a fresh live AdmissionProtectionProjectionV1
+persists the one assembly identity and exposes its exact external
+  protected-ref-advance authorization request
+performs no target-host object import/reopen, import receipt, admission intent,
+  protected-ref CAS, or final attestation
+```
+
+If no matching authorization is already service-reopened, this invocation
+raises exactly
+`AdmissionTerminalError(
+terminal = BLOCKED_EXTERNAL_BOOTSTRAP,
+reason_code = CEREMONY_UNAVAILABLE
+)`; it never returns a partial `AdmittedWaveV1`. Through Bootstrap's external
+append-only control plane, obtain one fresh
+`ProtectedRefAdvanceAuthorizationV1` only after the non-host object closure is
+complete. The service authenticates that it binds the exact repository,
+canonical protected ref, wave, expected `PREW0_SW`, `W0_PW`, derived W0 Cw/Sw,
+proposal-receipt digest, lease ID, authenticated-bundle digest,
+evidence-object-set digest, intended target-host import key, admission-intent
+key, fresh live protection-projection digest, authorized operator
+principal/role, issue/expiry instants, nonce, and signature.
+
+The authorization is not a client argument, environment value, candidate file,
+or new `ProtectedAdmissionClient` method. Missing, expired, replayed,
+substituted, wrong-old/new-OID, wrong-object-set, or protection-drifted bytes
+remain `BLOCKED_EXTERNAL_BOOTSTRAP/CEREMONY_UNAVAILABLE` before any target-host
+effect.
+
+After that exact authorization is persisted and freshly reopened, invoke the
+same method with the same opaque values:
 
 ```text
 admittedW0 = ProtectedAdmissionClient.assemble_import_and_finalize(
@@ -3413,40 +3964,44 @@ admittedW0 = ProtectedAdmissionClient.assemble_import_and_finalize(
 )
 ```
 
-This is the only logical finalization operation. A repeat with the same lease
-and byte-identical authenticated bundle is idempotent same-intent recovery,
-not a second assembly or admission. From the lease and authenticated bundle,
-the service internally:
+This normally second invocation reopens the existing non-host Cw/Sw bytes and
+assembly identity; it does not construct a second object or authorization
+request. Only now may the service:
 
 ```text
-validates the exact 16-path/mode Cw allowlist and self-exclusion
-derives every leaf without accepting caller bytes
-constructs deterministic one-parent Cw over W0 Pw
-constructs deterministic one-parent Sw adding only W0.json mode 100644
-derives every author/committer/timestamp/parent/tree/blob/commit identity
-imports and reopens the complete exact Git object set
-creates signed object-import receipts and the W0 receipt
-obtains a fresh protection observation and creates one immutable intent
-performs one expected-PREW0_SW protected-ref CAS
+imports the authorization-bound complete object set into the target Git host
+reopens every imported object and exact Pw/Cw/Sw topology at that host
+creates and persists the one signed object-import receipt
+creates the one immutable admission intent bound by the authorization
+performs one non-force expected-PREW0_SW protected-ref CAS
 finalizes the same intent as an external signed admission attestation
 returns only the opaque finalized AdmittedWaveV1
 ```
 
-The caller cannot pass a leaf, allowlist, mode, Cw/Sw OID, commit identity,
-receipt, old/new ref OID, intent, or attestation field. Any missing/extra leaf,
-raw class, object-import/reopen mismatch, stale lease, CAS loss, unknown host
-state, changed external root, invalid cleanup terminal, or missing final
-attestation follows Bootstrap's pending/reconcile/quarantine recovery oracle;
-the client never decomposes the operation, creates a new lease, or substitutes
-a new bundle.
+On re-entry, an already-valid matching authorization allows the first
+post-restart call to resume this second phase directly; it is still the same
+logical operation. The caller cannot pass a leaf, allowlist, mode, Cw/Sw OID,
+commit identity, object set, authorization, receipt, old/new ref OID, intent,
+or attestation field. Any missing/extra leaf, raw class,
+object-import/reopen mismatch, stale lease, CAS loss, unknown host state,
+changed external root, invalid cleanup terminal, or missing final attestation
+follows Bootstrap's pending/reconcile/quarantine recovery oracle. The client
+never decomposes the operation, creates a new lease, substitutes a new bundle,
+or exposes more than its four frozen methods.
 
 - [ ] **Step 5: Verify the opaque finalized result and immutable candidate**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py --root /Users/changgeng/.codex/worktrees/e4d7/Project06 --expect-candidate-lineage reparentedProgram --require-clean
 test "$(git rev-parse HEAD)" = "$W0_PW"
 test "$(git rev-parse "HEAD^{tree}")" = "$W0_PW_TREE"
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_ADMISSION_FINAL_STATUS="$(git status --porcelain=v1)"
+W0_ADMISSION_FINAL_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_ADMISSION_FINAL_STATUS_RC" = 0
+test -z "$W0_ADMISSION_FINAL_STATUS"
 ```
 
 Using only the Bootstrap verification adapter over `admittedW0`, require:
@@ -3459,6 +4014,8 @@ Cw diff = exact 16-path/mode allowlist
 Sw sole parent = Cw
 Sw diff = docs/superpowers/evidence/qinao-wave-admission/W0.json mode 100644
 receipt binds predecessor, payload, Cw, 13 gates, and K4 external root
+object-import receipt binds ProtectedRefAdvanceAuthorizationV1,
+  evidence-object-set digest, target-host import key, and admission-intent key
 canonical ref = returned Sw projection
 finalized external attestation binds returned Sw and receipt blob
 active verifier/modules remain B0 versions
@@ -3476,6 +4033,7 @@ once and require the Bootstrap verification adapter to prove
 `admittedW0.seal_commit_oid` equals that exact value. Then run:
 
 ```bash
+set -euo pipefail
 W0_SW="$(git rev-parse refs/heads/qinao-admitted)"
 CURRENT="$(git rev-parse HEAD)"
 if test "$CURRENT" = "$W0_PW"; then
@@ -3487,8 +4045,19 @@ else
   exit 2
 fi
 test "$(git rev-parse HEAD)" = "$W0_SW"
-test "$(git rev-list --parents -n 1 HEAD | wc -w | tr -d ' ')" = 2
-test -z "$(git status --porcelain=v1)"
+set +e
+W0_SW_PARENT_LINE="$(git rev-list --parents -n 1 HEAD)"
+W0_SW_PARENT_LINE_RC="$?"
+W0_FAST_FORWARD_STATUS="$(git status --porcelain=v1)"
+W0_FAST_FORWARD_STATUS_RC="$?"
+set -euo pipefail
+test "$W0_SW_PARENT_LINE_RC" = 0
+test "$W0_FAST_FORWARD_STATUS_RC" = 0
+test "$(
+  printf '%s\n' "$W0_SW_PARENT_LINE" |
+    awk 'NF == 2 { print 2; found = 1 } END { if (!found) print 0 }'
+)" = 2
+test -z "$W0_FAST_FORWARD_STATUS"
 ```
 
 Immediately call
@@ -3518,7 +4087,7 @@ assembly/finalization.
 | Swift gates | All 13 suites, including `BASRoutedMemoryFlipTests`, discovered and executed; zero-match impossible |
 | Open set | B0-self-contained exact 13-suite/16-safety-ID program is reopened from signed B0; all suites are nonempty/green; no successor receipt or raw log exists |
 | iOS | Bash floor gate passes; actual SampleHost iOS scheme passes; no macOS substitute |
-| Pw boundary | W0 source/schema/checker/test/fixture/probe/build inputs committed; clean HEAD OID/tree frozen; Bootstrap pin authorized, content-addressed, and independently reopened before K4; no candidate payload ref |
+| Pw boundary | W0 source/schema/checker/test/fixture/probe/build inputs committed; clean HEAD OID/tree frozen; one fresh `PayloadDispatchAuthorizationV1` binds the exact proposal object set/ref and create-once dispatch before Bootstrap pins and independently reopens the payload; no candidate payload ref |
 | K4 authority | Bootstrap controller-side `ExternalPhysicalGate` derives release Xcode/team/profile/device/custody/producer/attester from the opaque lease binding; no candidate executable/env/caller authority |
 | K4 sequence | Actual archive inspected and physical iOS 27 device bound before fresh challenge |
 | Device execution | Structured `devicectl` JSON for install/launch/process/copy/uninstall/reinstall/reopen |
@@ -3528,7 +4097,7 @@ assembly/finalization.
 | Destruction | Independent reopen precedes local run-key/volume destruction and signed no-residue proof; crash cleanup is recoverable; external live bundle retained; later external destruction invalidates proof |
 | Checker hardening | Legacy marker/log/source/plist/status/caller-team/challenge/ExecutionGate fiction rejected |
 | Privacy projection | Closed fields and coverage; raw path/device/team/profile/CDHash/challenge/log/trace absent |
-| Admission | `BLOCKED_K4` means no Cw/Sw; pass uses exactly one `assemble_import_and_finalize(lease, gate_results)` call and no candidate leaf/commit/ref identity; only afterward the implementation branch fast-forwards from W0 Pw to authenticated W0 Sw |
+| Admission | `BLOCKED_K4` means no Cw/Sw; pass uses one idempotent `assemble_import_and_finalize(lease, gate_results)` identity whose pre-authorization invocation constructs exact Cw/Sw only in non-host quarantine, whose fresh `ProtectedRefAdvanceAuthorizationV1` is obtained through Bootstrap's control plane, and whose same-key post-authorization invocation alone imports/reopens at the target Git host, receipts, intents, CASes, and finalizes; the four-method client surface and candidate no-leaf/no-commit/no-ref rule remain unchanged; only afterward the implementation branch fast-forwards from W0 Pw to authenticated W0 Sw |
 | Scope | No Artifact Mesh W1, no W1-W6 implementation, no second owner/verifier/scheduler/compiler |
 
 ## Self-Review Before Execution
@@ -3539,6 +4108,11 @@ assembly/finalization.
 - [ ] Verify every Python module is invoked with `python3 -m unittest`, never direct-file-only or `pytest`.
 - [ ] Verify every K4 production input is signed/derived, every runtime private selector remains internal, and every public projection string passes the leak classifier.
 - [ ] Verify `ReleaseProfileBinding`, `ExternalPhysicalGateBinding`, `EvaluationLease`, `AuthenticatedGateResultBundle`, and `AdmittedWaveV1` remain opaque Bootstrap imports and no local mirror/redeclaration exists.
+- [ ] Verify `PayloadDispatchAuthorizationV1` precedes proposal pin/dispatch and
+  `ProtectedRefAdvanceAuthorizationV1` follows exact non-host Cw/Sw derivation
+  but precedes every target-host import/receipt/intent/CAS effect; both remain
+  signed external-service records rather than client arguments or candidate
+  schemas.
 - [ ] Verify the protected root guard implements `reparentedProgram` exactly; an old audited-tip-ancestor-only guard blocks legal reparenting and must be repaired upstream first.
 - [ ] Verify clean `HEAD` OID/tree is frozen and the Bootstrap-owned payload pin is authorized/reopened before the first K4 archive/device command; no candidate payload ref or ref-writing command exists.
 - [ ] Verify missing payload authorization/object/pin/reopen yields `BLOCKED_PAYLOAD_OBJECT_AVAILABILITY`; a missing physical prerequisite yields `BLOCKED_K4`; neither path creates W0 Cw/Sw/admission.

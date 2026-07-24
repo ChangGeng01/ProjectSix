@@ -4,7 +4,7 @@
 
 **Goal:** Repair and preserve the adopted 22-commit clean-candidate lineage, then add a read-only, byte-exact provenance and reviewed-import mechanism that cannot mutate the dirty source or overwrite an intervening clean-candidate edit.
 
-**Architecture:** C0 has two immutable roles. The dirty source worktree is evidence only: a stable double-read inventories its base, HEAD, index, worktree, untracked, deletion, mode, symlink, and non-UTF-8 path strata without writing its index, refs, object database, or files. The adopted clean candidate is the only execution root: an exact root/branch/ancestry guard protects every mutating command, an all-`hold` import map requires an explicit source stratum for every imported row, and a separate ephemeral apply plan binds the destination HEAD/tree/index plus every touched preimage before `git apply --index` performs the reviewed change.
+**Architecture:** C0 has two immutable roles. The dirty source worktree is evidence only: a stable double-read inventories its base, HEAD, index, worktree, untracked, deletion, mode, symlink, and non-UTF-8 path strata without invoking an object-writing command from the source root or changing its index, refs, worktree, or files. The adopted clean candidate is the only execution root: an exact root/branch/ancestry guard protects every mutating command, an all-`hold` import map requires an explicit source stratum for every imported row, and a separate ephemeral apply plan binds the destination HEAD/tree/index plus every touched preimage. Candidate-side temporary-index construction may add unreachable objects to the repository's shared common object store; those objects change no source identity and are explicitly outside the source-stability oracle. A durable per-worktree transaction journal is fsynced before `git apply --index`; restart classifies the exact preimage, staged postimage, committed postimage, or divergence, so a crash can resume or return the same receipt without reset or blind replay.
 
 **Tech Stack:** Git object/index plumbing, Python 3 standard library only, `unittest`, canonical JSON, SHA-256, `os.lstat`/`O_NOFOLLOW`, temporary indexes, and Git binary patches.
 
@@ -29,10 +29,19 @@
 - Symlinks are inventoried as link-target bytes with mode `120000`; no code follows them. Absolute, escaping, or parent-component symlinks fail closed.
 - Directories, FIFOs, sockets, devices, unresolved index stages, replace objects, grafts, and shallow ancestry fail closed.
 - Inventory capture performs two complete equal reads. One unequal pair causes one full retry; a second unequal pair fails with `source_drift`.
-- `candidate_base_commit` in the reviewed map records the immutable approved reconstruction base. It does not pretend to be the later destination CAS.
+- `candidate_base_commit` in the reviewed map equals
+  `inventory.approved_base_commit` byte-for-byte, must reopen as a commit, and
+  must be an ancestor of the guarded candidate `HEAD`. It records the
+  immutable approved reconstruction base and is never a caller-selected
+  substitute for the later destination CAS.
 - Every apply operation first creates an ephemeral apply-plan JSON. That plan binds the current candidate HEAD, HEAD tree, index tree, clean-status digest, import-map digest, inventory digest, batch, selected rows, and exact destination preimages.
 - Apply rejects a changed HEAD/tree/index/status, changed map/inventory, changed source byte/mode, missing or new destination path, destination symlink, or any unstaged/untracked/intervening edit.
 - Apply uses a temporary index to construct a full-index binary patch and `git apply --index --binary`; it never copies a directory, chooses “latest,” follows a symlink, or overwrites a mismatched preimage.
+- Apply holds a kernel-released `flock` and a canonical journal below the
+  linked worktree's own Git directory. A process crash cannot leave a
+  permanent existence lock. Exact preimage resumes, exact staged postimage
+  returns the same deterministic receipt, exact committed postimage finalizes
+  idempotently, and every other shape is quarantined without mutation.
 - No C0 tool creates or changes B0/admission authority, controlled authority text, K4 evidence, Artifact Mesh, production code, a protected ref, or an external attestation.
 - Stage exact paths only. Each commit step compares the staged path set before committing.
 
@@ -80,6 +89,7 @@ second C1 authority from appearing here.
 Run after the six-plan amendment commit and before Bootstrap freezes C1:
 
 ```bash
+set -euo pipefail
 test "$(git rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
 test "$(git show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
@@ -130,12 +140,22 @@ exactly ten rows.
 Run from `/Users/changgeng/.codex/worktrees/e4d7/Project06`:
 
 ```bash
+set -euo pipefail
 test "$(pwd -P)" = /Users/changgeng/.codex/worktrees/e4d7/Project06
 test "$(git branch --show-current)" = codex/qinao-w1-clean-candidate
 test "$(git rev-parse HEAD)" = 486e1ec5983ad4390c5b07f04607f1345b912c4c
-test "$(git rev-list --count 59c26f508262d7c25869faac0ec0abf968ec1e02..HEAD)" = 22
-test "$(git status --short)" = " M scripts/check_qinao_owner_ledger.py"
-test "$(git diff --binary -- scripts/check_qinao_owner_ledger.py | shasum -a 256 | awk '{print $1}')" = ca122962ca9f198b8a951cd04696b0bdd7c780c8b7c190f922942826ef677f8d
+candidate_commit_count="$(
+  git rev-list --count 59c26f508262d7c25869faac0ec0abf968ec1e02..HEAD
+)"
+test "$candidate_commit_count" = 22
+candidate_status="$(git status --short)"
+test "$candidate_status" = " M scripts/check_qinao_owner_ledger.py"
+checker_diff_sha256="$(
+  git diff --binary -- scripts/check_qinao_owner_ledger.py |
+    shasum -a 256 |
+    awk '{print $1}'
+)"
+test "$checker_diff_sha256" = ca122962ca9f198b8a951cd04696b0bdd7c780c8b7c190f922942826ef677f8d
 ```
 
 Expected: every assertion exits 0. Any mismatch is a stop; do not “repair” it with reset, checkout, or force.
@@ -143,10 +163,23 @@ Expected: every assertion exits 0. Any mismatch is a stop; do not “repair” i
 - [ ] **Step 2: Reproduce the one known RED and the green admission suite**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_wave_admission
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_check_qinao_owner_ledger
+set +e
+owner_ledger_diagnostic="$(
+  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+    scripts.test_check_qinao_owner_ledger 2>&1
+)"
+owner_ledger_rc=$?
+set -euo pipefail
+printf '%s\n' "$owner_ledger_diagnostic"
+test "$owner_ledger_rc" -eq 1
+test "${owner_ledger_diagnostic#*Ran }" != "$owner_ledger_diagnostic"
+test "${owner_ledger_diagnostic#*Ran 0 tests}" = "$owner_ledger_diagnostic"
+test "${owner_ledger_diagnostic#*FAILED (failures=1)}" != "$owner_ledger_diagnostic"
+test "${owner_ledger_diagnostic#*test_schema_v2_digest_targets_reject_symlink_nonregular_and_unreadable}" != "$owner_ledger_diagnostic"
+test "${owner_ledger_diagnostic#*target path must not contain symlink components}" != "$owner_ledger_diagnostic"
 ```
 
 Expected: wave admission discovers at least 20 tests and passes. Owner Ledger discovers at least 101 tests and fails only the `symlink` subcase of `test_schema_v2_digest_targets_reject_symlink_nonregular_and_unreadable`; the actual diagnostic contains `target path must not contain symlink components`.
@@ -177,6 +210,7 @@ Keep the existing resolve/containment/regular-file/readability/digest checks aft
 - [ ] **Step 4: Run both focused methods and the full baseline**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_owner_ledger.QinaoOwnerLedgerCLITests.test_schema_v2_digest_targets_reject_symlink_nonregular_and_unreadable \
   scripts.test_check_qinao_owner_ledger.QinaoOwnerLedgerCLITests.test_schema_v2_digest_rejects_symlinked_parent_component
@@ -191,13 +225,16 @@ Expected: exactly two focused methods pass; every discovered full-suite test pas
 - [ ] **Step 5: Commit the existing checker slice without rewriting its parent**
 
 ```bash
+set -euo pipefail
 git add scripts/check_qinao_owner_ledger.py
-test "$(git diff --cached --name-only)" = scripts/check_qinao_owner_ledger.py
+staged_paths="$(git diff --cached --name-only)"
+test "$staged_paths" = scripts/check_qinao_owner_ledger.py
 git commit -m "fix(qinao): preserve owner ledger symlink diagnostics"
 test "$(git rev-parse HEAD^)" = 486e1ec5983ad4390c5b07f04607f1345b912c4c
 git merge-base --is-ancestor \
   486e1ec5983ad4390c5b07f04607f1345b912c4c HEAD
-test -z "$(git status --porcelain=v1)"
+worktree_status="$(git status --porcelain=v1)"
+test -z "$worktree_status"
 ```
 
 Expected: one new commit with one path; the 22-commit tip remains the immediate parent and an ancestor.
@@ -229,6 +266,10 @@ class RootContract:
 class CandidateLineage(Enum):
     PREBOOTSTRAP_PREPARATION = "prebootstrapPreparation"
     REPARENTED_PROGRAM = "reparentedProgram"
+
+def candidate_lineage_for_import_batch(
+    destination_batch: str,
+) -> CandidateLineage
 
 @dataclass(frozen=True)
 class RootIdentity:
@@ -291,6 +332,12 @@ class RootContract:
 class CandidateLineage(Enum):
     PREBOOTSTRAP_PREPARATION = "prebootstrapPreparation"
     REPARENTED_PROGRAM = "reparentedProgram"
+
+
+def candidate_lineage_for_import_batch(
+    destination_batch: str,
+) -> CandidateLineage:
+    raise RootGuardError("RED: import batch lineage is not accepted")
 
 
 @dataclass(frozen=True)
@@ -372,6 +419,22 @@ class QinaoExecutionRootTests(unittest.TestCase):
             identity.candidate_lineage,
             guard.CandidateLineage.REPARENTED_PROGRAM,
         )
+
+        for batch in ("C1", "C2"):
+            self.assertEqual(
+                guard.candidate_lineage_for_import_batch(batch),
+                guard.CandidateLineage.PREBOOTSTRAP_PREPARATION,
+            )
+        for batch in ("C3", "C4"):
+            self.assertEqual(
+                guard.candidate_lineage_for_import_batch(batch),
+                guard.CandidateLineage.REPARENTED_PROGRAM,
+            )
+        with self.assertRaisesRegex(
+            guard.RootGuardError,
+            "unknown import destination batch",
+        ):
+            guard.candidate_lineage_for_import_batch("C5")
 
     def test_candidate_guard_rejects_partial_or_forged_forensic_state(self) -> None:
         self.fixture.apply_valid_reparent_transaction()
@@ -563,8 +626,20 @@ The fixture methods are complete when they:
 - [ ] **Step 2: Run the guard suite to verify RED**
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_qinao_execution_root
+set -euo pipefail
+set +e
+red_diagnostic="$(
+  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+    scripts.test_qinao_execution_root 2>&1
+)"
+red_rc=$?
+set -euo pipefail
+printf '%s\n' "$red_diagnostic"
+test "$red_rc" -eq 1
+test "${red_diagnostic#*Ran }" != "$red_diagnostic"
+test "${red_diagnostic#*Ran 0 tests}" = "$red_diagnostic"
+test "${red_diagnostic#*FAILED}" != "$red_diagnostic"
+test "${red_diagnostic#*RED: candidate execution root is not accepted}" != "$red_diagnostic"
 ```
 
 Expected: the module imports, all methods are discovered, and acceptance cases fail with one of the two exact typed RED messages defined above. A syntax error, import error, or zero discovery is not the required RED.
@@ -607,6 +682,18 @@ class RootContract:
 class CandidateLineage(Enum):
     PREBOOTSTRAP_PREPARATION = "prebootstrapPreparation"
     REPARENTED_PROGRAM = "reparentedProgram"
+
+
+def candidate_lineage_for_import_batch(
+    destination_batch: str,
+) -> CandidateLineage:
+    if destination_batch in {"C1", "C2"}:
+        return CandidateLineage.PREBOOTSTRAP_PREPARATION
+    if destination_batch in {"C3", "C4"}:
+        return CandidateLineage.REPARENTED_PROGRAM
+    raise RootGuardError(
+        f"unknown import destination batch: {destination_batch!r}"
+    )
 
 
 @dataclass(frozen=True)
@@ -1073,6 +1160,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run and commit the guard**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_execution_root
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py \
@@ -1082,11 +1170,14 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py \
 git diff --check
 git add scripts/qinao_execution_root.py \
   scripts/test_qinao_execution_root.py
-test "$(git diff --cached --name-only)" = "$(printf '%s\n' \
+staged_paths="$(git diff --cached --name-only)"
+expected_staged_paths="$(printf '%s\n' \
   scripts/qinao_execution_root.py \
   scripts/test_qinao_execution_root.py)"
+test "$staged_paths" = "$expected_staged_paths"
 git commit -m "build(qinao): guard clean candidate execution root"
-test -z "$(git status --porcelain=v1)"
+worktree_status="$(git status --porcelain=v1)"
+test -z "$worktree_status"
 ```
 
 Expected: positive discovery, all tests pass, the CLI emits one canonical JSON line with exact keys `candidate_lineage,head_commit,head_tree,schema_version` and `candidate_lineage == "prebootstrapPreparation"`, and the commit contains exactly the two files. A lineage mismatch exits 2 with prefix `qinao-execution-root:`.
@@ -1296,8 +1387,20 @@ The fixture creates: one base-only file, one HEAD commit, one staged add, one mi
 - [ ] **Step 2: Run RED**
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_capture_qinao_candidate_inventory
+set -euo pipefail
+set +e
+red_diagnostic="$(
+  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+    scripts.test_capture_qinao_candidate_inventory 2>&1
+)"
+red_rc=$?
+set -euo pipefail
+printf '%s\n' "$red_diagnostic"
+test "$red_rc" -eq 1
+test "${red_diagnostic#*Ran }" != "$red_diagnostic"
+test "${red_diagnostic#*Ran 0 tests}" = "$red_diagnostic"
+test "${red_diagnostic#*FAILED}" != "$red_diagnostic"
+test "${red_diagnostic#*RED: source inventory capture is unavailable}" != "$red_diagnostic"
 ```
 
 Expected: the module imports, every method is discovered, and capture cases fail with the typed `SourceInventoryError` RED. Syntax/import errors do not count as RED.
@@ -1311,6 +1414,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -1320,11 +1424,12 @@ import posixpath
 import shutil
 import stat
 import tempfile
-from typing import Callable
+from typing import Callable, Iterator
 
 from scripts.qinao_execution_root import (
     CandidateLineage,
     DEFAULT_CONTRACT,
+    candidate_lineage_for_import_batch,
     require_candidate_root,
     require_source_root,
     run_git,
@@ -1378,23 +1483,531 @@ def _validate_raw_path(path: bytes) -> None:
         raise SourceInventoryError("Git path contains a forbidden component")
 
 
-def _abs_bytes(root: Path, path: bytes) -> bytes:
+@contextmanager
+def open_parent_dirfd_no_follow(
+    root: Path,
+    path: bytes,
+) -> Iterator[tuple[int, bytes]]:
     _validate_raw_path(path)
-    return os.path.join(os.fsencode(str(root)), *path.split(b"/"))
-
-
-def _check_parent_components(root: Path, path: bytes) -> None:
-    current = os.fsencode(str(root))
-    for component in path.split(b"/")[:-1]:
-        current = os.path.join(current, component)
-        try:
-            mode = os.lstat(current).st_mode
-        except FileNotFoundError:
-            return
-        if stat.S_ISLNK(mode):
-            raise SourceInventoryError(
-                f"parent-component symlink is forbidden: {_display_path(path)}"
+    components = path.split(b"/")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = os.open(os.fsencode(str(root)), flags)
+    try:
+        for component in components[:-1]:
+            next_descriptor = os.open(
+                component,
+                flags,
+                dir_fd=descriptor,
             )
+            os.close(descriptor)
+            descriptor = next_descriptor
+        yield descriptor, components[-1]
+    finally:
+        os.close(descriptor)
+
+
+_FIXED_CANDIDATE_JSON_PATHS = {
+    b"docs/superpowers/evidence/qinao-clean-candidate/"
+    b"2026-07-23-c0/source-inventory.json",
+    b"docs/superpowers/evidence/qinao-clean-candidate/"
+    b"2026-07-23-c0/import-map.json",
+    b"docs/superpowers/evidence/qinao-clean-candidate/"
+    b"2026-07-23-c0/source-provenance-v1.json",
+}
+MAX_GOVERNED_JSON_BYTES = 64 * 1024 * 1024
+
+
+def _fixed_candidate_path_bytes(relative_path: Path) -> bytes:
+    raw = os.fsencode(str(relative_path))
+    _validate_raw_path(raw)
+    if raw not in _FIXED_CANDIDATE_JSON_PATHS:
+        raise SourceInventoryError("candidate JSON path is not a fixed output")
+    return raw
+
+
+@contextmanager
+def _open_fixed_parent_for_install(
+    candidate_root: Path,
+    relative_path: Path,
+) -> Iterator[tuple[int, bytes]]:
+    raw = _fixed_candidate_path_bytes(relative_path)
+    components = raw.split(b"/")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = os.open(os.fsencode(str(candidate_root)), flags)
+    try:
+        for component in components[:-1]:
+            created = False
+            try:
+                next_descriptor = os.open(
+                    component,
+                    flags,
+                    dir_fd=descriptor,
+                )
+            except FileNotFoundError:
+                os.mkdir(component, 0o755, dir_fd=descriptor)
+                created = True
+                created_named = os.stat(
+                    component,
+                    dir_fd=descriptor,
+                    follow_symlinks=False,
+                )
+            except PermissionError:
+                created_named = os.stat(
+                    component,
+                    dir_fd=descriptor,
+                    follow_symlinks=False,
+                )
+                if (
+                    not stat.S_ISDIR(created_named.st_mode)
+                    or created_named.st_uid != os.geteuid()
+                    or stat.S_IMODE(created_named.st_mode) != 0
+                ):
+                    raise
+                # Recover only the exact mode-000 residue that umask 0777 can
+                # leave if a prior process dies immediately after mkdir.
+                created = True
+            if created:
+                if (
+                    not stat.S_ISDIR(created_named.st_mode)
+                    or created_named.st_uid != os.geteuid()
+                ):
+                    raise SourceInventoryError(
+                        "new fixed output parent identity/owner mismatch"
+                    )
+                # umask may have produced mode 000. Bootstrap only this pinned
+                # inode to owner-searchable, then validate through a no-follow
+                # descriptor before setting the governed final mode.
+                os.chmod(
+                    component,
+                    0o755,
+                    dir_fd=descriptor,
+                    follow_symlinks=False,
+                )
+                next_descriptor = os.open(
+                    component,
+                    flags,
+                    dir_fd=descriptor,
+                )
+                try:
+                    bootstrap_opened = os.fstat(next_descriptor)
+                    bootstrap_named = os.stat(
+                        component,
+                        dir_fd=descriptor,
+                        follow_symlinks=False,
+                    )
+                    if (
+                        not stat.S_ISDIR(bootstrap_opened.st_mode)
+                        or bootstrap_opened.st_uid != os.geteuid()
+                        or (bootstrap_opened.st_dev, bootstrap_opened.st_ino)
+                        != (created_named.st_dev, created_named.st_ino)
+                        or (bootstrap_opened.st_dev, bootstrap_opened.st_ino)
+                        != (bootstrap_named.st_dev, bootstrap_named.st_ino)
+                    ):
+                        raise SourceInventoryError(
+                            "new fixed output parent changed before fchmod"
+                        )
+                    os.fchmod(next_descriptor, 0o755)
+                    os.fsync(next_descriptor)
+                finally:
+                    os.close(next_descriptor)
+                next_descriptor = os.open(
+                    component,
+                    flags,
+                    dir_fd=descriptor,
+                )
+            try:
+                opened = os.fstat(next_descriptor)
+                named = os.stat(
+                    component,
+                    dir_fd=descriptor,
+                    follow_symlinks=False,
+                )
+                valid = (
+                    stat.S_ISDIR(opened.st_mode)
+                    and stat.S_ISDIR(named.st_mode)
+                    and opened.st_uid == os.geteuid()
+                    and not stat.S_IMODE(opened.st_mode) & 0o022
+                    and (opened.st_dev, opened.st_ino)
+                    == (named.st_dev, named.st_ino)
+                    and (
+                        not created
+                        or stat.S_IMODE(opened.st_mode) == 0o755
+                    )
+                )
+            except BaseException:
+                os.close(next_descriptor)
+                raise
+            if not valid:
+                os.close(next_descriptor)
+                raise SourceInventoryError(
+                    "fixed output parent identity/owner/mode mismatch"
+                )
+            if created:
+                os.fsync(next_descriptor)
+                os.fsync(descriptor)
+            os.close(descriptor)
+            descriptor = next_descriptor
+        yield descriptor, components[-1]
+    finally:
+        os.close(descriptor)
+
+
+def _read_regular_leaf(
+    parent: int,
+    leaf: bytes,
+    *,
+    allowed_modes: set[int],
+    require_single_link: bool = False,
+    fsync_after_read: bool = False,
+) -> bytes:
+    named_before = os.stat(leaf, dir_fd=parent, follow_symlinks=False)
+    descriptor = os.open(
+        leaf,
+        os.O_RDONLY
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0),
+        dir_fd=parent,
+    )
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_uid != os.geteuid()
+            or stat.S_IMODE(opened.st_mode) not in allowed_modes
+            or opened.st_size > MAX_GOVERNED_JSON_BYTES
+            or (require_single_link and opened.st_nlink != 1)
+            or (opened.st_dev, opened.st_ino)
+            != (named_before.st_dev, named_before.st_ino)
+        ):
+            raise SourceInventoryError(
+                "fixed JSON leaf identity/owner/mode mismatch"
+            )
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_GOVERNED_JSON_BYTES:
+                raise SourceInventoryError("fixed JSON leaf exceeds size limit")
+            chunks.append(chunk)
+        value = b"".join(chunks)
+        named_after = os.stat(
+            leaf,
+            dir_fd=parent,
+            follow_symlinks=False,
+        )
+        if (
+            opened.st_dev,
+            opened.st_ino,
+            opened.st_size,
+        ) != (
+            named_after.st_dev,
+            named_after.st_ino,
+            named_after.st_size,
+        ):
+            raise SourceInventoryError("fixed JSON leaf changed while reading")
+        if fsync_after_read:
+            os.fsync(descriptor)
+        return value
+    finally:
+        os.close(descriptor)
+
+
+def _decode_canonical_json_object(value: bytes) -> dict[str, object]:
+    try:
+        decoded = json.loads(value.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise SourceInventoryError("fixed JSON is invalid") from error
+    if not isinstance(decoded, dict) or canonical_json_bytes(decoded) != value:
+        raise SourceInventoryError("fixed JSON is not canonical object bytes")
+    return decoded
+
+
+def _reject_other_fixed_json_temporaries(
+    parent: int,
+    leaf: bytes,
+    expected_temporary: bytes,
+) -> None:
+    prefix = b"." + leaf + b".qinao-"
+    suffix = b".tmp"
+    lowercase_hex = frozenset(b"0123456789abcdef")
+    for name in os.listdir(parent):
+        raw = os.fsencode(name)
+        if not raw.startswith(prefix) or not raw.endswith(suffix):
+            continue
+        digest = raw[len(prefix) : -len(suffix)]
+        if len(digest) != 64 or any(byte not in lowercase_hex for byte in digest):
+            raise SourceInventoryError(
+                "fixed JSON temporary name is malformed"
+            )
+        if raw != expected_temporary:
+            raise SourceInventoryError(
+                "different fixed JSON install intent is present"
+            )
+
+
+def _load_fixed_candidate_json_no_follow(
+    candidate_root: Path,
+    relative_path: Path,
+) -> dict[str, object]:
+    raw = _fixed_candidate_path_bytes(relative_path)
+    with open_parent_dirfd_no_follow(candidate_root, raw) as (parent, leaf):
+        value = _read_regular_leaf(
+            parent,
+            leaf,
+            allowed_modes={0o644},
+        )
+        decoded = _decode_canonical_json_object(value)
+        digest = hashlib.sha256(value).hexdigest().encode("ascii")
+        temporary = b"." + leaf + b".qinao-" + digest + b".tmp"
+        _reject_other_fixed_json_temporaries(parent, leaf, temporary)
+        try:
+            stale = _read_regular_leaf(
+                parent,
+                temporary,
+                allowed_modes={0o600, 0o644},
+            )
+        except FileNotFoundError:
+            stale = None
+        if stale is None:
+            final_metadata = os.stat(
+                leaf,
+                dir_fd=parent,
+                follow_symlinks=False,
+            )
+            if final_metadata.st_nlink != 1:
+                raise SourceInventoryError(
+                    "fixed JSON final has unexplained hard links"
+                )
+        else:
+            final_metadata = os.stat(
+                leaf,
+                dir_fd=parent,
+                follow_symlinks=False,
+            )
+            try:
+                temporary_metadata = os.stat(
+                    temporary,
+                    dir_fd=parent,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                final_metadata = os.stat(
+                    leaf,
+                    dir_fd=parent,
+                    follow_symlinks=False,
+                )
+                if final_metadata.st_nlink != 1:
+                    raise SourceInventoryError(
+                        "fixed JSON final has unexplained hard links"
+                    )
+            else:
+                same_inode = (
+                    final_metadata.st_dev,
+                    final_metadata.st_ino,
+                ) == (
+                    temporary_metadata.st_dev,
+                    temporary_metadata.st_ino,
+                )
+                if (
+                    stale != value
+                    or (
+                        same_inode
+                        and (
+                            final_metadata.st_nlink != 2
+                            or temporary_metadata.st_nlink != 2
+                        )
+                    )
+                    or (
+                        not same_inode
+                        and (
+                            final_metadata.st_nlink != 1
+                            or temporary_metadata.st_nlink != 1
+                        )
+                    )
+                ):
+                    raise SourceInventoryError(
+                        "fixed JSON recovery temporary is unsafe"
+                    )
+                try:
+                    os.unlink(temporary, dir_fd=parent)
+                except FileNotFoundError:
+                    pass
+                os.fsync(parent)
+        reopened = _read_regular_leaf(
+            parent,
+            leaf,
+            allowed_modes={0o644},
+            require_single_link=True,
+        )
+        if reopened != value:
+            raise SourceInventoryError(
+                "fixed JSON changed during recovery reopen"
+            )
+    return decoded
+
+
+def _install_fixed_candidate_json_no_replace(
+    *,
+    candidate_root: Path,
+    source_root: Path,
+    relative_path: Path,
+    value: bytes,
+    mode: int,
+) -> None:
+    raw = _fixed_candidate_path_bytes(relative_path)
+    if mode != 0o644:
+        raise SourceInventoryError("fixed candidate JSON mode must be 0644")
+    if len(value) > MAX_GOVERNED_JSON_BYTES:
+        raise SourceInventoryError(
+            "fixed candidate JSON exceeds size limit before install"
+        )
+    _decode_canonical_json_object(value)
+    candidate_stat = os.stat(candidate_root, follow_symlinks=False)
+    source_stat = os.stat(source_root, follow_symlinks=False)
+    candidate_real = candidate_root.resolve(strict=True)
+    source_real = source_root.resolve(strict=True)
+    common = Path(
+        os.path.commonpath((str(candidate_real), str(source_real)))
+    )
+    if (
+        not stat.S_ISDIR(candidate_stat.st_mode)
+        or not stat.S_ISDIR(source_stat.st_mode)
+        or (candidate_stat.st_dev, candidate_stat.st_ino)
+        == (source_stat.st_dev, source_stat.st_ino)
+        or common in {candidate_real, source_real}
+    ):
+        raise SourceInventoryError(
+            "candidate/source roots are not distinct disjoint directories"
+        )
+    with _open_fixed_parent_for_install(
+        candidate_root,
+        relative_path,
+    ) as (parent, leaf):
+        digest = hashlib.sha256(value).hexdigest().encode("ascii")
+        temporary = b"." + leaf + b".qinao-" + digest + b".tmp"
+        _reject_other_fixed_json_temporaries(parent, leaf, temporary)
+        try:
+            existing = _read_regular_leaf(
+                parent,
+                leaf,
+                allowed_modes={mode},
+            )
+        except FileNotFoundError:
+            existing = None
+        if existing is not None:
+            if existing != value:
+                raise SourceInventoryError(
+                    "fixed candidate JSON already exists with different bytes"
+                )
+            if _load_fixed_candidate_json_no_follow(
+                candidate_root,
+                relative_path,
+            ) != _decode_canonical_json_object(value):
+                raise SourceInventoryError(
+                    "fixed candidate JSON recovered-final mismatch"
+                )
+            return
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
+        try:
+            descriptor = os.open(temporary, flags, 0o600, dir_fd=parent)
+        except FileExistsError:
+            stale = _read_regular_leaf(
+                parent,
+                temporary,
+                allowed_modes={mode},
+                require_single_link=True,
+                fsync_after_read=True,
+            )
+            if stale != value:
+                raise SourceInventoryError(
+                    "fixed JSON deterministic temporary has different bytes"
+                )
+            descriptor = None
+        if descriptor is not None:
+            try:
+                opened = os.fstat(descriptor)
+                named = os.stat(
+                    temporary,
+                    dir_fd=parent,
+                    follow_symlinks=False,
+                )
+                if (
+                    not stat.S_ISREG(opened.st_mode)
+                    or opened.st_uid != os.geteuid()
+                    or opened.st_nlink != 1
+                    or (opened.st_dev, opened.st_ino)
+                    != (named.st_dev, named.st_ino)
+                ):
+                    raise SourceInventoryError(
+                        "new fixed JSON temporary identity/owner mismatch"
+                    )
+                os.fchmod(descriptor, mode)
+                governed = os.fstat(descriptor)
+                named_after_fchmod = os.stat(
+                    temporary,
+                    dir_fd=parent,
+                    follow_symlinks=False,
+                )
+                if (
+                    not stat.S_ISREG(governed.st_mode)
+                    or stat.S_IMODE(governed.st_mode) != mode
+                    or governed.st_uid != os.geteuid()
+                    or governed.st_nlink != 1
+                    or (governed.st_dev, governed.st_ino)
+                    != (opened.st_dev, opened.st_ino)
+                    or (governed.st_dev, governed.st_ino)
+                    != (
+                        named_after_fchmod.st_dev,
+                        named_after_fchmod.st_ino,
+                    )
+                ):
+                    raise SourceInventoryError(
+                        "new fixed JSON temporary changed during fchmod"
+                    )
+                offset = 0
+                while offset < len(value):
+                    written = os.write(descriptor, value[offset:])
+                    if written <= 0:
+                        raise SourceInventoryError(
+                            "fixed JSON temporary write made no progress"
+                        )
+                    offset += written
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        try:
+            os.link(
+                temporary,
+                leaf,
+                src_dir_fd=parent,
+                dst_dir_fd=parent,
+                follow_symlinks=False,
+            )
+        except (FileExistsError, FileNotFoundError):
+            pass
+        os.fsync(parent)
+    if _load_fixed_candidate_json_no_follow(
+        candidate_root,
+        relative_path,
+    ) != _decode_canonical_json_object(value):
+        raise SourceInventoryError("fixed candidate JSON postinstall mismatch")
 
 
 def _safe_symlink_target(path: bytes, target: bytes) -> None:
@@ -1410,10 +2023,83 @@ def _safe_symlink_target(path: bytes, target: bytes) -> None:
 
 
 def _filesystem_entry(root: Path, path: bytes) -> dict[str, object]:
-    _check_parent_components(root, path)
-    absolute = _abs_bytes(root, path)
     try:
-        metadata = os.lstat(absolute)
+        with open_parent_dirfd_no_follow(root, path) as (parent, leaf):
+            metadata = os.stat(
+                leaf,
+                dir_fd=parent,
+                follow_symlinks=False,
+            )
+            if stat.S_ISLNK(metadata.st_mode):
+                target = os.readlink(leaf, dir_fd=parent)
+                if isinstance(target, str):
+                    target = os.fsencode(target)
+                closed_check = os.stat(
+                    leaf,
+                    dir_fd=parent,
+                    follow_symlinks=False,
+                )
+                if (metadata.st_dev, metadata.st_ino) != (
+                    closed_check.st_dev,
+                    closed_check.st_ino,
+                ):
+                    raise SourceInventoryError(
+                        f"symlink changed while reading: {_display_path(path)}"
+                    )
+                _safe_symlink_target(path, target)
+                return {
+                    "present": True,
+                    "kind": "symlink",
+                    "mode": "120000",
+                    "size": len(target),
+                    "sha256": _sha256(target),
+                }
+            if not stat.S_ISREG(metadata.st_mode):
+                raise SourceInventoryError(
+                    f"special file is forbidden: {_display_path(path)}"
+                )
+            descriptor = os.open(
+                leaf,
+                os.O_RDONLY
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_NONBLOCK", 0),
+                dir_fd=parent,
+            )
+            try:
+                opened = os.fstat(descriptor)
+                if not stat.S_ISREG(opened.st_mode):
+                    raise SourceInventoryError(
+                        f"file changed type while reading: {_display_path(path)}"
+                    )
+                if (metadata.st_dev, metadata.st_ino) != (
+                    opened.st_dev,
+                    opened.st_ino,
+                ):
+                    raise SourceInventoryError(
+                        f"file changed before open: {_display_path(path)}"
+                    )
+                chunks: list[bytes] = []
+                while True:
+                    chunk = os.read(descriptor, 1024 * 1024)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                value = b"".join(chunks)
+                closed_check = os.stat(
+                    leaf,
+                    dir_fd=parent,
+                    follow_symlinks=False,
+                )
+                if (opened.st_dev, opened.st_ino, opened.st_size) != (
+                    closed_check.st_dev,
+                    closed_check.st_ino,
+                    closed_check.st_size,
+                ):
+                    raise SourceInventoryError(
+                        f"file changed while reading: {_display_path(path)}"
+                    )
+            finally:
+                os.close(descriptor)
     except FileNotFoundError:
         return {
             "present": False,
@@ -1422,47 +2108,10 @@ def _filesystem_entry(root: Path, path: bytes) -> dict[str, object]:
             "size": None,
             "sha256": None,
         }
-    if stat.S_ISLNK(metadata.st_mode):
-        target = os.readlink(absolute)
-        if isinstance(target, str):
-            target = os.fsencode(target)
-        _safe_symlink_target(path, target)
-        return {
-            "present": True,
-            "kind": "symlink",
-            "mode": "120000",
-            "size": len(target),
-            "sha256": _sha256(target),
-        }
-    if not stat.S_ISREG(metadata.st_mode):
+    except OSError as error:
         raise SourceInventoryError(
-            f"special file is forbidden: {_display_path(path)}"
-        )
-    descriptor = os.open(absolute, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-    try:
-        opened = os.fstat(descriptor)
-        if not stat.S_ISREG(opened.st_mode):
-            raise SourceInventoryError(
-                f"file changed type while reading: {_display_path(path)}"
-            )
-        chunks: list[bytes] = []
-        while True:
-            chunk = os.read(descriptor, 1024 * 1024)
-            if not chunk:
-                break
-            chunks.append(chunk)
-        value = b"".join(chunks)
-        closed_check = os.lstat(absolute)
-        if (opened.st_dev, opened.st_ino, opened.st_size) != (
-            closed_check.st_dev,
-            closed_check.st_ino,
-            closed_check.st_size,
-        ):
-            raise SourceInventoryError(
-                f"file changed while reading: {_display_path(path)}"
-            )
-    finally:
-        os.close(descriptor)
+            f"descriptor-relative no-follow open failed: {_display_path(path)}"
+        ) from error
     mode = "100755" if opened.st_mode & 0o111 else "100644"
     return {
         "present": True,
@@ -1472,6 +2121,18 @@ def _filesystem_entry(root: Path, path: bytes) -> dict[str, object]:
         "sha256": _sha256(value),
     }
 ```
+
+All filesystem leaf access in inventory capture/reverification and apply
+source reopening uses this one descriptor-relative primitive. Tests pause
+after each parent component is opened, rename/swap the pathname to a symlink
+or different directory, and resume. Capture, second-read verification, patch
+construction, recovery, and lost-reply finalization must either read the
+already pinned directory object and then detect whole-inventory drift or fail
+closed; none may follow the replacement. Include intermediate-parent and
+final-leaf symlink swaps, non-UTF-8 components, deletion during walk, and
+regular↔symlink replacement, same-bytes mode replacement, and regular→FIFO
+replacement. `O_NONBLOCK` plus `fstat` prevents a raced special-file open from
+blocking the verifier.
 
 - [ ] **Step 4: Implement Git tree/index/status capture without writing the source**
 
@@ -1808,20 +2469,19 @@ def verify_inventory(*, root: Path, inventory: dict[str, object]) -> None:
 
 - [ ] **Step 6: Implement the capture/verify CLI**
 
-The CLI must require candidate CWD, accept exactly one of `--output` or `--verify`, and never write under the source root:
+The CLI must require candidate CWD, accept exactly one of `--output` or
+`--verify`, and never write under the source root:
 
 ```python
-def _load_json(path: Path) -> dict[str, object]:
-    value = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(value, dict):
-        raise SourceInventoryError("inventory JSON must be an object")
-    return value
-
-
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--approved-base")
+    parser.add_argument(
+        "--operation-batch",
+        choices=("C1", "C2", "C3", "C4"),
+        required=True,
+    )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--output", type=Path)
     group.add_argument("--verify", type=Path)
@@ -1829,10 +2489,23 @@ def main() -> int:
     candidate = require_candidate_root(
         Path.cwd(),
         require_clean=False,
-        expected_lineage=CandidateLineage.PREBOOTSTRAP_PREPARATION,
+        expected_lineage=candidate_lineage_for_import_batch(
+            arguments.operation_batch
+        ),
+    )
+    if arguments.output is not None and arguments.operation_batch != "C1":
+        parser.error("initial inventory capture is legal only for C1")
+    fixed_inventory = Path(
+        "docs/superpowers/evidence/qinao-clean-candidate/"
+        "2026-07-23-c0/source-inventory.json"
     )
     if arguments.verify is not None:
-        value = _load_json(arguments.verify)
+        if arguments.verify != fixed_inventory:
+            parser.error("--verify must name the fixed candidate inventory")
+        value = _load_fixed_candidate_json_no_follow(
+            candidate.root,
+            fixed_inventory,
+        )
         verify_inventory(root=arguments.root, inventory=value)
         print(
             f"inventory_status=complete paths={len(value['paths'])} "
@@ -1841,26 +2514,56 @@ def main() -> int:
         return 0
     if arguments.approved_base is None:
         parser.error("--approved-base is required with --output")
+    if arguments.output != fixed_inventory:
+        parser.error("--output must name the fixed candidate inventory")
+    try:
+        existing = _load_fixed_candidate_json_no_follow(
+            candidate.root,
+            fixed_inventory,
+        )
+    except FileNotFoundError:
+        existing = None
+    if existing is not None:
+        if (
+            existing.get("approved_base_commit") != arguments.approved_base
+            or existing.get("capture_tool_commit") != candidate.head_commit
+        ):
+            raise SourceInventoryError(
+                "existing inventory belongs to a different capture intent"
+            )
+        verify_inventory(root=arguments.root, inventory=existing)
+        print(
+            f"inventory_status=complete paths={len(existing['paths'])} "
+            "source_unchanged=true recovered_existing=true"
+        )
+        return 0
+    source_identity = require_source_root(arguments.root)
     captured_at = (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
+        run_git(
+            arguments.root,
+            "show",
+            "-s",
+            "--format=%cI",
+            source_identity.head_commit,
+        )
+        .stdout.decode("ascii")
+        .strip()
     )
+    if not captured_at:
+        raise SourceInventoryError("source HEAD committer instant is empty")
     value = capture_inventory(
         root=arguments.root,
         approved_base_commit=arguments.approved_base,
         capture_tool_commit=candidate.head_commit,
         captured_at=captured_at,
     )
-    output = arguments.output.resolve(strict=False)
-    source = arguments.root.resolve(strict=True)
-    if output == source or source in output.parents:
-        raise SourceInventoryError("inventory output cannot be inside source root")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = output.with_name(f".{output.name}.tmp-{os.getpid()}")
-    temporary.write_bytes(canonical_json_bytes(value))
-    os.replace(temporary, output)
+    _install_fixed_candidate_json_no_replace(
+        candidate_root=candidate.root,
+        source_root=arguments.root,
+        relative_path=fixed_inventory,
+        value=canonical_json_bytes(value),
+        mode=0o644,
+    )
     print(
         f"inventory_status=complete paths={len(value['paths'])} "
         "source_unchanged=true"
@@ -1872,20 +2575,58 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
+The two fixed-candidate JSON helpers use the same descriptor-relative,
+parent/final-no-follow, source-excluding, create-once-or-reopen-identical,
+exact-mode, file/directory-`fsync` contract frozen for the import map.
+`MAX_GOVERNED_JSON_BYTES == 64 * 1024 * 1024` is checked before any parent
+creation, temporary creation, lock creation, or final-name mutation and while
+streaming every reopen. An oversized value therefore leaves no directory,
+temporary, final, lock, or journal residue.
+`captured_at` is the exact source-HEAD committer instant (`%cI`), not a fresh
+wall-clock sample, so an unchanged crash/retry reconstructs the same
+inventory bytes and deterministic temporary name. If the final leaf already
+exists, the CLI reopens and re-verifies that capture before sampling any new
+time; it never manufactures a second intent. A linked or single-link owned
+digest temporary left by a crash is validated, unlinked, and parent-`fsync`ed
+before same-intent success; a foreign, multiply linked, substituted, or
+different-byte temporary fails closed.
+An exact complete single-link temporary is file-`fsync`ed and reused without
+`ftruncate`, `write`, replacement, or mode repair. Two same-intent installers
+may race only at the no-replace link and idempotent cleanup: neither ever
+writes an inode after it can be linked as the final. New directories and
+temporaries are tested under umask `0777`; identity/type/owner/link checks
+precede descriptor `fchmod`, and exact governed mode plus pathname/inode
+identity are revalidated after `fchmod` and reopen.
+Verification requires a regular mode-`100644` canonical leaf and never
+follows a symlink. Tests cover arbitrary/absolute/source-descendant paths,
+parent/final symlinks, byte-identical lost-reply reopen,
+preexisting-different bytes, restrictive umask, hard-linked temporary,
+crash-before-link, crash-after-link-before-unlink, wrong mode, and failure
+before any source or candidate mutation. They also cover missing-parent
+creation under umask `0777`, process death immediately after `mkdir` followed
+by recovery of only the exact owner/mode-`0000` residue, oversize preflight with zero residue,
+different-byte deterministic-temp quarantine without unlink, exact-temp
+reuse with mocked `ftruncate`/`write` forbidden, and two deliberately
+interleaved same-intent installers that never expose partial final bytes.
+
 - [ ] **Step 7: Run, inspect, and commit the inventory tool**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_execution_root \
   scripts.test_capture_qinao_candidate_inventory
 git diff --check
 git add scripts/capture_qinao_candidate_inventory.py \
   scripts/test_capture_qinao_candidate_inventory.py
-test "$(git diff --cached --name-only)" = "$(printf '%s\n' \
+staged_paths="$(git diff --cached --name-only)"
+expected_staged_paths="$(printf '%s\n' \
   scripts/capture_qinao_candidate_inventory.py \
   scripts/test_capture_qinao_candidate_inventory.py)"
+test "$staged_paths" = "$expected_staged_paths"
 git commit -m "build(qinao): capture stable source provenance"
-test -z "$(git status --porcelain=v1)"
+worktree_status="$(git status --porcelain=v1)"
+test -z "$worktree_status"
 ```
 
 Expected: all tests pass and exactly two paths are committed.
@@ -2098,11 +2839,35 @@ The test-only `import_row`, `omit_row`, `select_import`, and
 digest and `2026-07-23T00:00:00Z` before applying the one mutation under test.
 Production tools expose no default reviewer or review time.
 
+Add subtests that replace `candidate_base_commit` with another valid,
+existing 40-hex commit, a nonexistent 40-hex value, a descendant candidate
+tip, and a boolean/string lookalike. The pure validator rejects every
+substitution that differs from `inventory.approved_base_commit`; the CLI also
+requires that exact object to reopen as a commit and be an ancestor of the
+guarded candidate `HEAD`. A syntactically valid arbitrary commit is never an
+accepted reconstruction base. Run those Git checks only through the existing
+sanitized `run_git`; hostile `GIT_DIR`, `GIT_WORK_TREE`,
+`GIT_OBJECT_DIRECTORY`, alternates, replace refs, and graft environment
+subtests must not redirect the lookup.
+
 - [ ] **Step 2: Run RED**
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_qinao_import_map
+set -euo pipefail
+set +e
+red_diagnostic="$(
+  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+    scripts.test_qinao_import_map 2>&1
+)"
+red_rc=$?
+set -euo pipefail
+printf '%s\n' "$red_diagnostic"
+test "$red_rc" -eq 1
+test "${red_diagnostic#*Ran }" != "$red_diagnostic"
+test "${red_diagnostic#*Ran 0 tests}" = "$red_diagnostic"
+test "${red_diagnostic#*FAILED}" != "$red_diagnostic"
+test "${red_diagnostic#*RED: hold map builder is unavailable}" != "$red_diagnostic"
+test "${red_diagnostic#*RED: import map validator is unavailable}" != "$red_diagnostic"
 ```
 
 Expected: both modules import, every method is discovered, and assertions fail on the typed RED results. Syntax/import errors do not count as RED.
@@ -2121,14 +2886,28 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from scripts.capture_qinao_candidate_inventory import canonical_json_bytes
-from scripts.qinao_execution_root import CandidateLineage, require_candidate_root
+from scripts.capture_qinao_candidate_inventory import (
+    _install_fixed_candidate_json_no_replace,
+    _load_fixed_candidate_json_no_follow,
+    canonical_json_bytes,
+)
+from scripts.qinao_execution_root import (
+    CandidateLineage,
+    DEFAULT_CONTRACT,
+    require_candidate_root,
+    run_git,
+)
 
 
 def build_hold_map(
     inventory: dict[str, object],
     candidate_base_commit: str,
 ) -> dict[str, object]:
+    approved_base = inventory.get("approved_base_commit")
+    if candidate_base_commit != approved_base:
+        raise ValueError(
+            "candidate_base_commit must equal inventory approved_base_commit"
+        )
     rows = []
     for source in inventory["paths"]:
         rows.append(
@@ -2175,9 +2954,37 @@ def main() -> int:
         require_clean=False,
         expected_lineage=CandidateLineage.PREBOOTSTRAP_PREPARATION,
     )
-    inventory = json.loads(arguments.inventory.read_text(encoding="utf-8"))
+    fixed_inventory = Path(
+        "docs/superpowers/evidence/qinao-clean-candidate/"
+        "2026-07-23-c0/source-inventory.json"
+    )
+    if arguments.inventory != fixed_inventory:
+        parser.error("--inventory must name the fixed candidate inventory")
+    inventory = _load_fixed_candidate_json_no_follow(
+        Path.cwd(),
+        fixed_inventory,
+    )
+    expected_base = str(inventory["approved_base_commit"])
+    if arguments.candidate_base != expected_base:
+        raise SystemExit(
+            "candidate base does not equal inventory approved base"
+        )
+    run_git(Path.cwd(), "cat-file", "-e", f"{expected_base}^{{commit}}")
+    run_git(Path.cwd(), "merge-base", "--is-ancestor", expected_base, "HEAD")
     mapping = build_hold_map(inventory, arguments.candidate_base)
-    arguments.output.write_bytes(canonical_json_bytes(mapping))
+    fixed_output = Path(
+        "docs/superpowers/evidence/qinao-clean-candidate/"
+        "2026-07-23-c0/import-map.json"
+    )
+    if arguments.output != fixed_output:
+        raise SystemExit("import-map output path is not the fixed candidate path")
+    _install_fixed_candidate_json_no_replace(
+        candidate_root=Path.cwd(),
+        source_root=DEFAULT_CONTRACT.source_root,
+        relative_path=fixed_output,
+        value=canonical_json_bytes(mapping),
+        mode=0o644,
+    )
     print(f"import_map_status=hold rows={len(mapping['rows'])}")
     return 0
 
@@ -2185,6 +2992,55 @@ def main() -> int:
 if __name__ == "__main__":
     raise SystemExit(main())
 ```
+
+`_install_fixed_candidate_json_no_replace` accepts only the three literal
+candidate outputs frozen by this plan (`source-inventory.json`,
+`import-map.json`, and `source-provenance-v1.json`). It must therefore also
+make a first clean-candidate capture possible when one or more literal parent
+directories do not yet exist. Its parent-opening helper implements this exact
+descriptor-relative protocol; a caller-selected path or a generic recursive
+directory creator is forbidden:
+
+1. open the already-guarded candidate root with
+   `O_DIRECTORY|O_NOFOLLOW`;
+2. walk each fixed literal parent component with `openat`;
+3. on `ENOENT` only, call `mkdirat` for that exact component with requested
+   mode `0755`, immediately reopen it with
+   `O_DIRECTORY|O_NOFOLLOW`, descriptor-`fchmod` that newly created directory
+   to exact `0755` (so a restrictive process umask cannot alter the durable
+   contract), require owner `st_uid == geteuid()`, require exact mode `0755`,
+   `fsync` the new directory and its parent, and continue from the held child
+   descriptor;
+4. for an existing parent, require a real directory owned by the effective
+   user with no group/other write bit, but never chmod or otherwise mutate it;
+5. after every create/open, compare the descriptor `fstat` identity with a
+   fresh no-follow `statat` identity from the still-held parent; an
+   identity/type/owner/mode change closes all descriptors and fails;
+6. after the final leaf has been installed and file-`fsync`ed, `fsync` every
+   created directory from leaf to root and the nearest pre-existing parent.
+
+The digest-named temporary leaf—not the final name—is opened with
+`O_CREAT|O_EXCL|O_NOFOLLOW|O_NONBLOCK`, descriptor-`fchmod`ed to the exact
+requested file mode before any success observation, written as canonical
+bytes, file-`fsync`ed, and linked without replacement to the final name before
+the parent directory is `fsync`ed. Only newly created descriptors may be
+`fchmod`ed; a pre-existing parent or final leaf is never repaired in place.
+The helper treats a canonical byte-identical existing final leaf as
+same-intent lost-reply recovery, cleans only its exact digest-named owned
+temporary, and returns success without rewriting the final inode. It refuses
+a divergent existing leaf, parent/leaf symlink, special file, wrong root,
+source descendant, nonliteral output, ownership/mode drift, or rename
+substitution and never truncates/replaces a final leaf. It never uses
+`Path.mkdir(parents=True)`,
+`os.makedirs`, a pathname-only precheck, or a process-global `chdir`.
+Tests start from a candidate with the whole fixed evidence suffix absent and
+prove successful first creation; single-mutation cases cover an absent
+intermediate parent, preexisting safe parents, parent symlink/FIFO/file,
+foreign owner, group/world-writable parent, wrong newly-created mode, and a
+rename/symlink race at every component. A restrictive-umask subtest executes
+the successful first capture under `umask 077` and still observes exact
+directory `0755` and leaf `0644`. Every failure leaves the source unchanged
+and leaves no leaf or partially trusted directory chain usable by a retry.
 
 - [ ] **Step 4: Implement strict map validation**
 
@@ -2200,8 +3056,14 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from scripts.capture_qinao_candidate_inventory import canonical_json_bytes
-from scripts.qinao_execution_root import CandidateLineage, require_candidate_root
+from scripts.capture_qinao_candidate_inventory import (
+    _load_fixed_candidate_json_no_follow,
+    canonical_json_bytes,
+)
+from scripts.qinao_execution_root import (
+    candidate_lineage_for_import_batch,
+    require_candidate_root,
+)
 
 
 TOP_LEVEL_FIELDS = {
@@ -2320,6 +3182,10 @@ def validate_import_map(
         or any(character not in "0123456789abcdef" for character in candidate_base)
     ):
         errors.append("candidate_base_commit must be 40 lowercase hex")
+    if candidate_base != inventory.get("approved_base_commit"):
+        errors.append(
+            "candidate_base_commit must equal inventory approved_base_commit"
+        )
 
     inventory_rows = inventory.get("paths")
     map_rows = mapping.get("rows")
@@ -2446,14 +3312,37 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--inventory", type=Path, required=True)
     parser.add_argument("--map", type=Path, required=True)
+    parser.add_argument(
+        "--operation-batch",
+        choices=("C1", "C2", "C3", "C4"),
+        required=True,
+    )
     arguments = parser.parse_args()
-    require_candidate_root(
+    candidate = require_candidate_root(
         Path.cwd(),
         require_clean=False,
-        expected_lineage=CandidateLineage.PREBOOTSTRAP_PREPARATION,
+        expected_lineage=candidate_lineage_for_import_batch(
+            arguments.operation_batch
+        ),
     )
-    inventory = json.loads(arguments.inventory.read_text(encoding="utf-8"))
-    mapping = json.loads(arguments.map.read_text(encoding="utf-8"))
+    fixed_inventory = Path(
+        "docs/superpowers/evidence/qinao-clean-candidate/"
+        "2026-07-23-c0/source-inventory.json"
+    )
+    fixed_map = Path(
+        "docs/superpowers/evidence/qinao-clean-candidate/"
+        "2026-07-23-c0/import-map.json"
+    )
+    if arguments.inventory != fixed_inventory or arguments.map != fixed_map:
+        parser.error("--inventory/--map must name the fixed candidate pair")
+    inventory = _load_fixed_candidate_json_no_follow(
+        candidate.root,
+        fixed_inventory,
+    )
+    mapping = _load_fixed_candidate_json_no_follow(
+        candidate.root,
+        fixed_map,
+    )
     errors = validate_import_map(inventory, mapping)
     if errors:
         for error in errors:
@@ -2474,21 +3363,33 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
+`--operation-batch` is a phase assertion, not a source-selection escape
+hatch. The shared helper fixes `C1/C2 → prebootstrapPreparation` and
+`C3/C4 → reparentedProgram`; the checker also requires the requested batch to
+be present in the fixed reviewed-record groups once Bootstrap Task 1A installs
+that verifier (the initial all-hold map is legal only as C1 preparation).
+Tests run both lineages against both batch families and require wrong-phase
+failure before map bytes are accepted.
+
 - [ ] **Step 5: Run and commit the map tools**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_import_map
 git diff --check
 git add scripts/build_qinao_import_map.py \
   scripts/check_qinao_import_map.py \
   scripts/test_qinao_import_map.py
-test "$(git diff --cached --name-only)" = "$(printf '%s\n' \
+staged_paths="$(git diff --cached --name-only)"
+expected_staged_paths="$(printf '%s\n' \
   scripts/build_qinao_import_map.py \
   scripts/check_qinao_import_map.py \
   scripts/test_qinao_import_map.py)"
+test "$staged_paths" = "$expected_staged_paths"
 git commit -m "build(qinao): require reviewed source strata"
-test -z "$(git status --porcelain=v1)"
+worktree_status="$(git status --porcelain=v1)"
+test -z "$worktree_status"
 ```
 
 Expected: all tests pass; exactly three files are committed.
@@ -2500,6 +3401,9 @@ Expected: all tests pass; exactly three files are committed.
 **Files:**
 - Create: `scripts/apply_qinao_import_map.py`
 - Create: `scripts/test_apply_qinao_import_map.py`
+- Create/reopen outside the worktree in its linked Git directory:
+  `qinao-reviewed-import-transaction-v1.json` and
+  `qinao-reviewed-import.lock`
 
 **Interfaces:**
 - Produces:
@@ -2514,6 +3418,7 @@ class ApplyPlan:
     candidate_head_tree: str
     candidate_index_tree: str
     candidate_status_sha256: str
+    candidate_lineage: str
     destination_batch: str
     rows: tuple[dict[str, object], ...]
 
@@ -2534,6 +3439,24 @@ def apply_reviewed_imports(
     mapping: dict[str, object],
     plan: ApplyPlan,
 ) -> dict[str, object]
+
+def recover_pending_import(
+    *,
+    candidate_root: Path,
+    source_root: Path,
+    inventory: dict[str, object],
+    mapping: dict[str, object],
+    destination_batch: str,
+) -> dict[str, object]
+
+def finalize_reviewed_import(
+    *,
+    candidate_root: Path,
+    source_root: Path,
+    inventory: dict[str, object],
+    mapping: dict[str, object],
+    plan: ApplyPlan,
+) -> dict[str, object]
 ```
 
 Each apply-plan row is exactly:
@@ -2546,6 +3469,42 @@ source_sha256
 source_mode
 destination_preimage {present, mode, git_oid, sha256}
 ```
+
+The per-worktree journal has exactly:
+
+```text
+schema_version = 1
+plan_sha256
+apply_plan
+patch_sha256
+expected_post_index_tree
+expected_paths_b64
+```
+
+`apply_plan` is the exact closed `_plan_to_json(plan)` object;
+`expected_paths_b64` is its strictly raw-byte-sorted path projection. The
+journal has no PID, timestamp, branch selector, success Boolean, or mutable
+phase that could become recovery authority.
+
+Every apply/recovery/finalize path returns the same closed
+`ReviewedImportReceiptV1`:
+
+```text
+schema_version = 1
+status = applied
+destination_batch
+plan_sha256
+patch_sha256
+candidate_preimage_commit
+candidate_preimage_tree
+expected_post_index_tree
+expected_paths_b64
+```
+
+It deliberately contains no observed final commit OID, clock, PID, retry
+count, or caller message; therefore the exact pre-commit apply, staged
+recovery, and post-commit lost-reply finalization return byte-identical
+canonical JSON.
 
 - [ ] **Step 1: Create the typed RED seam and write apply tests**
 
@@ -2571,6 +3530,7 @@ class ApplyPlan:
     candidate_head_tree: str
     candidate_index_tree: str
     candidate_status_sha256: str
+    candidate_lineage: str
     destination_batch: str
     rows: tuple[dict[str, object], ...]
 
@@ -2595,6 +3555,28 @@ def apply_reviewed_imports(
     plan: ApplyPlan,
 ) -> dict[str, object]:
     raise SafeImportError("RED: reviewed import apply is unavailable")
+
+
+def recover_pending_import(
+    *,
+    candidate_root: Path,
+    source_root: Path,
+    inventory: dict[str, object],
+    mapping: dict[str, object],
+    destination_batch: str,
+) -> dict[str, object]:
+    raise SafeImportError("RED: reviewed import recovery is unavailable")
+
+
+def finalize_reviewed_import(
+    *,
+    candidate_root: Path,
+    source_root: Path,
+    inventory: dict[str, object],
+    mapping: dict[str, object],
+    plan: ApplyPlan,
+) -> dict[str, object]:
+    raise SafeImportError("RED: reviewed import finalization is unavailable")
 ```
 
 The test module creates a shared source/candidate repository, patches the root guard with a temporary `RootContract`, and includes:
@@ -2686,11 +3668,52 @@ class ApplyQinaoImportMapTests(unittest.TestCase):
         self.assertEqual(self.complete_probe(), before)
 ```
 
+Also add subprocess crash-cut tests at exactly:
+
+```text
+journalTemporaryFsyncedBeforeLink
+journalLinkedAndDirectoryFsyncedBeforeTemporaryCleanup
+journalTemporaryUnlinkedBeforeSecondDirectoryFsync
+journalDurableBeforeApply
+gitApplyReturnedBeforePostcheck
+postcheckCompleteBeforeReceipt
+receiptComputedBeforeCallerObserved
+externalCommitCompleteBeforeFinalize
+```
+
+Each child process exits abruptly without running Python cleanup. For the
+first three installer cuts, re-entry respectively reuses the exact
+single-link temp without writing it, cleans the exact same-inode
+`nlink == 2` residue to a freshly verified final `nlink == 1`, and reopens the
+already-clean final. For the five transaction cuts, re-entry must prove: the
+first resumes from the exact clean preimage; the middle three recognize the
+exact staged postimage and return byte-identical receipts without a second
+`git apply`; the final recognizes the exact single-parent committed postimage
+and finalizes. Tests also cover a truncated
+or symlink journal, a different-plan journal, missing/extra staged paths,
+unstaged drift, post-tree drift, wrong commit parent/tree/mode, and a second
+process holding the kernel lock. Every divergent case raises
+`SafeImportError("reviewed import transaction diverged; quarantine")` and
+leaves journal/index/worktree/HEAD untouched. No test repairs state with
+reset, checkout, restore, or clean.
+
 - [ ] **Step 2: Run RED**
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_apply_qinao_import_map
+set -euo pipefail
+set +e
+red_diagnostic="$(
+  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+    scripts.test_apply_qinao_import_map 2>&1
+)"
+red_rc=$?
+set -euo pipefail
+printf '%s\n' "$red_diagnostic"
+test "$red_rc" -eq 1
+test "${red_diagnostic#*Ran }" != "$red_diagnostic"
+test "${red_diagnostic#*Ran 0 tests}" = "$red_diagnostic"
+test "${red_diagnostic#*FAILED}" != "$red_diagnostic"
+test "${red_diagnostic#*RED: apply-plan preparation is unavailable}" != "$red_diagnostic"
 ```
 
 Expected: the module imports, every method is discovered, and assertions fail with the typed `SafeImportError` RED. Syntax/import errors do not count as RED.
@@ -2706,6 +3729,7 @@ import argparse
 import base64
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
+import fcntl
 import hashlib
 import json
 import os
@@ -2716,8 +3740,11 @@ import tempfile
 from typing import Iterator
 
 from scripts.capture_qinao_candidate_inventory import (
+    MAX_GOVERNED_JSON_BYTES,
     _index_tree_without_source_write,
+    _load_fixed_candidate_json_no_follow,
     canonical_json_bytes,
+    open_parent_dirfd_no_follow,
     verify_inventory,
 )
 from scripts.check_qinao_import_map import validate_import_map
@@ -2725,6 +3752,7 @@ from scripts.qinao_execution_root import (
     CandidateLineage,
     RootIdentity,
     RootGuardError,
+    candidate_lineage_for_import_batch,
     require_candidate_root,
     require_source_root,
     run_git,
@@ -2744,6 +3772,7 @@ class ApplyPlan:
     candidate_head_tree: str
     candidate_index_tree: str
     candidate_status_sha256: str
+    candidate_lineage: str
     destination_batch: str
     rows: tuple[dict[str, object], ...]
 
@@ -2773,12 +3802,17 @@ def _index_tree(root: Path) -> str:
     return tree
 
 
-def _require_clean_candidate(root: Path) -> RootIdentity:
+def _require_clean_candidate(
+    root: Path,
+    destination_batch: str,
+) -> RootIdentity:
     try:
         return require_candidate_root(
             root,
             require_clean=True,
-            expected_lineage=CandidateLineage.PREBOOTSTRAP_PREPARATION,
+            expected_lineage=candidate_lineage_for_import_batch(
+                destination_batch
+            ),
         )
     except RootGuardError as error:
         raise SafeImportError(str(error)) from error
@@ -2825,7 +3859,7 @@ def prepare_apply_plan(
     mapping: dict[str, object],
     destination_batch: str,
 ) -> ApplyPlan:
-    candidate = _require_clean_candidate(candidate_root)
+    candidate = _require_clean_candidate(candidate_root, destination_batch)
     require_source_root(source_root)
     verify_inventory(root=source_root, inventory=inventory)
     errors = validate_import_map(inventory, mapping)
@@ -2865,6 +3899,7 @@ def prepare_apply_plan(
         candidate_head_tree=candidate.head_tree,
         candidate_index_tree=_index_tree(candidate_root),
         candidate_status_sha256=_sha256(candidate.status_bytes),
+        candidate_lineage=candidate.candidate_lineage.value,
         destination_batch=destination_batch,
         rows=tuple(rows),
     )
@@ -2883,26 +3918,99 @@ def _inventory_rows(inventory: dict[str, object]) -> dict[bytes, dict[str, objec
 
 
 def _read_filesystem_bytes(root: Path, raw_path: bytes, mode: str) -> bytes:
-    absolute = os.path.join(os.fsencode(str(root)), *raw_path.split(b"/"))
-    metadata = os.lstat(absolute)
-    if mode == "120000":
-        if not stat.S_ISLNK(metadata.st_mode):
-            raise SafeImportError(f"source symlink changed type: {raw_path!r}")
-        target = os.readlink(absolute)
-        return target if isinstance(target, bytes) else os.fsencode(target)
-    if not stat.S_ISREG(metadata.st_mode):
-        raise SafeImportError(f"source regular file changed type: {raw_path!r}")
-    descriptor = os.open(absolute, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     try:
-        chunks: list[bytes] = []
-        while True:
-            chunk = os.read(descriptor, 1024 * 1024)
-            if not chunk:
-                break
-            chunks.append(chunk)
-        return b"".join(chunks)
-    finally:
-        os.close(descriptor)
+        with open_parent_dirfd_no_follow(root, raw_path) as (parent, leaf):
+            metadata = os.stat(
+                leaf,
+                dir_fd=parent,
+                follow_symlinks=False,
+            )
+            if mode == "120000":
+                if not stat.S_ISLNK(metadata.st_mode):
+                    raise SafeImportError(
+                        f"source symlink changed type: {raw_path!r}"
+                    )
+                target = os.readlink(leaf, dir_fd=parent)
+                value = (
+                    target
+                    if isinstance(target, bytes)
+                    else os.fsencode(target)
+                )
+                closed_check = os.stat(
+                    leaf,
+                    dir_fd=parent,
+                    follow_symlinks=False,
+                )
+                if (metadata.st_dev, metadata.st_ino) != (
+                    closed_check.st_dev,
+                    closed_check.st_ino,
+                ):
+                    raise SafeImportError(
+                        f"source symlink changed while reading: {raw_path!r}"
+                    )
+                return value
+            if not stat.S_ISREG(metadata.st_mode):
+                raise SafeImportError(
+                    f"source regular file changed type: {raw_path!r}"
+                )
+            actual_mode = "100755" if metadata.st_mode & 0o111 else "100644"
+            if actual_mode != mode:
+                raise SafeImportError(
+                    f"source regular file changed mode: {raw_path!r}"
+                )
+            descriptor = os.open(
+                leaf,
+                os.O_RDONLY
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_NONBLOCK", 0),
+                dir_fd=parent,
+            )
+            try:
+                opened = os.fstat(descriptor)
+                if not stat.S_ISREG(opened.st_mode):
+                    raise SafeImportError(
+                        f"source regular file changed type: {raw_path!r}"
+                    )
+                if (metadata.st_dev, metadata.st_ino) != (
+                    opened.st_dev,
+                    opened.st_ino,
+                ):
+                    raise SafeImportError(
+                        f"source regular file changed before open: {raw_path!r}"
+                    )
+                opened_mode = (
+                    "100755" if opened.st_mode & 0o111 else "100644"
+                )
+                if opened_mode != mode:
+                    raise SafeImportError(
+                        f"source regular file changed mode: {raw_path!r}"
+                    )
+                chunks: list[bytes] = []
+                while True:
+                    chunk = os.read(descriptor, 1024 * 1024)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                closed_check = os.stat(
+                    leaf,
+                    dir_fd=parent,
+                    follow_symlinks=False,
+                )
+                if (opened.st_dev, opened.st_ino, opened.st_size) != (
+                    closed_check.st_dev,
+                    closed_check.st_ino,
+                    closed_check.st_size,
+                ):
+                    raise SafeImportError(
+                        f"source file changed while reading: {raw_path!r}"
+                    )
+                return b"".join(chunks)
+            finally:
+                os.close(descriptor)
+    except OSError as error:
+        raise SafeImportError(
+            f"descriptor-relative source reopen failed: {raw_path!r}"
+        ) from error
 
 
 def _selected_bytes(
@@ -2940,7 +4048,9 @@ def _selected_bytes(
 
 
 def _assert_destination_cas(root: Path, plan: ApplyPlan) -> None:
-    identity = _require_clean_candidate(root)
+    identity = _require_clean_candidate(root, plan.destination_batch)
+    if identity.candidate_lineage.value != plan.candidate_lineage:
+        raise SafeImportError("destination batch/lineage changed")
     current = (
         identity.head_commit,
         identity.head_tree,
@@ -2970,41 +4080,122 @@ def _assert_destination_cas(root: Path, plan: ApplyPlan) -> None:
 
 
 @contextmanager
-def _import_lock(root: Path, plan: ApplyPlan) -> Iterator[None]:
+def _import_lock(
+    root: Path,
+    destination_batch: str,
+) -> Iterator[Path]:
+    try:
+        require_candidate_root(
+            root,
+            require_clean=False,
+            expected_lineage=candidate_lineage_for_import_batch(
+                destination_batch
+            ),
+        )
+    except RootGuardError as error:
+        raise SafeImportError(str(error)) from error
     git_dir = Path(
         run_git(root, "rev-parse", "--absolute-git-dir")
         .stdout.decode("utf-8")
         .strip()
     )
     lock = git_dir / "qinao-reviewed-import.lock"
+    lock_flags = (
+        os.O_RDWR
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
         descriptor = os.open(
             lock,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            lock_flags | os.O_CREAT | os.O_EXCL,
             0o600,
         )
-    except FileExistsError as error:
-        raise SafeImportError(
-            f"reviewed-import lock already exists: {lock}"
-        ) from error
+        os.fchmod(descriptor, 0o600)
+    except FileExistsError:
+        descriptor = os.open(lock, lock_flags)
     try:
-        os.write(
-            descriptor,
-            canonical_json_bytes(
-                {
-                    "candidate_head_commit": plan.candidate_head_commit,
-                    "candidate_head_tree": plan.candidate_head_tree,
-                    "import_map_sha256": plan.import_map_sha256,
-                    "destination_batch": plan.destination_batch,
-                }
-            ),
-        )
-        os.fsync(descriptor)
-        yield
+        metadata = os.fstat(descriptor)
+        named = os.stat(lock, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+            or metadata.st_uid != os.getuid()
+            or metadata.st_nlink != 1
+            or (metadata.st_dev, metadata.st_ino)
+            != (named.st_dev, named.st_ino)
+        ):
+            raise SafeImportError("reviewed-import lock ownership/mode mismatch")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise SafeImportError("reviewed-import transaction is active") from error
+        yield git_dir
     finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
         os.close(descriptor)
-        lock.unlink(missing_ok=True)
 ```
+
+The regular owner-only, single-link mode-`0600` lock file may persist, but the
+kernel lock never does: process exit releases it. A newly created descriptor
+is `fchmod`ed before validation so any process umask produces the same
+contract; a pre-existing inode is validated, never repaired. Never use file
+existence, a PID, age, or manual unlink as liveness. Tests include umask
+`0777`, symlink/FIFO/directory/hardlink substitution, two contenders, and
+process death while holding the kernel lock.
+The permanent Root Guard runs before `rev-parse`, `O_CREAT`, or any other
+filesystem/Git write. Wrong root/branch/lineage therefore leaves no lock,
+journal, object, index, or ref byte. `--recover-pending` carries the fixed
+destination batch so this pre-write guard does not need to trust an unlocked
+journal.
+
+Under that lock, install the closed journal before `git apply`. Compute the
+patch and `expected_post_index_tree` first; then canonicalize the exact journal
+shape above. Reject canonical bytes larger than
+`MAX_GOVERNED_JSON_BYTES` before creating a temporary, journal, or other
+filesystem residue. Write it to a same-directory mode-`0600` temporary regular file
+opened with `O_EXCL|O_NOFOLLOW`, `fsync` it, link it to the absent fixed
+journal path without replacement, `fsync` the Git directory, unlink the
+temporary name, and `fsync` the Git directory again. If the journal already
+exists, reopen with `O_NOFOLLOW`,
+require owner/mode/canonical field set, validate `plan_sha256`, and classify
+state instead of replacing it.
+
+A crash after the directory-fsynced link but before temporary cleanup leaves
+one legal residue only: final and expected deterministic temporary are the
+same `(st_dev, st_ino)`, both observations report `st_nlink == 2`, and both
+reopen to the exact canonical journal bytes. The loader unlinks only that
+temporary, fsyncs the Git directory, then requires a fresh final reopen with
+`st_nlink == 1`. A separate inode, different bytes, another digest-temporary,
+or any link count other than this exact `2 -> 1` transition quarantines
+without cleanup. A complete single-link temporary with no final is fsynced
+and reused without truncate/rewrite; a different or incomplete temporary is
+never unlinked or repaired.
+
+The classifier has exactly four outcomes:
+
+```text
+exactPreimage:
+  HEAD/tree/index/status and every destination preimage equal apply_plan
+exactStagedPostimage:
+  HEAD remains candidate_head_commit; index tree equals
+  expected_post_index_tree; staged raw-path set/modes/postimages are exact;
+  unstaged and untracked sets are empty
+exactCommittedPostimage:
+  clean HEAD has exactly one parent candidate_head_commit; HEAD tree equals
+  expected_post_index_tree; its raw-path/mode diff is exactly
+  expected_paths_b64
+divergent:
+  every other state
+```
+
+`exactPreimage` may execute the already-bound patch once.
+`exactStagedPostimage` never applies again and returns the same canonical
+receipt. `exactCommittedPostimage` returns that receipt and may remove the
+journal only after a file/directory-fsynced unlink. `divergent` returns the
+typed quarantine error without writing. Receipt bytes are a pure function of
+the journal/plan and expected post tree, so initial apply, recovery, and
+finalization are byte-identical.
 
 - [ ] **Step 5: Implement temporary-index patch creation and checked apply**
 
@@ -3093,6 +4284,107 @@ def _patch_for_plan(
     return patch, post_tree
 
 
+def _apply_reviewed_imports_locked(
+    *,
+    candidate_root: Path,
+    source_root: Path,
+    inventory: dict[str, object],
+    mapping: dict[str, object],
+    plan: ApplyPlan,
+    git_dir: Path,
+    transaction: dict[str, object] | None,
+) -> dict[str, object]:
+    if transaction is None:
+        _assert_destination_cas(candidate_root, plan)
+        expected_plan = prepare_apply_plan(
+            candidate_root=candidate_root,
+            source_root=source_root,
+            inventory=inventory,
+            mapping=mapping,
+            destination_batch=plan.destination_batch,
+        )
+        if canonical_json_bytes(asdict(expected_plan)) != canonical_json_bytes(
+            asdict(plan)
+        ):
+            raise SafeImportError(
+                "apply plan does not equal freshly derived plan"
+            )
+        patch, expected_post_tree = _patch_for_plan(
+            candidate_root=candidate_root,
+            source_root=source_root,
+            inventory=inventory,
+            mapping=mapping,
+            plan=plan,
+        )
+        transaction = _build_transaction(
+            plan=plan,
+            patch=patch,
+            expected_post_index_tree=expected_post_tree,
+        )
+        _install_transaction_no_replace(git_dir, transaction)
+    else:
+        _validate_transaction_for_plan(transaction, plan)
+
+    state = _classify_transaction_state(candidate_root, transaction)
+    if state == "exactCommittedPostimage":
+        return _receipt_for_transaction(transaction)
+    if state == "exactStagedPostimage":
+        return _receipt_for_transaction(transaction)
+    if state != "exactPreimage":
+        raise SafeImportError(
+            "reviewed import transaction diverged; quarantine"
+        )
+
+    patch, expected_post_tree = _patch_for_plan(
+        candidate_root=candidate_root,
+        source_root=source_root,
+        inventory=inventory,
+        mapping=mapping,
+        plan=plan,
+    )
+    if (
+        _sha256(patch) != transaction["patch_sha256"]
+        or expected_post_tree != transaction["expected_post_index_tree"]
+    ):
+        raise SafeImportError(
+            "reviewed import transaction diverged; quarantine"
+        )
+    _assert_destination_cas(candidate_root, plan)
+    completed = run_git(
+        candidate_root,
+        "apply",
+        "--index",
+        "--binary",
+        "--whitespace=nowarn",
+        check=False,
+        input_bytes=patch,
+    )
+    if completed.returncode != 0:
+        diagnostic = completed.stderr.decode(
+            "utf-8", "backslashreplace"
+        ).strip()
+        if run_git(
+            candidate_root,
+            "status",
+            "--porcelain=v2",
+            "-z",
+            "--untracked-files=all",
+        ).stdout:
+            raise SafeImportError(
+                "git apply failed and candidate is unexpectedly dirty: "
+                + diagnostic
+            )
+        raise SafeImportError("git apply rejected reviewed patch: " + diagnostic)
+    if _classify_transaction_state(
+        candidate_root,
+        transaction,
+    ) != "exactStagedPostimage":
+        raise SafeImportError(
+            "reviewed import transaction diverged; quarantine"
+        )
+    return _receipt_for_transaction(transaction)
+
+
 def apply_reviewed_imports(
     *,
     candidate_root: Path,
@@ -3101,106 +4393,249 @@ def apply_reviewed_imports(
     mapping: dict[str, object],
     plan: ApplyPlan,
 ) -> dict[str, object]:
-    errors = validate_import_map(inventory, mapping)
-    if errors:
-        raise SafeImportError("invalid import map: " + "; ".join(errors))
-    if type(plan.schema_version) is not int or plan.schema_version != 1:
-        raise SafeImportError("apply plan schema mismatch")
-    if plan.inventory_sha256 != _sha256(canonical_json_bytes(inventory)):
-        raise SafeImportError("apply plan inventory digest mismatch")
-    if plan.import_map_sha256 != _sha256(canonical_json_bytes(mapping)):
-        raise SafeImportError("apply plan import-map digest mismatch")
-    expected_plan = prepare_apply_plan(
+    _preflight_plan_and_transaction_sizes_before_lock(plan)
+    _validate_plan_review_basis(
         candidate_root=candidate_root,
         source_root=source_root,
         inventory=inventory,
         mapping=mapping,
-        destination_batch=plan.destination_batch,
+        plan=plan,
     )
-    if canonical_json_bytes(asdict(expected_plan)) != canonical_json_bytes(
-        asdict(plan)
-    ):
-        raise SafeImportError("apply plan does not equal freshly derived plan")
-    with _import_lock(candidate_root, plan):
-        _assert_destination_cas(candidate_root, plan)
-        patch, expected_post_tree = _patch_for_plan(
+    with _import_lock(
+        candidate_root,
+        plan.destination_batch,
+    ) as git_dir:
+        return _apply_reviewed_imports_locked(
+            candidate_root=candidate_root,
+            source_root=source_root,
+            inventory=inventory,
+            mapping=mapping,
+            plan=plan,
+            git_dir=git_dir,
+            transaction=_load_transaction_if_present(git_dir),
+        )
+
+
+def recover_pending_import(
+    *,
+    candidate_root: Path,
+    source_root: Path,
+    inventory: dict[str, object],
+    mapping: dict[str, object],
+    destination_batch: str,
+) -> dict[str, object]:
+    _preflight_transaction_file_before_lock(
+        candidate_root,
+        destination_batch,
+    )
+    with _import_lock(candidate_root, destination_batch) as git_dir:
+        transaction = _require_transaction(git_dir)
+        plan = _plan_from_json(transaction["apply_plan"])
+        if plan.destination_batch != destination_batch:
+            raise SafeImportError("recovery batch/journal mismatch")
+        _validate_plan_review_basis(
             candidate_root=candidate_root,
             source_root=source_root,
             inventory=inventory,
             mapping=mapping,
             plan=plan,
         )
-        _assert_destination_cas(candidate_root, plan)
-        completed = run_git(
-            candidate_root,
-            "apply",
-            "--index",
-            "--binary",
-            "--whitespace=nowarn",
-            check=False,
-            input_bytes=patch,
+        return _apply_reviewed_imports_locked(
+            candidate_root=candidate_root,
+            source_root=source_root,
+            inventory=inventory,
+            mapping=mapping,
+            plan=plan,
+            git_dir=git_dir,
+            transaction=transaction,
         )
-        if completed.returncode != 0:
-            diagnostic = completed.stderr.decode(
-                "utf-8", "backslashreplace"
-            ).strip()
-            if run_git(
+
+
+def finalize_reviewed_import(
+    *,
+    candidate_root: Path,
+    source_root: Path,
+    inventory: dict[str, object],
+    mapping: dict[str, object],
+    plan: ApplyPlan,
+) -> dict[str, object]:
+    _preflight_plan_and_transaction_sizes_before_lock(plan)
+    _validate_plan_review_basis(
+        candidate_root=candidate_root,
+        source_root=source_root,
+        inventory=inventory,
+        mapping=mapping,
+        plan=plan,
+    )
+    with _import_lock(
+        candidate_root,
+        plan.destination_batch,
+    ) as git_dir:
+        transaction = _load_transaction_if_present(git_dir)
+        if transaction is None:
+            transaction = _transaction_from_plan_and_committed_postimage(
                 candidate_root,
-                "status",
-                "--porcelain=v2",
-                "-z",
-                "--untracked-files=all",
-            ).stdout:
-                raise SafeImportError(
-                    "git apply failed and candidate is unexpectedly dirty: "
-                    + diagnostic
-                )
-            raise SafeImportError("git apply rejected reviewed patch: " + diagnostic)
-        actual_paths = [
-            path
-            for path in run_git(
-                candidate_root,
-                "diff",
-                "--cached",
-                "--name-only",
-                "-z",
-            ).stdout.split(b"\x00")
-            if path
-        ]
-        expected_paths = sorted(
-            _raw_path(str(row["path_b64"])) for row in plan.rows
-        )
-        if actual_paths != expected_paths:
-            raise SafeImportError(
-                f"staged path set mismatch: expected={expected_paths!r} "
-                f"actual={actual_paths!r}"
+                plan,
             )
-        if run_git(candidate_root, "diff", "--name-only", "-z").stdout:
-            raise SafeImportError("apply left unstaged changes")
-        actual_post_tree = _index_tree(candidate_root)
-        if actual_post_tree != expected_post_tree:
-            raise SafeImportError("post-apply index tree mismatch")
-    return {
-        "status": "applied",
-        "destination_batch": plan.destination_batch,
-        "candidate_parent_commit": plan.candidate_head_commit,
-        "candidate_parent_tree": plan.candidate_head_tree,
-        "post_index_tree": expected_post_tree,
-        "import_map_sha256": plan.import_map_sha256,
-        "paths": [
-            {
-                "path_b64": row["path_b64"],
-                "source_sha256": row["source_sha256"],
-                "source_mode": row["source_mode"],
-            }
-            for row in plan.rows
-        ],
-    }
+        else:
+            _validate_transaction_for_plan(transaction, plan)
+        if _classify_transaction_state(
+            candidate_root,
+            transaction,
+        ) != "exactCommittedPostimage":
+            raise SafeImportError(
+                "reviewed import transaction diverged; quarantine"
+            )
+        receipt = _receipt_for_transaction(transaction)
+        _unlink_transaction_and_fsync(git_dir)
+        return receipt
 ```
+
+Implement every underscored helper above in this same module with exactly this
+private surface; no additional recovery selector or mutable phase field is
+permitted:
+
+```text
+_build_transaction(*, plan: ApplyPlan, patch: bytes,
+    expected_post_index_tree: str) -> dict[str, object]
+_validate_transaction_for_plan(transaction: dict[str, object],
+    plan: ApplyPlan) -> None
+_install_transaction_no_replace(git_dir: Path,
+    transaction: dict[str, object]) -> None
+_load_transaction_if_present(git_dir: Path) -> dict[str, object] | None
+_require_transaction(git_dir: Path) -> dict[str, object]
+_classify_transaction_state(candidate_root: Path,
+    transaction: dict[str, object]) ->
+    Literal["exactPreimage", "exactStagedPostimage",
+            "exactCommittedPostimage", "divergent"]
+_receipt_for_transaction(transaction: dict[str, object]) ->
+    dict[str, object]
+_preflight_plan_and_transaction_sizes_before_lock(plan: ApplyPlan) -> None
+_preflight_transaction_file_before_lock(candidate_root: Path,
+    destination_batch: str) -> None
+_validate_plan_review_basis(*, candidate_root: Path, source_root: Path,
+    inventory: dict[str, object], mapping: dict[str, object],
+    plan: ApplyPlan) -> None
+_transaction_from_plan_and_committed_postimage(candidate_root: Path,
+    plan: ApplyPlan) -> dict[str, object]
+_unlink_transaction_and_fsync(git_dir: Path) -> None
+_install_external_plan_no_replace(*, output_path: Path,
+    candidate_root: Path, source_root: Path, value: bytes) -> None
+_read_external_plan_no_follow(path: Path, *, candidate_root: Path,
+    source_root: Path) -> dict[str, object]
+```
+
+`_build_transaction` emits exactly the six journal fields above, derives
+`plan_sha256` from canonical `_plan_to_json(plan)`, derives
+`expected_paths_b64` from the strict raw-byte sort, and accepts no
+caller-supplied digest. `_validate_transaction_for_plan` rejects
+missing/extra keys, bool-as-int schema values, noncanonical Base64,
+unsorted/duplicate paths, any digest mismatch, and any transaction whose
+embedded closed plan is not byte-identical to the argument.
+
+`_preflight_plan_and_transaction_sizes_before_lock` is pure: it canonicalizes
+the closed plan and a synthetic transaction with fixed-width SHA-256/tree
+placeholders plus the plan's exact path projection, and rejects either value
+above `MAX_GOVERNED_JSON_BYTES`. It performs no Git or filesystem operation.
+`_preflight_transaction_file_before_lock` first runs the permanent Root Guard
+for the supplied batch, resolves only the fixed per-worktree journal path,
+and bounded-reads it with no-follow solely to reject missing/oversized input;
+it returns no fields and grants no authority. The journal is independently
+reopened and fully validated after `_import_lock`.
+
+`_install_transaction_no_replace` and
+`_load_transaction_if_present` operate only on
+`<git-dir>/qinao-reviewed-import-transaction-v1.json`. Installation uses a
+deterministic digest-named same-directory owner-only temporary, exact
+mode-`0600` via descriptor `fchmod`, complete write/file-`fsync`,
+`linkat`-without-replacement, directory-`fsync`, temporary unlink, and a
+second directory-`fsync`; it never directly creates or replaces the final
+name. Before any temporary, final, journal, directory, or lock mutation, the
+shared atomic primitive rejects canonical bytes larger than
+`MAX_GOVERNED_JSON_BYTES`; the reader enforces the same bound in 1 MiB
+streaming chunks. A newly created inode is first checked only for
+regular/type/owner/pathname identity and `st_nlink == 1`, then descriptor
+`fchmod`ed and freshly revalidated for exact mode before its first write. An
+existing exact complete temporary is fsynced and reused without
+truncate/rewrite; different bytes or identity quarantine without unlink.
+
+Reopen normally requires no-follow regular owner-only single-final identity,
+bounded canonical bytes, and a fresh pathname/inode comparison. Its sole
+pre-cleanup exception is the expected deterministic temporary and final
+naming the same inode with both `st_nlink == 2`; after byte/identity
+validation it unlinks the temporary, directory-fsyncs, and freshly requires
+the final at `st_nlink == 1`. An exact existing journal is same-intent
+recovery; a divergent, truncated, symlink, unexplained hard link,
+different-digest temporary, or different-plan journal quarantines.
+
+`_require_transaction` is the same loader plus a typed missing-journal error.
+`_classify_transaction_state` is a read-only total function over the four
+states frozen above and returns `divergent` for every Git error, extra status
+row, mode mismatch, merge, missing object, or ambiguous relation.
+`_receipt_for_transaction` derives exactly the nine receipt fields above and
+first revalidates the complete journal; it reads no current clock or Git
+state. `_unlink_transaction_and_fsync` reopens and validates the exact
+journal inode/digest under the still-held import lock, uses descriptor-relative
+`unlinkat`, and `fsync`s the Git directory; absence or substitution is not
+success.
+
+`_transaction_from_plan_and_committed_postimage` is legal only for lost reply
+after an already-fsynced journal unlink. It derives the raw binary
+parent-to-HEAD patch and post tree from the exact clean one-parent child,
+reconstructs the journal through `_build_transaction`, then requires the
+closed classifier to return `exactCommittedPostimage`. It accepts only the
+expected parent, tree, raw-byte path set, modes, and selected source hashes;
+unchanged unrelated bytes must remain equal. This makes
+`journal absent + exact committed postimage` return the same receipt; every
+near miss quarantines.
+
+The two external-plan helpers implement the `/private/tmp` contract below and
+share the same atomic installer/reader, not a second ad hoc pathname writer.
+Each helper has one closed schema/state responsibility; none consults time,
+PID, branch spelling, status prose, or caller success.
+
+Every public apply/recover/finalize entry point performs a read-only
+`MAX_GOVERNED_JSON_BYTES` preflight before `_import_lock` can create its
+persistent lock inode. Apply/finalize preflight canonical plan bytes directly;
+recovery performs a bounded no-follow preflight of the fixed journal without
+using its fields as authority, then reopens and revalidates it under the
+kernel lock. The new-transaction path computes a pure serialized-size upper
+bound from the closed plan before locking and checks the exact transaction
+bytes again under the lock before any journal temporary is created. Thus an
+oversized input cannot leave even a lock-file residue, while no unlocked read
+can authorize recovery.
+
+`_validate_plan_review_basis` independently authenticates the inventory/map
+canonical digests, runs `verify_inventory` and `validate_import_map`, enforces
+the batch/lineage mapping, projects the exact reviewed rows for that batch,
+reopens every selected source byte/mode/hash, and recomputes destination
+preimages from `plan.candidate_head_commit`. Its projected rows must
+byte-equal `plan.rows`. It runs before journal-absent reconstruction and
+before any receipt is returned. `_apply_reviewed_imports_locked` is the exact
+body of `apply_reviewed_imports` after lock acquisition; recovery calls it
+while retaining the same kernel lock. It never releases and reacquires
+between journal read, classification, patch validation, and apply.
+
+Tests include wrong-root/branch/lineage non-mutation before lock `O_CREAT`,
+two concurrent recoverers, recovery-vs-finalize contention, a forged plan
+after an arbitrary one-parent commit, changed inventory/map/source after a
+lost reply, and the positive crash after commit/journal unlink/stdout loss.
+Only the last returns the original byte-identical receipt. Add three
+subprocess journal-installer cuts at exactly
+`journalTemporaryFsyncedBeforeLink`,
+`journalLinkedAndDirectoryFsyncedBeforeTemporaryCleanup`, and
+`journalTemporaryUnlinkedBeforeSecondDirectoryFsync`. The first reuses the
+single-link exact temporary without rewriting by re-entering apply with the
+same external plan; the latter two re-enter recovery. The second proves the legal
+same-inode `nlink == 2` cleanup and final `nlink == 1`; the third proves the
+already-clean final. Unrelated hard links, different bytes, and different
+digest-temporaries quarantine in all three. Also require oversize journal
+and external-plan preflight to leave no temporary, final, lock, journal, or
+directory residue.
 
 `hash-object -w` may add unreachable/reachable blob objects to the shared Git object database, but it does not mutate source refs, source index, source worktree, or source status. The stable source verification ignores unrelated object-database growth and reopens every selected source byte immediately before patch construction.
 
-- [ ] **Step 6: Implement strict plan JSON and two-mode CLI**
+- [ ] **Step 6: Implement strict plan JSON and four-mode crash-safe CLI**
 
 Add:
 
@@ -3220,6 +4655,7 @@ def _plan_from_json(value: dict[str, object]) -> ApplyPlan:
         "candidate_head_tree",
         "candidate_index_tree",
         "candidate_status_sha256",
+        "candidate_lineage",
         "destination_batch",
         "rows",
     }
@@ -3228,6 +4664,11 @@ def _plan_from_json(value: dict[str, object]) -> ApplyPlan:
     schema_version = value["schema_version"]
     if type(schema_version) is not int or schema_version != 1:
         raise SafeImportError("apply plan schema mismatch")
+    expected_lineage = candidate_lineage_for_import_batch(
+        value["destination_batch"]
+    ).value
+    if value["candidate_lineage"] != expected_lineage:
+        raise SafeImportError("apply plan batch/lineage mismatch")
     return ApplyPlan(
         schema_version=schema_version,
         inventory_sha256=value["inventory_sha256"],
@@ -3236,6 +4677,7 @@ def _plan_from_json(value: dict[str, object]) -> ApplyPlan:
         candidate_head_tree=value["candidate_head_tree"],
         candidate_index_tree=value["candidate_index_tree"],
         candidate_status_sha256=value["candidate_status_sha256"],
+        candidate_lineage=value["candidate_lineage"],
         destination_batch=value["destination_batch"],
         rows=tuple(value["rows"]),
     )
@@ -3250,10 +4692,31 @@ def main() -> int:
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--prepare-batch", choices=("C1", "C2", "C3", "C4"))
     modes.add_argument("--apply-plan", type=Path)
+    modes.add_argument(
+        "--recover-pending",
+        choices=("C1", "C2", "C3", "C4"),
+    )
+    modes.add_argument("--finalize-plan", type=Path)
     parser.add_argument("--output-plan", type=Path)
     arguments = parser.parse_args()
-    inventory = json.loads(arguments.inventory.read_text(encoding="utf-8"))
-    mapping = json.loads(arguments.map.read_text(encoding="utf-8"))
+    fixed_inventory = Path(
+        "docs/superpowers/evidence/qinao-clean-candidate/"
+        "2026-07-23-c0/source-inventory.json"
+    )
+    fixed_map = Path(
+        "docs/superpowers/evidence/qinao-clean-candidate/"
+        "2026-07-23-c0/import-map.json"
+    )
+    if arguments.inventory != fixed_inventory or arguments.map != fixed_map:
+        parser.error("--inventory/--map must name the fixed candidate pair")
+    inventory = _load_fixed_candidate_json_no_follow(
+        arguments.candidate_root,
+        fixed_inventory,
+    )
+    mapping = _load_fixed_candidate_json_no_follow(
+        arguments.candidate_root,
+        fixed_map,
+    )
     if arguments.prepare_batch is not None:
         if arguments.output_plan is None:
             parser.error("--output-plan is required with --prepare-batch")
@@ -3264,8 +4727,11 @@ def main() -> int:
             mapping=mapping,
             destination_batch=arguments.prepare_batch,
         )
-        arguments.output_plan.write_bytes(
-            canonical_json_bytes(_plan_to_json(plan))
+        _install_external_plan_no_replace(
+            output_path=arguments.output_plan,
+            candidate_root=arguments.candidate_root,
+            source_root=arguments.source_root,
+            value=canonical_json_bytes(_plan_to_json(plan)),
         )
         print(
             f"apply_plan_status=prepared batch={plan.destination_batch} "
@@ -3274,15 +4740,42 @@ def main() -> int:
         return 0
     if arguments.output_plan is not None:
         parser.error("--output-plan is legal only with --prepare-batch")
-    plan_value = json.loads(arguments.apply_plan.read_text(encoding="utf-8"))
-    plan = _plan_from_json(plan_value)
-    receipt = apply_reviewed_imports(
-        candidate_root=arguments.candidate_root,
-        source_root=arguments.source_root,
-        inventory=inventory,
-        mapping=mapping,
-        plan=plan,
-    )
+    if arguments.recover_pending is not None:
+        receipt = recover_pending_import(
+            candidate_root=arguments.candidate_root,
+            source_root=arguments.source_root,
+            inventory=inventory,
+            mapping=mapping,
+            destination_batch=arguments.recover_pending,
+        )
+    else:
+        plan_path = (
+            arguments.apply_plan
+            if arguments.apply_plan is not None
+            else arguments.finalize_plan
+        )
+        plan_value = _read_external_plan_no_follow(
+            plan_path,
+            candidate_root=arguments.candidate_root,
+            source_root=arguments.source_root,
+        )
+        plan = _plan_from_json(plan_value)
+        if arguments.apply_plan is not None:
+            receipt = apply_reviewed_imports(
+                candidate_root=arguments.candidate_root,
+                source_root=arguments.source_root,
+                inventory=inventory,
+                mapping=mapping,
+                plan=plan,
+            )
+        else:
+            receipt = finalize_reviewed_import(
+                candidate_root=arguments.candidate_root,
+                source_root=arguments.source_root,
+                inventory=inventory,
+                mapping=mapping,
+                plan=plan,
+            )
     print(canonical_json_bytes(receipt).decode("utf-8"), end="")
     return 0
 
@@ -3291,9 +4784,45 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
+`_install_external_plan_no_replace` permits only an absolute regular
+mode-`0600` leaf directly beneath `/private/tmp`, with a basename matching
+`qinao-[a-z0-9-]+-import-plan.json`. It proves the target is outside both
+candidate and preserved-source roots and opens the existing `/private/tmp`
+directory by descriptor with `O_DIRECTORY|O_NOFOLLOW`. It canonicalizes the
+deterministic plan first and rejects it if its byte length exceeds
+`MAX_GOVERNED_JSON_BYTES`, before opening `/private/tmp` or creating any
+temporary/final/lock residue. It then installs it with the same code-owned atomic
+primitive as the fixed candidate JSON: a digest-named same-directory
+temporary opened `O_CREAT|O_EXCL|O_NOFOLLOW|O_NONBLOCK`, owner/single-link
+identity validation, descriptor-`fchmod(0600)`, fresh exact-mode and
+pathname/inode validation, complete write, file-`fsync`,
+`linkat`-without-replacement to the final basename, parent-`fsync`, temporary
+`unlinkat`, and a second parent-`fsync`. The final name is therefore never
+partially visible. A canonical byte-identical final is same-intent
+lost-reply success after safe temporary cleanup. An exact complete
+single-link temporary is fsynced and reused without truncate/rewrite; two
+same-intent installers can only race at no-replace link and idempotent
+cleanup. Final plus deterministic temporary is legal only when both names
+identify the same inode at `st_nlink == 2`; cleanup fsyncs the parent and
+freshly proves final `st_nlink == 1`. A divergent final,
+foreign/multiply-linked temporary, or different deterministic plan fails
+closed. It never makes a caller-selected parent, directly opens the final
+with `O_CREAT`, or overwrites an existing leaf.
+`_read_external_plan_no_follow` enforces the same absolute path, owner,
+single-final-inode, regular-file, exact mode, bounded streaming size,
+no-follow, canonical-JSON, and root-exclusion contract before parsing. Tests
+attempt source/candidate descendants, relative paths, nested temp paths,
+parent/final symlinks, broad modes, restrictive umask, hard-linked
+temporary, crash before link, crash after link before cleanup,
+byte-identical retry, preexisting divergent bytes, invalid basenames,
+oversize zero-residue preflight, exact-temp no-rewrite, and deliberately
+interleaved same-intent installers;
+every case leaves both repositories byte-identical.
+
 - [ ] **Step 7: Run and commit the apply tool**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_execution_root \
   scripts.test_capture_qinao_candidate_inventory \
@@ -3302,11 +4831,14 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
 git diff --check
 git add scripts/apply_qinao_import_map.py \
   scripts/test_apply_qinao_import_map.py
-test "$(git diff --cached --name-only)" = "$(printf '%s\n' \
+staged_paths="$(git diff --cached --name-only)"
+expected_staged_paths="$(printf '%s\n' \
   scripts/apply_qinao_import_map.py \
   scripts/test_apply_qinao_import_map.py)"
+test "$staged_paths" = "$expected_staged_paths"
 git commit -m "build(qinao): apply reviewed imports with destination CAS"
-test -z "$(git status --porcelain=v1)"
+worktree_status="$(git status --porcelain=v1)"
+test -z "$worktree_status"
 ```
 
 Expected: all four modules have positive discovery and pass; exactly two files are committed.
@@ -3348,11 +4880,18 @@ candidate_destination_tree
 ```
 
 `build` requires the permanent root guard, a clean candidate, canonical
-inventory/map bytes, an exact-set-valid all-`hold` map, and an absent output.
+inventory/map bytes, an exact-set-valid all-`hold` map, and the absent exact
+repository-relative output
+`docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-provenance-v1.json`.
+Any other `--output` spelling is rejected before opening a file.
 It copies the seven source identity/digest fields from the verified inventory,
 computes the two file digests over their canonical bytes, and records fresh
 candidate `HEAD/HEAD^{tree}`. It writes canonical sorted compact UTF-8 JSON
-with one LF and no duplicate/unknown field.
+with one LF and no duplicate/unknown field through the same descriptor-walked
+candidate-only, source-excluding, parent/final-no-follow,
+digest-temporary/no-replace-link, mode-`100644`,
+file/directory-`fsync` installer used for the fixed map. It never follows,
+partially exposes, or replaces a final leaf.
 
 `verify --handoff-commit <oid>` requires a regular mode-`100644` handoff at the
 fixed Git path, exactly one parent equal to `candidate_destination_tip`, that
@@ -3362,18 +4901,23 @@ them, recomputes every field, and writes nothing.
 
 Named tests cover closed shape, noncanonical bytes, wrong inventory/map
 digest, dirty build, existing output, wrong parent/tree, extra diff, symlink,
-mode drift, and byte-identical rebuild in two disposable repositories.
+mode drift, arbitrary/absolute/source-descendant output, parent-symlink
+substitution, and byte-identical rebuild in two disposable repositories.
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_source_provenance_v1
 git add scripts/qinao_source_provenance_v1.py \
   scripts/test_qinao_source_provenance_v1.py
-test "$(git diff --cached --name-only)" = "$(printf '%s\n' \
+staged_paths="$(git diff --cached --name-only)"
+expected_staged_paths="$(printf '%s\n' \
   scripts/qinao_source_provenance_v1.py \
   scripts/test_qinao_source_provenance_v1.py)"
+test "$staged_paths" = "$expected_staged_paths"
 git commit -m "build(qinao): define source provenance handoff"
-test -z "$(git status --porcelain=v1)"
+worktree_status="$(git status --porcelain=v1)"
+test -z "$worktree_status"
 ```
 
 Expected: positive test discovery, all cases pass, and exactly two tooling
@@ -3382,11 +4926,14 @@ paths are committed.
 - [ ] **Step 1: Generate the canonical inventory at its exact evidence path**
 
 ```bash
+set -euo pipefail
 python3 scripts/capture_qinao_candidate_inventory.py \
+  --operation-batch C1 \
   --root /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 \
   --approved-base 59c26f508262d7c25869faac0ec0abf968ec1e02 \
   --output docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json
 python3 scripts/capture_qinao_candidate_inventory.py \
+  --operation-batch C1 \
   --root /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 \
   --verify docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json
 ```
@@ -3399,6 +4946,7 @@ This is a plan-level read-only assertion over the existing inventory schema;
 it adds no C0 selector, field, batch, or special import path:
 
 ```bash
+set -euo pipefail
 test "$(git -C /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
 test "$(git -C /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
 python3 - <<'PY'
@@ -3455,11 +5003,13 @@ added.
 - [ ] **Step 2: Generate the initial map with no selected byte**
 
 ```bash
+set -euo pipefail
 python3 scripts/build_qinao_import_map.py \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --candidate-base 59c26f508262d7c25869faac0ec0abf968ec1e02 \
   --output docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
 python3 scripts/check_qinao_import_map.py \
+  --operation-batch C1 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
 python3 - <<'PY'
@@ -3524,10 +5074,13 @@ Expected: `import_map_status=valid`, `import=0`, `omit=0`, and `hold` equals the
 - [ ] **Step 3: Re-open and verify both generated evidence files**
 
 ```bash
+set -euo pipefail
 python3 scripts/capture_qinao_candidate_inventory.py \
+  --operation-batch C1 \
   --root /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 \
   --verify docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json
 python3 scripts/check_qinao_import_map.py \
+  --operation-batch C1 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
 ```
@@ -3537,14 +5090,18 @@ Expected: both checks pass. The two evidence files contain metadata/digests only
 - [ ] **Step 4: Commit only the evidence pair**
 
 ```bash
+set -euo pipefail
 git add \
   docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
-test "$(git diff --cached --name-only)" = "$(printf '%s\n' \
+staged_paths="$(git diff --cached --name-only)"
+expected_staged_paths="$(printf '%s\n' \
   docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json \
   docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json)"
+test "$staged_paths" = "$expected_staged_paths"
 git commit -m "docs(qinao): bind c0 source provenance"
-test -z "$(git status --porcelain=v1)"
+worktree_status="$(git status --porcelain=v1)"
+test -z "$worktree_status"
 ```
 
 Expected: exactly two files are committed and the candidate is clean.
@@ -3566,12 +5123,15 @@ Expected: exactly two files are committed and the candidate is clean.
 - [ ] **Step 0: Reopen the exact committed graph source state**
 
 ```bash
+set -euo pipefail
 test "$(git -C /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
 test "$(git -C /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
 python3 scripts/capture_qinao_candidate_inventory.py \
+  --operation-batch C1 \
   --root /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 \
   --verify docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json
 python3 scripts/check_qinao_import_map.py \
+  --operation-batch C1 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
 python3 - <<'PY'
@@ -3641,6 +5201,7 @@ selected graph row, or substituted pin stops C0 before handoff.
 - [ ] **Step 1: Prove every initial decision remains canonical `hold`**
 
 ```bash
+set -euo pipefail
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -3673,19 +5234,30 @@ Expected: positive row count and `hold_default_status=verified`.
 - [ ] **Step 2: Prove zero-row real batches fail without touching candidate state**
 
 ```bash
-test -z "$(git status --porcelain=v1)"
-if python3 scripts/apply_qinao_import_map.py \
+set -euo pipefail
+worktree_status_before="$(git status --porcelain=v1)"
+test -z "$worktree_status_before"
+set +e
+prepare_diagnostic="$(python3 scripts/apply_qinao_import_map.py \
   --candidate-root /Users/changgeng/.codex/worktrees/e4d7/Project06 \
   --source-root /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json \
   --prepare-batch C1 \
-  --output-plan /private/tmp/qinao-c0-empty-apply-plan.json
-then
-  exit 1
-fi
+  --output-plan /private/tmp/qinao-c0-empty-apply-plan.json 2>&1)"
+prepare_rc=$?
+set -euo pipefail
+test "$prepare_rc" -eq 1
+case "$prepare_diagnostic" in
+  *"batch C1 has zero reviewed imports"*) ;;
+  *)
+    printf '%s\n' "$prepare_diagnostic" >&2
+    exit 1
+    ;;
+esac
 test ! -e /private/tmp/qinao-c0-empty-apply-plan.json
-test -z "$(git status --porcelain=v1)"
+worktree_status_after="$(git status --porcelain=v1)"
+test -z "$worktree_status_after"
 ```
 
 Expected: preparation exits non-zero with `batch C1 has zero reviewed imports`; no plan file, index change, worktree change, or source change exists.
@@ -3693,6 +5265,7 @@ Expected: preparation exits non-zero with `batch C1 has zero reviewed imports`; 
 - [ ] **Step 3: Run the positive import path only in disposable test repositories**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_apply_qinao_import_map.ApplyQinaoImportMapTests.test_prepare_is_read_only_and_binds_head_tree_index_status_and_preimages \
   scripts.test_apply_qinao_import_map.ApplyQinaoImportMapTests.test_apply_imports_regular_executable_symlink_and_deletion_exactly \
@@ -3736,16 +5309,27 @@ A later owning plan must perform these actions in order:
 9. independently inspect its HEAD/tree/index/status and per-path preimages;
 10. apply it before any intervening edit;
 11. compare the staged path set with the decoded plan paths; and
-12. commit only those exact paths.
+12. commit only those exact paths; and
+13. run `--finalize-plan` against that immutable plan, require the exact
+    one-parent committed postimage, and reopen the byte-identical receipt
+    before starting another batch.
 
-If any row remains `hold`, no command may import it. If the plan becomes stale, it is discarded and freshly prepared; it is never edited to match a newer tree.
+If any row remains `hold`, no command may import it. Before a journal exists,
+a stale plan is discarded and freshly prepared; it is never edited to match a
+newer tree. After the journal is durable, the transaction must be recovered
+or quarantined—never discarded, overwritten, or bypassed. A finalized batch
+cannot block the next batch, and a crash after journal unlink but before
+stdout still reopens the exact committed postimage and returns the same
+receipt.
 
 - [ ] **Step 5: Materialize and commit the exact C0 handoff**
 
 Require a clean tree whose `HEAD` is the Task-6 evidence-pair commit, then run:
 
 ```bash
-test -z "$(git status --porcelain=v1)"
+set -euo pipefail
+worktree_status_before="$(git status --porcelain=v1)"
+test -z "$worktree_status_before"
 C0_DESTINATION_TIP="$(git rev-parse HEAD)"
 C0_DESTINATION_TREE="$(git rev-parse HEAD^{tree})"
 python3 scripts/qinao_source_provenance_v1.py build \
@@ -3754,7 +5338,8 @@ python3 scripts/qinao_source_provenance_v1.py build \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json \
   --output docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-provenance-v1.json
 git add docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-provenance-v1.json
-test "$(git diff --cached --name-only)" = \
+staged_paths="$(git diff --cached --name-only)"
+test "$staged_paths" = \
   docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-provenance-v1.json
 git commit -m "docs(qinao): seal c0 source provenance handoff"
 test "$(git rev-parse HEAD^)" = "$C0_DESTINATION_TIP"
@@ -3762,7 +5347,8 @@ test "$(git rev-parse HEAD^^{tree})" = "$C0_DESTINATION_TREE"
 python3 scripts/qinao_source_provenance_v1.py verify \
   --root /Users/changgeng/.codex/worktrees/e4d7/Project06 \
   --handoff-commit "$(git rev-parse HEAD)"
-test -z "$(git status --porcelain=v1)"
+worktree_status_after="$(git status --porcelain=v1)"
+test -z "$worktree_status_after"
 ```
 
 Expected: the final C0 commit changes exactly the one handoff path; its
@@ -3776,6 +5362,7 @@ parent candidate tip/tree. It carries no raw source or admission claim.
 Run from `/Users/changgeng/.codex/worktrees/e4d7/Project06`:
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_execution_root \
   scripts.test_capture_qinao_candidate_inventory \
@@ -3785,16 +5372,19 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_wave_admission \
   scripts.test_check_qinao_owner_ledger
 python3 scripts/capture_qinao_candidate_inventory.py \
+  --operation-batch C1 \
   --root /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 \
   --verify docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json
 python3 scripts/check_qinao_import_map.py \
+  --operation-batch C1 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
 python3 scripts/qinao_source_provenance_v1.py verify \
   --root /Users/changgeng/.codex/worktrees/e4d7/Project06 \
   --handoff-commit "$(git rev-parse HEAD)"
 git diff --check
-test -z "$(git status --porcelain=v1)"
+worktree_status="$(git status --porcelain=v1)"
+test -z "$worktree_status"
 git merge-base --is-ancestor \
   59c26f508262d7c25869faac0ec0abf968ec1e02 HEAD
 git merge-base --is-ancestor \
@@ -3900,6 +5490,9 @@ Expected:
 - [x] Raw private C4 classes and production-before-C3 selections fail.
 - [x] The checked-in map avoids destination self-reference; the separate ephemeral apply plan binds the live destination HEAD/tree/index/status and per-path preimages.
 - [x] `git apply --index --binary` verifies index/worktree preimages and stages only the exact reviewed set.
+- [x] A kernel lock plus fsynced per-worktree journal makes preimage,
+  staged-postimage, committed-postimage, lost-reply, and next-batch recovery
+  deterministic; divergence never invokes reset or blind replay.
 - [x] Source drift, destination drift, symlink substitution, stale map/plan, partial path set, and zero-row batch all fail.
 - [x] Tooling, evidence, review decisions, and imported batches use isolated exact-path commits.
 - [x] The final C0 handoff is durable canonical JSON whose one-path commit

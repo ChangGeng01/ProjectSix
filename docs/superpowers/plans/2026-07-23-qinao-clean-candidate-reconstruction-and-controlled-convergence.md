@@ -24,7 +24,11 @@
 - V1 visible output is exactly `bufferedUntilVerified`; incremental/provisional visibility and cross-process heavy Provider execution remain V2-quarantined.
 - One K3-allocated Provider branch performs at most one physical invocation. Unknown external state is query/reconcile-only and is never blindly replayed.
 - Candidate code, tests, manifests, workflows, and checkers cannot select or activate the verifier or gate module that judges their own wave.
-- Protected evaluation starts from an externally pinned exact `Pw`, never a prebuilt `Sw`; current-run gate results are validated before the external service deterministically assembles/imports `Cw` and `Sw`.
+- Protected evaluation starts from an externally pinned exact `Pw`, never a
+  prebuilt `Sw`; current-run gate results are validated before the external
+  service deterministically assembles `Cw/Sw` in non-host quarantine, and no
+  target-host import occurs until the exact fresh advance authorization is
+  reopened.
 - `wave`, repository, protected ref, verifier, gate module, release profile, Team identity, and protection policy are predecessor/authority derived; they are never caller CLI, environment, branch-name, worktree-name, or candidate-manifest inputs.
 - `Pw` contains source, authority, schema, checker, test, fixture, and build-input bytes but no result that claims `Pw`.
 - `Cw` is the one-parent evidence-only child of `Pw`. It may add only schema-allowlisted privacy-clean evidence and one self-excluding evidence manifest.
@@ -38,10 +42,26 @@
 - 40 cold tok/s and 30 sustained tok/s are optional profile-qualified claims, never unconditional architecture completion gates.
 - When no performance claim is requested, W6 records the closed `.notRequested` disposition. Only a separately requested claim executes the complete two-device protocol.
 - Every filtered test proves positive discovery before execution. Every named scan first proves the exact path is a readable regular file. Exit 2 is failure.
+- Authority Task 2 must make every executable path in the exact seven
+  controlled documents repository-relative before any incumbent W1-W6 task
+  may run. The controlled bytes may not contain a developer-specific source
+  root, the adopted candidate's absolute root, or a `file://` repository
+  locator; commands either run under the permanent Root Guard or derive
+  `ROOT="$(git rev-parse --show-toplevel)"` only after that guard succeeds.
+- Python governance and domain gates are hermetic. They use the standard
+  library plus byte-pinned checked-in helpers only; no controlled document or
+  B0 program may invoke `uv run --with`, `pip`, `pipx`, `poetry`, `conda`,
+  `python -m pytest`, or another runtime dependency installer/resolver.
 - Every child plan begins by proving the exact clean-candidate root and branch; no relative command may run from the preserved dirty source worktree. Before P4 the Root Guard must report `prebootstrapPreparation`; after P4 it must report `reparentedProgram`, and the consuming child must additionally verify the signed bootstrap/predecessor handoff appropriate to its wave.
 - Never reset, clean, checkout-overwrite, normalize, delete, stage, or commit the preserved dirty source worktree.
 - Never use broad `git add`. Stage only literal reviewed paths and compare the staged set before each commit.
-- Do not push, create a pull request, update a protected ref, or claim a wave complete without separate user authorization and fresh required evidence.
+- Do not push, create a pull request, update a protected ref, or claim a wave
+  complete without separate user authorization and fresh required evidence.
+  Payload-object pinning plus one create-once evaluation dispatch is one
+  narrowly scoped authorization; protected canonical-ref CAS/finalization is
+  a second, later authorization over the exact service-derived `Sw`. Neither
+  authorization is implied by approval to implement, test, or execute a
+  candidate-local plan.
 
 ---
 
@@ -78,7 +98,7 @@ and a second graph writer are forbidden.
 |---|---|
 | W0 | Freeze second graph writers/schedulers, shared mutable Agent state, direct Provider scheduling, and legacy multi-round adoption paths; extend existing hazards only and create no future graph API or behavior |
 | W1 | Complete the original `runtime.semantic-dag` M/Create with immutable G1 topology/join/delegation/terminal-receipt values and the complete G2 V1/task-join value set; bind Attempt/edge refs under `runtime.turn-operation`; freeze context/continuity/recovery and RSI contracts; atomically close Ledger/schema/fixture/consumer membership; perform no retrieval, execution, allocation, network, effect, or activation |
-| W2 | Install the sole K3 `FULL` nucleus with Workspace/Mission/Attempt roots, active-head and Provider/delegation allocation CAS, terminal facts, zero-allocation proofs, budgets, opaque continuity ordering, and the semantic-Attempt terminal receipt in the incumbent K3 receipt-factory/historical-put allowlist; retain W1 Runtime values as foreign contracts and keep production Provider allocation disabled |
+| W2 | Before any W2 mutation, materialize and verify the canonical signed durable-raw-content Decision Gate and exactly one approved/disapproved disposition; then install the sole K3 `FULL` nucleus with Workspace/Mission/Attempt roots, active-head and Provider/delegation allocation CAS, terminal facts, zero-allocation proofs, budgets, opaque continuity ordering, and the semantic-Attempt terminal receipt in the incumbent K3 receipt-factory/historical-put allowlist; retain W1 Runtime values as foreign contracts and keep production Provider allocation disabled |
 | W3 | Integrate snapshot retrieval, grounding, State Market, context compilation, structured reasoning, graph fixtures, App-Agent/session isolation, and governed delegation in shadow/test-injected mode |
 | W4 | Integrate Provider packages, execution plans, certified envelopes, K1/K2/K3 handoff, cache/prefill/decode, production grounding, and graph-bound values only; perform no semantic-DAG executor wiring, graph shadow parity, replay cutover, or activation |
 | W5 | Complete K4, isolated/remote egress, authorized tools/effects/publication/erasure, successor-Attempt remand, unknown-effect reconciliation, and durable boundary recovery; never blindly retry |
@@ -125,6 +145,7 @@ Before any child executes a graph-bearing step it must reopen the pinned
 specification and verify all three identities:
 
 ```bash
+set -euo pipefail
 test "$(git rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
 test "$(git show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
 ```
@@ -177,7 +198,7 @@ and adoption of an orphan Artifact are invalid oracles.
 | Preserved source worktree | `/Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0` | Dirty forensic/source material; never mutate |
 | Preserved source branch | `codex/qinao-w1` | Holds approved design/plan commits and existing staged, unstaged, untracked work |
 | Approved design base | `59c26f508262d7c25869faac0ec0abf968ec1e02` | Immutable reconstruction base |
-| Adopted candidate worktree | `/Users/changgeng/.codex/worktrees/e4d7/Project06` | Sole clean candidate; do not create another |
+| Adopted candidate worktree | `/Users/changgeng/.codex/worktrees/e4d7/Project06` | Sole adopted candidate lineage; it carries only the frozen one-file delta until C0 Task 1 commits that repair, after which cleanliness is mandatory; do not create another |
 | Adopted candidate branch | `codex/qinao-w1-clean-candidate` | Unadmitted preparation lineage |
 | Audited candidate tip | `486e1ec5983ad4390c5b07f04607f1345b912c4c` | 22 preparation commits after approved base |
 | Candidate worktree delta | `scripts/check_qinao_owner_ledger.py` | One deterministic symlink-diagnostic failure |
@@ -314,6 +335,84 @@ expected_protection_policy_digest
 
 `build_evidence_storage_profile` has one canonical copy here. Catalog and Owner-Ledger projections bind its digest; they never contain a divergent second authority copy.
 
+`expected_protection_policy_digest` is not a digest of an unbounded provider
+response. It is SHA-256 over canonical JSON (UTF-8, sorted keys, no
+insignificant whitespace, one LF) for exactly this closed
+`AdmissionProtectionProjectionV1`:
+
+```text
+schema_version = 1
+repository_identity
+canonical_ref
+runner_ref
+run_ref_prefix
+payload_proposal_ref_prefix
+canonical_ref_policy_digest
+runner_ref_policy_digest
+run_ref_prefix_policy_digest
+payload_proposal_ref_prefix_policy_digest
+cas_service_principal_digest
+force_update_forbidden = true
+deletion_forbidden = true
+non_service_bypass_actor_digests
+```
+
+Each of the four nested digests is SHA-256 over canonical
+`RefProtectionPolicyProjectionV1` with exactly:
+
+```text
+schema_version = 1
+selector_kind = exactRef | prefix
+selector
+rulesets
+```
+
+`rulesets` is a nonempty list sorted by `ruleset_id`, with no duplicate
+`ruleset_id`; each closed row has exactly:
+
+```text
+ruleset_id
+enforcement = active
+provider_target_kind = exactRef | prefix
+provider_target
+allowed_writer_app_digests
+bypass_actor_digests
+force_update_forbidden = true
+deletion_forbidden = true
+```
+
+Both digest arrays in every ruleset row are explicitly present, sorted,
+duplicate-free arrays of nonempty lowercase SHA-256 identities; empty is
+distinct from absent. `allowed_writer_app_digests` must be exactly the
+single-element array containing the top-level
+`cas_service_principal_digest`; the service principal is never represented as
+a bypass actor. The top-level `non_service_bypass_actor_digests` is also an
+explicit sorted, duplicate-free array of nonempty lowercase SHA-256
+identities. It must equal the canonical sorted union of every nested
+`bypass_actor_digests` row after excluding the service principal and, for
+Qinao's service-only CAS policy, must be empty. An absent value, duplicate,
+different union, service principal in a bypass row, or any nonempty
+non-service bypass union is a protection mismatch.
+
+The canonical and runner projections require
+`selector_kind = exactRef` and an exact provider target byte-match.
+Run/proposal projections require `selector_kind = prefix`, a selector ending
+`/`, and provider starts-with semantics over that exact prefix; a broader,
+narrower, glob, regex, branch name, or normalized alternative is invalid.
+Every projected ruleset must match the same selector, be active, forbid
+force/deletion, and authorize only the signed service writer policy; bypass
+rows are explicit even when empty. Duplicate ruleset IDs are rejected before
+canonicalization rather than collapsed by a map. Raw provider-response
+digests remain separate audit fields.
+
+The projection explicitly excludes default/development-branch CI
+required-check context names. Authority Task 10 may migrate those contexts
+only through a separate signed governance-migration observation and must prove
+this admission projection is byte-identical before and after the migration.
+No consumer may silently widen the projection, hash arbitrary provider JSON,
+or reinterpret the required-check migration as a change to admission
+protection.
+
 It contains no bootstrap attestation digest, identifier, status, signature, or
 transparency entry. `BootstrapExportV1` is separate and binds exactly:
 
@@ -377,6 +476,60 @@ consumer may reconstruct or replace it from map prose. The tuple is
 authoritative for ordering only when the protected ref equals
 `seal_commit_oid` and the external attestation validates the same CAS
 transaction.
+
+### Fresh external mutation authorizations
+
+The Bootstrap service owns three opaque, append-only authorization records;
+they are not candidate JSON, CLI parameters, public client methods, or new SDK
+authority.
+
+`GovernanceValidationAuthorizationV1` binds repository and development
+branch, exact local preparation commit/tree, the UTF-8-byte-sorted
+duplicate-free seven `{path,mode,blob_oid}` governance rows, its closed Git
+object-set digest, workflow path/blob, `qinao-governance` job ID, the exact
+checkout/setup-python action OIDs, Python version, the already-signed
+`run_ref_prefix`, one create-once immutable validation ref and dispatch
+intent, the admission-protection projection digest, operator principal/role,
+issue/expiry instants, and nonce. It authorizes only target-host
+import/reopen of that exact object closure, creation/reopen of that one
+validation ref under the existing run prefix, and one execution of the bound
+job. It cannot mutate the candidate, development/default branch, canonical
+admission ref, workflow bytes, policy, or required checks. Only the
+Bootstrap-owned signed `GovernanceValidationRunObservationV1` from that exact
+successful run may feed the required-check migration; `noChangeRequired`
+instead carries explicit `notApplicable`.
+
+`PayloadDispatchAuthorizationV1` binds repository, admitted predecessor,
+exact payload commit/tree, proposal object-set digest, intended immutable
+proposal ref, one create-once run ref/dispatch intent, active B0 verifier,
+operator principal/role, issue/expiry instants, and nonce. It authorizes only
+host object import/reopen, immutable proposal pinning, and that one
+evaluation dispatch.
+
+`ProtectedRefAdvanceAuthorizationV1` is obtained only after the service has
+deterministically derived exact `Cw/Sw` in its non-host quarantine but before
+their target-repository import. It binds
+repository, canonical ref, wave, expected-old seal, exact `Pw/Cw/Sw`, proposal
+receipt, lease, authenticated gate-bundle digest, evidence object-set digest,
+one intended create-once Git-object-import key, one immutable
+admission-intent key, the fresh
+`AdmissionProtectionProjectionV1` digest, operator principal/role,
+issue/expiry instants, and nonce. It authorizes one non-force CAS plus
+the exact target-host object import/reopen, its one signed receipt, and
+same-intent finalization—nothing else.
+
+All three records are signature- and role-verified, short-lived,
+single-intent, reopened from the external append-only service, and rejected
+on missing, expired, replayed, substituted, or live-policy-drifted bytes.
+Governance validation first closes its local object set, then obtains its
+authorization, then imports/reopens and creates the validation ref; a host
+timeout is reconciled by exact intent/ref/run query and never by a second
+push. Admission assembly may deterministically construct objects in a
+non-host quarantine and expose the exact advance-authorization request, but
+it performs no target-repository object import, intent, or CAS until the
+advance record exists; retry resumes the same assembly identity. This
+preserves the four-method client surface without treating process memory or a
+local file as authorization.
 
 ### `ArtifactMeshW1Task0HandoffV1`
 
@@ -446,7 +599,11 @@ Use this exact cross-plan order:
    apply that exact reviewed C1 slice, correct the exact seven controlled
    documents and four governing addenda, demote the recovery companion,
    reverse the durable-raw-content/Decision-Gate contradictions, and make the
-   CoreAI plan traceability-only. Before advancing, all six files in this
+   CoreAI plan traceability-only. In the same atomic correction, normalize
+   every executable controlled-document path to repository-relative form,
+   reject all developer/candidate absolute repository roots, and replace
+   every dynamic Python dependency bootstrap with the standard-library
+   nonempty-test mechanism. Before advancing, all six files in this
    executable program-plan set must be regular indexed C1 postimages whose
    raw digests equal the signed review rows; a master without any child is
    incomplete.
@@ -510,6 +667,17 @@ Failure terminal: `BLOCKED_EXTERNAL_BOOTSTRAP` (including the narrower pre-cerem
 
 Return to the authority child plan:
 
+- after the exact seven-path governance commit exists locally, inspect the
+  signed required-check before-observation. If either retiring context is
+  active, close that commit/tree/object set and obtain a fresh
+  `GovernanceValidationAuthorizationV1`; the Bootstrap service imports and
+  reopens only those objects at the target host, creates/reopens one
+  create-once immutable validation ref below the already-signed run prefix,
+  and observes the exact `qinao-governance` job there before any
+  required-check migration. If neither context is active, require a
+  byte-identical signed after-observation and explicit `notApplicable`
+  replacement-run disposition instead. Neither branch permits an implicit
+  push or a development, canonical, or protected-ref mutation;
 - insert `wave_admission_v1` that byte-matches the canonical Output-B
   `BootstrapRootV1` projection, while separately authenticating its
   attestation and transparency inclusion through `BootstrapExportV1`;
@@ -555,7 +723,13 @@ Failure terminal: `BLOCKED_LINEAGE_TRANSACTION`.
 
 Return to the authority child for evidence generation and the bootstrap child for protected admission.
 
-After separate user authorization for the external object write, the admission service pins exact preW0 `Pw/PwTree` under its immutable content-addressed proposal ref and returns a signed payload-proposal receipt. The protected B0 runner starts from that `Pw`—never from a prebuilt seal—and active B0 modules produce the gate/evidence bundle. The service validates the B0-frozen output allowlist and deterministically assembles `Cw`, which adds:
+After a fresh `PayloadDispatchAuthorizationV1` for the exact external object
+write, immutable proposal pin, and one create-once run-ref/dispatch, the
+admission service pins exact preW0 `Pw/PwTree` and returns a signed
+payload-proposal receipt. The protected B0 runner starts from that `Pw`—never
+from a prebuilt seal—and active B0 modules produce the gate/evidence bundle.
+The service validates the B0-frozen output allowlist and deterministically
+assembles `Cw`, which adds:
 
 - the two migrated schema-v2 finding ledgers;
 - exact 74 QRM plus 39 source-review proof leaves;
@@ -569,7 +743,13 @@ After separate user authorization for the external object write, the admission s
 
 The service canonicalizes the receipt from its lease/result values and builds `Sw`, which adds only `docs/superpowers/evidence/qinao-wave-admission/preW0.json`.
 
-The service imports and reopens the Cw/Sw objects at the Git host, persists the object-import receipt, and only then executes intent/CAS/finalize. Candidate-side Cw/Sw builders are parity tools only. Only the finalized `AdmittedWaveV1` output unlocks W0.
+The service first derives exact Cw/Sw objects in a non-host quarantine and
+stops for a fresh `ProtectedRefAdvanceAuthorizationV1` over those exact bytes,
+their object-set/import key, and a fresh live admission-protection projection.
+Only after that record is authenticated may it import/reopen the objects at
+the target Git host, persist the one object-import receipt, and execute
+intent/CAS/finalize. Candidate-side Cw/Sw builders are parity tools only. Only
+the finalized `AdmittedWaveV1` output unlocks W0.
 
 Evaluation launch is not `workflow_dispatch`. The workflow exists only in B0,
 so the service persists an append-only dispatch intent and creates one
@@ -608,7 +788,15 @@ The production K4 driver derives release profile, Team, archive, product, and en
 
 If the platform, device, signing, custody, evidence store, or re-open path is absent, the exact terminal is `BLOCKED_K4`.
 
-Only after K4 passes may the external service assemble/import W0 `Cw`, build one-receipt `Sw`, perform protected CAS, and finalize the attestation.
+Only after K4 passes may the external service validate the fixed W0 output
+allowlist and deterministically derive/assemble exact `Cw/Sw` in non-host
+quarantine. That first same-intent call performs zero target-host
+object/ref/intent effect and stops for a fresh
+`ProtectedRefAdvanceAuthorizationV1` binding the exact object closure,
+import key, intent key, and live protection projection. Only the second
+same-identity call, after the record is persisted and reopened, may
+import/reopen at the target host, emit its signed receipt, perform protected
+CAS, and finalize the attestation.
 After independently reopening that finalized `AdmittedWaveV1`, fast-forward
 only `codex/qinao-w1-clean-candidate` from the exact W0 `Pw` to its
 authenticated W0 `Sw`; require a clean tree, no merge commit, and a second
@@ -627,14 +815,35 @@ Execute the first phase of the Artifact Mesh child plan immediately after admitt
 - commit the sole reviewed `artifact.mesh` owner-row proposal
   `converging → implemented`, then rerun the complete Phase-A gate set over
   that new tree;
-- produce `ArtifactMeshW1Task0HandoffV1`.
+- produce `ArtifactMeshW1Task0HandoffV1` in a code-owned
+  transition-OID-scoped external directory.
 
 Only that post-transition handoff permits later W1 consumers to compile
 against the repaired mechanism. Phase A does not admit W1 or make the
 proposed `implemented` row authoritative. A typed device/preflight block
 produces no transition and no handoff.
 
+The JSON handoff is transport, never capability. Every P8/P9 consumer calls
+the B0-pinned handoff validator in its own process. That validator freshly
+reopens authenticated admitted W0, exact current HEAD/tree, the sole
+one-parent/one-path mode-`100644` status transition, admitted-W0 authority
+blob IDs, the unit-preflight receipt, migration disposition, and every
+handoff digest, then returns an opaque process-local
+`ValidatedArtifactMeshTask0Handoff`. File existence, a previously successful
+shell, an environment variable, or a stale fixed `/private/tmp` path cannot
+unlock work.
+
 ### P9 — Execute W1 owner work and rebind Artifact Mesh to final W1 Pw
+
+Before the first incumbent W1 task, rerun the B0-pinned Authority and
+ArchitectureClosure programs over the exact indexed seven-document set.
+Require repository-relative execution surfaces, zero forbidden absolute
+repository prefixes/locators, and zero dynamic Python dependency bootstrap
+commands. A path or hermeticity regression is
+`BLOCKED_PREW0_EVIDENCE`; it is not repaired ad hoc inside a domain task.
+In the same process, require a freshly returned
+`ValidatedArtifactMeshTask0Handoff`; never deserialize or trust the transport
+record directly.
 
 Execute the corrected W1 slices in the exact mapping below. Freeze final W1 `Pw`.
 
@@ -652,8 +861,11 @@ Owner-Ledger gate revalidates the already-indexed
 `artifact.mesh / converging → implemented` proposal and the Artifact Mesh
 gate revalidates its physical evidence. No Ledger or status byte may change
 after final `Pw` is frozen. Only successful W1 admission makes the proposed
-row authoritative; the external service then assembles/imports W1 `Cw/Sw`
-and finalizes the protected transition without a post-`Pw` mutation.
+row authoritative; the external service first assembles exact W1 `Cw/Sw` in
+non-host quarantine, then crosses the fresh
+`ProtectedRefAdvanceAuthorizationV1` boundary before target-host
+import/reopen, receipt, intent, CAS, and finalization. Neither phase mutates
+`Pw`.
 
 Failure terminal: `BLOCKED_ARTIFACT_MESH_DEVICE_RECOVERY`.
 
@@ -689,10 +901,19 @@ After that Step 0, each wave repeats:
 1. derive wave and active modules from the protected predecessor;
 2. execute only the exact mapped domain slices;
 3. freeze immutable `Pw`;
-4. obtain separately authorized service-side payload-object pinning and a signed proposal receipt;
+4. obtain one fresh `PayloadDispatchAuthorizationV1`, then service-side
+   payload-object pinning, one create-once evaluation dispatch, and a signed
+   proposal receipt;
 5. run predecessor-derived active modules over exact `Pw`;
-6. let the external service validate the frozen evidence-output allowlist and deterministically assemble/import evidence-only `Cw` plus one fixed-receipt `Sw`;
-7. persist/reopen the Git-host object-import receipt, then run fresh live-policy observation, intent, CAS, audit, and final attestation;
+6. let the external service validate the frozen evidence-output allowlist and
+   deterministically derive/assemble evidence-only `Cw` plus one
+   fixed-receipt `Sw` entirely in non-host quarantine; close the exact object
+   set and publish the bound advance-authorization request, with zero
+   target-host import, receipt, intent, CAS, or attestation;
+7. obtain and reopen a distinct fresh
+   `ProtectedRefAdvanceAuthorizationV1`, then resume the same assembly
+   identity to import/reopen at the target Git host, persist its one signed
+   receipt, and run same-intent CAS, audit, and final attestation;
 8. stop on any unresolved true finding, later-wave dependency, missing recovery proof, object-availability/import uncertainty, or external unknown.
 
 ## Correct W1-W6 Owner/Domain Mapping
@@ -707,7 +928,9 @@ Execute in this order:
 2. Contracts Tasks 1, 2, 2A, 3, 4, and 5.
 3. Semantic Task 1 value-contract slice only.
 4. Silicon Task 1.
-5. Silicon Task 7 Step 0 plus its W1 portions of Steps 1, 2, 4, 5, 7, and 7A.
+5. Silicon Task 7 Step 0; the W1-owned slices of Steps 1, 2, 4, and 7;
+   Step 5A only; and Step 7A. Steps 5B and 5C remain exclusively in W4 and
+   W5 below.
 6. Runtime Task 1 Part A immutable semantic-DAG and typed boundary declarations only.
 7. Freeze final W1 `Pw`.
 8. Run Artifact Mesh final-W1-Pw device/reachability rebind from P9.
@@ -719,11 +942,22 @@ W1 must include the content-intake family's two `semantics.layercell` schema/val
 
 Execute in this order:
 
-1. Semantic Task 2.
-2. Semantic Task 4A immediately after Task 2 and before Task 3.
-3. Sovereign Task 4 K3 control-nucleus slice only.
-4. Content intake's two `runtime.turn-operation` `A` slices for Host parser/containment and receipt production.
-5. Authorized-input and remote-contract K3 E/A slices assigned to W2.
+1. Materialize and independently verify the Semantic plan's canonical W2
+   durable-raw-content Decision Gate artifact before any W2 source, schema,
+   store, or migration mutation. Require the exact class/purpose, coverage
+   digest, authorized operator role, issue/expiry window, and deletion/
+   erasure closure, then freeze exactly one signed `approved | disapproved`
+   disposition. Missing, stale, mismatched, or unauthorized bytes stop the
+   wave; encryption alone is not authorization.
+2. Semantic Task 2.
+3. Semantic Task 4A immediately after Task 2 and before Task 3, executing
+   exactly the branch selected by that reopened disposition. The approved
+   branch may materialize only its enumerated coverage; the disapproved
+   branch keeps digest/commitment-only truth and proves the durable writer
+   unreachable.
+4. Sovereign Task 4 K3 control-nucleus slice only.
+5. Content intake's two `runtime.turn-operation` `A` slices for Host parser/containment and receipt production.
+6. Authorized-input and remote-contract K3 E/A slices assigned to W2.
 
 No process MemoryLedger, StateABI, production grounding Provider, K4 helper, release, effect broker, or runtime executor is enabled in W2.
 
@@ -733,9 +967,12 @@ Execute in dependency order:
 
 1. Semantic Task 3.
 2. Semantic Task 4 snapshot/barrier work.
-3. Semantic Task 4B pure cache-contract and mutation slice.
-4. Semantic Task 5 Steps 3A and 3C.
-5. Semantic Task 6 Step 3A.
+3. Semantic Task 4B Steps 1-4, completing the pure cache-scope RED, contract,
+   GREEN, and W3 receipt without pulling in the W4 process-ledger suite.
+4. Semantic Task 5 Steps 1, 2, 3A, 3C, and 4A, followed only by the W3
+   pure-lane half of Step 5.
+5. Semantic Task 6 Steps 1, 2, 3A, and 4A, followed only by the W3
+   contract/test-conformer half of Step 5.
 6. Semantic Task 7.
 
 The exact flow is L7/R0 eligibility → L8 LaneQuery → R1-R4 mechanisms → L8 LaneResult → R5 bounded proposal → R6 validation/revalidation, conflict resolution, and one State Market → sole `BASContextCompiler`.
@@ -751,11 +988,22 @@ Execute in this order:
 3. Silicon Task 4 capability/thermal `HardCapDerivationSource`.
 4. Silicon Task 5 `BASProcessMemoryLedger`.
 5. Silicon Task 6.
-6. Silicon Task 7 Step 4 K3 production wiring, Step 5B, then Steps 3, 6, 8, and 9.
-7. Atomically install/reopen one Contracts `BASProviderBranchPolicy` and one Silicon binding that references it.
-8. Semantic Task 4B MLX/cache production wiring gate.
-9. Semantic Task 5 Step 3B.
-10. Semantic Task 6 Step 3B.
+6. Silicon Task 7's W4 slice of Step 1, then its W4 RED execution in Step 2.
+7. Silicon Task 7 Step 3.
+8. Silicon Task 7's W4 K3-production-wiring portion of Step 4.
+9. Atomically store, jointly validate, install, and independently reopen one
+   Contracts `BASProviderBranchPolicy` artifact and the one Silicon
+   `BASSiliconExecutionBinding` that references it. No production initializer,
+   allocation, grounding Provider, or physical call is reachable before this
+   barrier.
+10. Silicon Task 7 Step 5B.
+11. Silicon Task 7 Step 6.
+12. Silicon Task 7's W4 shared-resource portion of Step 7.
+13. Silicon Task 7 Steps 8 and 9.
+14. Semantic Task 5 Steps 2B, 3B, and 4B, followed only by the W4
+    production-wiring half of Step 5.
+15. Semantic Task 6 Steps 2B, 3B, and 4B, followed only by the W4
+    production-grounding half of Step 5.
 
 W4 creates no response spool, W5 effect/release behavior, content-intake L14 authorization, final intake profile selection, or W6 certification. Foreground fairness uses the one K1 finite-delay admission rule and one host HeavyPhase.
 
@@ -769,10 +1017,12 @@ Execute in this order:
 4. Sovereign Task 1.
 5. Sovereign Task 5.
 6. Remaining Sovereign Task 6 integration.
-7. Silicon Task 7 Step 5C.
-8. Silicon Task 7 Step 10 spool/release handoff.
-9. Runtime Task 5 Steps 5A and 5B direct/synthetic-effect retirement.
-10. Content intake's one `semantics.layercell` `E` slice for L14/current-policy authorization.
+7. Silicon Task 7's W5-only cases from Step 1.
+8. Silicon Task 7's W5 RED execution from Step 2.
+9. Silicon Task 7 Step 5C.
+10. Silicon Task 7 Step 10 spool/release handoff.
+11. Runtime Task 5 Steps 5A and 5B direct/synthetic-effect retirement.
+12. Content intake's one `semantics.layercell` `E` slice for L14/current-policy authorization.
 
 The generic boundary order remains permit → anchor → arm → one crossing. Unknown state remains query/reconcile-only. No W4 spool back-reference is legal, and content intake remains production-dark until W6 selects the exact release profile.
 
@@ -815,6 +1065,7 @@ Every final W6 closure must prove:
 | NextQuestion | closed source union, zero to five candidates, at most one card, explicit tap only |
 | Studio/publication | Provider-backed Studio disabled; fixed deterministic Studio uses non-answer mini-release; zero-Provider output cannot become visible final publication |
 | Web/intake | minimum disclosure, untrusted-source isolation, provenance/citation binding, bounded parser/containment receipt |
+| Durable content | content-free default; W2 exact-purpose Decision Gate and one reopened approved/disapproved disposition; no encrypted-write exception without authorization |
 | Reasoning | information-sufficiency phases, minimum clarification, deterministic cycle/budget termination |
 | Learning/RSI | complete split/holdout/canary/field/adoption order, 12 legacy retirements, one K3 invalidation CAS, no self-adoption |
 | Recovery | owner-private state facet plus boundary facet, no blind replay, no recovery super-owner |
@@ -855,7 +1106,8 @@ No blocked, pending, quarantined, local-preflight, unit-test, simulator, project
 
 ## Program Self-Review
 
-- [x] The existing clean candidate is adopted; no second candidate worktree is created.
+- [x] The sole candidate lineage is adopted; its one frozen initial delta is
+  committed by C0 Task 1, and no second candidate worktree is created.
 - [x] Dirty source preservation and destination-preimage CAS are assigned to the C0 child.
 - [x] B0 is minimal, externally attested, and the sole parent of preW0 Pw.
 - [x] The authority/bootstrap dependency is explicitly interleaved and non-circular.
@@ -866,10 +1118,17 @@ No blocked, pending, quarantined, local-preflight, unit-test, simulator, project
 - [x] `SampleHost/Package.swift` exclusion and the exact 26+14 matrix belong to the Artifact child.
 - [x] CoreAI convergence is non-executable traceability, not a sixth domain plan.
 - [x] The W1-W6 task/step mapping follows the incumbent plan schedules.
-- [x] Semantic Task 1 W1, Task 4B W3/W4, and Task 8 W6 slices are present.
+- [x] Semantic Task 1 W1; the canonical Decision Gate plus Task 2/4A W2;
+  Task 4B W3; every W3/W4 RED, implementation, GREEN, and split-commit slice
+  of Tasks 5/6; and Task 8 W6 are present.
+- [x] Silicon W4 preserves Tasks 2→3→4→5→6 and Task 7's
+  RED→3→4→policy/binding reopen→5B→6→7→8→9 order; W5 runs its own Task-7
+  RED before Steps 5C/10.
 - [x] Sovereign Task 4 W2 and the W5 pre-gate/2→3→1→5→6 order are present.
 - [x] Runtime W6 prelude and final-envelope order is present.
 - [x] The C3 learning/RSI/Main-Sub safety freeze is a W0 gate.
 - [x] Provider-backed Studio and zero-Provider publication remain dark.
 - [x] Performance is optional through a closed `.notRequested | requested` decision.
+- [x] Authority convergence makes all seven controlled-document execution
+  surfaces repository-relative and Python-hermetic before W1.
 - [x] Five executable child plans own code-level TDD; this program file does not duplicate their implementation.

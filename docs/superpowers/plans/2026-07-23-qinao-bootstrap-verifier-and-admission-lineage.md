@@ -4,7 +4,7 @@
 
 **Goal:** Build the externally anchored bootstrap trust root that freezes every gate needed through W6, evaluates exact Git payload objects without candidate-code trust, hands authoritative side effects to an authenticated external admission service, and reparents the finalized preW0 payload under a minimal single-parent `B0` without losing the existing 22 preparation commits.
 
-**Architecture:** `B0` is a minimal one-parent child of approved base `59c26f508262d7c25869faac0ec0abf968ec1e02`; it contains only the immutable workflow, runner, verifier V0, complete gate catalog, 19 executable gate modules, contracts, corpora, schemas, and their closed helper set. The protected workflow has read-only repository permission plus OIDC and begins from an exact proposed `Pw`, never a prebuilt seal. It executes only byte-verified active bytes, uploads signed gate/evidence outputs, and the external service alone validates the closed `Cw` output allowlist, deterministically constructs and imports `Cw` plus one-receipt `Sw`, creates the immutable admission intent, performs canonical-ref CAS, and finalizes the attestation. This ordering removes the impossible cycle in which `Sw` would need current-run results before the run starts. After the authority plan imports the signed bootstrap projection and freezes its preparation tree, one local `git update-ref --stdin` transaction creates a fixed original-tip forensic ref plus a content-addressed final-preparation forensic ref, then moves only the candidate ref to a new `Pw` with that exact tree and sole parent `B0`.
+**Architecture:** `B0` is a minimal one-parent child of approved base `59c26f508262d7c25869faac0ec0abf968ec1e02`; it contains only the immutable workflow, runner, verifier V0, complete gate catalog, 19 executable gate modules, contracts, corpora, schemas, and their closed helper set. The protected workflow has read-only repository permission plus OIDC and begins from an exact proposed `Pw`, never a prebuilt seal. It executes only byte-verified active bytes and uploads signed gate/evidence outputs. The external service's first `assemble_import_and_finalize` pass validates the closed output allowlist, deterministically closes `Cw` plus one-receipt `Sw` and their object/import/intent identity in non-host quarantine, publishes the protected-advance authorization request, and stops with zero target-host effects. Only after one fresh `ProtectedRefAdvanceAuthorizationV1` is authenticated and reopened may the same method resume the same lease/bundle/assembly identity, import and reopen that authorized object set on the target host, persist its receipt, create the immutable admission intent, perform canonical-ref CAS, and finalize the attestation. This two-pass ordering removes the impossible cycle in which `Sw` would need current-run results before the run starts without collapsing authorization into object construction. After the authority plan imports the signed bootstrap projection and freezes its preparation tree, one local `git update-ref --stdin` transaction creates a fixed original-tip forensic ref plus a content-addressed final-preparation forensic ref, then moves only the candidate ref to a new `Pw` with that exact tree and sole parent `B0`.
 
 **Tech Stack:** Python 3 standard library and `unittest`, Git object/index/ref plumbing, canonical JSON and closed JSON Schema, GitHub Actions OIDC with full-SHA Actions, an external append-only admission/CAS/attestation service, and existing Swift/Xcode/Rust gate commands invoked only through bootstrap-pinned modules.
 
@@ -28,7 +28,9 @@
 - The GitHub workflow has `contents: read` and `id-token: write`; it has no contents-write token, GitHub App private key, repository-admin credential, CAS credential, evidence-store credential, or attestation-signing key.
 - The external service alone owns B0/object import, bootstrap intent
   reconciliation, proposal-object pinning, evaluation dispatch intents/run
-  refs, deterministic `Cw/Sw` assembly/import, `AdmissionIntent`,
+  refs, the first-pass deterministic non-host `Cw/Sw` closure and
+  protected-advance authorization request, the second-pass same-identity
+  authorized target-host import/reopen and receipt, `AdmissionIntent`,
   protected-ref compare-and-swap, authenticated Git-host audit lookup,
   superseding-intent creation, final attestation publication, and quarantine.
 - Candidate-local `scripts/check_qinao_wave_admission.py` remains diagnostic and can emit only `preflight`; it can never emit `admitted`, update a ref, authenticate an attestation, or activate a proposed verifier/module.
@@ -42,6 +44,15 @@
   compartment it may build/install/run an exact-Pw subject under a
   lease-bound device policy, while an independent attester and external
   custody produce the only proof accepted by V0.
+- The exact seven controlled documents are executable inputs only after
+  Authority convergence has made their repository paths relative. B0
+  ArchitectureClosure rejects developer-specific source/candidate roots,
+  `file://` repository locators, or an executable path not rooted through the
+  exact payload reader.
+- Python gate execution is dependency-closed at B0. Neither a controlled
+  command nor a ProgramSpec may invoke `uv run --with`, `pip`, `pipx`,
+  `poetry`, `conda`, `python -m pytest`, or any runtime installer/resolver;
+  Python helpers are standard-library-only bytes in the verified B0 closure.
 - The master begins with the non-circular preparation order
   `C0 Tasks 1-7 (committed all-hold inventory/map/provenance) →
   Bootstrap Task 1 → Bootstrap Task 1A Steps 1-4 → Authority Task 1 →
@@ -65,6 +76,26 @@
 - This plan does not implement C0 source-inventory/import-map internals, edit the 7+4 authority prose, implement W0/K4, or implement Artifact Mesh.
 - Every code change follows RED → focused GREEN → full relevant suite → isolated commit. Never use a zero-match test/filter or a command whose missing path is treated as success.
 - All repository edits use exact paths. All external ceremony artifacts remain outside Git under `/private/tmp/qinao-bootstrap-ceremony-v1/export` and in the authenticated external transparency store.
+
+Before the first executable step of this child and again before every real B0
+proposal, ceremony request, lineage plan, or ref transaction, run:
+
+```bash
+set -euo pipefail
+cd /Users/changgeng/.codex/worktrees/e4d7/Project06
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py \
+  --root . \
+  --expect-candidate-lineage prebootstrapPreparation \
+  --require-clean
+```
+
+The sole exception is after the Task-10 transaction, where the same command
+uses `--expect-candidate-lineage reparentedProgram`. A missing guard tool,
+dirty source bytes, or unreadable guard input stops
+`BLOCKED_SOURCE_DRIFT/SOURCE_BYTES_CHANGED`; a wrong
+root/branch/lineage/HEAD transaction stops
+`BLOCKED_LINEAGE_TRANSACTION/LINEAGE_TRANSACTION_DIVERGENCE`. No later
+command in the block may mask either failure.
 
 ## Approved Dynamic Graph Bootstrap Amendment
 
@@ -180,6 +211,7 @@ not due to import or fixture absence.
 Run:
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_gate_catalog_v0 \
   scripts.test_qinao_wave_verifier_v0 \
@@ -272,6 +304,56 @@ The current local files are caches, never the trust root:
 /private/tmp/qinao-c0-import-review-v1/export/c3/import-review-v1.json
 /private/tmp/qinao-c0-import-review-v1/export/c3/import-review-reopen-receipt-v1.json
 ```
+
+The cache root and every descendant directory are code-owned: open or create
+the root with effective-UID ownership and mode `0700`, then descriptor-walk
+each literal `proposals`, `contexts`, `export`, and batch component with
+`O_DIRECTORY|O_NOFOLLOW`, owner equality, and mode `0700`. Every leaf is a
+regular owner-only mode-`0600` canonical JSON file opened with
+`O_NOFOLLOW`. No final proposal, context, record, or receipt leaf is ever
+opened with `O_CREAT`, truncated, renamed over, or replaced. All local writers,
+including the authenticated service-export adapter, use one shared
+descriptor-relative create-once installer:
+
+1. derive the deterministic same-operation temp basename
+   `.qinao-install-<64-lowercase-hex>.tmp` by domain-separated SHA-256 over
+   the final basename, canonical-value SHA-256, and the fixed operation intent
+   (`freeze-proposal`, `freeze-context`, `export-record`, or
+   `export-receipt`); reject every temp name outside that closed regex;
+2. create that code-owned temp in the same verified directory with
+   `openat(O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW, 0600)`;
+3. `fchmod` the open descriptor to exact `0600`, write the complete canonical
+   bytes, verify the byte count, and `fsync` the file;
+4. install the final name only with same-directory
+   `linkat(temp, final, flags=0)`, whose existing-target failure is the
+   no-replace decision;
+5. `fsync` the directory, unlink only the verified same-operation temporary
+   name, and `fsync` the directory again.
+
+On an existing final name or a lost reply after `linkat`, recovery opens the
+final with `O_NOFOLLOW`, verifies owner/mode/regular type, exact canonical
+bytes, and the expected inode/link relation, and treats only an
+identical-final value as success. If the verified same-operation temporary
+link remains, recovery proves it names the same inode, removes that temp link,
+directory-`fsync`s, and then requires final `st_nlink == 1`; no unrelated temp
+is cleaned up. A stale temp for another final/value/intent causes a
+fail-closed diagnostic and is left byte-for-byte in place. A foreign owner,
+broader mode, parent/final symlink, special
+file, unexpected hard link, divergent preexisting value, or repository/source
+descendant stops
+`BLOCKED_IMPORT_REVIEW/IMPORT_REVIEW_CONTEXT_MISMATCH` without overwrite or
+cleanup.
+
+The import-review tests cover safe first creation, byte-identical cache
+re-export, every parent/final symlink, foreign owner where the platform
+permits the fixture, broad mode, hard-link substitution, divergent bytes, and
+crash before/after temp `fsync`, `linkat`, each directory `fsync`, and temp
+unlink. They prove the final name is never an `O_CREAT` target, a preexisting
+final is never replaced, an identical-final lost reply succeeds, a divergent
+final survives byte-for-byte, and only a verified same-operation temp link is
+removed. A stale other-intent temp must cause failure and remain present with
+the same inode and bytes. Recovery reopens the content-addressed external
+record; it never deletes a suspicious cache to retry.
 
 Each signed record embeds the complete canonical `ImportReviewContextV1`,
 including its proposed decision rows. The external service persists that
@@ -433,8 +515,14 @@ After Output B validates, stop. The authority plan must:
 1. import `wave-admission-v1.json` byte-for-byte as the final Owner-Ledger `wave_admission_v1`;
 2. recompute the 7+4, Owner-Ledger, authority-bundle, and controlled-contract-catalog digests;
 3. remove the pre-ceremony draft handoff from the intended `Pw` tree or classify it as non-authoritative preparation evidence outside the Cw/Sw evidence sets;
-4. commit the complete indivisible authority preparation; and
-5. export `/private/tmp/qinao-bootstrap-ceremony-v1/authority-finalization-v1.json` with exact fields:
+4. commit the complete indivisible authority preparation;
+5. verify the fixed external
+   `/private/tmp/qinao-bootstrap-ceremony-v1/required-checks-migration-v1.json`
+   service record and prove its admission-protection projection equals the
+   signed bootstrap projection; and
+6. invoke Task 7A's code-owned `--write-authority-finalization` mode to export
+   `/private/tmp/qinao-bootstrap-ceremony-v1/authority-finalization-v1.json`
+   with exact fields:
 
 ```json
 {
@@ -444,7 +532,9 @@ After Output B validates, stop. The authority plan must:
   "wave_admission_projection_sha256": "64 lowercase hex",
   "owner_ledger_sha256": "64 lowercase hex",
   "authority_bundle_digest": "64 lowercase hex",
-  "controlled_contract_catalog_digest": "64 lowercase hex"
+  "controlled_contract_catalog_digest": "64 lowercase hex",
+  "governance_required_checks_migration_digest": "64 lowercase hex",
+  "admission_protection_projection_sha256": "64 lowercase hex"
 }
 ```
 
@@ -467,9 +557,24 @@ The protected runner uploads the complete result/evidence bundle to the external
 2. reject any missing, extra, noncanonical, privacy-bearing, executable, symlink, or non-allowlisted output;
 3. use the commit identity and receipt timestamp frozen in the signed evaluation lease to build one-parent evidence-only `Cw`;
 4. canonicalize the one receipt from service-derived values and build one-parent `Sw`;
-5. import both objects through its authenticated Git-host integration and re-open them from the host;
-6. persist an immutable object-import receipt before creating `AdmissionIntent`; and
-7. only then attempt protected-ref CAS and final attestation.
+5. close the exact `Cw/Sw` object set, import key, intent key, and live-protection projection in the non-host quarantine, persist the corresponding authorization request, and stop at `BLOCKED_EXTERNAL_BOOTSTRAP/CEREMONY_UNAVAILABLE`;
+6. obtain, authenticate, and reopen one exact fresh
+   `ProtectedRefAdvanceAuthorizationV1` before any target-host object import,
+   intent, or CAS;
+7. only under that authorization, import the exact object set through the
+   authenticated Git-host integration and reopen commit/tree/parent/blob
+   topology from the target host;
+8. persist the immutable same-authorization object-import receipt before
+   creating the bound `AdmissionIntent`; and
+9. only then attempt its non-force protected-ref CAS and same-intent final
+   attestation.
+
+An unknown authorization-persistence result queries the append-only service;
+an unknown target-host import queries/reopens the exact object set; and an
+unknown CAS queries host audit. None reissues the corresponding effect.
+Re-entry preserves the same lease, authenticated bundle, deterministic
+assembly, authorization request, object set, import key, intent key, and
+live-protection projection.
 
 The authority child owns the content schemas and parity compiler; this
 bootstrap child owns the active-run protocol and external-service conformance
@@ -478,19 +583,38 @@ evidence leaf, or receipt is never an admission input.
 
 ### Input E — externally pinned payload proposal
 
-After a wave freezes `Pw`, an operator with separate user authorization makes
-its objects available to the external service without touching the canonical
-ref. The service verifies the object set, creates the immutable
-content-addressed ref
-`refs/heads/qinao-payload-proposals/<full-payload-oid>`, reopens
-commit/tree/parents from the Git host, and returns a signed
-`PayloadProposalReceiptV1` outside Git. The workflow receives no payload
-input. A service-owned `EvaluationDispatchIntentV1` binds the proposal receipt
-to one opaque create-once run ref
+After a wave freezes `Pw`, the service may close its exact proposal object set
+only in a non-host quarantine. Before any target-host import, proposal-ref
+creation, dispatch intent, or run-ref creation, an operator with separate user
+authorization must cause one exact, fresh
+`PayloadDispatchAuthorizationV1` to be persisted, authenticated, and reopened
+from the append-only service. That record binds the predecessor chain,
+payload commit/tree, proposal object set, content-addressed proposal ref,
+dispatch intent, create-once B0 run ref, active verifier bundle, operator,
+expiry, nonce, and signature.
+
+Only then may the service import and reopen the exact payload objects through
+its authenticated Git-host integration. After host reopen it creates the
+immutable content-addressed ref
+`refs/heads/qinao-payload-proposals/<full-payload-oid>` once, reopens
+commit/tree/parents/ref audit from the Git host, and returns a signed
+`PayloadProposalReceiptV1` outside Git. Only that host-reopened receipt may be
+bound into the service-owned `EvaluationDispatchIntentV1`; the service then
+creates its one opaque run ref
 `refs/heads/qinao-admission-runs/<request-id>` at B0. The `push` event carries
 only B0/ref/run metadata; the service derives the payload from the intent. No
 upload branch, operator label, proposed wave, ref spelling, or event field is
 authority.
+
+Unknown authorization, payload import, proposal-ref create, or
+dispatch/run-ref create outcomes are queried and reopened under the same
+authorization and intent, never blindly repeated. A failed effect consumes
+that authorization and terminates the operation; a new attempt requires a
+new authorization rather than reusing a proposal receipt digest.
+`PayloadDispatchAuthorizationV1` cannot authorize Cw/Sw import, an admission
+intent, or canonical-ref CAS. Conversely,
+`ProtectedRefAdvanceAuthorizationV1` cannot import/pin `Pw`, create a payload
+proposal, or start an evaluation.
 
 An absent upload authorization, missing object, mismatched content-addressed
 ref, non-fast-forward replacement, deleted proposal ref, or failed host reopen
@@ -517,6 +641,152 @@ ProtectedAdmissionClient.assemble_import_and_finalize(
     gate_results: AuthenticatedGateResultBundle
 ) -> AdmittedWaveV1
 ```
+
+The protocol module also owns six closed external-service records without
+adding any public client method:
+
+```text
+AdmissionProtectionProjectionV1 =
+  {schema_version, repository_identity, canonical_ref, runner_ref,
+   run_ref_prefix, payload_proposal_ref_prefix,
+   canonical_ref_policy_digest, runner_ref_policy_digest,
+   run_ref_prefix_policy_digest,
+   payload_proposal_ref_prefix_policy_digest,
+   cas_service_principal_digest, force_update_forbidden,
+   deletion_forbidden, non_service_bypass_actor_digests}
+
+PayloadDispatchAuthorizationV1 =
+  {schema_version, repository_identity, predecessor_chain_digest,
+   payload_commit_oid, payload_tree_oid, proposal_object_set_digest,
+   proposal_ref, dispatch_intent_id, run_ref, active_verifier_bundle_digest,
+   operator_principal_digest, operator_role_digest, authorized_at, expires_at,
+   nonce, signature}
+
+ProtectedRefAdvanceAuthorizationV1 =
+  {schema_version, repository_identity, protected_ref, wave,
+   expected_old_oid, payload_commit_oid, evidence_commit_oid, seal_commit_oid,
+   payload_proposal_receipt_digest, evaluation_lease_id,
+   authenticated_gate_bundle_digest, evidence_object_set_digest,
+   intended_git_object_import_key, admission_intent_key,
+   live_protection_projection_sha256,
+   operator_principal_digest, operator_role_digest, authorized_at, expires_at,
+   nonce, signature}
+
+GovernanceValidationAuthorizationV1 =
+  {schema_version, repository_identity, development_branch,
+   preparation_commit_oid, preparation_tree_oid, preparation_path_rows,
+   preparation_object_set_digest, workflow_path, workflow_blob_oid, job_id,
+   checkout_action_oid, setup_python_action_oid, python_version,
+   run_ref_prefix, validation_ref, dispatch_intent_id,
+   admission_protection_projection_sha256,
+   operator_principal_digest, operator_role_digest, authorized_at, expires_at,
+   nonce, signature}
+
+GovernanceValidationRunObservationV1 =
+  {schema_version, repository_identity, development_branch,
+   governance_validation_authorization_digest, validation_ref,
+   dispatch_intent_id, preparation_commit_oid, preparation_tree_oid,
+   preparation_object_set_digest, workflow_path, workflow_blob_oid, job_id,
+   github_app_id, checkout_action_oid, setup_python_action_oid, python_version,
+   run_id, run_attempt, conclusion, host_response_digest, observed_at,
+   service_signature}
+
+GovernanceRequiredChecksMigrationV1 =
+  {schema_version, repository_identity, development_branch,
+   before_observation_digest, after_observation_digest,
+   migration_disposition, retired_contexts, replacement_context,
+   replacement_run_observation_digest, operator_principal_digests,
+   unchanged_unrelated_policy_projection_digest,
+   admission_protection_projection_sha256, service_signature}
+```
+
+`AdmissionProtectionProjectionV1` uses canonical JSON with the exact field set
+above and the master plan's closed nested policy projections. Required-check
+contexts on the development/default branch are explicitly outside it.
+`PayloadDispatchAuthorizationV1` permits only host import/reopen, immutable
+proposal pinning, and its one create-once B0 run-ref/dispatch.
+`ProtectedRefAdvanceAuthorizationV1` is issued only after deterministic
+`Cw/Sw` derivation in the service's non-host quarantine and before target-host
+import. It permits only the bound object-set import/reopen, its one signed
+receipt, non-force CAS, and same-intent finalization. These two admission
+authorizations are externally signed, short-lived, nonce-bound, role-checked,
+create-once, and reopened from the append-only service. Candidate files,
+environment variables, CLI values, prior authorizations, and process memory
+cannot satisfy either record.
+
+`GovernanceValidationAuthorizationV1` is a separate opaque, one-use service
+authorization, not a fifth `ProtectedAdmissionClient` method and not SDK
+authority exposed to Authority. Its `preparation_path_rows` is the
+UTF-8-byte-sorted, duplicate-free tuple of exactly seven
+`{path,mode,blob_oid}` rows:
+
+```text
+.github/workflows/test.yml
+scripts/check_qinao_payload_purity.py
+scripts/run_nonempty_python_unittest.py
+scripts/test_check_qinao_payload_purity.py
+scripts/test_check_w0_expected_open_set.py
+scripts/test_run_nonempty_python_unittest.py
+scripts/test_test_workflow_owner_ledger.py
+```
+
+Every mode is `100644`; each blob is reopened from
+`preparation_commit_oid`, whose tree equals `preparation_tree_oid`.
+`preparation_object_set_digest` covers the canonical sorted exact Git-object
+closure required to import and reopen that commit, tree, parents, and seven
+rows. The fixed workflow/job/toolchain bindings are
+`.github/workflows/test.yml`, `qinao-governance`,
+`actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683`,
+`actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405`, and
+Python `3.12`. `run_ref_prefix` and
+`admission_protection_projection_sha256` must byte-match the existing signed
+bootstrap projection; `validation_ref` is exactly
+`<run_ref_prefix>governance-validation/<opaque-request-id>`, is created once
+by the bound service principal, and can never be updated or deleted.
+
+The service may prepare the exact object pack only in a non-host quarantine.
+It must persist and reopen the valid, unexpired authorization before the
+first target-host write. It then imports only the authorized object set,
+reopens the commit/tree/parents/path rows from the target host, persists the
+same-intent import observation, and only then creates the bound validation ref
+for the bound dispatch intent. Ref creation triggers the one validation run;
+there is no implicit `git push`, caller credential, or mutation of the
+canonical, development, runner, payload-proposal, or any existing run ref.
+Unknown import, ref-create, or run outcomes are queried and reopened from host
+audit under the same dispatch intent; they are never blindly replayed. A
+failed/cancelled run consumes that authorization and leaves the migration
+hold in place. A new attempt requires a new externally approved
+authorization, nonce, intent, and create-once validation ref.
+
+Only an exact successful host run produces
+`GovernanceValidationRunObservationV1`. Its `conclusion` is literally
+`success`; every commit/tree/object/workflow/blob/job/pin/Python/ref/intent
+binding must match the authorization, and the GitHub App, run ID/attempt, raw
+host-response digest, time, and service signature are provider-authenticated.
+`GovernanceRequiredChecksMigrationV1.replacement_run_observation_digest`
+must equal the domain-separated digest of that reopened observation. A
+caller retry can reopen the same immutable authorization, intent, ref, and
+observation, but cannot consume the authorization for a second host effect.
+
+`GovernanceRequiredChecksMigrationV1.migration_disposition` is exactly
+`noChangeRequired | atomicallyReplaced | requireThenRemove`;
+`operator_principal_digests` is a sorted pair of distinct authorized
+principals. The provider-authenticated before/after observations bind raw
+response digests, ruleset IDs, app IDs, exact context names, bypass actors,
+enforcement, and the replacement job observation. Unrelated policy projects
+to the same digest, and the master-defined
+`AdmissionProtectionProjectionV1` must be byte-identical before and after.
+The record is an external service observation, not a candidate claim or a new
+Owner-Ledger authority.
+
+`assemble_import_and_finalize` may prepare exact objects only in a non-host
+quarantine and expose an external authorization request through the service
+control plane, but missing or expired
+`ProtectedRefAdvanceAuthorizationV1` stops before target-host import,
+intent, or CAS with
+`BLOCKED_EXTERNAL_BOOTSTRAP/CEREMONY_UNAVAILABLE`. Retrying after the
+authorization exists resumes the same lease/bundle/object/import identity and
+does not construct a second object, intent, or authorization request.
 
 `assemble_import_and_finalize` retains that non-union return type. Only
 `admitted` returns `AdmittedWaveV1`. Every non-final result raises or
@@ -567,7 +837,11 @@ object-write authorization and host reopen. `run_active_gates` owns the
 controller-side physical-broker phase and returns one service-envelope-bound
 bundle; candidate code cannot construct or supplement it.
 `assemble_import_and_finalize` derives every evidence leaf from that bundle
-and B0 contracts, then leaves all Cw/Sw object construction/import,
+and B0 contracts. Its first invocation closes the deterministic `Cw/Sw`
+object/import/intent identity only in non-host quarantine, publishes the
+advance-authorization request, and waits with zero target-host effects. After
+the fresh authorization is authenticated and reopened, the same method and
+same lease/bundle/assembly identity resume target-host import/reopen, receipt,
 `AdmissionIntent`, CAS, and finalization inside the external service.
 
 All four methods are recovery operations over immutable service records:
@@ -578,9 +852,14 @@ All four methods are recovery operations over immutable service records:
    of the prior result.
 2. `pin_payload_and_issue_lease(payload_oid)` is keyed by repository,
    predecessor-chain digest, payload commit/tree, active catalog digest, and
-   dispatch intent. A retry returns the same proposal receipt and same
-   `EvaluationLease`. While that evaluation is open or terminal, creation of a
-   new lease or second evaluation for the same key is forbidden.
+   dispatch intent. Before payload host import it reopens the one
+   `PayloadDispatchAuthorizationV1`; every unknown authorization/import/
+   proposal-ref/dispatch/run-ref outcome is queried. A retry returns the same
+   proposal receipt and same `EvaluationLease`, and each host/service effect
+   count remains one. A failed effect consumes the authorization; its receipt
+   digest cannot authorize a new attempt. While that evaluation is open or
+   terminal, creation of a new lease or second evaluation for the same key is
+   forbidden.
 3. `run_active_gates(same_evaluation_lease)` means query/resume, not rerun. It
    reopens the one append-only evaluation record, resumes only missing
    non-effectful predicates, and uses create-once per-program execution keys.
@@ -592,12 +871,15 @@ All four methods are recovery operations over immutable service records:
    `quarantinedAdmission`.
 4. `assemble_import_and_finalize(same_lease,same_bundle)` is keyed by lease,
    authenticated-bundle digest, assembly-contract digest, deterministic Cw/Sw
-   identities, and intent key. It queries and resumes the same
-   assembly/import/intent/CAS/attestation records. It never constructs a
-   second Cw, Sw, import receipt, or intent. Repetition after success returns
-   the byte-identical `AdmittedWaveV1` and program terminal `admitted`;
-   successful CAS without the same-intent attestation returns
-   `pendingAdmission`; any identity mismatch returns
+   identities, advance-authorization request, object-set/import/intent keys,
+   protection projection, and intent key. It waits for or queries the one
+   `ProtectedRefAdvanceAuthorizationV1` before target-host import, then queries
+   and resumes the same import/intent/CAS/attestation records. It never
+   constructs a second Cw, Sw, import receipt, or intent under a consumed
+   authorization. Repetition after success returns the byte-identical
+   `AdmittedWaveV1` and program terminal `admitted`; successful CAS without
+   the same-intent attestation returns `pendingAdmission`; any authorization,
+   assembly, binding, count, or lineage mismatch returns
    `quarantinedAdmission`.
 
 An expired lease with no terminal bundle does not authorize a replacement
@@ -605,6 +887,35 @@ lease automatically: the operation returns `BLOCKED_EXTERNAL_BOOTSTRAP` with
 a reason code `EVALUATION_LEASE_EXPIRED` until operator policy resolves the
 original evaluation. Tests crash after every durable boundary and prove these
 four retry laws, including “physical execution count remains one”.
+
+The existing protocol/recovery test methods add subtests that round-trip all
+six external-service records above and reject every missing/extra field,
+duplicate key, noncanonical byte sequence, invalid signature/role/nonce,
+expired-before-effect or cross-intent replayed authorization, wrong
+proposal/run ref, a dispatch reused for a second evaluation, advance
+authorization issued before deterministic
+quarantine-object closure or after an unauthorized target-host import,
+wrong old/new OID or bundle/object-set/import-key/intent digest, protection
+drift, and a CAS
+attempt with no fresh advance authorization. Crash immediately before and
+after both authorization requests and persistence, both object imports,
+proposal-ref/dispatch/run-ref creation, intent creation, CAS, and final
+attestation; re-entry must resume one identity and every physical/ref/import/
+intent/CAS effect count remains one.
+The governance-validation cases additionally reject any non-seven-row,
+unordered, duplicate, wrong-mode, or wrong-blob preparation set; altered
+commit/tree/object-set, workflow path/blob, job, pin, Python, signed prefix,
+projection, validation ref, intent, operator, expiry, nonce, or signature;
+authorization after target-host import; implicit push; canonical/development/
+runner/proposal/existing-ref mutation; a second ref or run under one
+authorization; and a success observation with any changed host binding.
+Crashes at authorization persistence, object import, ref creation, and run
+observation query must reopen the same operation. Unknown host outcomes cause
+queries, never another import/ref/run effect. The required-check migration
+cases cover all three dispositions, two distinct operators, exact
+before/after provider observations, the exact successful
+`GovernanceValidationRunObservationV1` digest, unchanged unrelated policy,
+and byte-identical admission protection.
 
 Every Authority/W0/Artifact consumer performs this exact three-branch
 re-entry before any pre-final ref guard:
@@ -716,7 +1027,7 @@ runtime_replay_certification
 - Create `docs/superpowers/specs/qinao-admission-attestation-v1.schema.json`: finalized post-CAS attestation.
 - Create `docs/superpowers/specs/qinao-bootstrap-attestation-v1.schema.json`: two-operator bootstrap root attestation.
 - Create `docs/superpowers/specs/qinao-bootstrap-intent-v1.schema.json`: two-approval, single-service, append-only create-or-reopen ceremony transaction.
-- Create `docs/superpowers/specs/qinao-admission-service-state-v1.schema.json`: closed crash-recovery state projection.
+- Create `docs/superpowers/specs/qinao-admission-service-state-v1.schema.json`: closed crash-recovery state projection, including the internal governance-validation authorization/object-import/dispatch/ref/run/migration records.
 - Create `docs/superpowers/specs/qinao-admission-service-binding-v1.schema.json`: closed public service/OIDC/runner binding; contains no credential.
 - Create `scripts/qinao_admission_recovery_oracle.py`: pure reference transition function used to conformance-test the external service.
 - Create `scripts/test_qinao_admission_recovery_oracle.py`: exhaustive legal/illegal state-event matrix.
@@ -743,6 +1054,10 @@ runtime_replay_certification
   `EvaluationLease`, `ExternalPhysicalGateBinding`,
   `PayloadProposalReceiptV1`, `GateResult`,
   `AuthenticatedGateResultBundle`, `ImportedCommit`, `AdmittedWaveV1`,
+  `PayloadDispatchAuthorizationV1`,
+  `ProtectedRefAdvanceAuthorizationV1`,
+  `GovernanceValidationAuthorizationV1`,
+  `GovernanceValidationRunObservationV1`,
   `ServiceEnvelope`, `ServiceBinding`, `AdmissionTerminalError`,
   `ProtectedAdmissionClient`, a
   preparation-only `canonicalize-service-binding` CLI, and domain-separated
@@ -756,14 +1071,17 @@ operation raises `ProtocolError("qinao.admission-protocol.unimplemented")`;
 tests import normally, discover the named methods, and assert that exact
 diagnostic. A `_FailedTest` import placeholder is not discovery.
 
-Add exact tests for sorted UTF-8 output, duplicate keys, NaN/infinity, booleans-as-integers, unknown keys, uppercase digests, short/full Git OIDs, and a caller-supplied authority selector:
+Add `import inspect` and `from dataclasses import fields`, then add exact tests
+for sorted UTF-8 output, duplicate keys, NaN/infinity, booleans-as-integers,
+unknown keys, uppercase digests, short/full Git OIDs, and a caller-supplied
+authority selector:
 
 ```python
 class AdmissionProtocolV1Tests(unittest.TestCase):
     def test_canonical_json_is_stable_utf8(self) -> None:
         self.assertEqual(
             canonical_json_bytes({"z": "脑", "a": 1}),
-            b'{"a":1,"z":"\\xe8\\x84\\x91"}',
+            b'{"a":1,"z":"\xe8\x84\x91"}',
         )
 
     def test_closed_json_rejects_duplicate_and_unknown_fields(self) -> None:
@@ -771,6 +1089,95 @@ class AdmissionProtocolV1Tests(unittest.TestCase):
             parse_closed_json(b'{"a":1,"a":2}', fields={"a"})
         with self.assertRaisesRegex(ProtocolError, "unknown fields"):
             parse_closed_json(b'{"a":1,"wave":"W0"}', fields={"a"})
+
+    def test_external_authorization_records_are_closed_and_not_client_authority(
+        self,
+    ) -> None:
+        self.assertEqual(
+            {
+                field.name
+                for field in fields(PayloadDispatchAuthorizationV1)
+            },
+            {
+                "schema_version", "repository_identity",
+                "predecessor_chain_digest", "payload_commit_oid",
+                "payload_tree_oid", "proposal_object_set_digest",
+                "proposal_ref", "dispatch_intent_id", "run_ref",
+                "active_verifier_bundle_digest",
+                "operator_principal_digest", "operator_role_digest",
+                "authorized_at", "expires_at", "nonce", "signature",
+            },
+        )
+        self.assertEqual(
+            {
+                field.name
+                for field in fields(ProtectedRefAdvanceAuthorizationV1)
+            },
+            {
+                "schema_version", "repository_identity", "protected_ref",
+                "wave", "expected_old_oid", "payload_commit_oid",
+                "evidence_commit_oid", "seal_commit_oid",
+                "payload_proposal_receipt_digest", "evaluation_lease_id",
+                "authenticated_gate_bundle_digest",
+                "evidence_object_set_digest",
+                "intended_git_object_import_key", "admission_intent_key",
+                "live_protection_projection_sha256",
+                "operator_principal_digest", "operator_role_digest",
+                "authorized_at", "expires_at", "nonce", "signature",
+            },
+        )
+        self.assertEqual(
+            {
+                field.name
+                for field in fields(GovernanceValidationAuthorizationV1)
+            },
+            {
+                "schema_version", "repository_identity",
+                "development_branch", "preparation_commit_oid",
+                "preparation_tree_oid", "preparation_path_rows",
+                "preparation_object_set_digest", "workflow_path",
+                "workflow_blob_oid", "job_id", "checkout_action_oid",
+                "setup_python_action_oid", "python_version",
+                "run_ref_prefix", "validation_ref", "dispatch_intent_id",
+                "admission_protection_projection_sha256",
+                "operator_principal_digest", "operator_role_digest",
+                "authorized_at", "expires_at", "nonce", "signature",
+            },
+        )
+        self.assertEqual(
+            {
+                field.name
+                for field in fields(GovernanceValidationRunObservationV1)
+            },
+            {
+                "schema_version", "repository_identity",
+                "development_branch",
+                "governance_validation_authorization_digest",
+                "validation_ref", "dispatch_intent_id",
+                "preparation_commit_oid", "preparation_tree_oid",
+                "preparation_object_set_digest", "workflow_path",
+                "workflow_blob_oid", "job_id", "github_app_id",
+                "checkout_action_oid", "setup_python_action_oid",
+                "python_version", "run_id", "run_attempt", "conclusion",
+                "host_response_digest", "observed_at", "service_signature",
+            },
+        )
+        public_methods = {
+            name
+            for name, value in inspect.getmembers(
+                ProtectedAdmissionClient, inspect.isfunction
+            )
+            if not name.startswith("_")
+        }
+        self.assertEqual(
+            public_methods,
+            {
+                "reopen_admitted_predecessor",
+                "pin_payload_and_issue_lease",
+                "run_active_gates",
+                "assemble_import_and_finalize",
+            },
+        )
 
     def test_evaluation_lease_has_no_caller_selection_fields(self) -> None:
         forbidden = {
@@ -915,14 +1322,23 @@ class AdmissionProtocolV1Tests(unittest.TestCase):
 Also reject a replacement lease while the first evaluation is open or
 terminal, a different bundle for the same lease, a bundle reused under another
 lease, second Cw/Sw bytes, second intent, and a second physical execution after
-an ambiguous transport failure. The RED fake exposes durable counters so
-query/resume cannot masquerade as rerun.
+an ambiguous transport failure. For both admission authorization records,
+mutate/omit/add each field, invalidate signature/role/nonce/expiry, substitute
+one bound digest/ref/key, and try to construct a verified value from only a
+digest or reopened Boolean. For the governance records, mutate each field
+individually; omit/add a field; reorder, duplicate, remove, or add a
+preparation row; change one mode/blob; move the validation ref outside the
+signed prefix; change one workflow/job/pin/Python/object binding; expire or
+replay the nonce; and attempt a second ref/run under the same authorization.
+Every mutation must fail before a target-host effect. The RED fake exposes
+durable counters so query/resume cannot masquerade as rerun.
 
 - [ ] **Step 2: Run the focused RED suite**
 
 Run:
 
 ```bash
+set -euo pipefail
 cd /Users/changgeng/.codex/worktrees/e4d7/Project06
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_admission_protocol_v1
@@ -1093,6 +1509,114 @@ class PayloadProposalReceiptV1:
     issued_at: str
     signing_identity_digest: str
     signature: str
+
+@dataclass(frozen=True)
+class PayloadDispatchAuthorizationV1:
+    schema_version: Literal[1]
+    repository_identity: str
+    predecessor_chain_digest: str
+    payload_commit_oid: str
+    payload_tree_oid: str
+    proposal_object_set_digest: str
+    proposal_ref: str
+    dispatch_intent_id: str
+    run_ref: str
+    active_verifier_bundle_digest: str
+    operator_principal_digest: str
+    operator_role_digest: str
+    authorized_at: str
+    expires_at: str
+    nonce: str
+    signature: str
+
+@dataclass(frozen=True)
+class ProtectedRefAdvanceAuthorizationV1:
+    schema_version: Literal[1]
+    repository_identity: str
+    protected_ref: str
+    wave: Literal["preW0", "W0", "W1", "W2", "W3", "W4", "W5", "W6"]
+    expected_old_oid: str
+    payload_commit_oid: str
+    evidence_commit_oid: str
+    seal_commit_oid: str
+    payload_proposal_receipt_digest: str
+    evaluation_lease_id: str
+    authenticated_gate_bundle_digest: str
+    evidence_object_set_digest: str
+    intended_git_object_import_key: str
+    admission_intent_key: str
+    live_protection_projection_sha256: str
+    operator_principal_digest: str
+    operator_role_digest: str
+    authorized_at: str
+    expires_at: str
+    nonce: str
+    signature: str
+
+@dataclass(frozen=True)
+class GovernancePreparationPathRow:
+    path: str
+    mode: Literal["100644"]
+    blob_oid: str
+
+@dataclass(frozen=True)
+class GovernanceValidationAuthorizationV1:
+    schema_version: Literal[1]
+    repository_identity: str
+    development_branch: str
+    preparation_commit_oid: str
+    preparation_tree_oid: str
+    preparation_path_rows: tuple[GovernancePreparationPathRow, ...]
+    preparation_object_set_digest: str
+    workflow_path: Literal[".github/workflows/test.yml"]
+    workflow_blob_oid: str
+    job_id: Literal["qinao-governance"]
+    checkout_action_oid: Literal[
+        "11bd71901bbe5b1630ceea73d27597364c9af683"
+    ]
+    setup_python_action_oid: Literal[
+        "a309ff8b426b58ec0e2a45f0f869d46889d02405"
+    ]
+    python_version: Literal["3.12"]
+    run_ref_prefix: Literal["refs/heads/qinao-admission-runs/"]
+    validation_ref: str
+    dispatch_intent_id: str
+    admission_protection_projection_sha256: str
+    operator_principal_digest: str
+    operator_role_digest: str
+    authorized_at: str
+    expires_at: str
+    nonce: str
+    signature: str
+
+@dataclass(frozen=True)
+class GovernanceValidationRunObservationV1:
+    schema_version: Literal[1]
+    repository_identity: str
+    development_branch: str
+    governance_validation_authorization_digest: str
+    validation_ref: str
+    dispatch_intent_id: str
+    preparation_commit_oid: str
+    preparation_tree_oid: str
+    preparation_object_set_digest: str
+    workflow_path: Literal[".github/workflows/test.yml"]
+    workflow_blob_oid: str
+    job_id: Literal["qinao-governance"]
+    github_app_id: int
+    checkout_action_oid: Literal[
+        "11bd71901bbe5b1630ceea73d27597364c9af683"
+    ]
+    setup_python_action_oid: Literal[
+        "a309ff8b426b58ec0e2a45f0f869d46889d02405"
+    ]
+    python_version: Literal["3.12"]
+    run_id: str
+    run_attempt: int
+    conclusion: Literal["success"]
+    host_response_digest: str
+    observed_at: str
+    service_signature: str
 
 @dataclass(frozen=True)
 class ServiceEnvelope:
@@ -1334,8 +1858,38 @@ def admission_intent_key(
     return sha256_hex(
         b"qinao-admission-intent-v1\0"
         + b"\0".join(part.encode("ascii") for part in parts)
-    )
+)
 ```
+
+The payload and advance authorization parsers require their exact field sets,
+canonical bytes, closed wave/ref grammar, full lowercase OIDs/digests,
+authorized operator role, unique nonce, and
+`authorized_at <= now < expires_at`, then verify the external signature in
+domains `qinao-payload-dispatch-authorization-v1` and
+`qinao-protected-ref-advance-authorization-v1`. They expose frozen typed
+records only after those checks; there is no unchecked constructor or
+digest-only “verified” value.
+
+The governance authorization parser requires `required == properties.keys()`
+for its closed service-state schema, exactly seven path rows equal to the
+literal set above, UTF-8 byte sorting, unique paths/blobs, mode `100644`,
+full lowercase Git OIDs, and nonempty opaque identity fields. It reopens the
+signed bootstrap projection and requires the record's repository,
+`run_ref_prefix`, and projection digest to match. It proves
+`workflow_blob_oid` is the blob at `workflow_path` in
+`preparation_commit_oid`, recomputes the tree, exact changed-path rows, and
+domain-separated object-set digest, and requires
+`authorized_at <= now < expires_at`. Its signature domain is
+`qinao-governance-validation-authorization-v1`.
+
+The run-observation parser requires positive non-Boolean `github_app_id` and
+`run_attempt`, a nonempty opaque decimal `run_id`, literal `success`,
+domain-separated authorization digest, byte-identical authorization
+bindings, and a verified service signature in domain
+`qinao-governance-validation-run-observation-v1`. Neither parser performs a
+host write. `ProtectedAdmissionClient` retains exactly the four methods shown
+above; governance validation is an external control-plane transaction
+conformance-tested by this module, not a caller capability.
 
 `EvidenceOutput` is the exact closed program-output receipt. Its
 `producer_step_id`, `schema_digest`, `evidence_class_id`, and
@@ -1387,7 +1941,17 @@ value. A mismatch is
 output path and therefore changes neither the preW0 132-file nor W0 16-file
 transport set.
 
-`EvidenceAssemblyResult` is valid only after the service validates the complete `EvidenceOutput` exact set against `cw_output_contract_digest`, writes Cw/Sw objects with the lease-frozen identities, imports them through its authenticated Git-host integration, and reopens their commit/tree/blob topology from the host. The external object-import receipt binds repository, exact object OIDs, uploaded pack/object-set digest, host transaction/audit identity, and reopen observation. It is persisted before `AdmissionIntent`; no runner-local OID or ref proves import.
+`EvidenceAssemblyResult` is valid only after the service validates the
+complete `EvidenceOutput` exact set against `cw_output_contract_digest`,
+writes and closes the lease-frozen Cw/Sw object identity in non-host
+quarantine, persists its advance-authorization request, authenticates and
+reopens the fresh `ProtectedRefAdvanceAuthorizationV1`, imports that same
+authorized object set through its Git-host integration, and reopens the
+commit/tree/blob topology from the host. The external object-import receipt
+binds repository, exact object OIDs, uploaded pack/object-set digest, host
+transaction/audit identity, and reopen observation. It is persisted before
+`AdmissionIntent`; the internal result is persisted only after both that
+receipt and intent exist, and no runner-local OID or ref proves import.
 
 The preparation-only CLI is exactly:
 
@@ -1408,6 +1972,7 @@ digest against the enterprise-managed trust anchor. A caller-provided
 Run:
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_admission_protocol_v1 \
   scripts.test_check_qinao_wave_admission
@@ -1418,6 +1983,7 @@ Expected: positive discovery and all tests pass.
 - [ ] **Step 5: Commit the protocol primitive**
 
 ```bash
+set -euo pipefail
 git add scripts/qinao_admission_protocol_v1.py \
   scripts/test_qinao_admission_protocol_v1.py
 git diff --cached --name-only
@@ -1739,13 +2305,47 @@ required `/private/tmp` context file after the signed record exists.
 `apply_fixed_map_postimage` accepts only the C1/C2/C3 enum and no root, map,
 record, key, context, row, reviewer, timestamp, output, force, or bypass
 argument. It runs the permanent execution-root/repository-identity guard,
-requires every path except the fixed map clean and the map at either the
-embedded prior digest or the exact derived postimage, obtains the opaque
-fixed verifier result, derives all review fields in memory, writes canonical
-bytes through a same-directory `O_EXCL` temporary file plus file/directory
-`fsync` and atomic replace, and immediately verifies preapply mode. If the map
-already equals that postimage, it is an idempotent verify-only success; every
-other state fails without overwrite.
+using only the shared C0 mapping
+`C1/C2 → prebootstrapPreparation; C3 → reparentedProgram`,
+and takes an exclusive advisory lock on the fixed
+`$GIT_DIR/qinao-import-map-postimage.lock` opened
+`O_RDWR|O_CREAT|O_NOFOLLOW`, then `fchmod`ed on its open descriptor and
+required effective-UID-owned, regular, exact mode `0600`, and link-count one.
+The lock is held through verification, content-CAS, and post-verification; it
+coordinates all code-owned writers but is never treated as sufficient against
+an uncooperative writer.
+
+Under that one lock, the materializer captures and then immediately before
+the write revalidates the exact HEAD OID/tree, raw index identity and
+`write-tree` OID, complete NUL-delimited worktree/status bytes, and the fixed
+map's `lstat`/open-`fstat` device+inode+mode+link-count+size plus raw bytes.
+Every non-map path must remain clean. The map must be the same regular inode
+and byte-for-byte equal either to the signed context's exact prior bytes or to
+the uniquely derived postimage. It obtains the opaque fixed verifier result
+and derives every review field in memory while still holding that lock.
+
+If the map is at the prior bytes, the implementation performs one exact
+preimage content-CAS with a generated single-path patch through argv-only
+`git apply --index` (or an equivalently atomic no-overwrite primitive). The
+patch binds the prior and postimage blob OIDs, mode, full prior content, and
+full postimage; the actual applying invocation—not a preceding
+`--check`—must reject any HEAD/index/worktree/map byte or inode drift. The
+implementation must not use check-then-rename, `os.replace`, plain `rename`,
+truncate, or a rollback overwrite. It then reopens and verifies under the
+same lock that HEAD is unchanged, the index and worktree contain exactly the
+postimage for the one map path, every other path/status byte is unchanged,
+and no unexpected inode/type/mode/link transition occurred. If the map
+already equals that exact postimage with the matching index/status state,
+this is an idempotent verify-only lost-reply success. Every other state fails
+without writing or replacing any competing bytes.
+
+The fixed-context freeze, fixed-export verification, map checker, and
+`apply_fixed_map_postimage` all call the same
+`candidate_lineage_for_import_batch` helper. Tests execute C1/C2 against a
+reparented fixture and C3 against a prebootstrap fixture and require failure
+before any cache/map write; they also prove the correct inverse cases pass.
+No caller-provided lineage, branch spelling, or current-HEAD heuristic may
+override the batch mapping.
 
 Tests reject duplicate/unknown/missing fields, a publicly constructible or
 mutable verified value, arbitrary reviewer/time, one operator, duplicate
@@ -1762,14 +2362,21 @@ new process and a machine-local cache loss, re-export only the authenticated
 self-contained record plus receipt, and still prove the same opaque
 `bound_context`, postimage history, and audit root.
 Materializer tests cover wrong repository/context/prior-map bytes, another
-dirty/staged/untracked path, caller path/key/row attempts, crash before and
-after atomic replace, stale temporary-file cleanup without data adoption,
-second identical application, and refusal to overwrite a non-prior,
+dirty/staged/untracked path, caller path/key/row attempts, wrong lock
+owner/mode/type/link count, map symlink/hard-link/special-file substitution,
+and second identical application. Deterministic race hooks mutate HEAD,
+index, another worktree path, map path entry, map inode, and map bytes after
+the first snapshot and immediately before the content-CAS. Every race must
+fail, preserve the competing bytes byte-for-byte, leave no intended
+postimage/staged residue, and never invoke a replace/rename fallback. Tests
+also cover a crash before CAS, successful CAS with reply loss, exact
+postimage verify-only recovery, and refusal to overwrite a non-prior,
 non-postimage map.
 
 - [ ] **Step 2: Run RED**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_import_review_v1 \
   scripts.test_qinao_import_map
@@ -1843,6 +2450,7 @@ context/history/transition mismatch -> IMPORT_REVIEW_CONTEXT_MISMATCH
 - [ ] **Step 4: Run tests, validate schemas, and commit the verifier slice**
 
 ```bash
+set -euo pipefail
 python3 -m json.tool \
   docs/superpowers/specs/qinao-import-review-v1.schema.json >/dev/null
 python3 -m json.tool \
@@ -1882,7 +2490,13 @@ the ten literal C1 proposal rows owned by Authority Task 2 and place their
 canonical exact subset at the code-owned proposal cache. Then run:
 
 ```bash
-test -z "$(git status --porcelain=v1)"
+set -euo pipefail
+set +e
+STATUS_BYTES="$(git status --porcelain=v1)"
+STATUS_RC="$?"
+set -euo pipefail
+test "$STATUS_RC" -eq 0
+test -z "$STATUS_BYTES"
 python3 scripts/qinao_import_review_v1.py --freeze-fixed-context C1
 python3 scripts/qinao_import_review_v1.py --verify-frozen-context C1
 ```
@@ -1901,8 +2515,10 @@ append-only by record ID/digest, appends the immutable receipt to
 transparency, and exports both current-cache files. Then run:
 
 ```bash
+set -euo pipefail
 python3 scripts/qinao_import_review_v1.py --verify-fixed-export C1
 python3 scripts/check_qinao_import_map.py \
+  --operation-batch C1 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
 ```
@@ -1929,7 +2545,13 @@ fixed C2 proposal cache. No wildcard, directory expansion, transitive
 discovery, or “current helper set” alias is permitted. Then run:
 
 ```bash
-test -z "$(git status --porcelain=v1)"
+set -euo pipefail
+set +e
+STATUS_BYTES="$(git status --porcelain=v1)"
+STATUS_RC="$?"
+set -euo pipefail
+test "$STATUS_RC" -eq 0
+test -z "$STATUS_BYTES"
 python3 scripts/qinao_import_review_v1.py --freeze-fixed-context C2
 python3 scripts/qinao_import_review_v1.py --verify-frozen-context C2
 ```
@@ -1941,8 +2563,10 @@ content address, and exports the immutable record/receipt pair. Only after
 that external operation completes run:
 
 ```bash
+set -euo pipefail
 python3 scripts/qinao_import_review_v1.py --verify-fixed-export C2
 python3 scripts/check_qinao_import_map.py \
+  --operation-batch C2 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
 ```
@@ -1965,7 +2589,13 @@ resulting clean candidate tip, operators place exactly twenty C3 proposal rows
 in the distinct fixed cache, then execute:
 
 ```bash
-test -z "$(git status --porcelain=v1)"
+set -euo pipefail
+set +e
+STATUS_BYTES="$(git status --porcelain=v1)"
+STATUS_RC="$?"
+set -euo pipefail
+test "$STATUS_RC" -eq 0
+test -z "$STATUS_BYTES"
 python3 scripts/qinao_import_review_v1.py --freeze-fixed-context C3
 python3 scripts/qinao_import_review_v1.py --verify-frozen-context C3
 ```
@@ -1976,8 +2606,10 @@ reopen, and fixed-cache export as Step 6. Only after that external operation
 has completed run:
 
 ```bash
+set -euo pipefail
 python3 scripts/qinao_import_review_v1.py --verify-fixed-export C3
 python3 scripts/check_qinao_import_map.py \
+  --operation-batch C3 \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
 ```
@@ -2577,6 +3209,15 @@ path. The only variable tokens are the complete tokens `{payload_root}` and
 `{derived_wave}`; substring interpolation is invalid. A Swift/Xcode test is a
 literal `suite_rows` entry:
 
+For a Python process primitive, the entrypoint is the B0-pinned interpreter
+wrapper and every import resolves inside its byte-verified standard-library
+or helper closure. Program/argv/source validation rejects `uv`, `pip`,
+`pipx`, `poetry`, `conda`, `pytest`, an installer alias, `-m pytest`, dynamic
+requirements/lock resolution, and any child process that could acquire a
+dependency. This is checked structurally before execution and again under the
+network-denied runtime; network denial is not used as the first proof of
+hermeticity.
+
 ```json
 {
   "package_or_project_path": "repository-relative regular path",
@@ -3052,6 +3693,7 @@ byte-compare the checked-in program source SHA-256 against
 - [ ] **Step 2: Run the focused RED suite**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_gate_catalog_v0
 ```
@@ -3071,6 +3713,7 @@ verify_checked_in_projection(*, source_path: Path, repository_root: Path) -> Non
 and a CLI with exactly one mode:
 
 ```bash
+set -euo pipefail
 python3 scripts/build_qinao_gate_catalog_v0.py \
   --verify-projection scripts/qinao_gate_modules/v0/program-spec-v1.json
 ```
@@ -3913,7 +4556,7 @@ The exact current-wave deltas are:
 
 | Program | Newly required delta; all prior deltas remain required |
 |---|---|
-| `architecture-closure-v1` | exact non-empty owner/storage/recovery/entrypoint/test/status closure, prior-phase result set, 7+4 reciprocal document rows, and Ledger-derived active release-profile rows |
+| `architecture-closure-v1` | exact non-empty owner/storage/recovery/entrypoint/test/status closure, prior-phase result set, 7+4 reciprocal document rows, repository-relative controlled-document execution surfaces with zero developer/candidate absolute roots or `file://` locators, zero dynamic Python dependency bootstrap, and Ledger-derived active release-profile rows |
 | `ios27-floor-v1` | three literal Package.swift paths, every literal governed project/configuration row from the production graph, and `BehavioralAISubstrate/scripts/build-rust-xcframework.sh` at deployment floor 27 |
 | `owner-ledger-v2` | schema-v2 Ledger, 29 owner rows, 7 controlled documents, 4 governing addenda, 14+4+4+7 topology, candidate creation-gate rows, reciprocal document/catalog digests, and at W1 the predecessor-derived one-commit/one-field `artifact.mesh / converging → implemented` owner-health transition with no later row drift |
 | `plan-remediation-v1` | exactly 39 literal remediation source identities, non-empty test command/suite rows, and terminal negative/mutation identities |
@@ -4087,7 +4730,7 @@ The 19 contracts freeze these exact evaluation programs; no implementer chooses 
 | `qinao.xcode27-toolchain` | `xcode_toolchain_probe` requires selected Xcode major 27, iOS 27 SDK/runtime inventory, and the lease's signed non-shipping verification-toolchain identity; when active release profiles exist it additionally proves their declared build toolchains are compatible |
 | `qinao.ios27-floor` | `deployment_floor_scan` reads all three `Package.swift`, every governed Xcode project/configuration, and `BehavioralAISubstrate/scripts/build-rust-xcframework.sh`; every owned deployment floor is 27 |
 | `qinao.production-reachability` | `production_graph_reachability` traverses the authority-selected package/Xcode/XcodeGen/workspace/product graph, AST/SIL/index and linked-symbol closure; every discovered project and indirect edge is classified |
-| `qinao.architecture-closure` | `architecture_closure_exact_set` requires non-empty owner/storage/recovery/entrypoint/test/status fields, reciprocal 7+4 refs, the exact Ledger-derived active shipping-profile set (empty at preW0), and byte-compared generated output |
+| `qinao.architecture-closure` | `architecture_closure_exact_set` requires non-empty owner/storage/recovery/entrypoint/test/status fields, reciprocal 7+4 refs, repository-relative Files/link/command surfaces in all seven controlled documents, zero developer/candidate absolute repository locators, zero dynamic Python dependency bootstrap, the exact Ledger-derived active shipping-profile set (empty at preW0), and byte-compared generated output |
 | `qinao.v2-quarantine` | `v2_quarantine_exact_set` requires exactly seven feature IDs, 21 rule IDs, one execution receipt/mutation per predicate, explicit lab sets, and zero shipping reachability |
 | `qinao.provider-boundary` | `source_import_boundary_scan` covers imports, declarations, strings/comments-safe symbol positions, linked symbols, factories/callbacks/reflection; no CoreAI/FoundationModels/MLX/Qwen/MiniCPM/Granite implementation leaks into QinaoRuntimeSDK |
 | `qinao.w0-open-set` | B0-self-contained `w0_open_set_v1_exact_set` enforces the literal 13-suite/16-safety-ID contract and its fixed negative/mutation cases; `swiftpm_filter_nonempty` discovers and executes every exact suite. Candidate `check_w0_expected_open_set.py`, sequence receipts, and probe logs are never gate inputs. |
@@ -4126,6 +4769,7 @@ Before finalizing `bootstrap-paths-v1.json`, reopen the enterprise-managed
 Preparation-R binding. Run:
 
 ```bash
+set -euo pipefail
 python3 -m scripts.qinao_admission_protocol_v1 canonicalize-service-binding \
   --input '/Library/Application Support/Qinao/Bootstrap/import-review-service-binding-v1.json' \
   --output scripts/qinao_gate_modules/v0/service-binding-v1.json
@@ -4150,6 +4794,7 @@ The catalog stores the exact sorted `bootstrap_helper_paths` used by its 19 cont
 - [ ] **Step 7: Run exact-set tests and commit**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_gate_catalog_v0 \
   scripts.test_qinao_admission_protocol_v1
@@ -4333,6 +4978,7 @@ Also test absolute/`..`/NUL/non-UTF8 paths, symlink escape, submodule mode, exec
 - [ ] **Step 2: Run the focused RED suite**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_wave_verifier_v0
 ```
@@ -4538,6 +5184,7 @@ an outer expected failure is rejected.
 Run:
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_wave_verifier_v0 \
   scripts.test_qinao_gate_catalog_v0
@@ -4551,6 +5198,7 @@ of the 19 module bundles is covered and no corpus program is unreachable.
 - [ ] **Step 6: Commit verifier V0**
 
 ```bash
+set -euo pipefail
 git add scripts/qinao_wave_verifier_v0.py \
   scripts/test_qinao_wave_verifier_v0.py
 git diff --cached --check
@@ -4703,7 +5351,14 @@ def test_signed_projection_binds_nine_graph_rows_without_new_field(self) -> None
     )
 ```
 
-Also reject missing/extra profile fields, credentials/secrets/URLs with user-info, unknown external-evidence classes, an unsigned profile, profile in the blocked manifest, catalog/profile digest mismatch, external attestation encoded in the receipt schema, a payload proposal without host-side object reopen, caller-supplied proposal ref, nondeterministic/missing Cw/Sw commit identity, Cw/Sw object import without host reopen, and any `--wave`, `--ref`, `--profile`, `--verifier`, or `--module` flag.
+Also reject missing/extra profile fields, credentials/secrets/URLs with
+user-info, unknown external-evidence classes, an unsigned profile, profile in
+the blocked manifest, catalog/profile digest mismatch, external attestation
+encoded in the receipt schema, a payload proposal without host-side object
+reopen, caller-supplied proposal ref, nondeterministic/missing Cw/Sw commit
+identity, target-host Cw/Sw import before a fresh reopened
+`ProtectedRefAdvanceAuthorizationV1`, Cw/Sw object import without host reopen,
+and any `--wave`, `--ref`, `--profile`, `--verifier`, or `--module` flag.
 The test-owned `GRAPH_GATE_IDS` tuple is the exact nine IDs frozen in Task 2.
 Mutating any one of their contract/module/corpus/program digests while
 updating only a candidate or local projection must fail through the existing
@@ -4713,6 +5368,7 @@ gate, selector, or attestation field is added.
 - [ ] **Step 2: Run the focused RED suite**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_wave_admission
 ```
@@ -4819,6 +5475,18 @@ nested object has `additionalProperties: false`. The obsolete aliases
 `runner_digest`, and `bootstrap_attestation_digest` are invalid rather than
 silently translated.
 
+`expected_protection_policy_digest` is recomputed only from the exact
+13-field `AdmissionProtectionProjectionV1` and exact
+`RefProtectionPolicyProjectionV1`/ruleset-row field sets frozen in the master
+and protocol module. Provider adapters retain raw response digests separately.
+Development/default-branch required-check contexts are never projected into
+this value. Extend the existing projection test method with subtests for
+missing/extra fields, absent-vs-empty arrays, unordered arrays, duplicate
+writer/bypass identities, raw-response hashing, context-name inclusion, each
+nested policy mutation, inactive enforcement, false force/deletion flags,
+exact-ref/prefix confusion, non-slash prefix, broader/narrower/glob/regex
+target, selector normalization, unauthorized writer, and noncanonical JSON.
+
 `bootstrap_attestation_policy` has exactly
 `schema_version`, `signature_algorithm`, `signing_identity_digest`,
 `transparency_store_identity_digest`, and
@@ -4899,6 +5567,7 @@ Its values remain `authority = "none"`, `production_admission = "blocked"`, `sta
 - [ ] **Step 6: Run schemas and tests, then commit**
 
 ```bash
+set -euo pipefail
 python3 -m json.tool \
   docs/superpowers/specs/qinao-wave-admission-bootstrap-v1.schema.json
 python3 -m json.tool \
@@ -5037,6 +5706,7 @@ Assert the public envelope never emits `finalized`, `quarantined`, or
 - [ ] **Step 2: Run focused RED tests**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_protected_admission_runner
 ```
@@ -5240,8 +5910,9 @@ output mount, no network route, no broker socket, no inherited OIDC/request
 token, no Git credential, no service credential, and closed nonessential file
 descriptors. The controller validates outputs after the evaluator exits. If the
 host cannot attest and enforce that split, the run stops
-`BLOCKED_EXTERNAL_BOOTSTRAP`; clearing environment variables alone is not an
-isolation proof.
+`BLOCKED_EXTERNAL_BOOTSTRAP` with reason code
+`RUNNER_ATTESTATION_UNAVAILABLE`; clearing environment variables alone is not
+an isolation proof.
 
 `ExternalPhysicalGateController` implements
 `PhysicalProjectionResolver.resolve(request:
@@ -5290,7 +5961,8 @@ producer and attester differ; custody reopen precedes projection acceptance
 candidate result/FD/environment cannot satisfy a physical primitive
 raw physical material never enters evaluator output or Git
 evidence outputs equal the active signed path/mode/blob allowlist
-service assembly returns deterministic Cw/Sw plus a host-reopened object-import receipt
+first same-identity service call closes deterministic Cw/Sw in non-host quarantine, publishes the advance-authorization request, returns the expected hold, and has zero target-host effects
+after a fresh ProtectedRefAdvanceAuthorizationV1 is authenticated and reopened, the second same-identity call imports/reopens exactly that object set and persists its receipt before intent/CAS
 runner invokes no git commit-tree, hash-object -w, update-index, update-ref, GitHub ref API, intent API, or attestation signer
 service final/pending/quarantine state maps to distinct exit codes
 ```
@@ -5303,6 +5975,7 @@ cell fails before module execution.
 Run:
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_protected_admission_runner \
   scripts.test_qinao_external_physical_gate_v0 \
@@ -5314,6 +5987,7 @@ Expected: all tests pass.
 - [ ] **Step 6: Commit protected runner and workflow**
 
 ```bash
+set -euo pipefail
 git add .github/workflows/qinao-wave-admission.yml \
   scripts/qinao_protected_admission_runner.py \
   scripts/test_qinao_protected_admission_runner.py \
@@ -5340,20 +6014,40 @@ Expected: exactly five staged paths.
 - Create: `scripts/test_qinao_admission_recovery_oracle.py`
 
 **Interfaces:**
-- Consumes: signed payload-proposal receipt, immutable evaluation/assembly/import records, authenticated object/ref observations, immutable intent record, Git-host CAS audit, attestation record, and observation freshness.
-- Produces: one pure `RecoveryDecision`; the external service implementation must pass this conformance suite before ceremony.
+- Consumes: payload-dispatch and protected-advance authorization requests plus
+  opaque signed authorizations, signed payload-proposal receipt, immutable
+  evaluation/assembly/import records, authenticated object/ref observations,
+  immutable intent record, Git-host CAS audit, attestation record, effect
+  counts, and observation freshness.
+- Produces: one pure `RecoveryDecision` for admission and one pure
+  `GovernanceValidationRecoveryDecision` for the pre-migration validation
+  run; the external service implementation must pass both conformance suites
+  before ceremony.
 
 The state enum is exact:
 
 ```python
 class AdmissionState(Enum):
+    PAYLOAD_AUTHORIZATION_REQUIRED = "payloadAuthorizationRequired"
+    PAYLOAD_AUTHORIZED = "payloadAuthorized"
+    PAYLOAD_OBJECT_IMPORT_UNKNOWN = "payloadObjectImportUnknown"
+    PAYLOAD_OBJECTS_REOPENED = "payloadObjectsReopened"
+    PAYLOAD_PROPOSAL_REF_CREATE_UNKNOWN = "payloadProposalRefCreateUnknown"
+    PAYLOAD_PROPOSAL_REOPENED = "payloadProposalReopened"
+    PAYLOAD_DISPATCH_INTENT_CREATE_UNKNOWN = "payloadDispatchIntentCreateUnknown"
+    PAYLOAD_DISPATCH_INTENT_REOPENED = "payloadDispatchIntentReopened"
+    PAYLOAD_RUN_REF_CREATE_UNKNOWN = "payloadRunRefCreateUnknown"
     PAYLOAD_PINNED = "payloadPinned"
+    PAYLOAD_FAILED_HOLD = "payloadFailedHold"
     EVALUATION_OPEN = "evaluationOpen"
     ASSEMBLY_READY = "assemblyReady"
+    ADVANCE_AUTHORIZATION_REQUIRED = "advanceAuthorizationRequired"
+    ADVANCE_AUTHORIZED = "advanceAuthorized"
     OBJECT_IMPORT_UNKNOWN = "objectImportUnknown"
     OBJECTS_IMPORTED = "objectsImported"
     INTENT_OPEN = "intentOpen"
     CAS_OUTCOME_UNKNOWN = "casOutcomeUnknown"
+    ADVANCE_FAILED_HOLD = "advanceFailedHold"
     PENDING_ADMISSION = "pendingAdmission"
     FINALIZED = "finalized"
     SUPERSEDED = "superseded"
@@ -5364,50 +6058,222 @@ The decision enum is exact:
 
 ```python
 class RecoveryAction(Enum):
+    WAIT_FOR_PAYLOAD_AUTHORIZATION = "waitForPayloadAuthorization"
+    QUERY_PAYLOAD_AUTHORIZATION = "queryPayloadAuthorization"
+    IMPORT_PAYLOAD_OBJECTS = "importPayloadObjects"
+    QUERY_PAYLOAD_OBJECTS = "queryPayloadObjects"
+    CREATE_PAYLOAD_PROPOSAL_REF = "createPayloadProposalRef"
+    QUERY_PAYLOAD_PROPOSAL_REF = "queryPayloadProposalRef"
+    CREATE_PAYLOAD_DISPATCH_INTENT = "createPayloadDispatchIntent"
+    QUERY_PAYLOAD_DISPATCH_INTENT = "queryPayloadDispatchIntent"
+    CREATE_PAYLOAD_RUN_REF = "createPayloadRunRef"
+    QUERY_PAYLOAD_RUN_REF = "queryPayloadRunRef"
+    RETURN_PAYLOAD_HOLD = "returnPayloadHold"
     ISSUE_EVALUATION_LEASE = "issueEvaluationLease"
     RETRY_SAME_EVALUATION = "retrySameEvaluation"
     ASSEMBLE_BYTE_IDENTICAL_OBJECTS = "assembleByteIdenticalObjects"
-    IMPORT_OR_REOPEN_OBJECTS = "importOrReopenObjects"
+    WAIT_FOR_ADVANCE_AUTHORIZATION = "waitForAdvanceAuthorization"
+    QUERY_ADVANCE_AUTHORIZATION = "queryAdvanceAuthorization"
+    IMPORT_AUTHORIZED_OBJECTS = "importAuthorizedObjects"
+    QUERY_HOST_OBJECTS = "queryHostObjects"
     CREATE_INTENT = "createIntent"
     RETRY_SAME_INTENT = "retrySameIntent"
     QUERY_HOST_AUDIT = "queryHostAudit"
     CREATE_SUPERSEDING_INTENT = "createSupersedingIntent"
+    RETURN_ADVANCE_HOLD = "returnAdvanceHold"
     FINALIZE_BYTE_IDENTICAL_ATTESTATION = "finalizeByteIdenticalAttestation"
     RETURN_EXISTING_ATTESTATION = "returnExistingAttestation"
     BLOCK_NEXT_WAVE = "blockNextWave"
     QUARANTINE = "quarantine"
 ```
 
+Governance validation uses a disjoint state/action vocabulary so it can never
+be mistaken for protected admission or create SDK authority:
+
+```python
+class GovernanceValidationState(Enum):
+    AUTHORIZATION_REQUIRED = "authorizationRequired"
+    AUTHORIZATION_PERSISTENCE_UNKNOWN = "authorizationPersistenceUnknown"
+    AUTHORIZED = "authorized"
+    OBJECT_IMPORT_UNKNOWN = "objectImportUnknown"
+    OBJECTS_REOPENED = "objectsReopened"
+    REF_CREATE_UNKNOWN = "refCreateUnknown"
+    REF_REOPENED = "refReopened"
+    RUN_OUTCOME_UNKNOWN = "runOutcomeUnknown"
+    RUN_SUCCEEDED = "runSucceeded"
+    RUN_FAILED_HOLD = "runFailedHold"
+    QUARANTINED = "quarantined"
+
+class GovernanceValidationAction(Enum):
+    WAIT_FOR_AUTHORIZATION = "waitForAuthorization"
+    QUERY_AUTHORIZATION = "queryAuthorization"
+    IMPORT_EXACT_OBJECTS = "importExactObjects"
+    QUERY_HOST_OBJECTS = "queryHostObjects"
+    CREATE_VALIDATION_REF = "createValidationRef"
+    QUERY_HOST_REF = "queryHostRef"
+    QUERY_HOST_RUN = "queryHostRun"
+    RETURN_SUCCESS_OBSERVATION = "returnSuccessObservation"
+    RETURN_FAILED_HOLD = "returnFailedHold"
+    QUARANTINE = "quarantine"
+```
+
 - [ ] **Step 1: Write the exhaustive RED transition table**
 
-Tests cover every row:
+Tests first cover the complete `PayloadDispatchAuthorizationV1` operation.
+“Exact payload authorization” means the opaque signed record is persisted,
+authenticated, reopened, fresh for a new effect, and byte-matches the one
+authorization request and all payload/proposal/dispatch bindings. Expiry
+after an effect starts permits only query/reopen:
 
-| Proposal/evaluation state | Evidence/assembly state | Host object observation | Decision |
+| Payload authorization | Target payload objects | Proposal ref/receipt | Dispatch intent | Run ref | Decision |
+|---|---|---|---|---|---|
+| absent/pending, or expired before any effect | known absent | absent | absent | absent | `waitForPayloadAuthorization` |
+| persistence unknown or persisted but not reopened | no effect | absent | absent | absent | `queryPayloadAuthorization` |
+| exact and fresh | known absent, import count 0 | absent | absent | absent | `importPayloadObjects` |
+| same operation | import outcome unknown | absent | absent | absent | `queryPayloadObjects` |
+| exact and fresh | exact objects host-reopened | known absent, create count 0 | absent | absent | `createPayloadProposalRef` |
+| same operation | exact objects host-reopened | create outcome unknown | absent | absent | `queryPayloadProposalRef` |
+| exact and fresh | exact objects host-reopened | exact ref/receipt reopened | known absent, create count 0 | absent | `createPayloadDispatchIntent` |
+| same operation | exact objects host-reopened | exact ref/receipt reopened | persistence outcome unknown | absent | `queryPayloadDispatchIntent` |
+| exact and fresh | exact objects host-reopened | exact ref/receipt reopened | exact intent reopened | known absent, create count 0 | `createPayloadRunRef` |
+| same operation | exact objects host-reopened | exact ref/receipt reopened | exact intent reopened | create outcome unknown | `queryPayloadRunRef` |
+| same operation consumed by this exact completed chain | exact host-reopened | exact host-reopened | exact intent reopened | exact B0 run ref reopened | `issueEvaluationLease` |
+| any authorized payload host effect failed/cancelled | any | any | any | any | `returnPayloadHold` |
+| invalid/mismatched/cross-intent replay, receipt digest without fresh authorization, effect before authorization/reopen, or any effect count greater than one | any | any | any | any | `quarantine` |
+
+The payload authorization cannot be replaced by
+`PayloadProposalReceiptV1`, its digest, a host object that happens to exist,
+or a prior consumed authorization. Known-absent plus exact fresh reopened
+authorization is the only state that selects a create/import action; every
+unknown state selects its corresponding query.
+
+The evaluation and protected-advance rows are then exhaustive:
+
+| Payload/evaluation state | Assembly/advance authorization | Target Cw/Sw objects | Decision |
 |---|---|---|---|
 | exact pinned payload, no evaluation | absent | n/a | `issueEvaluationLease` |
 | same open evaluation | incomplete/no terminal results | n/a | `retrySameEvaluation` |
-| same open evaluation | exact complete passing outputs | absent | `assembleByteIdenticalObjects` |
-| same evaluation | exact assembly record | absent or unknown | `importOrReopenObjects` |
-| same evaluation | exact assembly/import receipt | exact Cw/Sw reopened | `createIntent` |
-| missing/mismatched proposal, lease, output allowlist, commit identity, receipt bytes, Cw/Sw topology, import receipt, or host object | any | any | `quarantine` |
+| same open evaluation | exact complete passing outputs, no assembly | absent | `assembleByteIdenticalObjects` |
+| same evaluation and exact assembly | absent/pending, or expired before effect | absent | `waitForAdvanceAuthorization` |
+| same assembly identity | authorization persistence unknown or not reopened | no target effect | `queryAdvanceAuthorization` |
+| exact assembly plus exact fresh reopened authorization | bound objects known absent, import count 0 | absent | `importAuthorizedObjects` |
+| same authorized assembly | target import outcome unknown | unknown | `queryHostObjects` |
+| same authorized assembly/import receipt | exact Cw/Sw host-reopened | exact bound import/intent/protection values | `createIntent` |
+| authorized import/intent/CAS effect failed with a known terminal outcome | any | any | `returnAdvanceHold` |
+| missing/mismatched lease, output allowlist, assembly, authorization request/record, object-set/import-key/intent-key/protection projection, receipt, Cw/Sw topology, host object, same-assembly identity, or any target-host effect count greater than one | any | any | `quarantine` |
 
 Only after the exact `objectsImported → createIntent` row does the post-intent table apply:
 
-| Ref | Host audit | Intent | Attestation | Observation | Decision |
+| Ref | Host audit | Intent | Advance authorization | Attestation | Decision |
 |---|---|---|---|---|---|
-| `prior` | `noCAS` | absent | absent | fresh | `createIntent` |
-| `prior` | `noCAS` | same open | absent | fresh | `retrySameIntent` |
-| `prior` | `noCAS` | same open | absent | expired | `createSupersedingIntent` |
-| `prior` | `unknown` | any | absent | any | `queryHostAudit` |
-| `Sw` | same-intent success | same open | absent | any | `finalizeByteIdenticalAttestation` |
-| `Sw` | same-intent success | same open | identical finalized | any | `returnExistingAttestation` |
-| `Sw` | same-intent success | same open | absent | any next-wave request | `blockNextWave` |
+| `prior` | `noCAS` | absent | exact fresh, intent count 0 | absent | `createIntent` |
+| `prior` | `noCAS` | same open | exact fresh, CAS count 0 | absent | `retrySameIntent` |
+| `prior` | `noCAS` | same open expired | no fresh replacement | absent | `waitForAdvanceAuthorization` |
+| `prior` | `noCAS` | same open expired | exact fresh replacement bound to same assembly and predecessor intent | absent | `createSupersedingIntent` |
+| `prior` | `unknown` | any | same operation, even if now expired | absent | `queryHostAudit` |
+| `Sw` | same-intent success | same open | same consumed operation | absent | `finalizeByteIdenticalAttestation` |
+| `Sw` | same-intent success | same open | same consumed operation | identical finalized | `returnExistingAttestation` |
+| `Sw` | same-intent success | same open | same consumed operation | any next-wave request | `blockNextWave` |
 | other | any | any | any | any | `quarantine` |
 | `Sw` | different transaction | any | any | any | `quarantine` |
-| `Sw` | same transaction | different lineage | any | any | `quarantine` |
-| `Sw` | same transaction | same intent | mismatched attestation | any | `quarantine` |
+| `Sw` | same transaction | different lineage/assembly/authorization | any | any | `quarantine` |
+| `Sw` | same transaction | same intent | any | mismatched attestation | `quarantine` |
 
-Also test evaluation retry after runner loss, partial result upload, assembly crash after Cw but before Sw, import timeout followed by exact host reopen, import receipt without objects, objects without the same assembly digest, competing successor CAS loss, repeated finalization, two superseders, changed repository/wave/prior/Sw/receipt/verifier bytes, stale live-policy observation, and an audit timeout.
+Also test evaluation retry after runner loss, partial result upload, assembly
+crash after Cw but before Sw, authorization-request crash/reopen, unknown
+authorization persistence, import timeout followed by exact host reopen,
+import receipt without authorization or objects, objects without the same
+assembly/authorization digest, competing successor CAS loss, repeated
+finalization, two superseders, changed repository/wave/prior/Sw/receipt/
+verifier bytes, stale live-policy observation, and an audit timeout.
+
+The focused admission-authorization classes contain:
+
+```python
+PAYLOAD_AUTHORIZATION_RECOVERY_TESTS = {
+    "test_payload_pending_waits_without_host_effect",
+    "test_payload_unknown_authorization_only_queries_service",
+    "test_payload_import_requires_fresh_reopened_authorization",
+    "test_payload_unknown_import_ref_intent_and_run_ref_only_query",
+    "test_payload_reopen_precedes_each_later_effect",
+    "test_payload_failure_consumes_authorization_and_terminates",
+    "test_payload_receipt_digest_cannot_replace_new_authorization",
+    "test_payload_digest_or_reopened_bool_without_typed_record_quarantines",
+    "test_payload_every_effect_count_is_at_most_one",
+}
+
+ADVANCE_AUTHORIZATION_RECOVERY_TESTS = {
+    "test_advance_request_precedes_authorization_and_target_import",
+    "test_advance_pending_waits_and_unknown_only_queries",
+    "test_advance_import_requires_exact_fresh_reopened_authorization",
+    "test_advance_unknown_import_only_queries_host",
+    "test_advance_reentry_preserves_same_assembly_and_binding_digests",
+    "test_advance_intent_and_cas_require_bound_authorization",
+    "test_advance_failure_consumes_authorization_and_terminates",
+    "test_advance_digest_or_reopened_bool_without_typed_record_quarantines",
+    "test_advance_crash_matrix_keeps_every_effect_at_most_one",
+}
+```
+
+Crash immediately before and after each payload/advance authorization
+request, authorization persistence/reopen, object import, host reopen,
+proposal-ref create, dispatch-intent persist, run-ref create, import receipt,
+intent, CAS, and attestation boundary. Mutation subtests independently change
+each request/authorization digest, freshness/expiry/consumed bit, payload or
+evidence object-set digest, proposal/import/intent key, live-protection
+projection, assembly identity, ref, receipt, or effect count. Every changed
+binding quarantines before a new effect. Separate fixtures set
+`*_authorization_reopened = true` and supply plausible digests/expanded
+fields while omitting the typed authorization, or supply a typed record with
+an invalid signature/role/nonce/expiry; all quarantine. Same-operation
+re-entry always returns the existing record or a query action.
+
+Add this separate governance-validation recovery table. “Exact
+authorization” means the signed record was reopened from the append-only
+service and its dispatch intent is the same durable operation. It must be
+unexpired before either new host effect. Once an authorized effect has
+started, later expiry cannot authorize replay and cannot suppress the
+query/reopen needed to resolve its outcome:
+
+| Authorization | Target-host objects | Validation ref | Host job | Decision |
+|---|---|---|---|---|
+| absent/pending, or expired before any effect | absent | absent | absent | `waitForAuthorization` |
+| persistence unknown or persisted but not reopened | no effect | absent | absent | `queryAuthorization` |
+| exact fresh and reopened | known absent | absent | absent | `importExactObjects` |
+| exact | import outcome unknown | absent | absent | `queryHostObjects` |
+| exact | exact reopened | known absent | absent | `createValidationRef` |
+| exact | exact reopened | create outcome unknown | absent | `queryHostRef` |
+| exact | exact reopened | exact reopened | absent/queued/in-progress/unknown | `queryHostRun` |
+| exact | exact reopened | exact reopened | exact success observation | `returnSuccessObservation` |
+| exact | exact reopened | exact reopened | failed/cancelled/timed-out | `returnFailedHold` |
+| invalid/mismatched/cross-intent replay, or any effect before authorization | any | any | any | `quarantine` |
+
+The focused class has exactly these methods:
+
+```python
+GOVERNANCE_VALIDATION_RECOVERY_TESTS = {
+    "test_authorization_waits_or_queries_before_target_host_import",
+    "test_unknown_import_queries_objects_without_reimport",
+    "test_unknown_ref_create_queries_ref_without_second_create",
+    "test_unknown_run_queries_same_dispatch_without_second_ref",
+    "test_exact_success_returns_one_observation_for_migration",
+    "test_failed_run_consumes_authorization_and_preserves_hold",
+    "test_governance_validation_mutation_matrix_quarantines",
+}
+```
+
+The mutation matrix changes each closed authorization/observation field,
+removes/adds/reorders/duplicates a preparation row, changes one row's
+mode/blob, substitutes the commit/tree/object-set, workflow path/blob, job,
+action pin, Python version, signed prefix/projection, validation ref, dispatch
+intent, GitHub App, head/run attempt, operator, expiry, nonce, or signature,
+and attempts authorization reuse, a second ref/run, implicit push, ref
+update/delete, or canonical/development/runner/proposal-ref mutation. Every
+case quarantines before a new host effect. A plausible authorization digest
+or `authorization_reopened = true` without the actual typed signed record
+also quarantines. The fake adapter counts object
+imports, ref creates, and provider runs and requires each to remain at most
+one across a crash after every durable boundary.
 
 Add one schema identity regression:
 
@@ -5442,6 +6308,7 @@ receipt and never invokes the device boundary again.
 - [ ] **Step 2: Run focused RED tests**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_admission_recovery_oracle
 ```
@@ -5457,10 +6324,72 @@ RED.
 class RecoveryObservation:
     canonical_ref_oid: str
     expected_prior_oid: str
+    payload_dispatch_authorization: PayloadDispatchAuthorizationV1 | None
+    payload_authorization_request_digest: str | None
+    payload_dispatch_authorization_digest: str | None
+    payload_authorization_status: Literal[
+        "absent", "pending", "unknown", "reopened", "expired",
+        "consumed", "failed", "invalid"
+    ]
+    payload_authorization_persisted: bool
+    payload_authorization_reopened: bool
+    payload_authorization_fresh: bool
+    payload_authorization_consumed: bool
+    payload_authorization_expires_at: str | None
+    payload_bound_predecessor_chain_digest: str | None
+    payload_bound_commit_oid: str | None
+    payload_bound_tree_oid: str | None
+    payload_bound_object_set_digest: str | None
+    payload_bound_proposal_ref: str | None
+    payload_bound_dispatch_intent_id: str | None
+    payload_bound_run_ref: str | None
+    payload_bound_active_verifier_digest: str | None
+    payload_host_import_state: Literal[
+        "absent", "unknown", "reopened", "failed", "mismatch"
+    ]
+    payload_proposal_ref_state: Literal[
+        "absent", "unknown", "reopened", "failed", "mismatch"
+    ]
+    payload_dispatch_intent_state: Literal[
+        "absent", "unknown", "reopened", "failed", "mismatch"
+    ]
+    payload_run_ref_state: Literal[
+        "absent", "unknown", "reopened", "failed", "mismatch"
+    ]
+    payload_object_import_effect_count: int
+    payload_proposal_ref_create_effect_count: int
+    payload_dispatch_intent_effect_count: int
+    payload_run_ref_create_effect_count: int
     payload_proposal: PayloadProposalReceiptV1 | None
     evaluation: EvaluationRecord | None
     gate_result_bundle: AuthenticatedGateResultBundle | None
     assembly: EvidenceAssemblyResult | None
+    protected_ref_advance_authorization: (
+        ProtectedRefAdvanceAuthorizationV1 | None
+    )
+    advance_authorization_request_digest: str | None
+    protected_ref_advance_authorization_digest: str | None
+    advance_authorization_status: Literal[
+        "absent", "pending", "unknown", "reopened", "expired",
+        "consumed", "failed", "invalid"
+    ]
+    advance_authorization_persisted: bool
+    advance_authorization_reopened: bool
+    advance_authorization_fresh: bool
+    advance_authorization_consumed: bool
+    advance_authorization_expires_at: str | None
+    advance_bound_assembly_digest: str | None
+    advance_bound_object_set_digest: str | None
+    advance_bound_import_key: str | None
+    advance_bound_intent_key: str | None
+    advance_bound_protection_projection_digest: str | None
+    advance_target_object_state: Literal[
+        "absent", "unknown", "reopened", "failed", "mismatch"
+    ]
+    advance_target_object_import_effect_count: int
+    admission_intent_create_effect_count: int
+    protected_ref_cas_effect_count: int
+    attestation_finalize_effect_count: int
     object_import_receipt: GitObjectImportReceipt | None
     host_object_observation: HostObjectObservation | None
     proposed_seal_oid: str | None
@@ -5482,9 +6411,115 @@ class RecoveryDecision:
     predecessor_intent_id: str | None
     diagnostic_id: str
 
+@dataclass(frozen=True)
+class GovernanceValidationRecoveryObservation:
+    authorization: GovernanceValidationAuthorizationV1 | None
+    authorization_request_digest: str | None
+    authorization_digest: str | None
+    authorization_status: Literal[
+        "absent", "pending", "unknown", "reopened", "expired",
+        "consumed", "failed", "invalid"
+    ]
+    authorization_persisted: bool
+    authorization_reopened: bool
+    authorization_fresh: bool
+    authorization_consumed: bool
+    authorization_expires_at: str | None
+    operation_dispatch_intent_id: str | None
+    decision_time: str
+    target_object_state: Literal["absent", "unknown", "reopened", "mismatch"]
+    target_object_set_digest: str | None
+    validation_ref_state: Literal["absent", "unknown", "reopened", "mismatch"]
+    validation_ref_oid: str | None
+    host_run_state: Literal[
+        "absent", "queued", "inProgress", "unknown", "succeeded",
+        "failed", "cancelled", "timedOut", "mismatch"
+    ]
+    run_observation: GovernanceValidationRunObservationV1 | None
+    object_import_effect_count: int
+    validation_ref_create_effect_count: int
+    provider_run_effect_count: int
+
+@dataclass(frozen=True)
+class GovernanceValidationRecoveryDecision:
+    state: GovernanceValidationState
+    action: GovernanceValidationAction
+    dispatch_intent_id: str | None
+    validation_ref: str | None
+    run_observation_digest: str | None
+    diagnostic_id: str
+
 ```
 
-Implement exactly `decide_recovery(observation: RecoveryObservation) -> RecoveryDecision` as a total, side-effect-free function over the closed enums and fields above.
+Implement exactly
+`decide_recovery(observation: RecoveryObservation) -> RecoveryDecision` as a
+total, side-effect-free function over the closed enums and fields above. It
+first validates that every Boolean/status combination is consistent, every
+effect count is a non-Boolean integer in `0...1`, and every reopened record
+byte-matches its request, authorization, predecessor, payload/assembly, and
+host observation. It never trusts an authorization digest, status, or Boolean
+alone: a create/import/CAS action requires the corresponding frozen typed
+`PayloadDispatchAuthorizationV1` or
+`ProtectedRefAdvanceAuthorizationV1` imported from the Task-1 protocol
+module. The oracle re-verifies its closed fields, signature, operator role,
+nonce uniqueness, and expiry, derives the authorization digest and all
+expanded binding projections from that typed record, and requires exact
+equality with the durable reopen observation. A digest-only, Boolean-only, or
+locally redeclared lookalike is `QUARANTINE`.
+
+For payload dispatch, absent/pending/expired-before-effect returns
+`WAIT_FOR_PAYLOAD_AUTHORIZATION`; an unknown persistence outcome or a
+persisted-but-not-reopened record returns `QUERY_PAYLOAD_AUTHORIZATION`.
+Only a fresh reopened `PayloadDispatchAuthorizationV1` with zero corresponding
+effect count can select payload import, proposal-ref create, dispatch-intent
+persist, or run-ref create, in that order. Each later action requires an exact
+durable reopen of the prior effect: target-host reopen for imported objects
+and the proposal ref, then append-only-service reopen for the dispatch intent,
+before run-ref creation. An unknown effect selects only its matching query.
+Failure marks the authorization consumed and returns
+`RETURN_PAYLOAD_HOLD`; consumed authorization plus the exact completed chain
+may return the existing proposal/dispatch, but can never create another
+effect. A receipt or receipt digest without the current authorization is
+`QUARANTINE`.
+
+For protected advance, deterministic non-host assembly first freezes
+`advance_authorization_request_digest` from the same assembly identity,
+object-set digest, import key, intent key, and live-protection projection.
+Absent/pending/expired-before-effect returns
+`WAIT_FOR_ADVANCE_AUTHORIZATION`; unknown or not-yet-reopened persistence
+returns `QUERY_ADVANCE_AUTHORIZATION`. Only the exact fresh reopened
+`ProtectedRefAdvanceAuthorizationV1` with zero target-import effect count can
+select `IMPORT_AUTHORIZED_OBJECTS`; unknown import selects only
+`QUERY_HOST_OBJECTS`. Intent and CAS actions require the same authorization,
+host-reopened objects, immutable import receipt, and exact bound keys/
+projection. A known failed effect consumes the authorization and returns
+`RETURN_ADVANCE_HOLD`. Expiry after a possibly completed effect never permits
+replay; it permits only query/reopen. Any re-entry with a different assembly,
+request, authorization, object set, import key, intent key, protection
+projection, or an effect count above one is `QUARANTINE`.
+
+Implement
+`decide_governance_validation_recovery(observation:
+GovernanceValidationRecoveryObservation) ->
+GovernanceValidationRecoveryDecision` as a second total, side-effect-free
+function over the table above. It validates every authorization binding and
+requires the actual typed authorization to derive
+`authorization_request_digest`, `authorization_digest`, expiry, and the
+signed dispatch intent before choosing a host action. Absent/pending or
+expired-before-effect selects `waitForAuthorization`; unknown persistence or
+a persisted-but-not-reopened record selects only `queryAuthorization`.
+`operation_dispatch_intent_id` must equal the signed intent.
+`importExactObjects` is legal only for authenticated known-absent objects, an
+unexpired reopened authorization, and zero prior import effect;
+`createValidationRef` is legal only after exact host reopen, while the
+authorization remains unexpired, and with zero prior ref/run effect.
+Expiration after either effect begins still permits only its matching query
+action. Every unknown state chooses its query action. No decision
+reissues an import, creates a second ref, requests a second run, updates or
+deletes a ref, or touches the canonical/development/runner/proposal refs.
+Success returns only the digest of the exact reopened
+`GovernanceValidationRunObservationV1`; failure returns the persistent hold
+and requires a fresh authorization for any later attempt.
 
 Freeze these supporting records in the same module; no caller supplies them:
 
@@ -5568,18 +6603,25 @@ class AttestationRecord:
 `assembleByteIdenticalObjects` is legal only for one complete passing
 result/evidence exact set under the signed output contract. Its Cw/Sw
 identity, receipt bytes, and timestamps come only from the immutable
-evaluation record. `createIntent` is legal only after the same assembled Cw/Sw
-have an immutable object-import receipt, a host-side reopen observation, and a
-policy observation satisfying
+evaluation record. It produces the immutable advance-authorization request
+but no target-host effect. `createIntent` is legal only after the same
+assembled Cw/Sw have a fresh reopened
+`ProtectedRefAdvanceAuthorizationV1`, an immutable same-authorization
+object-import receipt, a host-side reopen observation, and a policy
+observation satisfying
 `policy_observed_at <= decision_time < policy_valid_until` and
 `decision_time < intent_expires_at`. It freezes the attestation ID,
 attestation creation time, signing policy, and unsigned-field digest before
 CAS. `createSupersedingIntent` is legal only after authenticated `noCAS`, only
 when `decision_time >= intent_expires_at` or the policy observation is
-expired, and only when repository/wave/prior/Sw/receipt/verifier bytes are
-identical. It names the old intent as `predecessorIntentID` and never mutates
-it. After same-intent CAS success, deterministic signing over the frozen draft
-plus the audited CAS transaction makes retries byte-identical.
+expired, and only after a fresh reopened replacement
+`ProtectedRefAdvanceAuthorizationV1` binds the identical repository/wave/
+prior/assembly/object-set/import-key/protection bytes plus the superseding
+intent key and predecessor intent. It names the old intent as
+`predecessorIntentID` and never mutates it. The prior authorization or object
+import receipt cannot authorize that new intent. After same-intent CAS
+success, deterministic signing over the frozen draft plus the audited CAS
+transaction makes retries byte-identical.
 `pendingAdmission` never activates the next verifier/module or permits another
 wave.
 
@@ -5593,6 +6635,98 @@ replacement module or rerun an external effect.
 - [ ] **Step 4: Close all six schemas**
 
 Every schema uses `additionalProperties: false`, exact required fields, lowercase digests/OIDs, sorted unique arrays, and explicit state enums. The intent schema freezes:
+
+In `qinao-admission-service-state-v1.schema.json`, the existing closed
+`PayloadDispatchAuthorizationV1` and
+`ProtectedRefAdvanceAuthorizationV1` definitions use the exact field sets
+from the protocol section and have
+`additionalProperties: false` plus `required == properties.keys()`. The root
+adds immutable payload-authorization-request, payload authorization,
+payload-object-import, proposal-ref, proposal receipt, dispatch-intent,
+run-ref, advance-authorization-request, advance authorization, Cw/Sw import,
+intent, CAS, and attestation record digests/states/effect counts. Every
+authorization-request → authorization → effect record names the same
+operation identity; absent, pending, unknown, reopened, expired, consumed,
+failed, and invalid are distinct closed states. Each effect count is exactly
+zero or one and JSON Boolean is rejected as integer.
+
+The payload transition is exactly:
+
+```text
+payloadAuthorizationRequired -> payloadAuthorized
+payloadAuthorized -> payloadObjectImportUnknown | payloadObjectsReopened
+payloadObjectImportUnknown -> payloadObjectsReopened | payloadFailedHold | quarantined
+payloadObjectsReopened -> payloadProposalRefCreateUnknown | payloadProposalReopened
+payloadProposalRefCreateUnknown -> payloadProposalReopened | payloadFailedHold | quarantined
+payloadProposalReopened -> payloadDispatchIntentCreateUnknown | payloadDispatchIntentReopened
+payloadDispatchIntentCreateUnknown -> payloadDispatchIntentReopened | payloadFailedHold | quarantined
+payloadDispatchIntentReopened -> payloadRunRefCreateUnknown | payloadPinned
+payloadRunRefCreateUnknown -> payloadPinned | payloadFailedHold | quarantined
+payloadPinned -> evaluationOpen
+```
+
+After `assemblyReady`, the protected-advance transition is exactly:
+
+```text
+assemblyReady -> advanceAuthorizationRequired
+advanceAuthorizationRequired -> advanceAuthorized
+advanceAuthorized -> objectImportUnknown | objectsImported
+objectImportUnknown -> objectsImported | advanceFailedHold | quarantined
+objectsImported -> intentOpen
+intentOpen -> casOutcomeUnknown | pendingAdmission | advanceFailedHold | superseded
+casOutcomeUnknown -> pendingAdmission | advanceFailedHold | quarantined
+pendingAdmission -> finalized | advanceFailedHold | quarantined
+finalized -> immutable finalized
+```
+
+Missing/pending authorization produces a wait action without changing state;
+unknown authorization/import/ref/dispatch/CAS outcomes produce only their
+query action. No transition skips host reopen, goes backward to reissue an
+effect, or substitutes a proposal/import receipt for a fresh authorization.
+
+In `qinao-admission-service-state-v1.schema.json`, add closed `$defs` for
+`GovernancePreparationPathRow`,
+`GovernanceValidationAuthorizationV1`, and
+`GovernanceValidationRunObservationV1` with field sets exactly matching Task
+1; each definition has `additionalProperties: false` and
+`required == properties.keys()`. The authorization definition fixes the seven
+literal paths, mode `100644`, exact row cardinality, UTF-8 byte order and
+uniqueness, workflow/job/action/Python literals, signed
+`refs/heads/qinao-admission-runs/` prefix, validation-ref subprefix,
+lowercase full OIDs/digests, positive non-Boolean times/counts where
+applicable, and a domain-separated signature over the canonical object with
+only `signature` omitted. The run-observation
+definition fixes `conclusion = success`, positive non-Boolean GitHub App and
+run-attempt values, and byte equality to the authorization through its
+domain-separated digest.
+
+The service-state root retains the immutable governance-authorization request
+digest, authorization persistence/reopen/freshness/consumption status, the
+actual typed authorization and its derived digest, plus append-only
+identities/digests for exactly one target-host object-import observation,
+dispatch intent, create-once validation-ref observation, provider-run
+observation, and resulting required-check migration per operation. Absent is
+distinct from empty. Each later record names the prior record and the same
+dispatch intent; no field can encode a generic push, ref update/delete,
+canonical/default/runner/proposal-ref mutation, or a second use of one
+authorization.
+
+The exact governance-validation state transitions are:
+
+```text
+authorizationRequired -> authorizationPersistenceUnknown | authorized
+authorizationPersistenceUnknown -> authorized | quarantined
+authorized -> objectImportUnknown | objectsReopened
+objectImportUnknown -> objectsReopened | quarantined
+objectsReopened -> refCreateUnknown | refReopened
+refCreateUnknown -> refReopened | quarantined
+refReopened -> runOutcomeUnknown | runSucceeded | runFailedHold
+runOutcomeUnknown -> runSucceeded | runFailedHold | quarantined
+runSucceeded -> immutable success observation
+runFailedHold -> immutable failed hold
+```
+
+No transition goes backward or produces a second target-host effect.
 
 ```text
 intent_id
@@ -5682,16 +6816,19 @@ The bootstrap bundle manifest excludes the attestation and export envelope,
 so no object participates in a digest cycle.
 
 The service-state schema freezes append-only identities/digests for bootstrap
-object import/intent, payload proposal, evaluation dispatch/run ref,
+object import/intent, payload and advance authorization requests/records,
+payload proposal, evaluation dispatch/run ref,
 evaluation lease/result bundle, external physical request/private-custody
 receipt/privacy-clean projection, assembly record, object-import receipt,
-intent/supersession, CAS audit, and final attestation. A later phase references
-the exact prior record; it never overwrites it. No schema permits a
-caller-selected wave/ref/profile/verifier field or raw secret.
+intent/supersession, CAS audit, final attestation, governance validation, and
+required-check migration. A later phase references the exact prior record; it
+never overwrites it. No schema permits a caller-selected
+wave/ref/profile/verifier field or raw secret.
 
 - [ ] **Step 5: Run conformance and JSON checks**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_admission_recovery_oracle \
   scripts.test_qinao_admission_protocol_v1 \
@@ -5713,6 +6850,7 @@ Expected: all tests and schema parses pass.
 - [ ] **Step 6: Commit the external-service contract**
 
 ```bash
+set -euo pipefail
 git add docs/superpowers/specs/qinao-admission-evaluation-lease-v1.schema.json \
   docs/superpowers/specs/qinao-admission-intent-v1.schema.json \
   docs/superpowers/specs/qinao-admission-attestation-v1.schema.json \
@@ -5791,6 +6929,7 @@ Reject extra/missing path, path mode mismatch, symlink/special file, source-tree
 - [ ] **Step 2: Run focused RED tests**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_build_qinao_bootstrap_lineage
 ```
@@ -5967,10 +7106,42 @@ authority draft and external export paths are absent from B0
 ```
 
 The builder writes proposal JSON only to an explicit output path and refuses a path under the repository root.
+For the one production proposal path, it also owns the complete parent
+contract. `/private/tmp/qinao-bootstrap-ceremony-v1` is opened/created with
+`O_DIRECTORY|O_NOFOLLOW`, owner equal to the current effective UID, and mode
+exactly `0700`; an existing symlink, foreign owner, broader mode, or
+non-directory fails. The final proposal name is never an `O_CREAT`, rename,
+truncate, or replace target. The builder derives the deterministic
+same-operation basename `.qinao-install-<64-lowercase-hex>.tmp` with
+domain-separated SHA-256 over final basename, canonical proposal SHA-256, and
+fixed intent `b0-proposal`; any temp outside that closed regex is invalid. It
+creates that same-directory temporary with
+`openat(O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW, 0600)`, `fchmod`s its open
+descriptor to exact `0600`, writes and byte-count checks the complete
+canonical JSON, file-`fsync`s, then installs the final name only with
+same-directory `linkat(..., flags=0)`. It directory-`fsync`s the new link,
+unlinks only the verified same-operation temp, and directory-`fsync`s again.
+
+An existing-final error or lost reply reopens the final with `O_NOFOLLOW` and
+requires effective-UID ownership, regular type, exact mode `0600`, canonical
+byte identity, and link count one. A crash after `linkat` but before temp
+unlink may be recovered only when the operation-specific temp exists and
+provably names the same inode; remove that temp, directory-`fsync`, and then
+require final link count one. Exact byte-identical final is the sole retry
+success; a stale temp for another final/value/intent fails and remains
+byte-for-byte present. A divergent or suspicious final/temp is never
+unlinked, truncated, renamed over, or overwritten. Disposable tests cover
+absent parent, safe
+creation under restrictive umask, parent/leaf symlink, foreign-owner fixture
+where supported, broad mode, crash before/after temp `fsync`, `linkat`, each
+directory `fsync`, and temp unlink, byte-identical-final lost reply,
+same-inode temp cleanup, unexpected hard link, divergent-final survival, and
+stale-other-intent-temp failure without deletion.
 
 - [ ] **Step 5: Run tests and commit the builder**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_build_qinao_bootstrap_lineage \
   scripts.test_qinao_gate_catalog_v0 \
@@ -5988,6 +7159,11 @@ Expected: all tests pass; exactly three files committed.
 - [ ] **Step 6: Generate and inspect the real proposal without moving refs**
 
 ```bash
+set -euo pipefail
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py \
+  --root . \
+  --expect-candidate-lineage prebootstrapPreparation \
+  --require-clean
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --proposal-only \
   --git-dir "$(git rev-parse --absolute-git-dir)" \
@@ -6008,8 +7184,8 @@ current branch, index, worktree, and all refs remain byte-identical.
 ### Task 7A: Freeze Authority-Finalization Verification and Atomic Reparenting Before Hold C
 
 **Files:**
-- Verify without modifying: `scripts/build_qinao_bootstrap_lineage.py`
-- Verify without modifying: `scripts/test_build_qinao_bootstrap_lineage.py`
+- Modify: `scripts/build_qinao_bootstrap_lineage.py`
+- Modify: `scripts/test_build_qinao_bootstrap_lineage.py`
 - Consume without modifying: `scripts/qinao_execution_root.py`
 
 **Interfaces:**
@@ -6043,6 +7219,10 @@ def test_ref_transaction_is_create_once_and_all_or_nothing(self) -> None:
             git_dir=fixture.git_dir,
             plan=plan,
             root_contract=fixture.root_contract,
+            authority_finalization_path=fixture.authority_finalization_path,
+            signed_projection_path=fixture.signed_projection_path,
+            governance_migration_path=fixture.governance_migration_path,
+            b0_proposal_path=fixture.b0_proposal_path,
         )
     self.assertFalse(fixture.ref_exists(ORIGINAL_FORENSIC_REF))
     self.assertFalse(fixture.ref_exists(plan.preparation_forensic_ref))
@@ -6062,6 +7242,10 @@ def test_partial_or_divergent_state_is_quarantined(self) -> None:
             git_dir=fixture.git_dir,
             plan=plan,
             root_contract=fixture.root_contract,
+            authority_finalization_path=fixture.authority_finalization_path,
+            signed_projection_path=fixture.signed_projection_path,
+            governance_migration_path=fixture.governance_migration_path,
+            b0_proposal_path=fixture.b0_proposal_path,
         )
 ```
 
@@ -6087,6 +7271,11 @@ class RefTransactionPlan:
     bootstrap_oid: str
     preparation_tree_oid: str
     payload_commit_identity: CommitIdentity
+    authority_finalization_sha256: str
+    signed_projection_sha256: str
+    b0_proposal_sha256: str
+    governance_required_checks_migration_sha256: str
+    expected_wave_admission_projection_sha256: str
 
 class LineageDisposition(Enum):
     READY_TO_APPLY = "readyToApply"
@@ -6107,11 +7296,14 @@ PW_COMMIT_IDENTITY = CommitIdentity(
 Implement exactly:
 
 ```text
-verify_authority_finalization(*, handoff_path: Path, signed_projection_path: Path) -> AuthorityFinalization
+write_authority_finalization(*, candidate_root: Path, output_path: Path, signed_projection_path: Path, governance_migration_path: Path) -> AuthorityFinalization
+verify_authority_finalization(*, handoff_path: Path, signed_projection_path: Path, governance_migration_path: Path) -> AuthorityFinalization
 build_reparented_payload(*, git_dir: Path, preparation_tip_oid: str, bootstrap_oid: str) -> str
-plan_lineage_transaction(*, candidate_ref: str, expected_old_tip: str, new_payload_oid: str, original_forensic_ref: str, original_tip_oid: str, preparation_forensic_prefix: str) -> RefTransactionPlan
+plan_lineage_transaction(*, git_dir: Path, authority_finalization_path: Path, signed_projection_path: Path, governance_migration_path: Path, b0_proposal_path: Path, candidate_ref: str, expected_old_tip: str, new_payload_oid: str, original_forensic_ref: str, original_tip_oid: str, preparation_forensic_prefix: str) -> RefTransactionPlan
 inspect_lineage_state(*, git_dir: Path, plan: RefTransactionPlan) -> LineageDisposition
-apply_lineage_transaction(*, git_dir: Path, plan: RefTransactionPlan, root_contract: RootContract) -> None
+apply_lineage_transaction(*, git_dir: Path, plan: RefTransactionPlan, root_contract: RootContract, authority_finalization_path: Path, signed_projection_path: Path, governance_migration_path: Path, b0_proposal_path: Path) -> None
+verify_governance_required_checks_migration(*, migration_path: Path, signed_projection_path: Path) -> GovernanceRequiredChecksMigrationV1
+write_final_verification(*, output_path: Path, authority_finalization_path: Path, signed_projection_path: Path, governance_migration_path: Path, b0_proposal_path: Path, lineage_plan_path: Path, bootstrap_export_path: Path) -> FinalVerificationV1
 ```
 
 `build_reparented_payload` uses exact preparation tree, B0 as sole parent, and
@@ -6120,6 +7312,40 @@ different clock/locale/timezone/Git config must yield one OID.
 `verify_authority_finalization` checks commit/tree, final Owner Ledger,
 byte-matched signed projection, 7+4/catalog digests, ancestry, and absence of
 raw exports/self-claiming evidence.
+`write_authority_finalization` derives the current clean candidate
+commit/tree and every digest itself after the permanent Root Guard; it accepts
+no caller OID/digest. It first verifies the signed
+`GovernanceRequiredChecksMigrationV1`, proves its admission-protection digest
+equals the signed projection, and emits exactly:
+
+```text
+schema_version
+preparation_tip_oid
+preparation_tree_oid
+wave_admission_projection_sha256
+owner_ledger_sha256
+authority_bundle_digest
+controlled_contract_catalog_digest
+governance_required_checks_migration_digest
+admission_protection_projection_sha256
+```
+
+`FinalVerificationV1` has exactly
+`schema_version,status,b0_commit_oid,b0_tree_oid,preparation_tip_oid,
+preparation_tree_oid,payload_commit_oid,payload_tree_oid,
+authority_finalization_sha256,signed_projection_sha256,
+governance_required_checks_migration_sha256,
+bootstrap_export_envelope_sha256,lineage_plan_sha256`, with
+`status = bootstrap_ready_for_prew0_gate_evaluation`.
+
+Every plan/verify/apply/recovery mode reopens all four fixed artifacts,
+recomputes their canonical SHA-256 values, proves the signed projection digest
+and governance-migration digest inside authority finalization, re-verifies the
+migration service signature and unchanged protection projection, and compares
+them to the five immutable plan
+fields before inspecting or moving a ref. Mutation, replacement, symlink,
+wrong mode, or disappearance between dry-run and apply quarantines without a
+partial transaction.
 
 The ref transaction bytes are exactly:
 
@@ -6138,9 +7364,31 @@ Both forensic refs must be direct refs. The only updated ref is
 `refs/heads/codex/qinao-w1-clean-candidate`; canonical, runner, run, proposal,
 tag, symbolic, index, and worktree state is out of scope and rejected.
 
+The CLI parser is frozen in this task. It has one mutually exclusive mode
+from `--proposal-only`, `--verify-proposal`,
+`--write-authority-finalization`, `--verify-authority-finalization`,
+`--verify-required-checks-migration`, `--plan-payload-lineage`,
+`--verify-lineage-plan`, `--apply-lineage-plan`,
+`--verify-applied-lineage`, or `--write-final-verification`. Each mode accepts
+only the fixed inputs shown in Tasks 7-11, rejects irrelevant/duplicate
+arguments, refuses repository-contained output artifacts, and emits one
+closed status line. Every external JSON output uses the same secure
+mode-`0700` parent/mode-`0600` leaf, canonical byte, atomic install,
+file/directory `fsync`, byte-identical reopen, and divergent-reopen refusal
+contract frozen in Task 7.
+
+Add parser/contract tests for every mode, missing/extra/cross-mode arguments,
+each exact output field set, artifact mutation between plan/verify/apply,
+authority-finalization writer derivation (no caller digest), governance
+migration signature/projection mismatch, symlink/mode substitution, and
+final-summary idempotent/divergent reopen. These are subtests under the
+existing lineage-builder test methods; do not hide them behind a zero-match
+selector.
+
 - [ ] **Step 3: Run GREEN and commit before ceremony**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_build_qinao_bootstrap_lineage
 git add scripts/build_qinao_bootstrap_lineage.py \
@@ -6149,7 +7397,12 @@ test "$(git diff --cached --name-only)" = "$(printf '%s\n' \
   scripts/build_qinao_bootstrap_lineage.py \
   scripts/test_build_qinao_bootstrap_lineage.py)"
 git commit -m "feat(qinao): freeze atomic prew0 lineage transaction"
-test -z "$(git status --porcelain=v1)"
+set +e
+STATUS_BYTES="$(git status --porcelain=v1)"
+STATUS_RC="$?"
+set -euo pipefail
+test "$STATUS_RC" -eq 0
+test -z "$STATUS_BYTES"
 ```
 
 Expected: all tests pass and exactly two paths commit. Task 8 may now begin;
@@ -6224,6 +7477,7 @@ def test_bootstrap_export_v1_has_exact_closed_fields(self) -> None:
 - [ ] **Step 2: Run focused RED tests**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_bootstrap_ceremony
 ```
@@ -6268,10 +7522,45 @@ class BootstrapExportV1:
 
 Implement exactly
 `build_ceremony_request(authority_draft_path: Path, b0_proposal_path: Path) ->
-CeremonyRequest`; the two paths are fixed candidate-index paths selected by
-the caller only after the execution-root guard succeeds.
+CeremonyRequest`. `authority_draft_path` must equal the one literal indexed
+path
+`docs/superpowers/evidence/qinao-authority-convergence-draft-v1.json` and is
+reopened from the candidate index after the execution-root guard.
+`b0_proposal_path` must equal the one fixed external path
+`/private/tmp/qinao-bootstrap-ceremony-v1/b0-proposal-v1.json`; it is never a
+repository or candidate-index path. Neither argument is a free-form selector.
 
 The generator reopens Input A from the candidate index, requires exact 7+4 cardinality/digests, re-verifies B0, and writes canonical bytes only to `/private/tmp/qinao-bootstrap-ceremony-v1/ceremony-request-v1.json`. Provider endpoint, OIDC issuer/subject/audience, service signing identity, branch-protection digest, evidence-storage profile, and operator approvals are added only by the authenticated external ceremony, never by candidate CLI values.
+It reuses Task 7's exact code-owned mode-`0700` parent and mode-`0600`
+atomic-leaf contract; it never assumes the parent exists and never creates it
+through a shell command or permissive default umask.
+
+The only CLI is:
+
+```bash
+set -euo pipefail
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  scripts/prepare_qinao_bootstrap_ceremony.py \
+  --authority-draft \
+  docs/superpowers/evidence/qinao-authority-convergence-draft-v1.json \
+  --b0-proposal \
+  /private/tmp/qinao-bootstrap-ceremony-v1/b0-proposal-v1.json
+```
+
+It accepts no output path, root, repository, B0 OID, profile, service, or
+operator argument. It obtains the candidate root from the permanent guard,
+reopens Input A from the index, and opens the B0 proposal by its exact fixed
+external path with `O_NOFOLLOW`. The request is installed atomically at the
+code-owned output path with file and directory `fsync`. An absent output is
+created; an existing byte-identical regular mode-`0600` output is an
+idempotent reopen; a symlink, other mode, noncanonical value, or differing
+byte is `CEREMONY_UNAVAILABLE` and is never overwritten.
+
+The existing ceremony substitution test methods gain subtests for a wrong
+authority path, worktree-vs-index substitution, a B0 proposal under the
+repository, a second external proposal path, an output-path flag, symlinked
+input/output, an existing different output, and byte-identical crash re-entry.
+No new test-method cardinality is introduced.
 
 - [ ] **Step 4: Import B0 objects, then run one recoverable two-operator ceremony**
 
@@ -6286,8 +7575,8 @@ tree, exact bootstrap-path/mode/blob set and object closure from the approved
 base, imports only the missing objects, reopens every object from the target
 repository, and returns signed `BootstrapObjectImportReceiptV1`. Missing
 authorization/object, a thin/extra pack, local-only OID, wrong parent/path, or
-failed host reopen stops `BLOCKED_EXTERNAL_BOOTSTRAP` before approvals or
-refs.
+failed host reopen stops `BLOCKED_EXTERNAL_BOOTSTRAP` with reason code
+`CEREMONY_UNAVAILABLE` before approvals or refs.
 
 Operator 1 and Operator 2 independently authenticate and review the exact same
 request, B0 import receipt, Input A, all 19 programs/corpora, runner/workflow,
@@ -6345,6 +7634,7 @@ verification.
 `verify_qinao_bootstrap_export.py` has one allowed command:
 
 ```bash
+set -euo pipefail
 python3 scripts/verify_qinao_bootstrap_export.py \
   --request /private/tmp/qinao-bootstrap-ceremony-v1/ceremony-request-v1.json \
   --export-directory /private/tmp/qinao-bootstrap-ceremony-v1/export
@@ -6373,6 +7663,7 @@ no secret/private key/access token/raw device identity appears
 - [ ] **Step 6: Run ceremony tests and commit tooling**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_bootstrap_ceremony \
   scripts.test_build_qinao_bootstrap_lineage \
@@ -6387,7 +7678,19 @@ Expected: all local conformance tests pass; exactly three files committed.
 
 - [ ] **Step 7: Execute the ceremony checkpoint**
 
-Run request generation and verification exactly as above. Expected
+Run the exact request command from Step 3, then:
+
+```bash
+set -euo pipefail
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  scripts/verify_qinao_bootstrap_export.py \
+  --request \
+  /private/tmp/qinao-bootstrap-ceremony-v1/ceremony-request-v1.json \
+  --export-directory \
+  /private/tmp/qinao-bootstrap-ceremony-v1/export
+```
+
+Expected
 verification output:
 
 ```text
@@ -6421,6 +7724,7 @@ continue to Task 9 or Task 10.
 - [ ] **Step 1: Record the exact external output digests**
 
 ```bash
+set -euo pipefail
 shasum -a 256 \
   /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json \
   /private/tmp/qinao-bootstrap-ceremony-v1/export/bootstrap-attestation-v1.json \
@@ -6441,11 +7745,14 @@ Task 7A already committed the mode. Do not edit or commit any repository byte;
 run:
 
 ```bash
+set -euo pipefail
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-authority-finalization \
   /private/tmp/qinao-bootstrap-ceremony-v1/authority-finalization-v1.json \
   --signed-projection \
-  /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json
+  /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json \
+  --governance-migration \
+  /private/tmp/qinao-bootstrap-ceremony-v1/required-checks-migration-v1.json
 ```
 
 It proves the preparation tip exists, its tree matches the handoff, its Owner Ledger byte-matches the signed projection, the 7+4 digests are final, the tree descends from baseline `486e1ec5983ad4390c5b07f04607f1345b912c4c`, and no draft handoff or external raw export is included as authoritative Cw/Sw evidence.
@@ -6455,17 +7762,22 @@ Expected: `verified authority finalization: tree stable, wave_admission_v1 byte-
 - [ ] **Step 4: Double-read the preparation tree before lineage**
 
 ```bash
+set -euo pipefail
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-authority-finalization \
   /private/tmp/qinao-bootstrap-ceremony-v1/authority-finalization-v1.json \
   --signed-projection \
-  /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json
+  /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json \
+  --governance-migration \
+  /private/tmp/qinao-bootstrap-ceremony-v1/required-checks-migration-v1.json
 sleep 1
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --verify-authority-finalization \
   /private/tmp/qinao-bootstrap-ceremony-v1/authority-finalization-v1.json \
   --signed-projection \
-  /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json
+  /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json \
+  --governance-migration \
+  /private/tmp/qinao-bootstrap-ceremony-v1/required-checks-migration-v1.json
 ```
 
 Expected: both runs report identical preparation commit/tree and projection digest. Any drift returns to Hold C.
@@ -6492,9 +7804,15 @@ Expected: both runs report identical preparation commit/tree and projection dige
 - [ ] **Step 1: Re-run the frozen transaction suite without editing**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_build_qinao_bootstrap_lineage
-test -z "$(git status --porcelain=v1)"
+set +e
+STATUS_BYTES="$(git status --porcelain=v1)"
+STATUS_RC="$?"
+set -euo pipefail
+test "$STATUS_RC" -eq 0
+test -z "$STATUS_BYTES"
 ```
 
 Expected: Task 7A tests remain green and the final authority preparation tree is unchanged. Any source diff or new commit invalidates Hold C.
@@ -6502,6 +7820,7 @@ Expected: Task 7A tests remain green and the final authority preparation tree is
 - [ ] **Step 2: Produce a dry-run transaction plan**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py \
   --root /Users/changgeng/.codex/worktrees/e4d7/Project06 \
   --expect-candidate-lineage prebootstrapPreparation \
@@ -6509,6 +7828,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py \
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --plan-payload-lineage \
   --authority-finalization /private/tmp/qinao-bootstrap-ceremony-v1/authority-finalization-v1.json \
+  --signed-projection /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json \
+  --governance-migration /private/tmp/qinao-bootstrap-ceremony-v1/required-checks-migration-v1.json \
   --b0-proposal /private/tmp/qinao-bootstrap-ceremony-v1/b0-proposal-v1.json \
   --candidate-ref refs/heads/codex/qinao-w1-clean-candidate \
   --original-forensic-ref refs/qinao-forensics/clean-candidate-22-commit-tip-20260723 \
@@ -6516,7 +7837,11 @@ python3 scripts/build_qinao_bootstrap_lineage.py \
   --preparation-forensic-prefix refs/qinao-forensics/prew0-preparation \
   --output /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json
 python3 scripts/build_qinao_bootstrap_lineage.py \
-  --verify-lineage-plan /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json
+  --verify-lineage-plan /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json \
+  --authority-finalization /private/tmp/qinao-bootstrap-ceremony-v1/authority-finalization-v1.json \
+  --signed-projection /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json \
+  --governance-migration /private/tmp/qinao-bootstrap-ceremony-v1/required-checks-migration-v1.json \
+  --b0-proposal /private/tmp/qinao-bootstrap-ceremony-v1/b0-proposal-v1.json
 ```
 
 Expected:
@@ -6536,8 +7861,13 @@ verified lineage plan:
 Run only after the dry-run output and both operator artifacts remain current:
 
 ```bash
+set -euo pipefail
 python3 scripts/build_qinao_bootstrap_lineage.py \
-  --apply-lineage-plan /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json
+  --apply-lineage-plan /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json \
+  --authority-finalization /private/tmp/qinao-bootstrap-ceremony-v1/authority-finalization-v1.json \
+  --signed-projection /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json \
+  --governance-migration /private/tmp/qinao-bootstrap-ceremony-v1/required-checks-migration-v1.json \
+  --b0-proposal /private/tmp/qinao-bootstrap-ceremony-v1/b0-proposal-v1.json
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py \
   --root /Users/changgeng/.codex/worktrees/e4d7/Project06 \
   --expect-candidate-lineage reparentedProgram \
@@ -6549,6 +7879,7 @@ Expected: `lineage transaction committed atomically`, followed by a canonical Ro
 - [ ] **Step 4: Verify the post-transaction invariants**
 
 ```bash
+set -euo pipefail
 PREP_OID="$(python3 -c 'import json; print(json.load(open("/private/tmp/qinao-bootstrap-ceremony-v1/authority-finalization-v1.json"))["preparation_tip_oid"])')"
 PW_OID="$(git rev-parse refs/heads/codex/qinao-w1-clean-candidate)"
 B0_OID="$(python3 -c 'import json; print(json.load(open("/private/tmp/qinao-bootstrap-ceremony-v1/b0-proposal-v1.json"))["bootstrap_commit_oid"])')"
@@ -6582,6 +7913,7 @@ Expected: every local `test` exits 0, and authenticated external verification st
 - [ ] **Step 1: Run all Python suites with non-zero discovery**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_admission_protocol_v1 \
   scripts.test_qinao_import_review_v1 \
@@ -6598,14 +7930,17 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
 Expected: every named module reports discovered tests and the aggregate exits
 0. The graph assertions report exactly 19 gates, 152 cells, nine mapped rows,
 eight catalog tests, eight exact-OID tests, three runner-selection tests,
-four recovery tests, four B0-minimality tests, 126 outer corpus executions,
-and 110 nested graph-case executions. `w0_open_set` reports exactly 16 safety
-IDs, 13 suites, ten ordered graph-freeze rows, and a matching canonical
-digest. There is no gate 20.
+four graph-recovery tests, nine payload-authorization recovery tests, nine
+advance-authorization recovery tests, seven governance-validation recovery
+tests, four B0-minimality tests, 126 outer corpus executions, and 110 nested
+graph-case executions. `w0_open_set` reports exactly 16 safety IDs, 13 suites,
+ten ordered graph-freeze rows, and a matching canonical digest. There is no
+gate 20.
 
 - [ ] **Step 2: Re-run baseline Owner-Ledger tests without absorbing its dirty change**
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_owner_ledger
 ```
@@ -6615,6 +7950,7 @@ Expected: all tests pass after the authority plan's separate owner-ledger repair
 - [ ] **Step 3: Validate every JSON and workflow guard**
 
 ```bash
+set -euo pipefail
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -6667,6 +8003,7 @@ Expected: all JSON parses and workflow assertions pass.
 - [ ] **Step 4: Re-verify B0, external export, and lineage**
 
 ```bash
+set -euo pipefail
 python3 scripts/build_qinao_gate_catalog_v0.py \
   --verify-projection scripts/qinao_gate_modules/v0/program-spec-v1.json
 python3 scripts/build_qinao_bootstrap_lineage.py \
@@ -6675,7 +8012,11 @@ python3 scripts/verify_qinao_bootstrap_export.py \
   --request /private/tmp/qinao-bootstrap-ceremony-v1/ceremony-request-v1.json \
   --export-directory /private/tmp/qinao-bootstrap-ceremony-v1/export
 python3 scripts/build_qinao_bootstrap_lineage.py \
-  --verify-applied-lineage /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json
+  --verify-applied-lineage /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json \
+  --authority-finalization /private/tmp/qinao-bootstrap-ceremony-v1/authority-finalization-v1.json \
+  --signed-projection /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json \
+  --governance-migration /private/tmp/qinao-bootstrap-ceremony-v1/required-checks-migration-v1.json \
+  --b0-proposal /private/tmp/qinao-bootstrap-ceremony-v1/b0-proposal-v1.json
 ```
 
 Expected: all four commands exit 0 and report the same B0/Pw identities.
@@ -6709,6 +8050,7 @@ add gate 20 or matrix cell 153
 Command:
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_protected_admission_runner \
   scripts.test_qinao_external_physical_gate_v0 \
@@ -6721,9 +8063,13 @@ Expected: all mutation cases are discovered and rejected.
 - [ ] **Step 6: Emit the local handoff summary outside Git**
 
 ```bash
+set -euo pipefail
 python3 scripts/build_qinao_bootstrap_lineage.py \
   --write-final-verification \
   /private/tmp/qinao-bootstrap-ceremony-v1/final-verification-v1.json \
+  --authority-finalization /private/tmp/qinao-bootstrap-ceremony-v1/authority-finalization-v1.json \
+  --signed-projection /private/tmp/qinao-bootstrap-ceremony-v1/export/wave-admission-v1.json \
+  --governance-migration /private/tmp/qinao-bootstrap-ceremony-v1/required-checks-migration-v1.json \
   --b0-proposal /private/tmp/qinao-bootstrap-ceremony-v1/b0-proposal-v1.json \
   --lineage-plan /private/tmp/qinao-bootstrap-ceremony-v1/prew0-lineage-plan-v1.json \
   --bootstrap-export /private/tmp/qinao-bootstrap-ceremony-v1/export/export-envelope-v1.json
@@ -6748,10 +8094,10 @@ This plan is complete when all of the following are true:
 6. two independent operators have established and attested the canonical and runner refs at B0;
 7. verifier V0 proves candidate/worktree/import/network isolation over exact payload OIDs;
 8. the protected workflow can authenticate by OIDC but cannot write refs or select wave/ref/profile/verifier/module;
-9. the external service passes the complete payload-proposal/evaluation/evidence-assembly/object-import/intent/CAS/attestation crash-recovery conformance matrix;
+9. the external service passes the complete payload-proposal/evaluation/non-host-assembly/advance-authorization/authorized-object-import/intent/CAS/attestation crash-recovery conformance matrix;
 10. the authority plan byte-matches final `wave_admission_v1` and freezes one final preparation tree;
 11. the local atomic transaction produces a `Pw` with that exact tree and sole parent B0; and
-12. active B0 modules can emit the exact `Pw`-bound gate/evidence bundle, and service conformance proves deterministic evidence-only `Cw` plus one-receipt `Sw` assembly without a prebuilt seal.
+12. active B0 modules can emit the exact `Pw`-bound gate/evidence bundle, and service conformance proves the same-identity sequence of deterministic non-host evidence-only `Cw` plus one-receipt `Sw` closure/request, fresh reopened advance authorization, authorized host import/reopen and receipt, then intent/CAS/finalization without a prebuilt seal.
 
 Not completed here:
 
@@ -6783,8 +8129,8 @@ locally fabricated substitute.
   coupled ProgramSpec/projection/digest mutations.
 - [x] `build_evidence_storage_profile` appears only in the signed projection/Owner-Ledger handoff, never in B0 catalog or blocked candidate projection.
 - [x] Protected runner and external service responsibilities are non-overlapping and testable.
-- [x] Crash recovery covers payload pinning, lost evaluation, partial upload, deterministic assembly, unknown object import, unknown CAS, expired observations, supersession, pending attestation, idempotent finalization, competing successors, and quarantine.
-- [x] Same-payload pin, same-lease gate recovery, same-intent finalization, physical-effect at-most-once, and the three-branch consumer re-entry contract are explicit and tested.
+- [x] Crash recovery covers payload authorization and import plus the distinct deterministic non-host Cw/Sw closure/request → pending/unknown/persisted/reopened/fresh/expired/consumed advance authorization → same-identity authorized target-host import/reopen and receipt → intent/CAS/finalization sequence, together with proposal-ref, dispatch-intent, run-ref, lost evaluation, partial upload, supersession, pending attestation, idempotent finalization, competing successors, and quarantine.
+- [x] Same-payload pin, same-lease gate recovery, same-assembly advance authorization, same-intent finalization, every host/service effect at-most-once, receipt-not-authorization rejection, and the three-branch consumer re-entry contract are explicit and tested.
 - [x] Non-admitted outcomes use closed `AdmissionTerminalError`; exact W0/Artifact reason registries have no arbitrary detail channel.
 - [x] Preparation-only ImportReviewV1 binds
   repository/base/inventory/candidate state, the exact batch row set, two
@@ -6792,6 +8138,6 @@ locally fabricated substitute.
   C2, and later C3 remain distinct append-only records.
 - [x] No caller-selected wave/ref/profile/verifier/module is accepted by authoritative paths.
 - [x] Input A, Output B, Hold C, and Output D are exact cross-plan interfaces.
-- [x] C0 internals, authority content edits, W0/K4, and Artifact Mesh remain outside this plan; domain plans own output semantics/producers/schemas, while Bootstrap alone freezes Cw/Sw admission-transport paths, modes, caps, unions, and assembly/import mechanism.
+- [x] C0 internals, authority content edits, W0/K4, and Artifact Mesh remain outside this plan; domain plans own output semantics/producers/schemas, while Bootstrap alone freezes Cw/Sw admission-transport paths, modes, caps, unions, and the two-pass non-host-closure/authorization/authorized-import mechanism.
 - [x] Commands use exact paths and expected terminals; code steps include concrete signatures or complete closed data shapes.
 - [x] No step stages or commits the pre-existing dirty Owner-Ledger checker change.

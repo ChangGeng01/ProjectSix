@@ -4,15 +4,18 @@
 
 **Goal:** Repair the incumbent `artifact.mesh` implementation, prove its owner-private SQLite/Keychain durability and physical crash recovery, and expose one production assembly seam without creating a new owner, expanding its historical M/Create evidence, or claiming W1 admission from candidate-local work.
 
-**Architecture:** The incumbent three M paths remain the only Artifact Mesh creation paths. One internal anchor port/record, one Keychain adapter, one Qinao mechanism factory, and one host call seam are the exact four W1 E/A slices; a separately installable iOS lab app and predecessor-derived verification tools exercise the production mechanism without entering the shipping graph. Work is deliberately split into Task-0 candidate-local code/preflight and a later final-W1-`Pw` physical proof. After the first candidate tree passes completely, Task 10 alone proposes the indexed `artifact.mesh / converging → implemented` owner-row transition and reruns the full Phase-A gates over that new tree; only its post-transition handoff unlocks later W1 compilation. The second phase runs only through the bootstrap-owned `ProtectedAdmissionClient` and its external physical-gate broker, revalidates the already-indexed proposal, and makes it authoritative only through W1 admission. Artifact Mesh emits no candidate admission leaf and owns no proposal, lease, custody, runner, evidence-assembly, import, ref, or finalization authority.
+**Architecture:** The incumbent three M paths remain the only Artifact Mesh creation paths. One internal anchor port/record, one Keychain adapter, one Qinao mechanism factory, and one host call seam are the exact four W1 E/A slices; a separately installable iOS lab app and predecessor-derived verification tools exercise the production mechanism without entering the shipping graph. Work is deliberately split into Task-0 candidate-local code/preflight and a later final-W1-`Pw` physical proof. After the first candidate tree passes completely, Task 10 alone proposes the indexed `artifact.mesh / converging → implemented` owner-row transition and reruns the full Phase-A gates over that new tree; only its post-transition handoff unlocks later W1 compilation. The second phase runs only through the bootstrap-owned `ProtectedAdmissionClient` and its external physical-gate broker, revalidates the already-indexed proposal, and makes it authoritative only through W1 admission. Before any final-W1 payload host effect, Bootstrap persists, authenticates, and freshly reopens one exact opaque `PayloadDispatchAuthorizationV1`; only then may it import/reopen the payload objects at the target Git host, create/reopen their immutable content-addressed proposal pin, persist the create-once evaluation dispatch intent/run ref, and return the signed proposal receipt/lease. That consumed payload authorization cannot authorize `Cw/Sw`, an admission intent, or protected-ref advancement. The later assembly identity crosses a distinct mandatory authorization boundary: its first invocation derives and closes exact `Cw/Sw` only in a non-host quarantine and publishes the authorization request with zero target-host effect; only after Bootstrap persists and freshly reopens its opaque `ProtectedRefAdvanceAuthorizationV1` may a second invocation with the same lease and byte-identical bundle import/reopen those exact objects, receipt, intent, CAS, and finalize. Artifact Mesh emits no candidate admission leaf and owns no proposal, lease, custody, runner, evidence-assembly, authorization, import, ref, or finalization authority.
 
 **Tech Stack:** Swift 6, SwiftPM, XCTest, Crypto/CryptoKit, Security.framework Keychain, SQLite3 in persistent WAL mode with `synchronous=FULL`, Xcode 27, iOS 27, XcodeGen, structured `xcrun devicectl`, Python 3 standard-library `unittest`, canonical JSON, Git object/index verification, and the bootstrap-owned protected admission/physical-broker/custody capabilities.
 
 ## Global Constraints
 
 - Approved dynamic-graph non-delta pin: commit `9d484befb4a4593d93789457ebddfd7cde358e3b`, path `docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md`, blob `e2c59656f9eb184efc3ab933fe442c9dd0b7d507`, SHA-256 `5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5`.
+- Tasks 10, 11, and 12 each reopen and hash that graph pin afresh in their
+  own process. A prior task's shell variables, receipt, success text, or
+  candidate copy cannot satisfy a later task.
 - Start Phase A from the exact finalized admitted-W0 seal. Start Phase B from the exact immutable final W1 `Pw`; neither phase accepts a caller-supplied wave.
-- Import, without redeclaration, the bootstrap-owned opaque `ExternalPhysicalGateBinding`, `PayloadProposalReceiptV1`, `EvaluationLease`, `AuthenticatedGateResultBundle`, `ImportedCommit`, `AdmittedWaveV1`, and `ProtectedAdmissionClient`. If the active bootstrap does not expose their signed service binding and exact client surface, stop at `BLOCKED_EXTERNAL_BOOTSTRAP`; no repository helper may emulate them.
+- Import, without redeclaration, the bootstrap-owned opaque `ExternalPhysicalGateBinding`, `PayloadDispatchAuthorizationV1`, `PayloadProposalReceiptV1`, `EvaluationLease`, `AuthenticatedGateResultBundle`, `ProtectedRefAdvanceAuthorizationV1`, `ImportedCommit`, `AdmittedWaveV1`, and `ProtectedAdmissionClient`. If the active bootstrap does not expose their signed service binding and exact client surface, stop at `BLOCKED_EXTERNAL_BOOTSTRAP`; no repository helper may emulate them.
 - Phase A starts only after `ProtectedAdmissionClient.reopen_admitted_predecessor()` returns a service-envelope-verified finalized W0 whose seal equals clean `HEAD`. An unsigned path, cached JSON, candidate parser result, or caller assertion is not an admitted predecessor.
 - The deployment floor is iOS 27.0. `BehavioralAISubstrate/Package.swift`, `QinaoRuntimeSDK/Package.swift`, `SampleHost/Package.swift`, the lab project, and every archive command must retain that floor.
 - Repair, but never extend or resubmit, the historical M/Create set:
@@ -47,13 +50,60 @@
   `AdmissionTerminalError`. A bare `BLOCKED_*` name below denotes the terminal
   class only; emission also requires its registry-closed reason code, while
   only `pendingAdmission` carries null.
-- Phase B first obtains separate user authorization and calls `ProtectedAdmissionClient.pin_payload_and_issue_lease(payload_oid:)`; only the externally pinned proposal receipt and signed lease can select toolchain, release profile, shipping archive, lab archive, signing identity, device policy, custody, producer, attester, and evidence broker. Production rejects every `QINAO_*` selector and every CLI device/team/toolchain/archive/custody/evidence-client selector.
+- Phase B first requires Bootstrap's external control plane to persist,
+  authenticate, and freshly reopen one exact opaque
+  `PayloadDispatchAuthorizationV1` for the final W1 `Pw`. Before that record
+  exists, `pin_payload_and_issue_lease(payload_oid:)` performs zero
+  target-host payload-object import/reopen, proposal-ref creation, evaluation
+  dispatch, or run-ref creation. Only under that authorization may Bootstrap
+  import/reopen the exact payload objects at the target Git host, create and
+  reopen their immutable content-addressed proposal pin, persist the one
+  create-once evaluation dispatch intent/run ref, and return the signed
+  `PayloadProposalReceiptV1` plus `EvaluationLease`. The authorization is not
+  a client argument, fifth method, local schema, candidate value, or SDK
+  authority, and it cannot substitute for the later
+  `ProtectedRefAdvanceAuthorizationV1`. Only the externally pinned proposal
+  receipt and signed lease can select toolchain, release profile, shipping
+  archive, lab archive, signing identity, device policy, custody, producer,
+  attester, and evidence broker. Production rejects every `QINAO_*` selector
+  and every CLI device/team/toolchain/archive/custody/evidence-client
+  selector.
 - Phase B binds the exact final W1 `Pw` commit/tree, selected shipping archive, lab archive, physical device/boot/container, E/A manifest, 40 matrix rows, and external raw-evidence reopen. If the real reboot-before-first-unlock observation is unexercisable, the row remains unexecuted and the exact terminal is `BLOCKED_ARTIFACT_MESH_DEVICE_RECOVERY`.
 - Raw archives, provisioning profiles, CMS/signing chains, device identifiers, container copies, Keychain observations, and physical traces never enter Git. They live only in an encrypted ephemeral root whose key is supplied out of band by the external broker; after external reopen and independent verification, key destruction and verified no-residue cleanup are mandatory and crash-recoverable.
-- Only `ProtectedAdmissionClient.assemble_import_and_finalize(lease:gate_results:)` may validate the authenticated results, construct/import/reopen `Cw` and `Sw`, create the import receipt and intent, perform protected-ref CAS, and finalize admission. Candidate code, the device controller, the protected runner, and Artifact Mesh evidence code cannot supply a leaf or any commit/ref bytes.
+- Every production lab `DerivedData`, `.xcresult` result bundle, `HOME`,
+  `TMPDIR`, cloned-package directory, module cache, SwiftPM cache, and
+  Xcode/tool cache lives beneath that same broker-issued encrypted custody
+  root. The existing opaque custody/destruction receipt must prove all of
+  those scoped roots were covered, their keys were destroyed, and no readable
+  residue remains; no new Artifact schema or handoff field is introduced.
+- Every multi-command Bash gate begins with `set -euo pipefail`. Expected
+  nonzero commands use a tightly bounded `set +e`, capture the exact return
+  code, and immediately restore `set -euo pipefail`. `git status`, `git diff`,
+  `git diff-tree`, and `rg` outputs are accepted only after their return codes
+  are captured and classified; in particular `rg` return code 1 means no
+  match, return code 0 means a match, and return code 2 or any other value is
+  a gate failure.
+- `ProtectedAdmissionClient.assemble_import_and_finalize(lease:gate_results:)`
+  remains one of exactly four public client methods and owns one idempotent
+  assembly identity across two invocations. Before advance authorization, it
+  may only validate the authenticated results, derive and close exact
+  `Cw/Sw` in the service's non-host quarantine, freeze their object-set,
+  import-key and intent-key commitments, and expose the bound authorization
+  request; it performs zero target-host import/reopen, object-import receipt,
+  admission intent, protected-ref CAS, or final attestation. After Bootstrap
+  has persisted, authenticated, and freshly reopened one matching opaque
+  `ProtectedRefAdvanceAuthorizationV1`, the same method with the same lease
+  and byte-identical bundle resumes that same assembly identity and alone may
+  import/reopen the already-closed objects at the target host, persist the
+  receipt and intent, perform the one non-force CAS, and finalize admission.
+  The authorization is not a fifth method, client argument, candidate file,
+  environment value, local schema, or SDK authority. Candidate code, the
+  device controller, the protected runner, and Artifact Mesh evidence code
+  cannot supply a leaf, authorization, or any commit/ref bytes.
 - Use only the generic E/A API:
 
 ```bash
+set -euo pipefail
 python3 scripts/check_qinao_ea_extensions.py \
   --root . \
   --manifest docs/superpowers/evidence/qinao-ea-extensions/W1/artifact-mesh-task0.json \
@@ -130,6 +180,7 @@ manifest, owner, or recovery route is added.
 Run this before every task and after every context/session restart:
 
 ```bash
+set -euo pipefail
 test "$PWD" = /Users/changgeng/.codex/worktrees/e4d7/Project06
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py \
   --root /Users/changgeng/.codex/worktrees/e4d7/Project06 \
@@ -142,6 +193,7 @@ Expected: one canonical JSON line with exact keys `candidate_lineage,head_commit
 After that permanent guard passes, require the predecessor-provided interfaces:
 
 ```bash
+set -euo pipefail
 test -f docs/superpowers/specs/2026-07-23-qinao-convergence-correction-and-clean-candidate-design.md
 test -f scripts/check_qinao_ea_extensions.py
 test -f scripts/check_qinao_wave_admission.py
@@ -203,6 +255,7 @@ The last three files only adapt incumbent callers to the required mechanism conf
 - Modify `SampleHost/Package.swift`
 - Create `SampleHost/ArtifactMeshDeviceLab/project.yml`
 - Create generated `SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.pbxproj`
+- Create generated `SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.xcworkspace/contents.xcworkspacedata`
 - Create generated shared scheme `SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshDeviceLab.xcscheme`
 - Create generated shared scheme `SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshCASContenderLab.xcscheme`
 - Create `SampleHost/ArtifactMeshDeviceLab/App/ArtifactMeshDeviceLabApp.swift`
@@ -287,7 +340,46 @@ ProtectedAdmissionClient.assemble_import_and_finalize(
 ) -> AdmittedWaveV1
 ```
 
-`ExternalPhysicalGateBinding` and all receipt/envelope fields are opaque imports carried by the signed lease. This plan neither mirrors their schemas nor adds a wrapper authority. `run_active_gates` owns the controller-side external physical-broker phase; `assemble_import_and_finalize` exclusively owns output validation, Cw/Sw construction/import/reopen, intent, CAS, and final attestation.
+`ExternalPhysicalGateBinding`, `PayloadDispatchAuthorizationV1`,
+`ProtectedRefAdvanceAuthorizationV1`, and all receipt/envelope fields are
+opaque Bootstrap imports. This plan neither mirrors their schemas nor adds a
+wrapper authority.
+`pin_payload_and_issue_lease` cannot turn generic user consent into host
+authority. Bootstrap first persists, authenticates, and freshly reopens the
+exact `PayloadDispatchAuthorizationV1` bound to final `Pw`; only then may the
+same service operation import/reopen the payload objects at the target Git
+host, create/reopen the immutable content-addressed proposal pin, persist its
+create-once evaluation dispatch intent/run ref, and return the signed
+proposal receipt/lease. The record is consumed by that payload transaction,
+never exposed as a client argument, and cannot authorize the later
+`Cw/Sw` object import, admission intent, protected-ref CAS, or finalization.
+`run_active_gates` owns only the controller-side external physical-broker
+phase. `assemble_import_and_finalize` owns one service-side assembly identity
+whose first invocation validates output and derives/closes deterministic
+`Cw/Sw` only in non-host quarantine. If the matching advance authorization
+has not already been service-reopened, that invocation exposes the exact
+external request and raises
+`AdmissionTerminalError(BLOCKED_EXTERNAL_BOOTSTRAP,
+CEREMONY_UNAVAILABLE)` with no partial `AdmittedWaveV1` and no target-host
+effect. Bootstrap's control plane—not a fifth client method—then obtains,
+persists, authenticates, and reopens one fresh opaque
+`ProtectedRefAdvanceAuthorizationV1`. A later invocation of the same method
+with the same lease, byte-identical bundle, and same assembly identity may
+then import/reopen those already-closed objects at the target host, create
+the one receipt and intent, perform the one non-force CAS, and finalize the
+attestation. It never constructs a second `Cw/Sw`, authorization request,
+import identity, or intent.
+The same existing B0-pinned protected runner/gate process may execute the
+closed handoff byte validator below after it has freshly reopened
+service-verified `admittedW0`. On success it retains only an in-process,
+nonserializable validated handle (descriptively
+`ValidatedArtifactMeshTask0Handoff`) scoped to that process, repository,
+admitted-W0 seal, transition OID, and payload commit/tree. This is not a public
+type, method, wire, owner, or persisted schema, and no candidate helper may
+mint or emulate it. A restart or different OID requires another validator
+execution in the same existing protected entrypoint. If that entrypoint
+cannot produce the in-process validated handle,
+stop at `BLOCKED_EXTERNAL_BOOTSTRAP`.
 
 The physical protocol operations, in frozen order, are:
 
@@ -505,18 +597,42 @@ Create this exact JSON:
 - [ ] **Step 2: Run the RED checker**
 
 ```bash
-python3 scripts/check_qinao_ea_extensions.py \
-  --root . \
-  --manifest docs/superpowers/evidence/qinao-ea-extensions/W1/artifact-mesh-task0.json \
-  --payload-commit "$(git rev-parse HEAD)" \
-  --payload-tree "$(git rev-parse HEAD^{tree})"
+set -euo pipefail
+set +e
+EA_MANIFEST_RED_TRANSCRIPT="$(
+  python3 scripts/check_qinao_ea_extensions.py \
+    --root . \
+    --manifest docs/superpowers/evidence/qinao-ea-extensions/W1/artifact-mesh-task0.json \
+    --payload-commit "$(git rev-parse HEAD)" \
+    --payload-tree "$(git rev-parse HEAD^{tree})" \
+    2>&1
+)"
+EA_MANIFEST_RED_RC="$?"
+set -euo pipefail
+printf '%s\n' "$EA_MANIFEST_RED_TRANSCRIPT"
+test "$EA_MANIFEST_RED_RC" = 1
+for marker in \
+  'slices=4' \
+  'BASArtifactMeshAnchorPort' \
+  'BASArtifactMeshKeychainAnchor' \
+  'QinaoDefaults.makeArtifactMeshStore' \
+  'QinaoDefaults.makeSovereignHost'
+do
+  case "$EA_MANIFEST_RED_TRANSCRIPT" in
+    *"$marker"*) ;;
+    *) printf 'missing RED diagnostic: %s\n' "$marker" >&2; exit 1 ;;
+  esac
+done
 ```
 
-Expected: non-zero with all four missing implementation seams reported; it must report `slices=4`, not zero.
+Expected: exact exit 1 with `slices=4` and all four named missing
+implementation seams in the captured transcript. Any other return code,
+missing diagnostic, or zero-slice result is invalid RED.
 
 - [ ] **Step 3: Prove the M evidence was not expanded or relabeled**
 
 ```bash
+set -euo pipefail
 python3 - <<'PY'
 import json, pathlib
 root = pathlib.Path(".")
@@ -547,6 +663,7 @@ Expected: `artifact-mesh-history: PASS m_paths=3 retrospective=true`.
 - [ ] **Step 4: Commit the manifest alone**
 
 ```bash
+set -euo pipefail
 git add docs/superpowers/evidence/qinao-ea-extensions/W1/artifact-mesh-task0.json
 git commit -m "docs(qinao): freeze artifact mesh W1 extensions"
 ```
@@ -593,6 +710,37 @@ final class BASArtifactMeshKeychainAnchorTests: XCTestCase {
         #"{"schemaVersion":2}"#.utf8)
     XCTAssertThrowsError(
         try BASArtifactMeshAnchorRecord(canonicalBytes: bytes))
+  }
+
+  func testStateAccountGenerationIsDerivedFromPendingThenCommittedFloor()
+      throws
+  {
+    let zero = String(repeating: "0", count: 64)
+    let genesis = BASArtifactMeshAnchorRecord(
+        applicationContainerID: Fixtures.containerID,
+        storeRole: Fixtures.storeRole,
+        storeIdentity: Fixtures.storeIdentity,
+        committed: nil,
+        pending: BASArtifactMeshPendingTransaction(
+          kind: .genesis,
+          transactionID: UUID(uuidString:
+            "00000000-0000-0000-0000-000000000203")!,
+          createRequestID: UUID(uuidString:
+            "00000000-0000-0000-0000-000000000204")!,
+          proposed: Fixtures.floor(
+            generation: 0,
+            previousCommittedDigest: zero),
+          expectedPreviousDigest: zero,
+          expectedDatabaseAbsent: true))
+    let committed0 = try Fixtures.committed(generation: 0)
+    let pending1 = try committed0.addingPending(
+      Fixtures.pending(from: committed0, generation: 1))
+    let committed1 = try pending1.promotingPending()
+
+    XCTAssertEqual(try genesis.stateAccountGeneration(), 0)
+    XCTAssertEqual(try committed0.stateAccountGeneration(), 0)
+    XCTAssertEqual(try pending1.stateAccountGeneration(), 1)
+    XCTAssertEqual(try committed1.stateAccountGeneration(), 1)
   }
 
   func testTransitionValidatorAcceptsOnlyExactPendingAndPromotion()
@@ -697,16 +845,38 @@ hashing, defaulting, or transition acceptance and must not be staged.
 - [ ] **Step 2: Run RED**
 
 ```bash
-python3 scripts/run_nonempty_swift_filter.py \
-  --package-path BehavioralAISubstrate \
-  --filter BASArtifactMeshKeychainAnchorTests \
-  --require-suite BASArtifactMeshKeychainAnchorTests
+set -euo pipefail
+set +e
+ANCHOR_RECORD_RED_TRANSCRIPT="$(
+  python3 scripts/run_nonempty_swift_filter.py \
+    --package-path BehavioralAISubstrate \
+    --filter BASArtifactMeshKeychainAnchorTests \
+    --require-suite BASArtifactMeshKeychainAnchorTests \
+    2>&1
+)"
+ANCHOR_RECORD_RED_RC="$?"
+set -euo pipefail
+printf '%s\n' "$ANCHOR_RECORD_RED_TRANSCRIPT"
+test "$ANCHOR_RECORD_RED_RC" = 1
+for marker in \
+  'testAnchorRecordCanonicalRoundTrip' \
+  'testFutureAnchorRecordVersionFailsClosed' \
+  'testStateAccountGenerationIsDerivedFromPendingThenCommittedFloor' \
+  'testTransitionValidatorAcceptsOnlyExactPendingAndPromotion' \
+  'unimplemented'
+do
+  case "$ANCHOR_RECORD_RED_TRANSCRIPT" in
+    *"$marker"*) ;;
+    *) printf 'missing RED diagnostic/discovery: %s\n' "$marker" >&2; exit 1 ;;
+  esac
+done
 ```
 
 Expected: SwiftPM's list phase succeeds and discovers every named test; the
-suite executes and exits non-zero because the stub reports
-`.unimplemented`. A compile/list failure, zero discovery, or failure caused
-by a missing symbol is invalid RED.
+suite executes with exact exit 1 because the stub reports the stable
+`unimplemented` diagnostic. A compile/list failure, zero discovery, missing
+named test, other return code, or failure caused by a missing symbol is
+invalid RED.
 
 - [ ] **Step 3: Implement the exact internal record**
 
@@ -783,6 +953,18 @@ struct BASArtifactMeshAnchorRecord: Codable, Sendable, Equatable {
         self.protectionVersion = protectionVersion
         self.committed = committed
         self.pending = pending
+    }
+
+    func stateAccountGeneration() throws -> UInt64 {
+        try validate()
+        if let pending {
+            return pending.proposed.generation
+        }
+        guard let committed else {
+            throw BASArtifactMeshAnchorRecordError.invalidField(
+              "missing state-account generation")
+        }
+        return committed.generation
     }
 
     func canonicalBytes() throws -> Data {
@@ -1060,17 +1242,19 @@ Task 0 exposes no genesis-reset method because the mapped trust/operator authori
 - [ ] **Step 4: Run GREEN**
 
 ```bash
+set -euo pipefail
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path BehavioralAISubstrate \
   --filter BASArtifactMeshKeychainAnchorTests \
   --require-suite BASArtifactMeshKeychainAnchorTests
 ```
 
-Expected: `BASArtifactMeshKeychainAnchorTests` executes at least 3 tests with 0 failures.
+Expected: `BASArtifactMeshKeychainAnchorTests` executes at least 4 tests with 0 failures.
 
 - [ ] **Step 5: Commit the internal record/port**
 
 ```bash
+set -euo pipefail
 git add \
   BehavioralAISubstrate/Sources/BASMemory/BASArtifactMeshAnchorPort.swift \
   BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASArtifactMeshKeychainAnchorTests.swift
@@ -1216,11 +1400,55 @@ record suite must still compile and remain green. Do not stage the stub.
 
 - [ ] **Step 2: Run RED**
 
-Run the non-empty BAS filter from Task 2.
+```bash
+set -euo pipefail
+set +e
+KEYCHAIN_ANCHOR_RED_TRANSCRIPT="$(
+  python3 scripts/run_nonempty_swift_filter.py \
+    --package-path BehavioralAISubstrate \
+    --filter BASArtifactMeshKeychainAnchorTests \
+    --require-suite BASArtifactMeshKeychainAnchorTests \
+    2>&1
+)"
+KEYCHAIN_ANCHOR_RED_RC="$?"
+set -euo pipefail
+printf '%s\n' "$KEYCHAIN_ANCHOR_RED_TRANSCRIPT"
+test "$KEYCHAIN_ANCHOR_RED_RC" = 1
+export KEYCHAIN_ANCHOR_RED_TRANSCRIPT
+python3 - <<'PY'
+import os
+
+transcript = os.environ["KEYCHAIN_ANCHOR_RED_TRANSCRIPT"]
+if "unimplemented" not in transcript:
+    raise SystemExit("missing exact Keychain RED diagnostic: unimplemented")
+for name in (
+    "testAnchorRecordCanonicalRoundTrip",
+    "testFutureAnchorRecordVersionFailsClosed",
+    "testStateAccountGenerationIsDerivedFromPendingThenCommittedFloor",
+    "testTransitionValidatorAcceptsOnlyExactPendingAndPromotion",
+):
+    lines = [line.lower() for line in transcript.splitlines() if name in line]
+    if not any("passed" in line for line in lines):
+        raise SystemExit(f"incumbent record RED baseline did not pass: {name}")
+for name in (
+    "testProductionSecurityQueryIsExact",
+    "testInteractionNotAllowedIsUnavailableNotAbsent",
+    "testMalformedOrFutureKeychainBytesFailClosed",
+    "testCompareAndSwapRejectsDigestRace",
+    "testSecondIndependentAnchorInstanceCannotReuseOldDigest",
+    "testExactOldAccountItemNotFoundMapsToCASConflict",
+    "testCopyRejectsTwoAccountsForOneStableSlot",
+):
+    if name not in transcript:
+        raise SystemExit(f"expanded Keychain RED test not discovered: {name}")
+PY
+unset KEYCHAIN_ANCHOR_RED_TRANSCRIPT
+```
 
 Expected: SwiftPM successfully lists and executes the expanded suite. The
 Task-2 record tests remain green and the new Security/CAS tests fail
-semantically on `.unimplemented`; compile/list failure or zero discovery is
+semantically with exact exit 1 on `unimplemented`; compile/list failure, any
+other return code, an incumbent record-test failure, or zero discovery is
 invalid RED.
 
 - [ ] **Step 3: Implement exact Keychain behavior**
@@ -1395,9 +1623,10 @@ private extension Fixtures {
         let digest = try record.digest().map {
           String(format: "%02x", $0)
         }.joined()
+        let generation = try record.stateAccountGeneration()
         return .init(
           account:
-            "\(stableAccountPrefix)g\(record.generation):d\(digest)",
+            "\(stableAccountPrefix)g\(generation):d\(digest)",
           value: try record.canonicalBytes())
     }
 
@@ -1445,11 +1674,16 @@ func stateAccount(
     let digest = try record.digest().map {
       String(format: "%02x", $0)
     }.joined()
-    return "\(prefix)g\(record.generation):d\(digest)"
+    let generation = try record.stateAccountGeneration()
+    return "\(prefix)g\(generation):d\(digest)"
 }
 ```
 
-The old account therefore binds both the current generation and the expected
+`stateAccountGeneration()` is a derived, non-Codable projection: it is
+`pending.proposed.generation` whenever a pending transaction exists and
+otherwise the committed generation. Thus the four legal seed states map to
+account generations `0, 0, 1, 1`; no new wire field is introduced. The old
+account therefore binds both that exact state generation and the expected
 canonical-record digest. The one absence-reservation account is exactly
 `"\(stableAccountPrefix)reservation"`. It is used only to make concurrent
 `expectedDigest == nil` creation single-winner: `SecItemAdd` first claims that
@@ -1658,8 +1892,9 @@ extension BASArtifactMeshKeychainAnchor {
         let digest = try record.digest().map {
           String(format: "%02x", $0)
         }.joined()
+        let generation = try record.stateAccountGeneration()
         return "\(scope.stableAccountPrefix)" +
-          "g\(record.generation):d\(digest)"
+          "g\(generation):d\(digest)"
     }
 
     private func decode(
@@ -1870,19 +2105,45 @@ public enum BASArtifactMeshKeychainCASLabProbe {
 #endif
 ```
 
-`seed` derives one canonical committed g=1 record from the challenge, performs
-the production anchor's absence CAS, and returns its digest. `contend` derives
-a distinct canonical g=2 replacement from
-`challenge + "\0" + contenderID`, calls the same production
-`compareAndSwap`, returns `winner` only on success, and maps only
-`.compareAndSwapConflict` to the loser outcome. It performs no direct Security
-call. Source and selected-archive scans require this entire public lab probe
-and both symbol names absent unless
+`seed` must exercise only legal production transitions. It derives all
+deterministic IDs/roots from the challenge and uses the production
+`compareAndSwap` plus a fresh `load` after every step for exactly this chain:
+
+```text
+absent
+  -> genesisPending g0
+  -> committed g0
+  -> committed g0 + floorAdvance pending g1
+  -> committed g1
+```
+
+Each CAS uses the digest freshly reopened from the immediately preceding
+state; the first uses `expectedDigest = nil`. Every reopen must equal the
+exact just-written canonical record before the next transition. `seed`
+returns only the final freshly reopened committed-g1 digest. It neither
+constructs nor writes committed g1 directly from absence.
+
+Each `contend` process freshly reopens that same committed g1, constant-time
+checks it against `expectedDigest`, derives from
+`challenge + "\0" + contenderID` one complete replacement equal to
+`committed g1 + distinct floorAdvance pending g2`, and calls the production
+`compareAndSwap(expectedDigest:expectedDigest,replacement:)` exactly once.
+It returns `winner` only on success and maps only
+`.compareAndSwapConflict` to the loser outcome; it never writes committed g2
+directly and performs no direct Security call. Lab-probe tests instrument the
+production anchor and require the seed transition sequence
+`[genesisPending(0), committed(0), floorAdvancePending(1), committed(1)]`,
+four seed CAS calls/four exact reopens, and one contender CAS call per
+process. They also reject skipped/reordered transitions, a digest not sourced
+from the immediately preceding reopen, direct committed-g1/g2 replacement,
+or more than one contender CAS. Source and selected-archive scans require
+this entire public lab probe and both symbol names absent unless
 `QINAO_ARTIFACT_MESH_DEVICE_LAB` is active.
 
 - [ ] **Step 4: Run GREEN and a source-boundary scan**
 
 ```bash
+set -euo pipefail
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path BehavioralAISubstrate \
   --filter BASArtifactMeshKeychainAnchorTests \
@@ -1902,24 +2163,61 @@ required = [
  "replacementAccount",
  "com.qinao.artifact-mesh.anchor.v1",
 ]
+if len(required) != 9:
+    raise SystemExit(
+      f"keychain source marker contract drift: {len(required)}")
 missing = [x for x in required if x not in s]
 if missing:
     raise SystemExit(f"keychain source missing {missing}")
 if "kSecAttrGeneric" in s:
     raise SystemExit("kSecAttrGeneric cannot provide uniqueness or CAS")
-print("artifact-mesh-keychain-source: PASS required=8")
+normalized = " ".join(s.split())
+lab_marker = "public enum BASArtifactMeshKeychainCASLabOutcome"
+if lab_marker not in s:
+    raise SystemExit("lab CAS probe is absent")
+lab = s[s.index(lab_marker):]
+exact_counts = {
+    ".compareAndSwap(": 5,  # four seed transitions + one contend
+    ".load()": 5,           # four seed reopens + one contend reopen
+    ".promotingPending()": 2,
+    ".addingPending(": 1,
+    "expectedDigest: nil": 1,
+}
+for marker, expected in exact_counts.items():
+    actual = lab.count(marker)
+    if actual != expected:
+        raise SystemExit(
+          f"lab CAS source count drift: {marker}={actual}, "
+          f"expected={expected}")
+for forbidden in ("SecItemAdd", "SecItemUpdate", "SecItemCopyMatching"):
+    if forbidden in lab:
+        raise SystemExit(f"lab probe bypasses production anchor: {forbidden}")
+tests = Path(
+  "BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/"
+  "BASArtifactMeshKeychainAnchorTests.swift"
+).read_text()
+for name in (
+    "testLabSeedUsesExactGenesisAndFloorAdvanceChain",
+    "testLabSeedUsesEachFreshlyReopenedDigest",
+    "testLabContenderBuildsPendingG2AndCallsCASOnce",
+):
+    if name not in tests:
+        raise SystemExit(f"lab CAS contract test missing: {name}")
+print("artifact-mesh-keychain-source: PASS required=9")
 PY
 ```
 
-Expected: all tests pass and source gate prints `required=8`. The package
+Expected: all tests pass and source gate prints `required=9`. The package
 tests prove exact-account stale-update behavior using independent anchor
-instances; the mandatory two-OS-process Security.framework race is the signed
+instances plus the legal four-transition seed and one-CAS-per-contender
+contract; the mandatory two-OS-process Security.framework race is the signed
 DeviceLab `raceSecondCAS` row in Tasks 7–9 and cannot be replaced by this
 in-process suite.
 
 - [ ] **Step 5: Commit**
 
 ```bash
+set -euo pipefail
 git add \
   BehavioralAISubstrate/Sources/BASMemory/BASArtifactMeshKeychainAnchor.swift \
   BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASArtifactMeshKeychainAnchorTests.swift
@@ -2051,16 +2349,50 @@ unrelated application file. The sidecar test closes the final connection
 before inspecting them. The quarantine test injects unit-only crash cuts; it
 does not add a fifteenth physical matrix fault.
 
+In the same uncommitted RED edit, add the final
+`BASArtifactMeshOpenIntent` shape and all test-only fixture/helper signatures
+used above so the complete suite compiles and lists. Add the minimum
+fail-closed production-open seam at its final source location, but make every
+new explicit-intent open throw a temporary error whose rendered description
+is exactly `artifact-mesh.sqlite-open.unimplemented` before creating or
+mutating a file. Do not install schema v2, metadata, persistent-WAL handling,
+or quarantine behavior in the stub, and do not stage it. A missing type,
+helper, or symbol is invalid RED.
+
 - [ ] **Step 2: Run RED**
 
 ```bash
-python3 scripts/run_nonempty_swift_filter.py \
-  --package-path BehavioralAISubstrate \
-  --filter BASArtifactStoreTests \
-  --require-suite BASArtifactStoreTests
+set -euo pipefail
+set +e
+SQLITE_OPEN_RED_TRANSCRIPT="$(
+  python3 scripts/run_nonempty_swift_filter.py \
+    --package-path BehavioralAISubstrate \
+    --filter BASArtifactStoreTests \
+    --require-suite BASArtifactStoreTests \
+    2>&1
+)"
+SQLITE_OPEN_RED_RC="$?"
+set -euo pipefail
+printf '%s\n' "$SQLITE_OPEN_RED_TRANSCRIPT"
+test "$SQLITE_OPEN_RED_RC" = 1
+for marker in \
+  'BASArtifactStoreTests' \
+  'testCreateRequiresGenesisReservationBeforeSQLiteCreate' \
+  'testReopenNeverUsesSQLiteOpenCreate' \
+  'testCommittedAnchorDatabaseMismatchQuarantinesWholeFamily' \
+  'artifact-mesh.sqlite-open.unimplemented'
+do
+  case "$SQLITE_OPEN_RED_TRANSCRIPT" in
+    *"$marker"*) ;;
+    *) printf 'missing RED diagnostic/discovery: %s\n' "$marker" >&2; exit 1 ;;
+  esac
+done
 ```
 
-Expected: existing tests discover; new tests fail because production open intent and metadata are absent.
+Expected: exact exit 1 after positive suite/test discovery, with failures
+caused only by `artifact-mesh.sqlite-open.unimplemented`. A compile/list
+failure, missing symbol, zero discovery, different return code, or unrelated
+diagnostic is invalid RED.
 
 - [ ] **Step 3: Replace the SQL resource with the exact schema-v2 objects**
 
@@ -2118,7 +2450,7 @@ CREATE TABLE artifact_mesh_store_metadata (
 
 CREATE TABLE artifact_mesh_recovery_lifecycle (
     ordinal INTEGER PRIMARY KEY AUTOINCREMENT,
-    recovery_id TEXT NOT NULL UNIQUE,
+    recovery_id TEXT NOT NULL,
     store_identity TEXT NOT NULL,
     generation TEXT NOT NULL,
     state TEXT NOT NULL CHECK (state IN (
@@ -2128,7 +2460,8 @@ CREATE TABLE artifact_mesh_recovery_lifecycle (
     wal_digest TEXT,
     shm_digest TEXT,
     previous_lifecycle_digest TEXT NOT NULL,
-    lifecycle_digest TEXT NOT NULL UNIQUE
+    lifecycle_digest TEXT NOT NULL UNIQUE,
+    UNIQUE (recovery_id, previous_lifecycle_digest)
 );
 
 CREATE TABLE artifact_mesh_recovery_lease (
@@ -2146,7 +2479,11 @@ validation to six tables/two indexes, and update
 `ArtifactMeshV1Schema.statementCount` from 5 to 8. Every new attestation put
 derives `attestation_purpose` from the already decoded
 `BASArtifactAttestationPayload`; no caller supplies it. Keep the resource
-filename and M evidence unchanged.
+filename and M evidence unchanged. The composite unique constraint's
+SQLite-owned automatic index already has `recovery_id` as its leading key,
+so do not add a third explicit index. Recovery reopen selects one
+`recovery_id`, orders by `ordinal ASC`, requires contiguous ordinals and an
+exact digest chain, and derives the sole current head from the final row.
 
 The existing public target-only query remains wire-compatible in Task 0 but
 is bounded to `LIMIT 9`, returns at most eight verified children, and throws
@@ -2406,6 +2743,7 @@ The helper changes no serialized payload and does not expose anchor state.
 - [ ] **Step 9: Run GREEN**
 
 ```bash
+set -euo pipefail
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path BehavioralAISubstrate \
   --filter BASArtifactStoreTests \
@@ -2414,13 +2752,52 @@ python3 scripts/run_nonempty_swift_filter.py \
   --package-path BehavioralAISubstrate \
   --filter BASArtifactMeshKeychainAnchorTests \
   --require-suite BASArtifactMeshKeychainAnchorTests
+python3 - <<'PY'
+from pathlib import Path
+
+sql = Path(
+  "BehavioralAISubstrate/Sources/BASMemory/SQL/"
+  "024_artifact_mesh_v1.sql"
+).read_text()
+normalized = " ".join(sql.split())
+if normalized.count("CREATE TABLE ") != 6:
+    raise SystemExit("artifact mesh schema must contain exactly six tables")
+if normalized.count("CREATE INDEX ") != 2:
+    raise SystemExit(
+      "artifact mesh schema must contain exactly two explicit indexes")
+if "recovery_id TEXT NOT NULL UNIQUE" in normalized:
+    raise SystemExit("recovery_id cannot be single-column UNIQUE")
+if "UNIQUE (recovery_id, previous_lifecycle_digest)" not in normalized:
+    raise SystemExit("recovery lifecycle fork-prevention constraint missing")
+source = Path(
+  "BehavioralAISubstrate/Sources/BASMemory/"
+  "BASArtifactSQLiteStore.swift"
+).read_text()
+if "statementCount = 8" not in source:
+    raise SystemExit("ArtifactMeshV1Schema.statementCount must equal 8")
+for marker in (
+    "ORDER BY ordinal ASC",
+    "previous_lifecycle_digest",
+    "lifecycle_digest",
+):
+    if marker not in source:
+        raise SystemExit(f"recovery lifecycle reopen shape missing: {marker}")
+print(
+  "artifact-mesh-schema-shape: PASS "
+  "tables=6 explicit_indexes=2 statements=8")
+PY
 ```
 
-Expected: both suites are non-empty with 0 failures; first-create/reopen tests observe `synchronous=2` (`FULL`) and no unexpected file recreation.
+Expected: both suites are non-empty with 0 failures; first-create/reopen tests
+observe `synchronous=2` (`FULL`) and no unexpected file recreation. The
+source gate prints `tables=6 explicit_indexes=2 statements=8`, forbids the
+single-column recovery-ID uniqueness bug, and requires ordered digest-chain
+reopen.
 
 - [ ] **Step 10: Commit the incumbent M repair**
 
 ```bash
+set -euo pipefail
 git add \
   BehavioralAISubstrate/Sources/BASMemory/SQL/024_artifact_mesh_v1.sql \
   BehavioralAISubstrate/Sources/BASMemory/BASArtifactSQLiteStore.swift \
@@ -2536,13 +2913,108 @@ func testRetiredAttemptAndSemanticHeadsHaveZeroWriteReadAuthority()
 }
 ```
 
+Add these recovery-history tests under the same suite:
+
+```swift
+func testOneRecoveryIDAppendsAllFourLifecycleStages() throws {
+    let fixture = try Self.makeQuarantinedRecoveryFixture()
+    try fixture.beginRecovery(holder: Self.holderA, expiry: 100)
+    try fixture.advanceRecoveryFloor(expectedFloor: 0)
+    let head = try fixture.currentLifecycleDigest()
+    try fixture.completeRecovery(expectedLifecycleDigest: head)
+    XCTAssertEqual(
+      try fixture.lifecycleRows().map(\.state),
+      [.quarantined, .leaseAcquired, .floorUpdated, .completed])
+    XCTAssertEqual(
+      Set(try fixture.lifecycleRows().map(\.recoveryID)),
+      [fixture.recoveryID])
+    XCTAssertEqual(
+      try fixture.lifecycleRows().map(\.ordinal),
+      try fixture.lifecycleRows().map(\.ordinal).sorted())
+}
+
+func testExpiredLeaseMayAppendAnotherLeaseAcquiredForSameRecoveryID()
+    throws
+{
+    let fixture = try Self.makeQuarantinedRecoveryFixture()
+    try fixture.beginRecovery(holder: Self.holderA, expiry: 100)
+    try fixture.advanceMonotonicClock(to: 101)
+    try fixture.beginRecovery(holder: Self.holderB, expiry: 200)
+    XCTAssertEqual(
+      try fixture.lifecycleRows().map(\.state),
+      [.quarantined, .leaseAcquired, .leaseAcquired])
+}
+
+func testSamePreviousLifecycleDigestCannotFork() throws {
+    let fixture = try Self.makeQuarantinedRecoveryFixture()
+    let previous = try fixture.currentLifecycleDigest()
+    try fixture._testAppendLifecycle(
+      state: .leaseAcquired, previousDigest: previous)
+    XCTAssertThrowsError(
+      try fixture._testAppendLifecycle(
+        state: .floorUpdated, previousDigest: previous))
+}
+
+func testDuplicateRecoveryCompletionFails() throws {
+    let fixture = try Self.makeRecoveryReadyToCompleteFixture()
+    let previous = try fixture.currentLifecycleDigest()
+    try fixture.completeRecovery(expectedLifecycleDigest: previous)
+    XCTAssertThrowsError(
+      try fixture.completeRecovery(expectedLifecycleDigest: previous))
+    XCTAssertEqual(
+      try fixture.lifecycleRows().filter { $0.state == .completed }.count,
+      1)
+}
+```
+
 Also add one table-driven test for wrong key epoch, schema rollback, record-count/root rollback, CAS-head root/revision rollback, ordinary-put floor rollback, recovery-floor rollback, missing WAL, missing SHM, stale family, torn metadata, lost SQLite reply, lost K3 reply, corrupt quarantine member, expired recovery lease, and duplicate recovery completion.
+
+In the same uncommitted RED edit, add all test-only fixture/hook signatures
+used by the new tests and the final internal recovery-method signatures from
+Step 6 so the suite compiles and lists. Their minimum fail-closed bodies must
+throw a temporary error whose rendered description is exactly
+`artifact-mesh.floor-recovery.unimplemented`; they perform no lifecycle
+append, lease mutation, floor update, barrier installation, or receipt
+return. Do not stage the stub. Missing production or helper symbols are
+invalid RED.
 
 - [ ] **Step 2: Run RED**
 
-Run the non-empty `BASArtifactStoreTests` command.
+```bash
+set -euo pipefail
+set +e
+FLOOR_RECOVERY_RED_TRANSCRIPT="$(
+  python3 scripts/run_nonempty_swift_filter.py \
+    --package-path BehavioralAISubstrate \
+    --filter BASArtifactStoreTests \
+    --require-suite BASArtifactStoreTests \
+    2>&1
+)"
+FLOOR_RECOVERY_RED_RC="$?"
+set -euo pipefail
+printf '%s\n' "$FLOOR_RECOVERY_RED_TRANSCRIPT"
+test "$FLOOR_RECOVERY_RED_RC" = 1
+for marker in \
+  'BASArtifactStoreTests' \
+  'testPendingWithoutSQLiteCommitClearsToExactCommittedFloor' \
+  'testK3ReferenceHookCannotRunBeforePromotion' \
+  'testOneRecoveryIDAppendsAllFourLifecycleStages' \
+  'testExpiredLeaseMayAppendAnotherLeaseAcquiredForSameRecoveryID' \
+  'testSamePreviousLifecycleDigestCannotFork' \
+  'testDuplicateRecoveryCompletionFails' \
+  'artifact-mesh.floor-recovery.unimplemented'
+do
+  case "$FLOOR_RECOVERY_RED_TRANSCRIPT" in
+    *"$marker"*) ;;
+    *) printf 'missing RED diagnostic/discovery: %s\n' "$marker" >&2; exit 1 ;;
+  esac
+done
+```
 
-Expected: new tests fail because pending/floor recovery and lab barriers are absent.
+Expected: exact exit 1 after positive suite/test discovery, with the new
+tests failing only on `artifact-mesh.floor-recovery.unimplemented`. A
+compile/list failure, missing symbol, zero discovery, other return code, or
+unrelated diagnostic is invalid RED.
 
 - [ ] **Step 3: Implement deterministic metadata derivation**
 
@@ -2620,7 +3092,20 @@ func completeRecovery(
 ) throws
 ```
 
-Each method uses `BEGIN IMMEDIATE`, exact expected generation/digest, append-only lifecycle digest chaining, and one singleton lease CAS. An expired lease can be replaced only by a new holder that proves expiry against monotonic time and appends a new `lease-acquired` lifecycle row. Completion deletes the exact lease after appending `completed`; a duplicate completion or wrong holder/generation fails.
+Each method uses `BEGIN IMMEDIATE`, exact expected generation/digest,
+append-only lifecycle digest chaining, and one singleton lease CAS. Before
+every append it selects the same `recovery_id` in `ordinal ASC` order,
+validates contiguous ordinals and every recomputed digest, and requires the
+caller's expected previous digest/state to equal the exact current head. The
+new row's `previous_lifecycle_digest` is that head; the composite
+`UNIQUE(recovery_id, previous_lifecycle_digest)` rejects two successors from
+one head, while repeated states reached from different valid heads remain
+legal. An expired lease can be replaced only by a new holder that proves
+expiry against monotonic time and appends another `lease-acquired` row for
+the same recovery ID. Completion deletes the exact lease only after appending
+`completed`; a duplicate completion, stale/forked previous digest, or wrong
+holder/generation fails. Reopen never infers current state from an unordered
+row or from `MAX(state)`.
 
 - [ ] **Step 7: Add lab-only fault barriers without shipping reachability**
 
@@ -2662,6 +3147,7 @@ enum, install method, callback storage, or symbols.
 - [ ] **Step 8: Run GREEN twice from clean processes**
 
 ```bash
+set -euo pipefail
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path BehavioralAISubstrate \
   --filter BASArtifactStoreTests \
@@ -2677,6 +3163,7 @@ Expected: both runs execute the same non-zero test count with 0 failures; no dat
 - [ ] **Step 9: Commit**
 
 ```bash
+set -euo pipefail
 git add \
   BehavioralAISubstrate/Sources/BASMemory/BASArtifactSQLiteStore.swift \
   BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASArtifactStoreTests.swift
@@ -2800,32 +3287,46 @@ call string or modify the host/callers yet. Do not stage the stub.
 - [ ] **Step 2: Run RED**
 
 ```bash
+set -euo pipefail
 set +e
-python3 scripts/run_nonempty_swift_filter.py \
-  --package-path QinaoRuntimeSDK \
-  --filter QinaoArtifactMeshAssemblyTests \
-  --require-suite QinaoArtifactMeshAssemblyTests
-assembly_status=$?
+ASSEMBLY_RED_TRANSCRIPT="$(
+  python3 scripts/run_nonempty_swift_filter.py \
+    --package-path QinaoRuntimeSDK \
+    --filter QinaoArtifactMeshAssemblyTests \
+    --require-suite QinaoArtifactMeshAssemblyTests \
+    2>&1
+)"
+ASSEMBLY_RED_RC="$?"
+set -euo pipefail
+printf '%s\n' "$ASSEMBLY_RED_TRANSCRIPT"
+test "$ASSEMBLY_RED_RC" = 1
+for marker in \
+  'QinaoArtifactMeshAssemblyTests' \
+  'testUnknownProtectionVersionFailsClosed' \
+  'unimplemented'
+do
+  case "$ASSEMBLY_RED_TRANSCRIPT" in
+    *"$marker"*) ;;
+    *) printf 'missing RED diagnostic/discovery: %s\n' "$marker" >&2; exit 1 ;;
+  esac
+done
+
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path QinaoRuntimeSDK \
   --filter QinaoSovereignHostAssemblyTests \
   --require-suite QinaoSovereignHostAssemblyTests
-host_status=$?
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path QinaoRuntimeSDK \
   --filter QinaoEffectFacadeFreezeTests \
   --require-suite QinaoEffectFacadeFreezeTests
-facade_status=$?
-set -e
-test "$assembly_status" -ne 0
-test "$host_status" -eq 0
-test "$facade_status" -eq 0
 ```
 
 Expected: all three list phases are non-empty. The new assembly suite
-executes and fails on the stub/source-shape assertions, while both incumbent
-baseline suites remain green. A compile/list/link failure, a zero-match
-filter, or an incumbent-suite failure is invalid RED.
+executes with exact exit 1 on the `unimplemented` stub/source-shape
+diagnostic. After strict mode is immediately restored, both incumbent
+baseline suites run as ordinary GREEN commands and must pass. A
+compile/list/link failure, a zero-match filter, another RED return code, or
+an incumbent-suite failure is invalid RED.
 
 - [ ] **Step 3: Implement the exact configuration and factory**
 
@@ -2946,6 +3447,7 @@ before Runtime construction, add `public let artifactMesh: BASArtifactSQLiteStor
 - [ ] **Step 5: Run GREEN plus incumbent seam tests**
 
 ```bash
+set -euo pipefail
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path QinaoRuntimeSDK \
   --filter QinaoArtifactMeshAssemblyTests \
@@ -2965,6 +3467,7 @@ Expected: all three suites non-empty and green. The façade freeze remains uncha
 - [ ] **Step 6: Commit**
 
 ```bash
+set -euo pipefail
 git add \
   QinaoRuntimeSDK/Sources/QinaoDefaults/QinaoArtifactMeshAssembly.swift \
   QinaoRuntimeSDK/Sources/QinaoDefaults/QinaoSovereignHostAssembly.swift \
@@ -2985,6 +3488,7 @@ Expected: exactly six paths, containing the two assembly E/A seams and necessary
 - Modify: `SampleHost/Package.swift`
 - Create: `SampleHost/ArtifactMeshDeviceLab/project.yml`
 - Create: `SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.pbxproj`
+- Create: `SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.xcworkspace/contents.xcworkspacedata`
 - Create: `SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshDeviceLab.xcscheme`
 - Create: `SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshCASContenderLab.xcscheme`
 - Create: `SampleHost/ArtifactMeshDeviceLab/App/ArtifactMeshDeviceLabApp.swift`
@@ -3013,14 +3517,19 @@ exclude: [
 Run:
 
 ```bash
+set -euo pipefail
 cd SampleHost
 xcodebuild test \
   -scheme SampleHost \
-  -destination 'platform=iOS Simulator,name=iPhone 17e'
+  -destination 'platform=iOS Simulator,name=iPhone 17e' \
+  -derivedDataPath \
+    /private/tmp/qinao-artifact-mesh-w1-task0/samplehost-derived
 cd ..
 ```
 
 Expected: existing SampleHost tests pass and no unhandled-file warning names `ArtifactMeshDeviceLab`.
+All SampleHost build intermediates are confined to the named `/private/tmp`
+DerivedData root rather than the user's default Xcode cache.
 
 - [ ] **Step 2: Write the exact XcodeGen source**
 
@@ -3124,17 +3633,20 @@ schemes:
 Generate and verify both required real project artifacts:
 
 ```bash
+set -euo pipefail
 xcodegen generate \
   --spec SampleHost/ArtifactMeshDeviceLab/project.yml \
   --project SampleHost/ArtifactMeshDeviceLab
 test -s SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.pbxproj
+test -s SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.xcworkspace/contents.xcworkspacedata
 test -s SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshDeviceLab.xcscheme
 test -s SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshCASContenderLab.xcscheme
 ```
 
-Expected: XcodeGen succeeds and all three generated files are non-empty. Commit
-the pbxproj and both generated shared schemes; `project.yml` is the reviewable
-source but never substitutes for real generated project artifacts.
+Expected: XcodeGen succeeds and all four generated files are non-empty. Commit
+the pbxproj, generated workspace contents, and both generated shared schemes;
+`project.yml` is the reviewable source but never substitutes for real
+generated project artifacts.
 
 - [ ] **Step 3: Add exact entitlements**
 
@@ -3202,10 +3714,13 @@ evidence-client call.
 
 The primary `ArtifactMeshRecoveryProbe` gains a matching `cas-seed` mode that
 calls only `BASArtifactMeshKeychainCASLabProbe.seed` with the same
-container/role/access-group/challenge tuple, emits the expected digest, and
-stops at a live barrier. Its `cas-contender-a` mode uses the same `contend`
-call, so the race is between the primary app PID and companion app PID—not two
-Swift tasks.
+container/role/access-group/challenge tuple, emits the expected committed-g1
+digest plus its seed PID, and stops at a live barrier. The controller must
+read and validate that seed result while the process is live, terminate the
+seed PID, and query until that exact PID is absent before this bundle may be
+launched again. Its later `cas-contender-a` mode uses the same `contend` call,
+so the race is between two fresh primary/companion app PIDs—not the seed PID
+and not two Swift tasks.
 
 - [ ] **Step 4: Implement the closed protocol**
 
@@ -3370,33 +3885,37 @@ It must contain no `BASMemory`, `BASRuntimeCore`, `QinaoDefaults`, `BASArtifactS
 
 File mutations use file descriptors with `O_NOFOLLOW`, same-container canonical descendants, regular-file checks, and atomic rename. Keychain mutation uses the app's own exact service/account/access group; the controller never reads or writes that Keychain item.
 
-- [ ] **Step 8: Build the exact archive shape without claiming device proof**
+- [ ] **Step 8: Build both unsigned products without creating a plaintext archive**
 
 ```bash
-xcodebuild archive \
+set -euo pipefail
+xcodebuild build \
   -project SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj \
   -scheme ArtifactMeshDeviceLab \
   -destination 'generic/platform=iOS' \
-  -archivePath /private/tmp/qinao-artifact-mesh-w1-task0/lab-shape.xcarchive \
+  -derivedDataPath /private/tmp/qinao-artifact-mesh-w1-task0/lab-shape-derived \
   'OTHER_SWIFT_FLAGS=$(inherited) -DQINAO_ARTIFACT_MESH_DEVICE_LAB' \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO
-xcodebuild archive \
+xcodebuild build \
   -project SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj \
   -scheme ArtifactMeshCASContenderLab \
   -destination 'generic/platform=iOS' \
-  -archivePath /private/tmp/qinao-artifact-mesh-w1-task0/cas-contender-shape.xcarchive \
+  -derivedDataPath /private/tmp/qinao-artifact-mesh-w1-task0/cas-contender-shape-derived \
   'OTHER_SWIFT_FLAGS=$(inherited) -DQINAO_ARTIFACT_MESH_DEVICE_LAB' \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO
 ```
 
-Expected: both archives succeed as unsigned shape evidence only. They are not
-physical or production proof.
+Expected: both generic-device builds succeed as unsigned compilation evidence
+only. This step deliberately creates no `.xcarchive`; the two production
+archives are created only in Task 9 inside broker-issued encrypted custody.
+These builds are not physical or production proof.
 
 - [ ] **Step 9: Prove structural exclusion and commit**
 
 ```bash
+set -euo pipefail
 python3 - <<'PY'
 from pathlib import Path
 pkg = Path("SampleHost/Package.swift").read_text()
@@ -3408,10 +3927,13 @@ for token in ("BASMemory", "BASRuntimeCore", "QinaoDefaults",
     if token in fault:
         raise SystemExit(f"fault bootstrap can open store via {token}")
 pbx = Path("SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.pbxproj").read_text()
+workspace = Path("SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.xcworkspace/contents.xcworkspacedata").read_text()
 scheme = Path("SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshDeviceLab.xcscheme").read_text()
 cas_scheme = Path("SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshCASContenderLab.xcscheme").read_text()
 if "IPHONEOS_DEPLOYMENT_TARGET = 27.0" not in pbx:
     raise SystemExit("lab iOS floor drift")
+if "<Workspace" not in workspace or "project.pbxproj" in workspace:
+    raise SystemExit("generated workspace contents drift")
 if "ArtifactMeshDeviceLab" not in scheme:
     raise SystemExit("shared scheme drift")
 if "ArtifactMeshCASContenderLab" not in cas_scheme:
@@ -3422,6 +3944,7 @@ git add \
   SampleHost/Package.swift \
   SampleHost/ArtifactMeshDeviceLab/project.yml \
   SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.pbxproj \
+  SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.xcworkspace/contents.xcworkspacedata \
   SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshDeviceLab.xcscheme \
   SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshCASContenderLab.xcscheme \
   SampleHost/ArtifactMeshDeviceLab/App/ArtifactMeshDeviceLabApp.swift \
@@ -3434,7 +3957,7 @@ git commit -m "test(artifact-mesh): add isolated iOS recovery lab"
 ```
 
 Expected: two real lab-only app products, two shared schemes, iOS 27.0, and
-exactly eleven committed paths.
+exactly twelve committed paths.
 
 ---
 
@@ -3478,6 +4001,14 @@ accept unchanged boot identity for protectedDataUnavailable
 ```
 
 Each mutation must produce one stable diagnostic and non-zero exit.
+Put every checker test in the exact
+`ArtifactMeshDeviceRecoveryCheckerTests` class. Include the designated
+positive-path sentinel
+`testExactMatrixFixtureRequiresImplementedChecker`; it calls the final
+checker entrypoint over the exact positive fixture without swallowing or
+rewriting the temporary stub error. The mutation tests are present now but
+are intentionally exercised as a complete set in GREEN rather than being
+required to manufacture 68 independent failures from one stub.
 
 In the same uncommitted RED edit, create
 `scripts/check_artifact_mesh_device_recovery.py` as an importable stub with
@@ -3491,12 +4022,48 @@ stage the stub.
 - [ ] **Step 2: Run RED**
 
 ```bash
-python3 -m unittest -v scripts.test_check_artifact_mesh_device_recovery
+set -euo pipefail
+set +e
+MATRIX_CHECKER_RED_TRANSCRIPT="$(
+  python3 -m unittest -v \
+    scripts.test_check_artifact_mesh_device_recovery.ArtifactMeshDeviceRecoveryCheckerTests.testExactMatrixFixtureRequiresImplementedChecker \
+    2>&1
+)"
+MATRIX_CHECKER_RED_RC="$?"
+set -euo pipefail
+printf '%s\n' "$MATRIX_CHECKER_RED_TRANSCRIPT"
+test "$MATRIX_CHECKER_RED_RC" = 1
+export MATRIX_CHECKER_RED_TRANSCRIPT
+python3 - <<'PY'
+import os
+import re
+
+transcript = os.environ["MATRIX_CHECKER_RED_TRANSCRIPT"]
+if "artifact-mesh.matrix.unimplemented" not in transcript:
+    raise SystemExit("missing exact matrix RED diagnostic")
+if (
+    "testExactMatrixFixtureRequiresImplementedChecker" not in transcript
+    or not re.search(r"\bRan 1 test\b", transcript)
+    or not re.search(
+      r"testExactMatrixFixtureRequiresImplementedChecker .* \.\.\. ERROR",
+      transcript)
+):
+    raise SystemExit("matrix RED sentinel discovery/status is not exact")
+for forbidden in (
+    "_FailedTest", "ImportError", "ModuleNotFoundError", "Ran 0 tests",
+    "FAILED (failures=",
+):
+    if forbidden in transcript:
+        raise SystemExit(f"invalid matrix RED transcript: {forbidden}")
+PY
+unset MATRIX_CHECKER_RED_TRANSCRIPT
 ```
 
-Expected: every named case is discovered and fails only on
-`artifact-mesh.matrix.unimplemented`. Import failure, missing checked-in
-matrix, empty discovery, or an arbitrary exception is invalid RED.
+Expected: the one exact positive-path sentinel is discovered and errors only
+on `artifact-mesh.matrix.unimplemented` with exact exit 1. Import failure,
+missing positive fixture, empty/multiple discovery, another return code, or
+an arbitrary exception is invalid RED. Step 7 is the first point at which
+the complete positive-plus-mutation class must be green.
 
 - [ ] **Step 3: Freeze exact checker constants**
 
@@ -3629,8 +4196,8 @@ Use this exact table; every ID uses `fault.ACTION`:
 | `regressAnchorFloor` | `committedG1` | after `ordinaryPutAnchorFloorPromote` | `beforeRecoveryOpen` | `quarantine` |
 | `deleteKeychainAnchor` | `committedG0` | after `genesisAnchorPromote` | `beforeRecoveryOpen` | `quarantine` |
 | `dropSQLiteReply` | `committedPendingG1` | after `ordinaryPutSQLiteCommit` | `atDurableCommitBeforeReply` | `promote` |
-| `dropK3Reply` | `k3CommittedG1` | after `k3ReferenceCommit` | `atDurableCommitBeforeReply` | `queryReconcile` |
-| `raceSecondCAS` | `committedG0` | before `ordinaryPutSQLiteCommit` | `whileProcessAlive` | `queryReconcile` |
+| `dropK3Reply` | `committedG1` | after `k3ReferenceCommit` | `atDurableCommitBeforeReply` | `queryReconcile` |
+| `raceSecondCAS` | `committedG1` | before `ordinaryPutSQLiteCommit` | `whileProcessAlive` | `queryReconcile` |
 | `corruptQuarantineMember` | `quarantinedG1` | after `quarantineInstall` | `beforeRecoveryOpen` | `quarantine` |
 | `expireRecoveryLease` | `recoveryLeaseG1` | after `recoveryLeaseAcquire` | `beforeRecoveryOpen` | `recoveryComplete` |
 | `protectedDataUnavailable` | `committedG1` | before `reopen` | `afterRebootBeforeFirstUnlock` | `denyUnavailable` |
@@ -3731,9 +4298,9 @@ FAULT_SETUP = {
     "dropSQLiteReply":
         ("committedPendingG1", "after", "ordinaryPutSQLiteCommit"),
     "dropK3Reply":
-        ("k3CommittedG1", "after", "k3ReferenceCommit"),
+        ("committedG1", "after", "k3ReferenceCommit"),
     "raceSecondCAS":
-        ("committedG0", "before", "ordinaryPutSQLiteCommit"),
+        ("committedG1", "before", "ordinaryPutSQLiteCommit"),
     "corruptQuarantineMember":
         ("quarantinedG1", "after", "quarantineInstall"),
     "expireRecoveryLease":
@@ -3775,6 +4342,14 @@ def expected_rows():
             ))
     for fault in FAULT_TIMING:
         initial, cut_tag, operation = FAULT_SETUP[fault]
+        if FAULT_TIMING[fault] == "atDurableCommitBeforeReply":
+            expected_initial = NO_FAULT_EXPECTED[operation]["before"][0]
+            if initial != expected_initial:
+                raise AssertionError(
+                    "durable-commit lost-reply fault must start at "
+                    f"the operation's before state: {fault}: "
+                    f"{initial} != {expected_initial}"
+                )
         generation, put_floor, recovery_floor = (
             FAULT_EXPECTED_STATE[fault]
         )
@@ -3785,6 +4360,11 @@ def expected_rows():
         ))
     if len(rows) != 40:
         raise AssertionError(f"expected 40 rows, got {len(rows)}")
+    if FAULT_SETUP["raceSecondCAS"][0] != "committedG1":
+        raise AssertionError(
+            "raceSecondCAS must contend from the freshly reopened "
+            "seed committed-g1 state"
+        )
     return rows
 ```
 
@@ -3822,6 +4402,7 @@ With no evidence options it validates schema/index only and prints `mode=matrix`
 - [ ] **Step 7: Run GREEN and commit**
 
 ```bash
+set -euo pipefail
 python3 -m unittest -v scripts.test_check_artifact_mesh_device_recovery
 python3 scripts/check_artifact_mesh_device_recovery.py \
   --root . \
@@ -3906,6 +4487,21 @@ matrix checked before archive
 exact xcodebuild archive project/scheme/destination
 signed app extracted from exact archive
 codesign/provisioning/CDHash/entitlement checks precede install
+recorded `devicectl device install app` argv places every controller option,
+including `--device` and `--json-output`, before the positional app path
+recorded `devicectl device process launch` argv follows the frozen usage
+`[<options>] --device DEVICE <bundle> [<command-line-arguments> ...]`
+and places `--json-output` before the bundle ID
+the primary launch bundle is followed by exactly the two app flags and their
+values (`--qinao-artifact-mesh-mode VALUE`, `--command-file VALUE`); the
+companion launch bundle is followed by exactly its four pairs
+(`--challenge VALUE`, `--contender-id VALUE`, `--expected-digest VALUE`,
+`--result-file VALUE`); neither closed suffix contains `--json-output` or
+another controller option after the bundle
+launch JSON and PID are read only from the controller-owned structured
+`--json-output` file, never app argv, stdout, or an app event
+copy/terminate argv contains only the command-specific controller options
+and no app-command-line tail
 40 fresh run IDs and 40 fresh challenges
 every ordinary crash victim proven alive before SIGKILL and dead afterward
 no app-authored normal terminal before kill
@@ -3925,12 +4521,34 @@ unknown devicectl JSON shape fails
 voluntary app exit fails
 uninstall/cleanup failure is recorded and makes production fail
 two distinct signed app PIDs race one Keychain state and produce one winner/one conflict
+the seed result is read while its PID is live, that seed PID is terminated
+and proven absent with no normal terminal, and both contenders have fresh
+distinct PIDs that are simultaneously live and differ from the seed PID
+seed PID reuse, launch-before-seed-death, or a still-running primary bundle
+is rejected before the race
 production tool executable/version/SDK/archive/profile facts equal the signed binding
 encrypted workspace key destruction and no-residue verification are mandatory
 crash recovery destroys orphaned workspace keys before retry
+production lab DerivedData/result bundles/HOME/TMPDIR/package and module caches
+all resolve beneath the encrypted custody capability
+the opaque custody cleanup receipt covers every one of those roots
+every custody path component rejects symlink, rename-swap, inode
+substitution, hard-link, and name-to-open-FD mismatch races without writing
+or reading any byte outside the capability root
+command stdout/stderr floods, timeout, and spawned-child leaks hit signed
+hard caps, terminate the whole process group, wait for death, and leave only
+bounded FD-relative logs inside custody
 ```
 
 The recording runner returns structured JSON fixtures with real `devicectl` field paths captured from Xcode 27 help/shape fixtures; prose stdout is never parsed.
+
+Put every controller test in exact class
+`ArtifactMeshDeviceRecoveryRunnerTests`. Include the designated sentinel
+`testProductionControllerRequiresImplementedRunner`; it invokes the final
+controller entrypoint with a valid recording-runner fixture without
+swallowing or rewriting the temporary runner-stub error. Keep all Task-8
+checker tests exclusively in
+`ArtifactMeshDeviceRecoveryCheckerTests`.
 
 In the same uncommitted RED edit, create
 `scripts/run_artifact_mesh_device_recovery.py` as the smallest importable
@@ -3943,13 +4561,53 @@ the stub.
 - [ ] **Step 2: Run RED**
 
 ```bash
-python3 -m unittest -v scripts.test_check_artifact_mesh_device_recovery
+set -euo pipefail
+python3 -m unittest -v \
+  scripts.test_check_artifact_mesh_device_recovery.ArtifactMeshDeviceRecoveryCheckerTests
+set +e
+DEVICE_RUNNER_RED_TRANSCRIPT="$(
+  python3 -m unittest -v \
+    scripts.test_check_artifact_mesh_device_recovery.ArtifactMeshDeviceRecoveryRunnerTests.testProductionControllerRequiresImplementedRunner \
+    2>&1
+)"
+DEVICE_RUNNER_RED_RC="$?"
+set -euo pipefail
+printf '%s\n' "$DEVICE_RUNNER_RED_TRANSCRIPT"
+test "$DEVICE_RUNNER_RED_RC" = 1
+export DEVICE_RUNNER_RED_TRANSCRIPT
+python3 - <<'PY'
+import os
+import re
+
+transcript = os.environ["DEVICE_RUNNER_RED_TRANSCRIPT"]
+if "artifact-mesh.device-runner.unimplemented" not in transcript:
+    raise SystemExit("missing exact device-runner RED diagnostic")
+if "artifact-mesh.matrix.unimplemented" in transcript:
+    raise SystemExit("checker baseline regressed to its old RED stub")
+if (
+    "testProductionControllerRequiresImplementedRunner" not in transcript
+    or not re.search(r"\bRan 1 test\b", transcript)
+    or not re.search(
+      r"testProductionControllerRequiresImplementedRunner .* \.\.\. ERROR",
+      transcript)
+):
+    raise SystemExit("device-runner RED sentinel discovery/status is not exact")
+for forbidden in (
+    "_FailedTest", "ImportError", "ModuleNotFoundError", "Ran 0 tests",
+    "FAILED (failures=",
+):
+    if forbidden in transcript:
+        raise SystemExit(f"invalid device-runner RED transcript: {forbidden}")
+PY
+unset DEVICE_RUNNER_RED_TRANSCRIPT
 ```
 
-Expected: checker tests remain green; every named controller test is
-discovered and fails only on
-`artifact-mesh.device-runner.unimplemented`. Import failure, missing runner,
-or zero discovery is invalid RED.
+Expected: the complete checker class remains green; then the one exact
+controller positive-path sentinel is discovered and errors only on
+`artifact-mesh.device-runner.unimplemented` with exact exit 1. Import
+failure, missing runner fixture, multiple/zero sentinel discovery, another
+return code, or checker regression is invalid RED. Step 9 is the first point
+at which the complete checker-plus-controller module must be green.
 
 - [ ] **Step 3: Implement sanitized command execution**
 
@@ -3959,11 +4617,15 @@ Replace the Step-1 stub in place and add:
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+import selectors
+import signal
 import stat
 import subprocess
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Protocol
 
 def reject_production_selector_environment(
     environment: dict[str, str],
@@ -3973,10 +4635,22 @@ def reject_production_selector_environment(
         "XCODE_XCCONFIG_FILE", "DEVELOPMENT_TEAM",
         "CODE_SIGN_IDENTITY", "PROVISIONING_PROFILE",
         "PROVISIONING_PROFILE_SPECIFIER",
+        "ARCHS", "ONLY_ACTIVE_ARCH", "CONFIGURATION",
+        "EFFECTIVE_PLATFORM_NAME", "SYMROOT", "OBJROOT",
+        "BUILD_DIR", "DERIVED_DATA_PATH",
+        "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
+        "VIRTUAL_ENV", "PYTHONHOME", "PYTHONPATH",
     }
+    prefixes = (
+        "QINAO_", "DYLD_", "LD_", "PYTHON", "PIP_", "CONDA_", "GIT_",
+    )
     forbidden = sorted(
         key for key in environment
-        if key in exact or key.startswith("QINAO_")
+        if (
+            key.upper() in exact
+            or key.upper().endswith("_PROXY")
+            or key.upper().startswith(prefixes)
+        )
     )
     if forbidden:
         raise RuntimeError(
@@ -3986,112 +4660,243 @@ def reject_production_selector_environment(
 class CommandResult:
     argv: Sequence[str]
     returncode: int
-    json_path: Path | None
-    log_path: Path
+    json_relative_path: str | None
+    log_relative_root: str
     stdout_sha256: str
     stderr_sha256: str
+
+@dataclass(frozen=True)
+class CustodyRootCapability:
+    directory_fd: int
+    child_visible_root: str
+    device: int
+    inode: int
+    broker_parent_identity_digest: str
+    exclusive_writer_lease_digest: str
+
+@dataclass(frozen=True)
+class CommandLimits:
+    timeout_seconds: int
+    stdout_bytes: int
+    stderr_bytes: int
+    json_bytes: int
+    run_bytes_stdout_bytes: int | None
+    profile_probe_returncodes: tuple[int, ...]
+
+@dataclass(frozen=True)
+class _BoundedProcessResult:
+    returncode: int
+    stdout_sha256: str
+    stderr_sha256: str
+    retained_stdout: bytes | None
+
+class _CustodyFDTree(Protocol):
+    @property
+    def root_fd(self) -> int: ...
+
+    def open_directory_chain(
+        self, relative: str, *, create: bool
+    ) -> int: ...
+
+    def child_path(self, relative: str) -> str: ...
+
+    def create_exclusive_leaf(
+        self, relative: str, *, mode: int
+    ) -> int: ...
+
+    def fsync_and_verify_leaf(
+        self, fd: int, relative: str
+    ) -> None: ...
+
+    def read_bounded_verified_leaf(
+        self, fd: int, relative: str, limit: int
+    ) -> bytes: ...
+
+    def verified_unlink(
+        self, fd: int, relative: str
+    ) -> None: ...
+
+    def close(self) -> None: ...
+
+def _validate_and_dup_custody(
+    custody: CustodyRootCapability,
+) -> _CustodyFDTree: ...
+
+def _validate_signed_limits(
+    limits: dict[str, CommandLimits],
+) -> dict[str, CommandLimits]: ...
+
+def _validate_closed_devicectl_probe_shape(
+    document: dict[str, object], *, returncode: int
+) -> None: ...
+
+def _stream_process_bounded(
+    *,
+    command: tuple[str, ...],
+    environment: dict[str, str],
+    timeout_seconds: int,
+    stdout_limit: int,
+    stderr_limit: int,
+    stdout_log_fd: int,
+    stderr_log_fd: int,
+    retain_stdout: bool,
+) -> _BoundedProcessResult: ...
 
 class CommandRunner:
     def __init__(
         self,
         *,
         allowed_tools: frozenset[Path],
+        bound_xcrun: Path,
         developer_dir: Path,
-        isolated_home: Path,
-        isolated_tmp: Path,
+        custody: CustodyRootCapability,
+        signed_limits: dict[str, CommandLimits],
+        isolated_home: str,
+        isolated_tmp: str,
+        isolated_cache: str,
+        isolated_module_cache: str,
+        isolated_package_cache: str,
     ) -> None:
-        resolved = frozenset(path.resolve(strict=True)
-                             for path in allowed_tools)
-        if not resolved or any(not path.is_absolute()
-                               for path in resolved):
+        if not allowed_tools or any(not path.is_absolute()
+                                    for path in allowed_tools):
             raise RuntimeError("bound tools must be absolute")
-        self._allowed_tools = resolved
-        self._developer_dir = developer_dir.resolve(strict=True)
-        self._isolated_home = isolated_home.resolve(strict=True)
-        self._isolated_tmp = isolated_tmp.resolve(strict=True)
+        if (
+            not bound_xcrun.is_absolute()
+            or bound_xcrun not in allowed_tools
+        ):
+            raise RuntimeError("BOUND_XCRUN is not lease-bound")
+        self._allowed_tools = allowed_tools
+        self._bound_xcrun = bound_xcrun
+        self._developer_dir = developer_dir
+        self._custody = _validate_and_dup_custody(custody)
+        self._limits = _validate_signed_limits(signed_limits)
+        try:
+            for relative in (
+                isolated_home,
+                isolated_tmp,
+                isolated_cache,
+                isolated_module_cache,
+                isolated_package_cache,
+            ):
+                directory_fd = self._custody.open_directory_chain(
+                  relative, create=True)
+                os.close(directory_fd)
+        except BaseException:
+            self._custody.close()
+            raise
+        self._isolated_home = self._custody.child_path(isolated_home)
+        self._isolated_tmp = self._custody.child_path(isolated_tmp)
+        self._isolated_cache = self._custody.child_path(isolated_cache)
+        self._isolated_module_cache = self._custody.child_path(
+          isolated_module_cache)
+        self._isolated_package_cache = self._custody.child_path(
+          isolated_package_cache)
 
     def _environment(self) -> dict[str, str]:
         # Start empty. Never copy os.environ into a production child.
         return {
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
             "DEVELOPER_DIR": str(self._developer_dir),
-            "HOME": str(self._isolated_home),
-            "TMPDIR": str(self._isolated_tmp) + "/",
+            "HOME": self._isolated_home,
+            "CFFIXED_USER_HOME": self._isolated_home,
+            "TMPDIR": self._isolated_tmp + "/",
+            "XDG_CACHE_HOME": self._isolated_cache,
+            "CLANG_MODULE_CACHE_PATH": self._isolated_module_cache,
+            "SWIFTPM_MODULECACHE_OVERRIDE":
+                self._isolated_module_cache,
             "LANG": "C",
             "LC_ALL": "C",
             "NSUnbufferedIO": "YES",
         }
 
-    @staticmethod
-    def _write_log(
-        path: Path,
-        completed: subprocess.CompletedProcess[bytes],
-    ) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(
-          b"stdout\n" + completed.stdout
-          + b"\nstderr\n" + completed.stderr)
-        path.chmod(0o600)
-
     def _run(
         self,
+        command_kind: str,
         argv: Sequence[str],
         *,
-        json_path: Path | None,
-        log_path: Path,
-    ) -> tuple[subprocess.CompletedProcess[bytes], CommandResult]:
+        json_relative_path: str | None,
+        log_relative_root: str,
+        retain_stdout: bool = False,
+    ) -> tuple[bytes | None, CommandResult, int | None]:
         command = tuple(argv)
         if not command or any(not value for value in command):
             raise RuntimeError("empty command/argument")
         executable = Path(command[0])
-        if (
-            not executable.is_absolute()
-            or executable.resolve(strict=True)
-                not in self._allowed_tools
-        ):
+        if not executable.is_absolute() or executable not in self._allowed_tools:
             raise RuntimeError("executable is not lease-bound")
-        if json_path is not None:
-            json_path.parent.mkdir(parents=True, exist_ok=True)
-            json_path.unlink(missing_ok=True)
-        completed = subprocess.run(
-            command,
-            shell=False,
-            check=False,
-            capture_output=True,
-            timeout=300,
-            env=self._environment(),
-        )
-        self._write_log(log_path, completed)
-        result = CommandResult(
-            argv=command,
-            returncode=completed.returncode,
-            json_path=json_path,
-            log_path=log_path,
-            stdout_sha256=hashlib.sha256(
-              completed.stdout).hexdigest(),
-            stderr_sha256=hashlib.sha256(
-              completed.stderr).hexdigest(),
-        )
-        if completed.returncode != 0:
-            raise RuntimeError(
-              f"command failed rc={completed.returncode}")
-        return completed, result
+        limits = self._limits[command_kind]
 
-    def run_json(
+        json_fd: int | None = None
+        stdout_fd: int | None = None
+        stderr_fd: int | None = None
+        returned_json_fd = False
+        try:
+            if json_relative_path is not None:
+                json_fd = self._custody.create_exclusive_leaf(
+                  json_relative_path, mode=0o600)
+                json_output = self._custody.child_path(
+                  json_relative_path)
+                if command.count("--json-output") != 1:
+                    raise RuntimeError(
+                      "exactly one --json-output is required")
+                position = command.index("--json-output")
+                if command[position + 1] != json_output:
+                    raise RuntimeError(
+                      "JSON output is not the broker-presented "
+                      "custody leaf")
+
+            stdout_fd = self._custody.create_exclusive_leaf(
+              f"{log_relative_root}/stdout.bin", mode=0o600)
+            stderr_fd = self._custody.create_exclusive_leaf(
+              f"{log_relative_root}/stderr.bin", mode=0o600)
+            completed = _stream_process_bounded(
+              command=command,
+              environment=self._environment(),
+              timeout_seconds=limits.timeout_seconds,
+              stdout_limit=(
+                limits.run_bytes_stdout_bytes
+                if retain_stdout
+                else limits.stdout_bytes
+              ),
+              stderr_limit=limits.stderr_bytes,
+              stdout_log_fd=stdout_fd,
+              stderr_log_fd=stderr_fd,
+              retain_stdout=retain_stdout,
+            )
+            self._custody.fsync_and_verify_leaf(
+              stdout_fd, f"{log_relative_root}/stdout.bin")
+            self._custody.fsync_and_verify_leaf(
+              stderr_fd, f"{log_relative_root}/stderr.bin")
+            result = CommandResult(
+                argv=command,
+                returncode=completed.returncode,
+                json_relative_path=json_relative_path,
+                log_relative_root=log_relative_root,
+                stdout_sha256=completed.stdout_sha256,
+                stderr_sha256=completed.stderr_sha256,
+            )
+            returned_json_fd = json_fd is not None
+            return completed.retained_stdout, result, json_fd
+        finally:
+            for owned in (stdout_fd, stderr_fd):
+                if owned is not None:
+                    os.close(owned)
+            if json_fd is not None and not returned_json_fd:
+                os.close(json_fd)
+
+    def _decode_reserved_json(
         self,
-        argv: Sequence[str],
-        *,
-        json_path: Path,
-        log_path: Path,
-    ) -> tuple[dict[str, object], CommandResult]:
-        _, result = self._run(
-          argv, json_path=json_path, log_path=log_path)
-        metadata = json_path.lstat()
-        if (
-            not stat.S_ISREG(metadata.st_mode)
-            or json_path.is_symlink()
-        ):
-            raise RuntimeError("JSON output is not a regular file")
+        command_kind: str,
+        json_fd: int,
+        json_relative_path: str,
+    ) -> dict[str, object]:
+        try:
+            raw = self._custody.read_bounded_verified_leaf(
+              json_fd,
+              json_relative_path,
+              self._limits[command_kind].json_bytes)
+        finally:
+            os.close(json_fd)
 
         def unique_object(
             pairs: list[tuple[str, object]],
@@ -4105,22 +4910,201 @@ class CommandRunner:
             return value
 
         decoded = json.loads(
-          json_path.read_bytes(),
+          raw.decode("utf-8", "strict"),
           object_pairs_hook=unique_object)
         if not isinstance(decoded, dict):
             raise RuntimeError("JSON root is not an object")
+        return decoded
+
+    def run_json(
+        self,
+        command_kind: str,
+        argv: Sequence[str],
+        *,
+        json_relative_path: str,
+        log_relative_root: str,
+    ) -> tuple[dict[str, object], CommandResult]:
+        _, result, json_fd = self._run(
+          command_kind,
+          argv,
+          json_relative_path=json_relative_path,
+          log_relative_root=log_relative_root)
+        if json_fd is None:
+            raise RuntimeError("JSON reservation was not retained")
+        decoded = self._decode_reserved_json(
+          command_kind, json_fd, json_relative_path)
+        if result.returncode != 0:
+            raise RuntimeError(
+              f"command failed rc={result.returncode}")
+        return decoded, result
+
+    def run_devicectl_profile_probe_json(
+        self,
+        argv: Sequence[str],
+        *,
+        json_relative_path: str,
+        log_relative_root: str,
+    ) -> tuple[dict[str, object], CommandResult]:
+        command_kind = "devicectl-list-profile-probe"
+        json_output = self._custody.child_path(json_relative_path)
+        command = tuple(argv)
+        if command != (
+            str(self._bound_xcrun),
+            "devicectl",
+            "list",
+            "devices",
+            "--json-output",
+            json_output,
+        ):
+            raise RuntimeError(
+              "profile probe argv is not the exact signed shape")
+        _, result, json_fd = self._run(
+          command_kind,
+          command,
+          json_relative_path=json_relative_path,
+          log_relative_root=log_relative_root)
+        if json_fd is None:
+            raise RuntimeError("profile-probe JSON reservation was not retained")
+        decoded = self._decode_reserved_json(
+          command_kind, json_fd, json_relative_path)
+        accepted = self._limits[command_kind].profile_probe_returncodes
+        if result.returncode not in accepted:
+            raise RuntimeError(
+              f"profile-probe return code is not signed: "
+              f"{result.returncode}")
+        _validate_closed_devicectl_probe_shape(
+          decoded, returncode=result.returncode)
         return decoded, result
 
     def run_bytes(
         self,
+        command_kind: str,
         argv: Sequence[str],
         *,
-        log_path: Path,
+        log_relative_root: str,
     ) -> tuple[bytes, CommandResult]:
-        completed, result = self._run(
-          argv, json_path=None, log_path=log_path)
-        return completed.stdout, result
+        if self._limits[command_kind].run_bytes_stdout_bytes is None:
+            raise RuntimeError("run_bytes is forbidden for this command")
+        stdout, result, _ = self._run(
+          command_kind,
+          argv,
+          json_relative_path=None,
+          log_relative_root=log_relative_root,
+          retain_stdout=True)
+        if stdout is None:
+            raise RuntimeError("bounded stdout was not retained")
+        if result.returncode != 0:
+            raise RuntimeError(
+              f"command failed rc={result.returncode}")
+        return stdout, result
+
+    def close(self) -> None:
+        self._custody.close()
+
+    def __enter__(self) -> "CommandRunner":
+        return self
+
+    def __exit__(self, *unused: object) -> None:
+        self.close()
 ```
+
+Implement the custody helpers and bounded runner, rather than substituting
+ordinary `Path` operations:
+
+- The signatures shown above are the exact private interface surface, not
+  permission to leave protocol ellipses or unimplemented calls in the
+  checked-in module. One private concrete `_CustodyFDTree` and the three
+  module functions `_validate_and_dup_custody`,
+  `_validate_signed_limits`, `_validate_closed_devicectl_probe_shape`, and
+  `_stream_process_bounded` must implement those exact signatures. An
+  `inspect.signature` identity test freezes every
+  parameter, keyword-only boundary, and `_BoundedProcessResult` field and
+  fails if any call target is absent.
+- `CustodyRootCapability` is created only from the broker-provided,
+  already-open directory capability. `_validate_and_dup_custody` uses
+  `dup/fstat`, requires `S_ISDIR`, matches the signed device/inode, and binds
+  `child_visible_root` as a real absolute path on the encrypted custody
+  mount whose `stat` device/inode equals that same open FD. The root's entire
+  parent chain is owned by a different broker identity/OS protection domain:
+  neither the controller nor any child can write, rename, rebind, mount over,
+  or replace the root or its parents. The signed
+  `broker_parent_identity_digest` and `exclusive_writer_lease_digest` prove
+  that isolation before a command runs. `Path.resolve()`, a textual prefix,
+  or a caller path is never authorization. If the active broker cannot prove
+  this no-other-writer/root-immutability premise, stop at
+  `BLOCKED_EXTERNAL_CUSTODY`; this plan does not claim safety against an
+  arbitrary same-UID writer outside that lease/sandbox premise.
+- Relative names are non-empty normalized components with no absolute root,
+  empty component, `.`, `..`, NUL, or platform separator ambiguity. Parent
+  creation/traversal uses only `mkdirat` plus component-by-component
+  `openat(O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC)` from the custody root FD. It
+  retains each opened directory FD and compares `fstat(fd)` with
+  `fstatat(parent,name,AT_SYMLINK_NOFOLLOW)` before and after the operation.
+- Every JSON/log leaf is created once with
+  `openat(O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)`, followed by `fchmod`,
+  bounded full I/O, `fsync(file)`, `fstat`, name-to-open-FD device/inode
+  equality, regular-file type, `st_nlink == 1`, and `fsync(parent)`.
+  Verified unlink uses the retained parent FD and exact opened inode, then
+  `unlinkat` plus parent fsync. A symlink, hard link, rename swap, component
+  substitution, leaf replacement, or inode/name mismatch is the typed
+  `custodyPathRace` failure and cannot fall back to a pathname operation.
+- A `devicectl --json-output` leaf is reserved with that exclusive open and
+  kept open across the child. Because macOS tools cannot traverse an
+  arbitrary directory FD as a child-visible hierarchy, the child receives
+  only the real absolute path for that one already-created 0600 leaf beneath
+  the broker-protected `child_visible_root`; it does not receive the custody
+  root FD. Post-run parsing seeks/reads the same retained FD, rechecks that
+  the real name still resolves to that inode, and rechecks root-path identity
+  against the held directory FD.
+  JSON reads stop at the signed command-specific hard cap, reject an extra
+  byte, decode UTF-8 strictly, reject duplicate keys, and require the closed
+  command-specific object shape.
+- `_stream_process_bounded` uses `subprocess.Popen(start_new_session=True,
+  stdout=PIPE, stderr=PIPE, close_fds=True)` plus
+  nonblocking pipes and `selectors`. It hashes each stream incrementally and
+  writes it directly to its FD-relative 0600 log; it never uses
+  `subprocess.run(capture_output=True)` or accumulates unbounded output in
+  memory. `stdout_bytes`, `stderr_bytes`, timeout, JSON cap, and the optional
+  smaller `run_bytes_stdout_bytes` come only from the Bootstrap-signed
+  profile. `run_bytes` is unavailable unless that command has the smaller
+  cap and retains at most that many bytes.
+- On timeout, either stream exceeding its cap, selector/read/write failure,
+  or a descendant surviving the leader, the runner sends `SIGKILL` to the
+  whole process group, waits/reaps the leader, verifies the group has no live
+  member, fsyncs only the bounded logs already inside custody, and returns
+  respectively `commandTimeout`, `commandOutputLimitExceeded`, or
+  `commandProcessGroupLeak`. It never leaves unbounded bytes in memory or a
+  child writing after failure.
+
+FD ownership is closed: the broker retains the original capability FD;
+`_validate_and_dup_custody` owns one duplicate until idempotent
+`_CustodyFDTree.close`; `open_directory_chain` and
+`create_exclusive_leaf` transfer one FD to their caller; `_run` closes both
+log FDs on every path and transfers only the reserved JSON FD to `run_json`;
+`run_json` closes it in `finally`; `verified_unlink` never closes a
+caller-owned FD; and `_stream_process_bounded` owns/closes both pipe FDs and
+always waits/reaps the process group. Constructor failure closes the duplicate
+root, context exit is idempotent, and every exception path closes owned FDs
+in reverse acquisition order. Leak/fault-injection tests cover failure after
+each acquisition and require the pre-call FD count plus no live child.
+
+The Bootstrap-signed release-Xcode-27 profile also contains a no-device-effect
+tool probe: create one 0600 JSON leaf with `O_EXCL`, record its device/inode,
+run `BOUND_XCRUN devicectl list devices --json-output EXISTING_LEAF`, and require
+structured JSON plus the identical device/inode afterward even when the
+service returns a structured error. A recording fixture freezes that observed
+in-place-write behavior. If a later `devicectl` release rename-replaces the
+leaf, the profile/test fails with `commandOutputInodeReplaced` before any
+physical row or device mutation; the controller never weakens the same-inode
+postcondition.
+
+`profile_probe_returncodes` is nonempty only for the exact
+`devicectl-list-profile-probe` command kind and is a sorted, duplicate-free,
+Bootstrap-signed closed tuple. Every production command kind carries an empty
+tuple and still requires return code zero. The probe method accepts only the
+exact lease-bound absolute `BOUND_XCRUN devicectl list devices --json-output
+<reserved-leaf>` argv shape; it cannot be reused to tolerate a nonzero
+archive, install, copy, launch, terminate, inspection, or evidence command.
 
 Every `devicectl` caller supplies its exact `--json-output` pair to
 `run_json`. The caller additionally validates the command-specific closed
@@ -4128,9 +5112,12 @@ field shape and all paths against the already validated output root. Any
 non-zero exit, absent JSON, duplicate JSON key, unknown required shape, or
 path escape fails.
 
-The protected broker constructs `allowed_tools`, `developer_dir`, isolated
-HOME, and isolated TMPDIR only from the service-envelope-verified lease and
-opaque `ExternalPhysicalGateBinding`. The set contains exact absolute
+The protected broker constructs `allowed_tools`, `developer_dir`, encrypted
+custody root, isolated HOME/TMPDIR/cache/module-cache/package-cache roots only
+from the service-envelope-verified lease and opaque
+`ExternalPhysicalGateBinding`. Every isolated root must be a fresh descendant
+of the capability root and must be opened relative to its root FD; a textual
+prefix comparison is insufficient. The set contains exact absolute
 `xcodebuild`, `xcrun`, `codesign`, `security`, `dwarfdump`, `otool`, and `nm`
 paths; production commands never rely on PATH lookup. Before any archive or
 device effect, the controller reruns the binding-prescribed
@@ -4151,12 +5138,24 @@ Candidate-preflight resolves its explicit preflight-only values. Production
 receives the corresponding `BOUND_*` values only from the lease/broker and
 runs the absolute lease-bound executable twice:
 
+In the argv below, `ENCRYPTED_WORKSPACE/PackageCache` is exactly
+`self._isolated_package_cache`; `DerivedData`, `ResultBundles`, archive paths,
+HOME, TMPDIR, module cache, and tool cache are sibling real child paths
+produced only by `self._custody.child_path(relative)` after the corresponding
+directories were opened from `self._custody.root_fd`. Recording-runner tests
+assert their opened device/inode identities against that held root FD and
+the broker-protected `child_visible_root`, not textual-prefix similarity.
+
 ```text
 BOUND_XCODEBUILD archive
 -project SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj
 -scheme ArtifactMeshDeviceLab
 -destination generic/platform=iOS
 -archivePath ENCRYPTED_WORKSPACE/ArtifactMeshDeviceLab.xcarchive
+-derivedDataPath ENCRYPTED_WORKSPACE/DerivedData/ArtifactMeshDeviceLab
+-resultBundlePath ENCRYPTED_WORKSPACE/ResultBundles/ArtifactMeshDeviceLab.xcresult
+-clonedSourcePackagesDirPath ENCRYPTED_WORKSPACE/PackageCache/SourcePackages
+-disableAutomaticPackageResolution
 DEVELOPMENT_TEAM=BOUND_PUBLIC_TEAM_ID
 CODE_SIGN_STYLE=Automatic
 OTHER_SWIFT_FLAGS=$(inherited) -DQINAO_ARTIFACT_MESH_DEVICE_LAB
@@ -4166,12 +5165,22 @@ BOUND_XCODEBUILD archive
 -scheme ArtifactMeshCASContenderLab
 -destination generic/platform=iOS
 -archivePath ENCRYPTED_WORKSPACE/ArtifactMeshCASContenderLab.xcarchive
+-derivedDataPath ENCRYPTED_WORKSPACE/DerivedData/ArtifactMeshCASContenderLab
+-resultBundlePath ENCRYPTED_WORKSPACE/ResultBundles/ArtifactMeshCASContenderLab.xcresult
+-clonedSourcePackagesDirPath ENCRYPTED_WORKSPACE/PackageCache/SourcePackages
+-disableAutomaticPackageResolution
 DEVELOPMENT_TEAM=BOUND_PUBLIC_TEAM_ID
 CODE_SIGN_STYLE=Automatic
 OTHER_SWIFT_FLAGS=$(inherited) -DQINAO_ARTIFACT_MESH_DEVICE_LAB
 ```
 
 Do not add `-allowProvisioningUpdates`; signing/profile availability is an external prerequisite, not an implicit network mutation.
+Before either invocation, create all named descendants through the custody root
+FD with mode `0700`, reject pre-existing members, and prove `archivePath`,
+`derivedDataPath`, `resultBundlePath`, cloned packages, HOME, TMPDIR, and every
+cache environment path reopen beneath the same encrypted capability. The two
+archive commands may share only the immutable cloned-package directory; their
+DerivedData and result bundles remain disjoint.
 
 Require exactly one app in each archive:
 
@@ -4183,13 +5192,13 @@ Products/Applications/ArtifactMeshCASContenderLab.app
 Capture and cross-check:
 
 ```text
-codesign --verify --deep --strict --verbose=4 LAB_APP
-codesign -d --entitlements :- LAB_APP
-codesign -dvvv LAB_APP
-security cms -D -i LAB_APP/embedded.mobileprovision
-dwarfdump --uuid LAB_APP/ArtifactMeshDeviceLab
-otool -L LAB_APP/ArtifactMeshDeviceLab
-nm -gjU LAB_APP/ArtifactMeshDeviceLab
+BOUND_CODESIGN --verify --deep --strict --verbose=4 LAB_APP
+BOUND_CODESIGN -d --entitlements :- LAB_APP
+BOUND_CODESIGN -dvvv LAB_APP
+BOUND_SECURITY cms -D -i LAB_APP/embedded.mobileprovision
+BOUND_DWARFDUMP --uuid LAB_APP/ArtifactMeshDeviceLab
+BOUND_OTOOL -L LAB_APP/ArtifactMeshDeviceLab
+BOUND_NM -gjU LAB_APP/ArtifactMeshDeviceLab
 ```
 
 The controller passes
@@ -4214,61 +5223,102 @@ For every matrix row except `protectedDataUnavailable`:
 3. install the exact app:
 
 ```text
-xcrun devicectl device install app
+BOUND_XCRUN devicectl device install app
 --device DEVICE_UDID
-LAB_APP
 --json-output INSTALL_JSON
+LAB_APP
 ```
 
 4. copy the canonical command:
 
 ```text
-xcrun devicectl device copy to
+BOUND_XCRUN devicectl device copy to
 --device DEVICE_UDID
+--json-output COPY_COMMAND_JSON
 --source COMMAND_JSON
 --destination Library/Application Support/QinaoArtifactMeshLab/Commands/RUN_ID.json
 --domain-type appDataContainer
 --domain-identifier com.qinao.artifact-mesh-device-lab
---json-output COPY_COMMAND_JSON
 ```
 
 5. launch normal mode:
 
 ```text
-xcrun devicectl device process launch
+BOUND_XCRUN devicectl device process launch
 --device DEVICE_UDID
+--json-output LAUNCH_JSON
 com.qinao.artifact-mesh-device-lab
 --qinao-artifact-mesh-mode normal
 --command-file Library/Application Support/QinaoArtifactMeshLab/Commands/RUN_ID.json
---json-output LAUNCH_JSON
 ```
 
-6. read the PID from structured JSON, query `device info processes`, copy the event directory from the app data container, and verify the exact challenge-bound live barrier;
+The checked-in command builder and recording-runner test freeze the
+`devicectl device process launch` help contract exactly as
+`[<options>] --device DEVICE <bundle> [<command-line-arguments> ...]`.
+Accordingly, the bundle is the positional boundary: every controller/output
+option precedes it, and its suffix is exactly the two app flags above plus
+their two values. `--json-output` after the bundle is forbidden because it
+would become app argv. The install builder similarly freezes
+`[<options>] --device DEVICE <path>` and therefore places its JSON option
+before `LAB_APP`.
+
+6. read the PID only from the controller-owned structured `LAUNCH_JSON`
+output, query `device info processes`, copy the event directory from the app
+data container, and verify the exact challenge-bound live barrier; app stdout
+or an app-authored event cannot supply the controller launch PID;
 7. for a live/drop-reply/CAS action, require its exact pre-kill events;
 8. prove PID alive, then run:
 
 ```text
-xcrun devicectl device process terminate
+BOUND_XCRUN devicectl device process terminate
 --device DEVICE_UDID
+--json-output KILL_JSON
 --pid PROCESS_ID
 --kill
---json-output KILL_JSON
 ```
+
+The copy and terminate builders have no app-command-line tail: every token
+after their subcommand is a documented controller option/value. Recording
+tests reject a positional/app-argv suffix or more than one JSON-output pair.
 
 9. query processes until the exact PID is absent; fail if an app normal-terminal event preceded death;
 10. for `beforeRecoveryOpen`, launch `fault-bootstrap`, require mutation before/after digests and kill barrier, prove its distinct PID alive, SIGKILL it, and prove it dead;
 11. relaunch normal recovery, copy trace, require exactly one expected terminal, prove the recovery PID's identity, kill it after the terminal barrier, and prove it dead.
 
 For `raceSecondCAS`, first install both exact signed apps. The primary app
-executes `cas-seed` and returns the challenge-bound expected digest. The
-controller then launches the primary app in `cas-contender-a` mode and the
-companion bundle in its sole contender mode without waiting for either
-terminal. It proves two distinct PIDs are simultaneously alive, copies results
-from their distinct app data containers, verifies the same challenge/expected
-digest and contender IDs `{a,b}`, and requires the outcome multiset exactly
-`{winner, compareAndSwapConflict}`. It then kills and proves both PIDs dead.
-Reusing one PID, two Swift tasks, sequential contenders, two winners, two
-losers, or direct controller `SecItem*` use fails.
+executes `cas-seed`, reaches its live barrier, and returns the
+challenge-bound committed-g1 expected digest plus `seedPID`. The controller
+proves that exact PID alive, reads and validates the seed result, terminates
+it, rejects any normal terminal, and queries until that exact PID is absent.
+Only then does it concurrently launch the primary app in
+`cas-contender-a` mode and the companion bundle in its sole contender mode,
+without waiting for either terminal. Both returned PIDs must be fresh,
+distinct from one another and from `seedPID`, and simultaneously alive. The
+controller copies results from their distinct app data containers, verifies
+the same challenge/expected digest and contender IDs `{a,b}`, and requires
+the outcome multiset exactly `{winner, compareAndSwapConflict}`. It then
+kills and proves both PIDs dead. A second primary launch while seed is live,
+seed PID reuse, failure to prove seed death, one reused PID, two Swift tasks,
+sequential contenders, two winners, two losers, or direct controller
+`SecItem*` use fails.
+
+The companion launch builder is a separate closed variant and records exactly:
+
+```text
+BOUND_XCRUN devicectl device process launch
+--device DEVICE_UDID
+--json-output COMPANION_LAUNCH_JSON
+com.qinao.artifact-mesh-cas-contender-lab
+--challenge LOWERCASE_64_HEX
+--contender-id b
+--expected-digest LOWERCASE_64_HEX
+--result-file Library/Application Support/QinaoArtifactMeshLab/CAS/RESULT.json
+```
+
+Its four app-argument pairs appear only after the companion bundle ID.
+Reusing the primary two-pair suffix, accepting either bundle's arguments for
+the other bundle, moving a controller option after either positional bundle,
+or accepting an extra/missing/reordered pair fails the recording-runner test.
 
 Both apps are uninstalled after the race; the primary app is uninstalled after
 every other scenario. A fresh challenge-specific Keychain account makes
@@ -4301,8 +5351,9 @@ When status is blocked, leave `fault.protectedDataUnavailable` absent from execu
 
 The manifest lists SHA-256/length for every archive inspection, structured
 devicectl JSON/log, command, trace, copied container member, matrix blob,
-source payload OID/tree, selected shipping archive observation, and feasibility
-receipt.
+source payload OID/tree, selected shipping archive observation, feasibility
+receipt, both DerivedData roots, both `.xcresult` roots, isolated HOME/TMPDIR,
+cloned packages, module cache, SwiftPM cache, and Xcode/tool cache.
 
 Candidate-preflight creates a challenge-scoped encrypted ephemeral workspace
 outside the repository/common Git directory, writes only through a root
@@ -4333,6 +5384,35 @@ emit privacy-clean custody/destruction receipt into
 AuthenticatedGateResultBundle
 ```
 
+The existing opaque custody/destruction receipt—not a new Artifact payload or
+handoff field—must cover this exact closed cleanup projection:
+
+```text
+evaluation identity and final payload commit/tree
+immutable raw-object SHA-256/length and external reopen equality
+workspace journal generation and encrypted-root identity digest
+covered roots:
+  archives
+  DerivedData
+  ResultBundles
+  HOME
+  TMPDIR
+  PackageCache
+  ModuleCache
+  ToolCache
+key destruction completed
+every covered root inaccessible after key destruction
+every covered directory entry removed
+no readable residue verified from a separately reopened parent capability
+orphan cleanup journal empty after crash-recovery replay
+```
+
+The active B0 gate accepts the receipt only from the external broker inside
+the authenticated bundle and independently verifies every Boolean/postcondition
+against the broker journal. A controller Boolean, missing covered root, a
+cleanup attempt without no-residue reopen, or a receipt emitted before key
+destruction fails production.
+
 Those are operations of the opaque `ExternalPhysicalGateBinding`, not a new
 Artifact Mesh evidence-client API. There is no `--evidence-client`, bootstrap
 path, provider, endpoint, profile, credential, raw key, or custody selector.
@@ -4362,7 +5442,9 @@ no normal terminal before victim death
 fault bootstrap contains no store-open event
 dropSQLiteReply has durable SQLite commit, suppressed delivery, then live kill barrier
 dropK3Reply has durable K3 commit, suppressed delivery, then live kill barrier
-raceSecondCAS has two simultaneously live distinct app PIDs and one winner/one conflict
+raceSecondCAS has a validated seed result, seed PID termination/absence with
+no normal terminal, then two fresh simultaneously live distinct contender
+PIDs (neither equal to seed PID) and one winner/one conflict
 every SQLite connection proves PERSIST_WAL=1 and final-close sidecars persist
 quarantine performs one durable dedicated-directory rename and crash-cut recovery never splits the family
 actual terminal/floors/roots equal matrix-resolved expectations
@@ -4370,6 +5452,8 @@ selected shipping archive contains no lab bundle/condition/probe/fault symbol
 production reachability classifies ArtifactMeshDeviceLab as lab-only and shipping paths empty
 external put/reopen receipts bind exact raw bundle and signed lease
 workspace-key destruction and no-readable-residue receipt are verified
+both production archive DerivedData roots and `.xcresult` bundles are in custody
+HOME/TMPDIR/package/module/tool caches are in custody and in the cleanup receipt
 ```
 
 The checker parses no caller Boolean and never trusts a controller summary without reopening raw leaf events.
@@ -4377,7 +5461,99 @@ The checker parses no caller Boolean and never trusts a controller summary witho
 - [ ] **Step 9: Run GREEN**
 
 ```bash
+set -euo pipefail
 python3 -m unittest -v scripts.test_check_artifact_mesh_device_recovery
+python3 - <<'PY'
+import ast
+from pathlib import Path
+
+runner_path = Path("scripts/run_artifact_mesh_device_recovery.py")
+source = runner_path.read_text()
+tree = ast.parse(source)
+runner = next(
+  (
+    node for node in tree.body
+    if isinstance(node, ast.ClassDef) and node.name == "CommandRunner"
+  ),
+  None,
+)
+if runner is None:
+    raise SystemExit("CommandRunner source is absent")
+for node in ast.walk(runner):
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        if node.func.attr in {
+            "resolve", "mkdir", "unlink", "write_bytes", "read_bytes",
+        }:
+            raise SystemExit(
+              f"path-based custody I/O remains: {node.func.attr}")
+        if (
+            node.func.attr == "run"
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "subprocess"
+        ):
+            raise SystemExit("CommandRunner cannot use subprocess.run")
+required = (
+    "CustodyRootCapability",
+    "_CustodyFDTree",
+    "_BoundedProcessResult",
+    "_validate_and_dup_custody",
+    "_validate_signed_limits",
+    "_stream_process_bounded",
+    "open_directory_chain",
+    "child_path",
+    "create_exclusive_leaf",
+    "fsync_and_verify_leaf",
+    "read_bounded_verified_leaf",
+    "verified_unlink",
+    "dir_fd",
+    "O_DIRECTORY",
+    "O_NOFOLLOW",
+    "O_EXCL",
+    "fchmod",
+    "fsync",
+    "fstat",
+    "selectors",
+    "subprocess.Popen",
+    "start_new_session=True",
+    "killpg",
+    "wait",
+    "commandOutputLimitExceeded",
+    "commandTimeout",
+    "commandProcessGroupLeak",
+)
+missing = [marker for marker in required if marker not in source]
+if missing:
+    raise SystemExit(f"bounded custody runner source missing: {missing}")
+tests = Path(
+  "scripts/test_check_artifact_mesh_device_recovery.py"
+).read_text()
+for name in (
+    "testExactMatrixFixtureRequiresImplementedChecker",
+    "testProductionControllerRequiresImplementedRunner",
+    "testEveryProductionCommandUsesLeaseBoundAbsoluteExecutable",
+    "testDevicectlLaunchOptionsPrecedeBundleAndAppArgvIsExact",
+    "testPrimaryLaunchHasExactTwoPairSuffix",
+    "testCompanionLaunchHasExactFourPairSuffix",
+    "testDevicectlInstallOptionsPrecedeAppPath",
+    "testLaunchPIDComesOnlyFromControllerJSON",
+    "testCASSeedPIDDiesBeforeFreshContendersLaunch",
+    "testProductionEnvironmentRejectsEveryClosedSelectorClass",
+    "testOnlyExactDevicectlListProfileProbeAcceptsSignedNonzero",
+    "testPrivateCustodyRunnerInterfaceIdentity",
+    "testCustodyRootRequiresBrokerExclusiveParentAndNoOtherWriter",
+    "testDevicectlExistingJSONLeafRetainsInodeForReleaseProfile",
+    "testCustodyTraversalRejectsEveryComponentSymlink",
+    "testCustodyRenameAndLeafSubstitutionCannotEscape",
+    "testCustodyHardlinkRejected",
+    "testEveryInjectedFailureClosesOwnedFDs",
+    "testOutputFloodKillsProcessGroup",
+    "testTimeoutKillsDescendantsAndWaits",
+    "testRunBytesUsesSmallerSignedCap",
+):
+    if name not in tests:
+        raise SystemExit(f"controller contract test missing: {name}")
+print("artifact-mesh-controller-source: PASS capability_io=bounded")
+PY
 python3 scripts/check_artifact_mesh_device_recovery.py \
   --root . \
   --matrix docs/superpowers/specs/qinao-artifact-mesh-device-recovery-matrix-v1.json \
@@ -4385,11 +5561,14 @@ python3 scripts/check_artifact_mesh_device_recovery.py \
   --payload-tree "$(git rev-parse HEAD^{tree})"
 ```
 
-Expected: all controller/checker mutation tests pass; matrix-only output remains exactly `rows=40 no_fault=26 faults=14`.
+Expected: all controller/checker mutation tests pass, the source scan prints
+`capability_io=bounded`, and matrix-only output remains exactly
+`rows=40 no_fault=26 faults=14`.
 
 - [ ] **Step 10: Commit**
 
 ```bash
+set -euo pipefail
 git add \
   scripts/run_artifact_mesh_device_recovery.py \
   scripts/check_artifact_mesh_device_recovery.py \
@@ -4409,9 +5588,12 @@ Expected: exactly three paths.
   `scripts/check_qinao_ea_extensions.py` and
   `scripts/test_check_qinao_ea_extensions.py`
 - Modify exactly once after the first full pass: `docs/superpowers/specs/qinao-owner-ledger-v1.json`
-- Create outside Git: `/private/tmp/qinao-artifact-mesh-w1-task0/unit-preflight-receipt-v1.json`
-- Create outside Git: `/private/tmp/qinao-artifact-mesh-w1-task0/handoff-v1.json`
-- Create outside Git: `/private/tmp/qinao-artifact-mesh-w1-task0/device-preflight/`
+- Create outside Git, scoped by the exact transition OID:
+  `/private/tmp/qinao-artifact-mesh-w1-task0/by-transition-oid/<STATUS_TRANSITION_COMMIT>/unit-preflight-receipt-v1.json`
+- Create outside Git, scoped by the exact transition OID:
+  `/private/tmp/qinao-artifact-mesh-w1-task0/by-transition-oid/<STATUS_TRANSITION_COMMIT>/handoff-v1.json`
+- Create outside Git, scoped by the exact payload OID:
+  `/private/tmp/qinao-artifact-mesh-w1-task0/by-payload-oid/<PHASE_A_COMMIT>/device-preflight/`
 
 **Interfaces:**
 - Consumes: service-envelope-verified `AdmittedWaveV1` returned by `ProtectedAdmissionClient.reopen_admitted_predecessor()` and all Phase-A commits.
@@ -4434,6 +5616,24 @@ authenticated admission-chain digest as `ADMITTED_W0_CHAIN_DIGEST`. Then
 require:
 
 ```bash
+set -euo pipefail
+GRAPH_PIN_COMMIT=9d484befb4a4593d93789457ebddfd7cde358e3b
+GRAPH_PIN_PATH=docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md
+GRAPH_PIN_BLOB=e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+GRAPH_PIN_SHA256=5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
+test "$(git cat-file -t "$GRAPH_PIN_COMMIT")" = commit
+test "$(git rev-parse "$GRAPH_PIN_COMMIT:$GRAPH_PIN_PATH")" = \
+  "$GRAPH_PIN_BLOB"
+test "$(git cat-file -t "$GRAPH_PIN_BLOB")" = blob
+python3 - "$GRAPH_PIN_BLOB" "$GRAPH_PIN_SHA256" <<'PY'
+import hashlib
+import subprocess
+import sys
+
+raw = subprocess.check_output(["git", "cat-file", "blob", sys.argv[1]])
+if hashlib.sha256(raw).hexdigest() != sys.argv[2]:
+    raise SystemExit("approved dynamic-graph pin SHA-256 drift")
+PY
 test "$(git cat-file -t "$ADMITTED_W0_SEAL")" = commit
 git merge-base --is-ancestor "$ADMITTED_W0_SEAL" HEAD
 ```
@@ -4442,11 +5642,193 @@ Expected: root lineage is `reparentedProgram`; the service-envelope-verified
 final W0 seal is the Phase-A base and is an ancestor of the Phase-A tip.
 `ADMITTED_W0_CHAIN_DIGEST` must byte-equal
 `admittedW0.admission_chain_digest` and match 64 lowercase hex. Unsigned
-`/private/tmp` admitted-wave JSON is not read.
+`/private/tmp` admitted-wave JSON is not read. The graph commit/path/blob/raw
+SHA-256 are freshly proven in this Task-10 process; an earlier task's result
+cannot satisfy this step.
+
+- [ ] **Step 1A: Select the exact re-entry state before running a gate or editing the Ledger**
+
+Capture `git status` without allowing a Git failure to masquerade as an empty
+tree, then classify `HEAD` with this closed oracle:
+
+```bash
+set -euo pipefail
+set +e
+TASK10_STATUS="$(git status --porcelain=v1)"
+TASK10_STATUS_RC="$?"
+set -euo pipefail
+test "$TASK10_STATUS_RC" = 0
+test -z "$TASK10_STATUS"
+
+set +e
+TASK10_PHASE_STATE="$(
+python3 - <<'PY'
+import copy
+import json
+import pathlib
+import stat
+import subprocess
+
+ledger = "docs/superpowers/specs/qinao-owner-ledger-v1.json"
+
+def git(*args: str) -> str:
+    return subprocess.check_output(
+        ["git", *args], text=True
+    ).strip()
+
+def entry(treeish: str) -> tuple[str, str, str]:
+    raw = git("ls-tree", treeish, "--", ledger)
+    if not raw or "\t" not in raw:
+        raise SystemExit("ledger tree entry missing")
+    metadata, path = raw.split("\t", 1)
+    mode, kind, oid = metadata.split()
+    if path != ledger or mode != "100644" or kind != "blob":
+        raise SystemExit("ledger mode/type/path drift")
+    return mode, kind, oid
+
+def document(treeish: str) -> dict:
+    value = json.loads(git("show", f"{treeish}:{ledger}"))
+    if not isinstance(value, dict):
+        raise SystemExit("ledger root is not an object")
+    return value
+
+def artifact_row(value: dict) -> dict:
+    rows = [
+        row for row in value.get("owners", [])
+        if isinstance(row, dict)
+        and row.get("owner_id") == "artifact.mesh"
+    ]
+    if len(rows) != 1:
+        raise SystemExit("artifact.mesh owner row must be unique")
+    return rows[0]
+
+head = git("rev-parse", "HEAD")
+head_tree = git("rev-parse", "HEAD^{tree}")
+entry(head_tree)
+index = git("ls-files", "-s", "--", ledger).splitlines()
+if len(index) != 1 or index[0].split(maxsplit=1)[0] != "100644":
+    raise SystemExit("ledger index mode drift")
+worktree = pathlib.Path(ledger).lstat()
+if (
+    not stat.S_ISREG(worktree.st_mode)
+    or stat.S_IMODE(worktree.st_mode) != 0o644
+):
+    raise SystemExit("ledger worktree mode drift")
+
+after = document(head_tree)
+after_row = artifact_row(after)
+if after_row.get("status") == "converging":
+    print("preTransition")
+    raise SystemExit(0)
+if after_row.get("status") != "implemented":
+    raise SystemExit("ledger status is outside Task-10 state space")
+
+parents = git("show", "-s", "--format=%P", head).split()
+if len(parents) != 1:
+    raise SystemExit("transition commit must have exactly one parent")
+parent = parents[0]
+parent_tree = git("rev-parse", f"{parent}^{{tree}}")
+entry(parent_tree)
+changed = git(
+    "diff-tree", "--no-commit-id", "--name-only", "-r", head
+).splitlines()
+if changed != [ledger]:
+    raise SystemExit("implemented HEAD is not the exact one-path transition")
+before = document(parent_tree)
+before_row = artifact_row(before)
+if before_row.get("status") != "converging":
+    raise SystemExit("transition parent is not converging")
+normalized = copy.deepcopy(after)
+artifact_row(normalized)["status"] = "converging"
+if normalized != before:
+    raise SystemExit("transition delta exceeds artifact.mesh status")
+print("exactTransition")
+PY
+)"
+TASK10_PHASE_STATE_RC="$?"
+set -euo pipefail
+test "$TASK10_PHASE_STATE_RC" = 0 || {
+  # The protected service emits the existing closed terminal; candidate code
+  # does not manufacture this value.
+  exit "$TASK10_PHASE_STATE_RC"
+}
+case "$TASK10_PHASE_STATE" in
+  preTransition|exactTransition) ;;
+  *) exit 2 ;;
+esac
+```
+
+The protected runner maps any oracle failure or any other repository shape to
+`AdmissionTerminalError(terminal = quarantinedAdmission,
+reason_code = IDENTITY_MISMATCH)` before a byte changes.
+
+For `preTransition`, set `TASK10_RESUME=normal` and execute Steps 2–9.
+
+For `exactTransition`, derive only:
+
+```bash
+set -euo pipefail
+STATUS_TRANSITION_COMMIT="$(git rev-parse HEAD)"
+PHASE_A_COMMIT="$STATUS_TRANSITION_COMMIT"
+PHASE_A_TREE="$(git rev-parse "$PHASE_A_COMMIT^{tree}")"
+PRETRANSITION_COMMIT="$(git rev-parse "$STATUS_TRANSITION_COMMIT^")"
+PRETRANSITION_TREE="$(git rev-parse "$PRETRANSITION_COMMIT^{tree}")"
+TASK0_HANDOFF_ROOT="/private/tmp/qinao-artifact-mesh-w1-task0/by-transition-oid/$STATUS_TRANSITION_COMMIT"
+TASK0_TRANSITION_COMMIT="$STATUS_TRANSITION_COMMIT"
+PW_COMMIT="$PHASE_A_COMMIT"
+PW_TREE="$PHASE_A_TREE"
+ADMITTED_AUTH_EA_CHECKER_BLOB="$(
+  git rev-parse \
+    "$ADMITTED_W0_SEAL:scripts/check_qinao_ea_extensions.py"
+)"
+ADMITTED_AUTH_EA_TEST_BLOB="$(
+  git rev-parse \
+    "$ADMITTED_W0_SEAL:scripts/test_check_qinao_ea_extensions.py"
+)"
+test "$(git rev-parse \
+  "$PHASE_A_TREE:scripts/check_qinao_ea_extensions.py")" = \
+  "$ADMITTED_AUTH_EA_CHECKER_BLOB"
+test "$(git rev-parse \
+  "$PHASE_A_TREE:scripts/test_check_qinao_ea_extensions.py")" = \
+  "$ADMITTED_AUTH_EA_TEST_BLOB"
+export STATUS_TRANSITION_COMMIT PHASE_A_COMMIT PHASE_A_TREE
+export PRETRANSITION_COMMIT PRETRANSITION_TREE TASK0_HANDOFF_ROOT
+export TASK0_TRANSITION_COMMIT
+export PW_COMMIT PW_TREE
+export ADMITTED_AUTH_EA_CHECKER_BLOB ADMITTED_AUTH_EA_TEST_BLOB
+```
+
+Open the two exact OID-scoped files beneath `TASK0_HANDOFF_ROOT` with
+directory-FD-relative `openat`, `O_NOFOLLOW`, regular-file, owner, and mode
+`0600` checks. File existence is not success. In the same existing B0-pinned
+protected runner/gate process that freshly verified `admittedW0`, run the
+closed Task-11 Step-3 byte validator over those two read-only FDs and the
+fresh authenticated projections
+`(repository identity, admitted-W0 seal/chain digest,
+STATUS_TRANSITION_COMMIT, PHASE_A_COMMIT, PHASE_A_TREE)`. The validator must
+consume the FDs, recompute every Git/blob/digest/mode relation, and on success
+retain only the process-local nonserializable
+`ValidatedArtifactMeshTask0Handoff` handle described above. It exposes no
+constructor, file-path success bit, serializable receipt, or new client
+method. If the existing protected entrypoint cannot run this validator and
+retain that handle, stop at `BLOCKED_EXTERNAL_BOOTSTRAP`.
+
+If fresh validation succeeds and its transient projection equals the exact
+transition/tree/chain/status tuple, set `TASK10_RESUME=step9Only` and execute
+only Step 9. If either file is missing or fresh validation rejects its bytes,
+set `TASK10_RESUME=steps7Through9`, discard the invalid temporary bytes, and
+rerun Steps 7–9 using the just-derived `HEAD^` preimage; never rerun Step 6 or
+create a second transition commit. No fourth state exists.
 
 - [ ] **Step 2: Run all exact non-empty unit gates**
 
+At this pretransition position, execute this step only when
+`TASK10_RESUME=normal`. Step 7 separately invokes this complete gate set over
+the post-transition tree for both `normal` and `steps7Through9`;
+`step9Only` never invokes it.
+
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_artifact_mesh_device_recovery
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
@@ -4482,6 +5864,7 @@ Expected: every suite has positive discovery/execution counts and 0 failures.
 - [ ] **Step 3: Run the realized E/A gate over the exact Phase-A tip**
 
 ```bash
+set -euo pipefail
 PHASE_A_COMMIT="$(git rev-parse HEAD)"
 PHASE_A_TREE="$(git rev-parse HEAD^{tree})"
 python3 scripts/check_qinao_ea_extensions.py \
@@ -4505,6 +5888,7 @@ Derive both Authority-owned blobs from the authenticated admitted-W0 seal,
 then require the current Phase-A tree to retain them byte-for-byte:
 
 ```bash
+set -euo pipefail
 AUTH_EA_CHECKER_BLOB="$(
   git rev-parse \
     "$ADMITTED_W0_SEAL:scripts/check_qinao_ea_extensions.py"
@@ -4526,6 +5910,7 @@ test "$(git rev-parse \
 Run only the frozen selectors and mechanically prove positive discovery:
 
 ```bash
+set -euo pipefail
 mkdir -p /private/tmp/qinao-artifact-mesh-w1-task0
 set +e
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
@@ -4537,7 +5922,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   >/private/tmp/qinao-artifact-mesh-w1-task0/ea-non-delta-unittest.txt \
   2>&1
 EA_NON_DELTA_RC="$?"
-set -e
+set -euo pipefail
 test "$EA_NON_DELTA_RC" = 0
 python3 - <<'PY'
 from pathlib import Path
@@ -4562,6 +5947,7 @@ PY
 Now derive the stable, transcript-independent result digest:
 
 ```bash
+set -euo pipefail
 EA_NON_DELTA_RESULT_SHA256="$(
   python3 - "$AUTH_EA_CHECKER_BLOB" "$AUTH_EA_TEST_BLOB" <<'PY'
 import hashlib
@@ -4588,8 +5974,11 @@ print(hashlib.sha256(b"".join(parts)).hexdigest())
 PY
 )"
 test "${#EA_NON_DELTA_RESULT_SHA256}" = 64
+ADMITTED_AUTH_EA_CHECKER_BLOB="$AUTH_EA_CHECKER_BLOB"
+ADMITTED_AUTH_EA_TEST_BLOB="$AUTH_EA_TEST_BLOB"
 export AUTH_EA_CHECKER_BLOB AUTH_EA_TEST_BLOB
 export EA_NON_DELTA_RESULT_SHA256
+export ADMITTED_AUTH_EA_CHECKER_BLOB ADMITTED_AUTH_EA_TEST_BLOB
 ```
 
 Expected: both file blobs equal their Authority-owned admitted-W0 blobs, all
@@ -4603,12 +5992,26 @@ verbose transcript is diagnostic only and never enters Git or the handoff.
 Rerun Task 1's M-history check, then:
 
 ```bash
-test -z "$(git diff --name-only "$ADMITTED_W0_SEAL"..HEAD -- \
+set -euo pipefail
+set +e
+TASK10_HISTORY_DIFF="$(
+  git diff --name-only "$ADMITTED_W0_SEAL"..HEAD -- \
   docs/superpowers/evidence/qinao-owner-create/artifact-mesh--core.json \
   docs/superpowers/evidence/qinao-owner-create/artifact-mesh--schema.json \
   docs/superpowers/evidence/qinao-owner-create/artifact-mesh--sqlite-store.json \
   docs/superpowers/evidence/qinao-owner-corrections/artifact-mesh-retrospective-create-correction-v1.json \
-  docs/superpowers/specs/qinao-owner-ledger-v1.json)"
+  docs/superpowers/specs/qinao-owner-ledger-v1.json
+)"
+TASK10_HISTORY_DIFF_RC="$?"
+set -euo pipefail
+test "$TASK10_HISTORY_DIFF_RC" = 0
+test -z "$TASK10_HISTORY_DIFF"
+test "$(git ls-tree "$PHASE_A_TREE" -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
+test "$(git ls-files -s -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
 ```
 
 Expected: empty diff for historical evidence and Ledger. Parse the indexed
@@ -4623,28 +6026,61 @@ an owner-health substitute.
 Require non-empty environment values:
 
 ```bash
+set -euo pipefail
 test -n "$PREFLIGHT_DEVICE_ID"
 test -n "$PREFLIGHT_DEVELOPMENT_TEAM"
+PREFLIGHT_OUTPUT_ROOT="/private/tmp/qinao-artifact-mesh-w1-task0/by-payload-oid/$PHASE_A_COMMIT/device-preflight"
+export PREFLIGHT_OUTPUT_ROOT
 ```
 
 Then run:
 
 ```bash
+set -euo pipefail
 set +e
-python3 scripts/run_artifact_mesh_device_recovery.py \
-  --root . \
-  --matrix docs/superpowers/specs/qinao-artifact-mesh-device-recovery-matrix-v1.json \
-  --payload-commit "$PHASE_A_COMMIT" \
-  --payload-tree "$PHASE_A_TREE" \
-  --device "$PREFLIGHT_DEVICE_ID" \
-  --development-team "$PREFLIGHT_DEVELOPMENT_TEAM" \
-  --output-directory /private/tmp/qinao-artifact-mesh-w1-task0/device-preflight \
-  --mode candidate-preflight
-DEVICE_PREFLIGHT_RC=$?
-set -e
+DEVICE_PREFLIGHT_TRANSCRIPT="$(
+  python3 scripts/run_artifact_mesh_device_recovery.py \
+    --root . \
+    --matrix docs/superpowers/specs/qinao-artifact-mesh-device-recovery-matrix-v1.json \
+    --payload-commit "$PHASE_A_COMMIT" \
+    --payload-tree "$PHASE_A_TREE" \
+    --device "$PREFLIGHT_DEVICE_ID" \
+    --development-team "$PREFLIGHT_DEVELOPMENT_TEAM" \
+    --output-directory "$PREFLIGHT_OUTPUT_ROOT" \
+    --mode candidate-preflight \
+    2>&1
+)"
+DEVICE_PREFLIGHT_RC="$?"
+set -euo pipefail
+printf '%s\n' "$DEVICE_PREFLIGHT_TRANSCRIPT"
 case "$DEVICE_PREFLIGHT_RC" in
-  0) ;;
-  20|21|22) exit "$DEVICE_PREFLIGHT_RC" ;;
+  0)
+    case "$DEVICE_PREFLIGHT_TRANSCRIPT" in
+      *'artifact-mesh-device-recovery: PREFLIGHT rows=40 disposition=exercisable'*) ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  20)
+    case "$DEVICE_PREFLIGHT_TRANSCRIPT" in
+      *'PREFLIGHT_BLOCKED code=20 reason=PROTECTED_DATA_UNAVAILABLE'*) ;;
+      *) exit 1 ;;
+    esac
+    exit 20
+    ;;
+  21)
+    case "$DEVICE_PREFLIGHT_TRANSCRIPT" in
+      *'PREFLIGHT_BLOCKED code=21 reason=SIGNING_PROFILE_UNAVAILABLE'*) ;;
+      *) exit 1 ;;
+    esac
+    exit 21
+    ;;
+  22)
+    case "$DEVICE_PREFLIGHT_TRANSCRIPT" in
+      *'PREFLIGHT_BLOCKED code=22 reason=PHYSICAL_DEVICE_UNAVAILABLE'*) ;;
+      *) exit 1 ;;
+    esac
+    exit 22
+    ;;
   *) exit "$DEVICE_PREFLIGHT_RC" ;;
 esac
 ```
@@ -4657,7 +6093,8 @@ artifact-mesh-device-recovery: PREFLIGHT rows=40 disposition=exercisable
 
 The controller writes canonical `preflight-disposition-v1.json` with
 `disposition = exercisable` and the exact pretransition
-`PHASE_A_COMMIT/PHASE_A_TREE`. Exit 20, 21, or 22 remains its honest typed
+`PHASE_A_COMMIT/PHASE_A_TREE`. Exit 20, 21, or 22 must carry the exact
+captured diagnostic mapped above and remains its honest typed
 signing/device/platform block, but it stops Task 10 immediately and produces
 no status proposal and no handoff. No blocked disposition can be carried
 forward as permission.
@@ -4667,6 +6104,7 @@ forward as permission.
 Record:
 
 ```bash
+set -euo pipefail
 PRETRANSITION_COMMIT="$PHASE_A_COMMIT"
 PRETRANSITION_TREE="$PHASE_A_TREE"
 ```
@@ -4675,14 +6113,21 @@ Edit only `docs/superpowers/specs/qinao-owner-ledger-v1.json`. Before staging,
 run this semantic exact-delta check:
 
 ```bash
+set -euo pipefail
 python3 - <<'PY'
-import copy, hashlib, json, pathlib, subprocess
+import copy, hashlib, json, pathlib, stat, subprocess
 
 path = "docs/superpowers/specs/qinao-owner-ledger-v1.json"
 before = json.loads(subprocess.check_output(
     ["git", "show", f"HEAD:{path}"], text=True
 ))
 after = json.loads(pathlib.Path(path).read_text())
+metadata = pathlib.Path(path).lstat()
+if (
+    not stat.S_ISREG(metadata.st_mode)
+    or stat.S_IMODE(metadata.st_mode) != 0o644
+):
+    raise SystemExit("owner Ledger worktree mode must be 0644")
 
 def unique_artifact_row(document):
     rows = [
@@ -4716,9 +6161,25 @@ python3 -m unittest -v \
   scripts.test_check_qinao_owner_ledger \
   scripts.test_qinao_owner_ledger_v2
 git add docs/superpowers/specs/qinao-owner-ledger-v1.json
-test "$(git diff --cached --name-only)" = \
+test "$(git ls-files -s -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
+set +e
+TASK10_CACHED_DIFF="$(git diff --cached --name-only --)"
+TASK10_CACHED_DIFF_RC="$?"
+set -euo pipefail
+test "$TASK10_CACHED_DIFF_RC" = 0
+test "$TASK10_CACHED_DIFF" = \
   docs/superpowers/specs/qinao-owner-ledger-v1.json
-git diff --cached --check
+set +e
+TASK10_CACHED_CHECK="$(
+  git diff --cached --check 2>&1
+)"
+TASK10_CACHED_CHECK_RC="$?"
+set -euo pipefail
+printf '%s\n' "$TASK10_CACHED_CHECK"
+test "$TASK10_CACHED_CHECK_RC" = 0
+test -z "$TASK10_CACHED_CHECK"
 git commit -m "docs(qinao): propose artifact mesh implemented status"
 ```
 
@@ -4726,12 +6187,29 @@ Require the new commit to have exactly one parent equal
 `PRETRANSITION_COMMIT`, an exact one-path diff, and no mode change. Record:
 
 ```bash
+set -euo pipefail
 STATUS_TRANSITION_COMMIT="$(git rev-parse HEAD)"
 PHASE_A_COMMIT="$STATUS_TRANSITION_COMMIT"
 PHASE_A_TREE="$(git rev-parse HEAD^{tree})"
 test "$(git rev-parse HEAD^)" = "$PRETRANSITION_COMMIT"
-test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = \
+set +e
+TASK10_TRANSITION_DIFF="$(
+  git diff-tree --no-commit-id --name-only -r HEAD
+)"
+TASK10_TRANSITION_DIFF_RC="$?"
+set -euo pipefail
+test "$TASK10_TRANSITION_DIFF_RC" = 0
+test "$TASK10_TRANSITION_DIFF" = \
   docs/superpowers/specs/qinao-owner-ledger-v1.json
+test "$(git ls-tree "$PRETRANSITION_TREE" -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
+test "$(git ls-tree "$PHASE_A_TREE" -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
+test "$(git ls-files -s -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
 ```
 
 This commit is a candidate proposal only. A failed or interrupted subsequent
@@ -4739,13 +6217,50 @@ rerun cannot unlock another W1 task and cannot be admitted.
 
 - [ ] **Step 7: Rerun the complete Phase-A gate set over the post-transition tree**
 
+Execute this step for `TASK10_RESUME=normal` and
+`TASK10_RESUME=steps7Through9`; `step9Only` skips it. In the recovery branch,
+the Step-1A values derived from `HEAD^` are the sole pretransition identity.
+Reopen both Ledger blobs, require the parent row is `converging`, the current
+row is `implemented`, and require their only semantic delta is that status
+field. Recompute `ARTIFACT_MESH_PRE_ROW_SHA256` from the parent rather than
+reusing shell state.
+
+Before any rerun require:
+
+```bash
+set -euo pipefail
+test "$(git rev-parse "$STATUS_TRANSITION_COMMIT^")" = \
+  "$PRETRANSITION_COMMIT"
+test "$(git rev-parse "$PRETRANSITION_COMMIT^{tree}")" = \
+  "$PRETRANSITION_TREE"
+test "$(git rev-parse "$STATUS_TRANSITION_COMMIT^{tree}")" = \
+  "$PHASE_A_TREE"
+test "$(git ls-tree "$PRETRANSITION_TREE" -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
+test "$(git ls-tree "$PHASE_A_TREE" -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
+test "$(git ls-files -s -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
+TASK0_HANDOFF_ROOT="/private/tmp/qinao-artifact-mesh-w1-task0/by-transition-oid/$STATUS_TRANSITION_COMMIT"
+PREFLIGHT_OUTPUT_ROOT="/private/tmp/qinao-artifact-mesh-w1-task0/by-payload-oid/$PHASE_A_COMMIT/device-preflight"
+TASK0_TRANSITION_COMMIT="$STATUS_TRANSITION_COMMIT"
+PW_COMMIT="$PHASE_A_COMMIT"
+PW_TREE="$PHASE_A_TREE"
+export TASK0_HANDOFF_ROOT PREFLIGHT_OUTPUT_ROOT
+export TASK0_TRANSITION_COMMIT
+export PW_COMMIT PW_TREE
+```
+
 Rerun every command from Steps 2, 3, and 3A with the new
 `PHASE_A_COMMIT/PHASE_A_TREE`; Step 3A must freshly rederive
 `AUTH_EA_CHECKER_BLOB`, `AUTH_EA_TEST_BLOB`, and
 `EA_NON_DELTA_RESULT_SHA256` rather than reuse shell state from the
-pretransition run. Then delete and recreate the candidate-preflight output
-directory and rerun Step 5 against those new OIDs. The only accepted result
-remains:
+pretransition run. Atomically replace only the exact payload-OID-scoped
+candidate-preflight directory and rerun Step 5 against those new OIDs; a
+different OID directory is never consulted. The only accepted result remains:
 
 ```text
 artifact-mesh-device-recovery: PREFLIGHT rows=40 disposition=exercisable
@@ -4773,7 +6288,15 @@ Task 10 incomplete; there is no handoff and no consumer unlock.
 
 - [ ] **Step 8: Emit the post-transition unit receipt and handoff outside Git**
 
-Create `unit-preflight-receipt-v1.json` from this exact object:
+Execute this step for `TASK10_RESUME=normal` and
+`TASK10_RESUME=steps7Through9`; `step9Only` skips it. Require
+`TASK0_HANDOFF_ROOT` to be the exact
+`by-transition-oid/$STATUS_TRANSITION_COMMIT` directory, create it through
+directory-FD-relative operations with mode `0700`, and refuse symlinks,
+hardlinks, pre-existing foreign-owner files, and a path whose final component
+does not byte-equal the transition OID.
+
+Create OID-scoped `unit-preflight-receipt-v1.json` from this exact object:
 
 ```python
 import os
@@ -4845,8 +6368,11 @@ Every lower-case value below has one derivation and no caller/default seam:
 | `artifact_mesh_post_row_sha256` | Step 7's canonical unique owner-row postimage |
 | `artifact_mesh_status_transition_sha256` | the Step-7 pre/post row+commit+tree digest |
 
-After canonicalizing and writing `unit-preflight-receipt-v1.json`, reopen its
-raw bytes, closed-parse the object, and only then derive
+After canonicalizing, write
+`$TASK0_HANDOFF_ROOT/unit-preflight-receipt-v1.json` through an adjacent
+exclusive temporary file, `fsync`, atomic rename, parent-directory `fsync`,
+and final mode `0600`. Reopen its
+raw bytes with `openat`/`O_NOFOLLOW`, closed-parse the object, and only then derive
 `unit_preflight_receipt_sha256`. No lower-case value may be copied from an
 older `/private/tmp` run.
 
@@ -4857,7 +6383,8 @@ its existing `unit_preflight_receipt_sha256` commits to the complete canonical
 unit receipt, including the Authority module, five case IDs, two blobs, exact
 counts, and result digest. No direct non-delta field is added to the handoff.
 
-Create `handoff-v1.json` from this exact `ArtifactMeshW1Task0HandoffV1` object:
+Create `$TASK0_HANDOFF_ROOT/handoff-v1.json` from this exact
+`ArtifactMeshW1Task0HandoffV1` object:
 
 ```python
 handoff = {
@@ -4895,23 +6422,62 @@ SHA256(
 ```
 
 Canonicalize with sorted keys, no insignificant whitespace, UTF-8, and
-exactly one terminal LF. Reread both files and
+exactly one terminal LF. Use the same exclusive-temp/`fsync`/atomic-rename/
+directory-`fsync`/mode-`0600` sequence. Reread both OID-scoped files with
+directory-relative no-follow opens and
 verify every OID/digest against Git and finalized W0 inputs. In particular,
 `task0_code_tree_oid` and the unit receipt both bind the post-transition,
 post-rerun tree; neither may bind `PRETRANSITION_TREE`.
 
 - [ ] **Step 9: Prove the handoff is non-authoritative and leave clean**
 
+For `normal` and `steps7Through9`, the same existing B0-pinned protected
+runner/gate process now runs the closed validator over the two newly reopened
+OID-scoped FDs and fresh `admittedW0` projections, retaining the in-process
+`ValidatedArtifactMeshTask0Handoff` handle. For `step9Only`, use only the
+fresh handle produced in Step 1A. A pathname, successful `stat`, JSON parse,
+digest text, or handle from a previous process cannot unlock this step.
+
 ```bash
-test -z "$(git status --porcelain=v1)"
-test -z "$(git ls-files | rg \
-  'artifact-mesh-w1-task0/(handoff|unit-preflight)|device-preflight' || true)"
+set -euo pipefail
+set +e
+TASK10_FINAL_STATUS="$(git status --porcelain=v1)"
+TASK10_FINAL_STATUS_RC="$?"
+set -euo pipefail
+test "$TASK10_FINAL_STATUS_RC" = 0
+test -z "$TASK10_FINAL_STATUS"
+
+git ls-files \
+  >/private/tmp/qinao-artifact-mesh-w1-task0/tracked-files.txt
+set +e
+TASK10_TRACKED_TEMP_MATCHES="$(
+  rg 'artifact-mesh-w1-task0/(handoff|unit-preflight)|device-preflight' \
+    /private/tmp/qinao-artifact-mesh-w1-task0/tracked-files.txt \
+    2>&1
+)"
+TASK10_TRACKED_TEMP_RG_RC="$?"
+set -euo pipefail
+case "$TASK10_TRACKED_TEMP_RG_RC" in
+  1) test -z "$TASK10_TRACKED_TEMP_MATCHES" ;;
+  0)
+    printf '%s\n' "$TASK10_TRACKED_TEMP_MATCHES" >&2
+    exit 1
+    ;;
+  *) exit "$TASK10_TRACKED_TEMP_RG_RC" ;;
+esac
+test "$(git rev-parse HEAD)" = "$STATUS_TRANSITION_COMMIT"
+test "$(git rev-parse HEAD^{tree})" = "$PHASE_A_TREE"
+test "$(git ls-tree "$PHASE_A_TREE" -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
 git log -1 --format='%H %T'
 ```
 
 Expected: clean tree; no result file in Git; `HEAD` is exactly the
 one-path status-proposal commit; its tree equals the handoff's
-`task0_code_tree_oid`. Hand the two temporary paths to the W1 orchestrator.
+`task0_code_tree_oid`. Hand the two OID-scoped read-only FDs—not bare
+pathnames—to the existing W1 protected runner; it must freshly rerun the
+validator in every consumer process.
 Do not create `Cw`, `Sw`, or an admission receipt. The proposal is not
 authoritative until final-W1-`Pw` B0 validation and W1 admission.
 
@@ -4921,13 +6487,28 @@ authoritative until final-W1-`Pw` B0 validation and W1 admission.
 
 Phase B begins only after every other authorized W1 owner task has completed
 and the W1 orchestrator has frozen one immutable final `Pw`. After separate
-user authorization, `ProtectedAdmissionClient.pin_payload_and_issue_lease`
-externally pins that exact OID and returns the signed proposal receipt/lease;
-only then may `run_active_gates` enter the physical broker. No prebuilt `Cw`,
-`Sw`, seal, candidate leaf, or admission result may launch or authorize
-evaluation. Only
-`ProtectedAdmissionClient.assemble_import_and_finalize` may consume the
-authenticated bundle, construct/import Cw/Sw, create intent, perform
+explicit user authorization, Bootstrap's external control plane persists,
+authenticates, and freshly reopens one exact opaque
+`PayloadDispatchAuthorizationV1` binding that final payload transaction.
+Only after that reopen may
+`ProtectedAdmissionClient.pin_payload_and_issue_lease` import/reopen the
+exact payload objects at the target Git host, create/reopen their immutable
+content-addressed proposal pin, persist the create-once evaluation dispatch
+intent/run ref, and return the signed proposal receipt/lease. Only then may
+`run_active_gates` enter the physical broker. No prebuilt `Cw`, `Sw`, seal,
+candidate leaf, or admission result may launch or authorize evaluation.
+`PayloadDispatchAuthorizationV1` is consumed by payload availability and
+dispatch only; it is neither reusable nor interchangeable with the later
+`ProtectedRefAdvanceAuthorizationV1`. After gate success, the first
+`ProtectedAdmissionClient.assemble_import_and_finalize` invocation consumes
+the authenticated bundle only to derive and close exact `Cw/Sw` in
+Bootstrap's non-host quarantine and publish its bound advance-authorization
+request; it has no target-host import/reopen, receipt, intent, CAS, or
+attestation effect. Bootstrap then obtains and freshly reopens its opaque
+`ProtectedRefAdvanceAuthorizationV1` through the external append-only control
+plane. Only a second invocation of that same four-method operation with the
+same lease, byte-identical bundle, and same assembly identity may import and
+host-reopen those exact objects, persist the one receipt and intent, perform
 protected-ref CAS, and finalize attestation. Phase B edits no source, matrix,
 test, checker, manifest, Ledger, or status byte. The final `Pw` already
 contains Task 10's proposed `artifact.mesh = implemented` owner row; Phase B
@@ -4939,12 +6520,20 @@ derive exact `PW_COMMIT/PW_TREE`, then inspect the authenticated current
 admission before assuming the old ref. If it is still exact admitted W0, call
 `pin_payload_and_issue_lease(payload_oid: PW_COMMIT)` again: Bootstrap's
 repository/predecessor/payload idempotency key must return the original
-proposal receipt and original opaque lease/evaluation, after which
-`run_active_gates(lease: lease)` performs only query/resume and returns the
-byte-identical terminal bundle. If it is already an authenticated admitted W1
-whose payload is exact `PW_COMMIT/PW_TREE` and whose seal/CAS/final attestation
-all verify, adopt that byte-identical `admittedW1` and perform no repin or
-finalize. Every other state raises
+proposal receipt and original opaque lease/evaluation only after the service
+queries and reopens the original consumed
+`PayloadDispatchAuthorizationV1`, payload import, proposal pin, dispatch
+intent, and run-ref records; it never issues a second payload authorization
+or host effect. `run_active_gates(lease: lease)` then performs only
+query/resume and returns the byte-identical terminal bundle. If it is already
+an authenticated admitted W1 whose payload is exact `PW_COMMIT/PW_TREE` and
+whose seal/CAS/final attestation all verify, adopt that byte-identical
+`admittedW1` and perform no repin or finalize. If admitted W0 remains current,
+retries reopen the same lease/bundle/assembly identity and resume its
+pre-authorization, authorization-ready, target-import-pending,
+intent/CAS-pending, or attestation-pending state; they never issue a second
+payload or advance authorization request or blindly replay a host effect.
+Every other state raises
 `AdmissionTerminalError(terminal = quarantinedAdmission,
 reason_code = IDENTITY_MISMATCH)`. This never creates a new
 lease, repeats a physical effect, or trusts a serialized candidate cache.
@@ -4952,12 +6541,24 @@ lease, repeats a physical effect, or trusts a serialized candidate cache.
 ### Task 11: Enter the Exact Final W1 Payload Without Trusting the Candidate
 
 **Files:**
-- Read through protected service: `AdmittedWaveV1`, `PayloadProposalReceiptV1`, `EvaluationLease`
-- Read outside Git as non-authoritative drift hint only: `/private/tmp/qinao-artifact-mesh-w1-task0/handoff-v1.json`
+- Import as an opaque Bootstrap type and require only through its external
+  control plane: `PayloadDispatchAuthorizationV1`
+- Read through protected service: `AdmittedWaveV1`,
+  `PayloadProposalReceiptV1`, `EvaluationLease`
+- Open outside Git as non-authoritative transport only, after independently
+  deriving the transition OID:
+  `/private/tmp/qinao-artifact-mesh-w1-task0/by-transition-oid/<TASK0_TRANSITION_COMMIT>/handoff-v1.json`
+- Open the matching OID-scoped unit receipt as non-authoritative transport
+  only; neither pathname nor file existence unlocks a consumer.
 - Verify only: final W1 payload tree
 
 **Interfaces:**
-- Consumes: separate user authorization, clean final W1 payload OID, bootstrap-owned `ProtectedAdmissionClient`, and finalized admitted W0.
+- Consumes: separate user authorization that Bootstrap materializes as one
+  exact opaque `PayloadDispatchAuthorizationV1`, clean final W1 payload OID,
+  bootstrap-owned `ProtectedAdmissionClient`, finalized admitted W0, and the
+  process-local validated handle produced by the existing B0-pinned runner's
+  fresh closed-byte validation. Artifact Mesh receives no authorization
+  fields or constructor.
 - Produces: externally pinned proposal receipt plus signed `EvaluationLease` for the active predecessor gate. It does not accept a caller ref, wave, device, team, toolchain, archive, custody, producer, attester, or candidate-generated admission state.
 
 - [ ] **Step 1: Require the permanent reparented-program root**
@@ -4965,26 +6566,60 @@ lease, repeats a physical effect, or trusts a serialized candidate cache.
 Run exactly:
 
 ```bash
+set -euo pipefail
+GRAPH_PIN_COMMIT=9d484befb4a4593d93789457ebddfd7cde358e3b
+GRAPH_PIN_PATH=docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md
+GRAPH_PIN_BLOB=e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+GRAPH_PIN_SHA256=5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
+test "$(git cat-file -t "$GRAPH_PIN_COMMIT")" = commit
+test "$(git rev-parse "$GRAPH_PIN_COMMIT:$GRAPH_PIN_PATH")" = \
+  "$GRAPH_PIN_BLOB"
+test "$(git cat-file -t "$GRAPH_PIN_BLOB")" = blob
+python3 - "$GRAPH_PIN_BLOB" "$GRAPH_PIN_SHA256" <<'PY'
+import hashlib
+import subprocess
+import sys
+
+raw = subprocess.check_output(["git", "cat-file", "blob", sys.argv[1]])
+if hashlib.sha256(raw).hexdigest() != sys.argv[2]:
+    raise SystemExit("approved dynamic-graph pin SHA-256 drift")
+PY
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/qinao_execution_root.py \
   --root /Users/changgeng/.codex/worktrees/e4d7/Project06 \
   --expect-candidate-lineage reparentedProgram \
   --require-clean
 ```
 
-Expected: one canonical JSON line with exact keys `candidate_lineage,head_commit,head_tree,schema_version`; lineage is `reparentedProgram`, schema version is integer 1, and the two OID values byte-match fresh `git rev-parse HEAD` / `git rev-parse HEAD^{tree}` reads. Any mismatch exits 2. The current working directory must equal that exact root.
+Expected: one canonical JSON line with exact keys `candidate_lineage,head_commit,head_tree,schema_version`; lineage is `reparentedProgram`, schema version is integer 1, and the two OID values byte-match fresh `git rev-parse HEAD` / `git rev-parse HEAD^{tree}` reads. Any mismatch exits 2. The current working directory must equal that exact root. This Task-11 process has also freshly proven the exact graph commit/path/blob/raw SHA-256.
 
 - [ ] **Step 2: Pin final `Pw`, issue the signed lease, and verify predecessor**
 
 The protected runner freezes:
 
 ```bash
+set -euo pipefail
 PW_COMMIT="$(git rev-parse HEAD)"
 PW_TREE="$(git rev-parse HEAD^{tree})"
 test "$(git rev-parse "$PW_COMMIT^{tree}")" = "$PW_TREE"
+test "$(git ls-tree "$PW_TREE" -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
+test "$(git ls-files -s -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
+export PW_COMMIT PW_TREE
 ```
 
-After a separate explicit user authorization makes that exact object set
-available to the external service, call only:
+After separate explicit user authorization, Bootstrap first closes the exact
+proposal object set in its non-host quarantine, then persists, authenticates,
+and freshly reopens one exact opaque `PayloadDispatchAuthorizationV1`.
+Before that reopen, target-host payload-object import/reopen, immutable
+proposal pin/ref creation, evaluation dispatch-intent persistence, and
+run-ref creation all have effect count zero. Only after that reopen may the
+same service operation import/reopen exact `PW_COMMIT/PW_TREE` objects at the
+target Git host, create/reopen their immutable content-addressed proposal pin,
+persist the create-once evaluation dispatch intent/run ref, and return the
+receipt/lease through this unchanged client call:
 
 ```text
 admittedW0 =
@@ -4995,7 +6630,11 @@ admittedW0 =
   )
 ```
 
-The protected runner verifies both service envelopes under active B0, then
+The protected runner verifies both service envelopes under active B0, the
+proposal receipt's opaque uploader-authorization digest, and the service
+observation proving that the same
+`PayloadDispatchAuthorizationV1` was persisted, authenticated, and freshly
+reopened before each of the ordered payload host effects above. It then
 requires the receipt/lease payload commit/tree equal `PW_COMMIT/PW_TREE`, the
 service-owned immutable content-addressed proposal ref reopens those exact
 objects from the host, the predecessor equals `admittedW0.seal_commit_oid`,
@@ -5003,10 +6642,49 @@ objects from the host, the predecessor equals `admittedW0.seal_commit_oid`,
 the service-derived wave is W1, and the complete B0-derived W1 gate set
 contains exactly one `qinao.artifact-mesh-device-recovery` entry plus its
 opaque `ExternalPhysicalGateBinding`. The lease must contain no caller
-selector. For Step 3 only, the protected runner exports
-`ADMITTED_W0_CHAIN_DIGEST` from the verified
-`admittedW0.admission_chain_digest`; it accepts no caller or temporary-file
-value.
+selector. The payload authorization is consumed by this exact payload
+transaction and cannot authorize `Cw/Sw`, `AdmissionIntent`, protected-ref
+CAS, or finalization; those remain behind the later distinct
+`ProtectedRefAdvanceAuthorizationV1`. For Step 3 only, the protected runner
+exports
+`ADMITTED_W0_SEAL`, `ADMITTED_W0_CHAIN_DIGEST`,
+`ADMITTED_AUTH_EA_CHECKER_BLOB`, and `ADMITTED_AUTH_EA_TEST_BLOB` from this
+same freshly verified `admittedW0` invocation. It derives the latter two
+directly and compares them with the final payload:
+
+```bash
+set -euo pipefail
+ADMITTED_AUTH_EA_CHECKER_BLOB="$(
+  git rev-parse \
+    "$ADMITTED_W0_SEAL:scripts/check_qinao_ea_extensions.py"
+)"
+ADMITTED_AUTH_EA_TEST_BLOB="$(
+  git rev-parse \
+    "$ADMITTED_W0_SEAL:scripts/test_check_qinao_ea_extensions.py"
+)"
+test "$(git cat-file -t "$ADMITTED_AUTH_EA_CHECKER_BLOB")" = blob
+test "$(git cat-file -t "$ADMITTED_AUTH_EA_TEST_BLOB")" = blob
+test "$(git rev-parse \
+  "$PW_TREE:scripts/check_qinao_ea_extensions.py")" = \
+  "$ADMITTED_AUTH_EA_CHECKER_BLOB"
+test "$(git rev-parse \
+  "$PW_TREE:scripts/test_check_qinao_ea_extensions.py")" = \
+  "$ADMITTED_AUTH_EA_TEST_BLOB"
+export ADMITTED_W0_SEAL ADMITTED_W0_CHAIN_DIGEST
+export ADMITTED_AUTH_EA_CHECKER_BLOB ADMITTED_AUTH_EA_TEST_BLOB
+```
+
+The protected runner also walks the exact first-parent commit range from
+`ADMITTED_W0_SEAL` through `PW_COMMIT`, without reading a handoff, and derives
+exactly one commit whose sole changed path is the Ledger and whose sole
+semantic owner-row delta is
+`artifact.mesh / converging → implemented`. It requires one parent and Ledger
+mode `100644` in both trees, exports the commit as
+`TASK0_TRANSITION_COMMIT`, and opens only the two files beneath its exact
+`by-transition-oid` directory with `openat`/`O_NOFOLLOW`, regular-file,
+single-link, current-owner, and mode-`0600` checks. Zero or multiple matching
+commits, a different mode, or a transport-open failure blocks. No handoff
+field is allowed to discover its own OID scope.
 
 Missing host objects or unavailable external pinning is exactly
 `BLOCKED_PAYLOAD_OBJECT_AVAILABILITY`; absent/incomplete service bindings are
@@ -5015,21 +6693,53 @@ lease, unsigned `/private/tmp` object, or caller wave cannot substitute.
 
 - [ ] **Step 3: Verify Phase-A bytes survived exactly**
 
-Run:
+The same existing B0-pinned protected runner process executes this closed
+validator with the two inherited read-only transport FDs and only the fresh
+authenticated projections from Step 2. A candidate shell must not run it with
+caller-authored environment values. The runner names the already-open,
+close-on-exec-except-for-this-child descriptors only as
+`HANDOFF_TRANSPORT_FD` and `UNIT_RECEIPT_TRANSPORT_FD`; neither value is a
+path. Success retains only the process-local
+validated handle; it writes no receipt or public object.
 
 ```bash
+set -euo pipefail
 python3 - <<'PY'
-import hashlib, json, os, pathlib, subprocess
+import hashlib, json, os, stat, subprocess
+
+def read_transport_fd(name: str) -> bytes:
+    raw = os.environ.pop(name, "")
+    if not raw.isdecimal():
+        raise SystemExit(f"missing protected transport FD: {name}")
+    fd = int(raw)
+    metadata = os.fstat(fd)
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+        or metadata.st_nlink != 1
+        or metadata.st_size < 2
+        or metadata.st_size > 1_048_576
+    ):
+        raise SystemExit(f"invalid protected transport FD: {name}")
+    os.lseek(fd, 0, os.SEEK_SET)
+    chunks = []
+    remaining = metadata.st_size
+    while remaining:
+        chunk = os.read(fd, remaining)
+        if not chunk:
+            raise SystemExit(f"short protected transport read: {name}")
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    os.close(fd)
+    return b"".join(chunks)
 
 def canonical_json_bytes(value):
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode() + b"\n"
 
-handoff_path = pathlib.Path(
-    "/private/tmp/qinao-artifact-mesh-w1-task0/handoff-v1.json"
-)
-handoff_bytes = handoff_path.read_bytes()
+handoff_bytes = read_transport_fd("HANDOFF_TRANSPORT_FD")
+unit_bytes = read_transport_fd("UNIT_RECEIPT_TRANSPORT_FD")
 handoff = json.loads(handoff_bytes)
 if handoff_bytes != canonical_json_bytes(handoff):
     raise SystemExit("Task-0 handoff is not canonical JSON plus one LF")
@@ -5080,9 +6790,26 @@ phase_a_tree = handoff["task0_code_tree_oid"]
 pretransition_commit = handoff["pretransition_task0_commit_oid"]
 pretransition_tree = handoff["pretransition_task0_tree_oid"]
 transition_commit = handoff["status_transition_commit_oid"]
+expected_transition_commit = os.environ.get(
+    "TASK0_TRANSITION_COMMIT", ""
+)
+if (
+    len(expected_transition_commit) != 40
+    or any(c not in "0123456789abcdef" for c in expected_transition_commit)
+    or transition_commit != expected_transition_commit
+):
+    raise SystemExit("handoff transition OID is not independently scoped")
 final_tree = subprocess.check_output(
     ["git", "rev-parse", "HEAD^{tree}"], text=True
 ).strip()
+final_commit = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"], text=True
+).strip()
+if (
+    final_commit != os.environ.get("PW_COMMIT", "")
+    or final_tree != os.environ.get("PW_TREE", "")
+):
+    raise SystemExit("validator payload scope differs from fresh final Pw")
 
 if subprocess.check_output(
     ["git", "rev-parse", f"{transition_commit}^{{tree}}"], text=True
@@ -5104,6 +6831,32 @@ changed = subprocess.check_output([
 ledger_path = "docs/superpowers/specs/qinao-owner-ledger-v1.json"
 if changed != [ledger_path]:
     raise SystemExit(f"status-transition path drift: {changed}")
+
+def require_ledger_mode(tree):
+    raw = subprocess.check_output(
+        ["git", "ls-tree", tree, "--", ledger_path], text=True
+    ).strip()
+    if not raw or "\t" not in raw:
+        raise SystemExit("owner Ledger tree entry missing")
+    metadata, actual_path = raw.split("\t", 1)
+    mode, kind, _ = metadata.split()
+    if (
+        actual_path != ledger_path
+        or mode != "100644"
+        or kind != "blob"
+    ):
+        raise SystemExit("owner Ledger mode/type/path drift")
+
+for tree in (pretransition_tree, phase_a_tree, final_tree):
+    require_ledger_mode(tree)
+index_entry = subprocess.check_output(
+    ["git", "ls-files", "-s", "--", ledger_path], text=True
+).strip().splitlines()
+if (
+    len(index_entry) != 1
+    or index_entry[0].split(maxsplit=1)[0] != "100644"
+):
+    raise SystemExit("owner Ledger final index mode drift")
 if subprocess.run(
     ["git", "merge-base", "--is-ancestor", transition_commit, "HEAD"]
 ).returncode != 0:
@@ -5154,11 +6907,6 @@ if (
 ):
     raise SystemExit("artifact.mesh status-transition digest drift")
 
-unit_path = pathlib.Path(
-    "/private/tmp/qinao-artifact-mesh-w1-task0/"
-    "unit-preflight-receipt-v1.json"
-)
-unit_bytes = unit_path.read_bytes()
 if (
     hashlib.sha256(unit_bytes).hexdigest()
     != handoff["unit_preflight_receipt_sha256"]
@@ -5268,6 +7016,16 @@ ea_paths = {
     "checker_blob_oid": "scripts/check_qinao_ea_extensions.py",
     "test_blob_oid": "scripts/test_check_qinao_ea_extensions.py",
 }
+admitted_w0_seal = os.environ.get("ADMITTED_W0_SEAL", "")
+if (
+    len(admitted_w0_seal) != 40
+    or any(c not in "0123456789abcdef" for c in admitted_w0_seal)
+):
+    raise SystemExit("fresh service-verified admitted-W0 seal missing")
+authority_environment = {
+    "checker_blob_oid": "ADMITTED_AUTH_EA_CHECKER_BLOB",
+    "test_blob_oid": "ADMITTED_AUTH_EA_TEST_BLOB",
+}
 for field, path in ea_paths.items():
     oid = ea_non_delta[field]
     if (
@@ -5276,6 +7034,20 @@ for field, path in ea_paths.items():
         or any(c not in "0123456789abcdef" for c in oid)
     ):
         raise SystemExit("Task-0 E/A Authority blob shape drift")
+    direct_admitted_oid = subprocess.check_output(
+        ["git", "rev-parse", f"{admitted_w0_seal}:{path}"],
+        text=True,
+    ).strip()
+    exported_admitted_oid = os.environ.get(
+        authority_environment[field], ""
+    )
+    if (
+        direct_admitted_oid != exported_admitted_oid
+        or oid != direct_admitted_oid
+    ):
+        raise SystemExit(
+            "Task-0 E/A blob differs from fresh admitted-W0 authority"
+        )
     for tree in (phase_a_tree, final_tree):
         actual = subprocess.check_output(
             ["git", "rev-parse", f"{tree}:{path}"], text=True
@@ -5348,6 +7120,7 @@ paths = (
  "SampleHost/Package.swift",
  "SampleHost/ArtifactMeshDeviceLab/project.yml",
  "SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.pbxproj",
+ "SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
  "SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshDeviceLab.xcscheme",
  "SampleHost/ArtifactMeshDeviceLab/ArtifactMeshDeviceLab.xcodeproj/xcshareddata/xcschemes/ArtifactMeshCASContenderLab.xcscheme",
  "SampleHost/ArtifactMeshDeviceLab/App/ArtifactMeshDeviceLabApp.swift",
@@ -5386,15 +7159,19 @@ PY
 
 Other W1 tasks may add unrelated bytes and may lawfully change their own
 Ledger/catalog rows, but may not rewrite an Artifact Mesh Task-0 path or the
-canonical `artifact.mesh` owner row. The 29-path mechanism comparison and
+canonical `artifact.mesh` owner row. The 30-path mechanism comparison and
 the separate row-level transition proof are both mandatory. Require the
 exact historical evidence-set digest from Phase A when the active gate parses
 the predecessor-bound prerequisites.
 
-Expected: `artifact-mesh-task0-drift: PASS paths=29` after the row-level proof
+Expected: `artifact-mesh-task0-drift: PASS paths=30` after the row-level proof
 also passes; otherwise use the
 existing terminal `BLOCKED_ARTIFACT_MESH_DEVICE_RECOVERY` with
 `reason=TASK0_DRIFT`. This plan adds no child-only blocked terminal.
+Only this validator's successful process status plus its still-live
+process-local validated handle allows Task 11 to return the already pinned
+lease to the orchestrator. The handle is destroyed when Task 11 returns and
+cannot be reused by Task 12.
 
 ---
 
@@ -5402,16 +7179,132 @@ existing terminal `BLOCKED_ARTIFACT_MESH_DEVICE_RECOVERY` with
 
 **Files:**
 - Verify only: final W1 `Pw`
+- Import as an opaque Bootstrap type and verify its completed service
+  transaction through the signed proposal receipt/lease:
+  `PayloadDispatchAuthorizationV1`
 - Consume through protected service: signed `EvaluationLease`, opaque `ExternalPhysicalGateBinding`, controller-side physical broker, encrypted custody capabilities
 - Receive through protected service: `AuthenticatedGateResultBundle`
 
 **Interfaces:**
-- Consumes: final W1 `Pw`, service-envelope-verified proposal receipt/lease, active B0 `qinao.artifact-mesh-device-recovery` module, and bootstrap-selected external physical broker.
+- Consumes: final W1 `Pw`, service-envelope-verified proposal receipt/lease
+  proving the exact `PayloadDispatchAuthorizationV1` preceded target-host
+  payload-object import/reopen, immutable proposal pin, and create-once
+  evaluation dispatch/run-ref creation, active B0
+  `qinao.artifact-mesh-device-recovery` module, and bootstrap-selected
+  external physical broker.
 - Produces: bootstrap-owned `AuthenticatedGateResultBundle` bound to final W1 `Pw`, exact active gate/output contract, and externally reopened evidence. Candidate scripts are untrusted parity tools and produce no leaf.
+- Does not produce or request `Cw`, `Sw`,
+  `ProtectedRefAdvanceAuthorizationV1`, an object-import receipt, an admission
+  intent, or a protected-ref effect. The two-invocation assembly/authorization
+  boundary begins only in Task 13 after this exact bundle is final.
 
 - [ ] **Step 1: Run all unit suites from the final payload**
 
-Run the five non-empty Swift suite commands from Task 10 Step 2, its
+This Task-12 process first calls
+`ProtectedAdmissionClient.reopen_admitted_predecessor()` again, verifies the
+service envelope under active B0, and requires that admitted W0 is the signed
+predecessor carried by the already verified proposal receipt/lease. It does
+not reuse Task 11's shell values or validated handle. Before running a unit
+suite or entering the broker, it uses Bootstrap's opaque parser/service
+binding—not a candidate schema—to reopen the proposal receipt's
+uploader-authorization digest and require the completed service transaction
+for the exact `PayloadDispatchAuthorizationV1`: persisted, authenticated, and
+freshly reopened authorization first; target-host payload import/reopen
+second; immutable content-addressed proposal pin third; create-once evaluation
+dispatch intent/run ref fourth. Any missing, reordered, substituted, or
+second-effect observation stops before `run_active_gates`. This task never
+receives or reconstructs the authorization fields, and that consumed record
+cannot satisfy the later `ProtectedRefAdvanceAuthorizationV1`. From those
+freshly verified service objects, the protected runner exposes only
+`TASK12_ADMITTED_W0_SEAL`, `TASK12_ADMITTED_W0_CHAIN_DIGEST`,
+`TASK12_RECEIPT_PAYLOAD_COMMIT`, `TASK12_RECEIPT_PAYLOAD_TREE`,
+`TASK12_LEASE_PAYLOAD_COMMIT`, and `TASK12_LEASE_PAYLOAD_TREE` to this closed
+step; no caller or temporary file may populate them.
+
+Freshly prove the graph pin, admitted-W0 Authority blobs, and final Ledger
+mode:
+
+```bash
+set -euo pipefail
+PW_COMMIT="$(git rev-parse HEAD)"
+PW_TREE="$(git rev-parse HEAD^{tree})"
+test "$(git rev-parse "$PW_COMMIT^{tree}")" = "$PW_TREE"
+test "$TASK12_RECEIPT_PAYLOAD_COMMIT" = "$PW_COMMIT"
+test "$TASK12_RECEIPT_PAYLOAD_TREE" = "$PW_TREE"
+test "$TASK12_LEASE_PAYLOAD_COMMIT" = "$PW_COMMIT"
+test "$TASK12_LEASE_PAYLOAD_TREE" = "$PW_TREE"
+test "${#TASK12_ADMITTED_W0_CHAIN_DIGEST}" = 64
+GRAPH_PIN_COMMIT=9d484befb4a4593d93789457ebddfd7cde358e3b
+GRAPH_PIN_PATH=docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md
+GRAPH_PIN_BLOB=e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+GRAPH_PIN_SHA256=5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
+test "$(git cat-file -t "$GRAPH_PIN_COMMIT")" = commit
+test "$(git rev-parse "$GRAPH_PIN_COMMIT:$GRAPH_PIN_PATH")" = \
+  "$GRAPH_PIN_BLOB"
+test "$(git cat-file -t "$GRAPH_PIN_BLOB")" = blob
+python3 - "$GRAPH_PIN_BLOB" "$GRAPH_PIN_SHA256" <<'PY'
+import hashlib
+import subprocess
+import sys
+
+raw = subprocess.check_output(["git", "cat-file", "blob", sys.argv[1]])
+if hashlib.sha256(raw).hexdigest() != sys.argv[2]:
+    raise SystemExit("approved dynamic-graph pin SHA-256 drift")
+PY
+
+# TASK12_ADMITTED_W0_SEAL is projected only from this process's freshly
+# service-envelope-verified admittedW0.
+test "$(git cat-file -t "$TASK12_ADMITTED_W0_SEAL")" = commit
+TASK12_AUTH_EA_CHECKER_BLOB="$(
+  git rev-parse \
+    "$TASK12_ADMITTED_W0_SEAL:scripts/check_qinao_ea_extensions.py"
+)"
+TASK12_AUTH_EA_TEST_BLOB="$(
+  git rev-parse \
+    "$TASK12_ADMITTED_W0_SEAL:scripts/test_check_qinao_ea_extensions.py"
+)"
+test "$(git cat-file -t "$TASK12_AUTH_EA_CHECKER_BLOB")" = blob
+test "$(git cat-file -t "$TASK12_AUTH_EA_TEST_BLOB")" = blob
+test "$(git rev-parse \
+  "$PW_TREE:scripts/check_qinao_ea_extensions.py")" = \
+  "$TASK12_AUTH_EA_CHECKER_BLOB"
+test "$(git rev-parse \
+  "$PW_TREE:scripts/test_check_qinao_ea_extensions.py")" = \
+  "$TASK12_AUTH_EA_TEST_BLOB"
+test "$(git ls-tree "$PW_TREE" -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
+test "$(git ls-files -s -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
+ADMITTED_W0_SEAL="$TASK12_ADMITTED_W0_SEAL"
+ADMITTED_W0_CHAIN_DIGEST="$TASK12_ADMITTED_W0_CHAIN_DIGEST"
+ADMITTED_AUTH_EA_CHECKER_BLOB="$TASK12_AUTH_EA_CHECKER_BLOB"
+ADMITTED_AUTH_EA_TEST_BLOB="$TASK12_AUTH_EA_TEST_BLOB"
+export ADMITTED_W0_SEAL ADMITTED_W0_CHAIN_DIGEST
+export ADMITTED_AUTH_EA_CHECKER_BLOB ADMITTED_AUTH_EA_TEST_BLOB
+export PW_COMMIT PW_TREE
+```
+
+The runner then independently rederives the unique exact Task-10 transition
+commit from the admitted-W0-to-`PW_COMMIT` first-parent range, without reading
+the handoff. It requires its parent/post/final Ledger modes all equal
+`100644`, the exact one-path/one-field `converging → implemented` delta, and
+transition ancestry in `PW_COMMIT`, and exports it as
+`TASK0_TRANSITION_COMMIT` solely inside this protected process. It opens only
+that OID-scoped handoff and
+unit receipt via read-only no-follow FDs. In this same B0-pinned process it
+reruns the complete closed validator: exact canonical field sets, fresh
+admitted-W0 chain/seal equality, independently derived transition/tree
+equality, pre/post/final owner rows and digests, exact unit receipt, direct
+equality of its Authority blob IDs with
+`TASK12_AUTH_EA_CHECKER_BLOB/TASK12_AUTH_EA_TEST_BLOB`, the stable five-case
+digest, four historical blobs, manifest digest, and all 30 Task-0 paths. Only
+the resulting process-local nonserializable validated handle unlocks the
+remaining Task-12 steps. Task 11's handle, file existence, or candidate JSON
+does not.
+
+Now run the five non-empty Swift suite commands from Task 10 Step 2, its
 device-recovery Python module, the realized E/A command from Step 3, and the
 five fully qualified Authority non-delta selectors plus blob/result-digest
 checks from Step 3A, substituting final `PW_COMMIT` and `PW_TREE`.
@@ -5445,6 +7338,24 @@ only:
 
 No Artifact plan code can construct `gateResults`, pass selectors to the
 broker, or read the raw device identity/custody key.
+`run_active_gates` is query/resume of the one evaluation and has no Cw/Sw
+assembly role: it neither derives an advance-authorization request nor
+imports a target-host object, creates an admission intent, advances the
+protected ref, or finalizes a wave.
+
+Before either production lab archive, the broker issues one fresh encrypted
+custody capability and requires both archive paths, disjoint DerivedData
+roots, disjoint `.xcresult` roots, isolated HOME/TMPDIR, cloned packages,
+module cache, SwiftPM cache, and Xcode/tool cache to reopen beneath it. The
+controller passes the exact Task-9 `-derivedDataPath`, `-resultBundlePath`,
+`-clonedSourcePackagesDirPath`, and
+`-disableAutomaticPackageResolution` arguments and its empty-derived,
+custody-scoped environment. A default `~/Library/Developer/Xcode`,
+`~/Library/Caches`, `/tmp` result bundle, or caller-selected cache is illegal.
+`run_active_gates` cannot return authenticated success until external reopen
+passes and the existing opaque custody/destruction receipt proves key
+destruction, removal of every covered root, separately reopened no-readable
+residue, and an empty orphan-cleanup journal.
 
 - [ ] **Step 3: Require the brokered physical result**
 
@@ -5494,7 +7405,8 @@ read-only reopened encrypted capability before key destruction, but that
 candidate result is parity/diagnostic only. The active module independently
 parses the reopened raw events, requires exact two-process CAS evidence,
 persistent-WAL/atomic-quarantine evidence, production reachability, external
-put/reopen, key destruction, no-residue receipt, and the independently
+put/reopen, the closed DerivedData/result-bundle/HOME/TMPDIR/package/module/
+tool-cache coverage set, key destruction, no-residue receipt, and the independently
 derived operator-visible projection
 `migration_disposition = anchorlessV1QuarantineRollForwardOnly`. Missing or
 substituted disposition fails the frozen B0 corpus. Candidate parity and the
@@ -5505,43 +7417,91 @@ If Task 12 is entered in a new process, first execute the Phase-B re-entry
 contract. Its admitted-W0 branch recovers the original authenticated `lease`
 and Step 2 resumes that existing evaluation; its already-admitted-W1 branch
 skips the rest of Task 12. If Task 13 is entered in a new process, execute the
-same oracle before finalization. Unknown effect state remains blocked for
-Bootstrap reconciliation and is never replayed.
+same oracle before touching the assembly operation. The admitted-W0 branch
+must additionally query the original assembly identity and distinguish
+pre-authorization from authorization-ready and post-authorization recovery;
+it cannot infer authorization from process memory. Unknown effect state
+remains blocked for Bootstrap reconciliation and is never replayed.
 
 - [ ] **Step 5: Recheck clean tree and immutable final payload**
 
 ```bash
-test -z "$(git status --porcelain=v1)"
+set -euo pipefail
+set +e
+TASK12_FINAL_STATUS="$(git status --porcelain=v1)"
+TASK12_FINAL_STATUS_RC="$?"
+set -euo pipefail
+test "$TASK12_FINAL_STATUS_RC" = 0
+test -z "$TASK12_FINAL_STATUS"
 test "$(git rev-parse HEAD)" = "$PW_COMMIT"
 test "$(git rev-parse HEAD^{tree})" = "$PW_TREE"
+test "$(git ls-tree "$PW_TREE" -- \
+  docs/superpowers/specs/qinao-owner-ledger-v1.json |
+  awk '{print $1}')" = 100644
 ```
 
 Expected: no tracked/untracked mutation and exact final W1 payload unchanged.
 
 ---
 
-### Task 13: Finalize Only Through the Bootstrap-Owned Protected Service
+### Task 13: Close in Quarantine, Authorize Host Effects, and Finalize
 
 **Files:**
 - Create in candidate/runner: nothing
-- Receive through protected service: finalized `AdmittedWaveV1`
-- Service-owned only: W1 `Cw`, W1 `Sw`, import receipts, intent, protected-ref CAS, final attestation
+- Import as an opaque Bootstrap type and reopen only as prior payload
+  transaction lineage through the signed proposal receipt/lease:
+  `PayloadDispatchAuthorizationV1`
+- Prepare only inside Bootstrap's non-host quarantine: exact W1 `Cw`, exact
+  W1 `Sw`, one assembly identity, and its opaque advance-authorization request
+- Reopen only through Bootstrap's append-only control plane:
+  `ProtectedRefAdvanceAuthorizationV1`
+- Receive through protected service after the authorization boundary:
+  finalized `AdmittedWaveV1`
+- Service-owned only after authorization: target-host object import/reopen,
+  signed object-import receipt, admission intent, protected-ref CAS, and final
+  attestation
 
 **Interfaces:**
-- Consumes: signed `EvaluationLease` and service-envelope-verified `AuthenticatedGateResultBundle` returned by `ProtectedAdmissionClient.run_active_gates`.
-- Produces: finalized `AdmittedWaveV1` through the single bootstrap-owned protected service operation. Artifact Mesh produces no candidate leaf and cannot reveal raw physical evidence.
+- Consumes: signed `EvaluationLease` and service-envelope-verified
+  `AuthenticatedGateResultBundle` returned by
+  `ProtectedAdmissionClient.run_active_gates`, plus the signed proposal
+  receipt proving the exact prior `PayloadDispatchAuthorizationV1` was used
+  only for payload host import/reopen, immutable proposal pin, and evaluation
+  dispatch/run-ref creation.
+- Consumes between invocations only through Bootstrap's external control
+  plane: one fresh opaque `ProtectedRefAdvanceAuthorizationV1` binding the
+  already-closed object set and assembly identity. It is not a client
+  argument, fifth method, candidate value, local schema, or SDK authority.
+- Produces: finalized `AdmittedWaveV1` only from the post-authorization
+  invocation of the same bootstrap-owned operation with the same lease,
+  byte-identical bundle, and same assembly identity. Artifact Mesh produces
+  no candidate leaf and cannot reveal raw physical evidence.
 
-- [ ] **Step 1: Verify the opaque authenticated result bundle**
+- [ ] **Step 1: Verify the opaque bundle and recover one assembly identity**
 
 On process/session re-entry, execute the Phase-B recovery oracle first. If
 current admission is exact W0, obtain the service's original receipt/lease
 through idempotent `pin_payload_and_issue_lease` and query/resume the original
-evaluation through `run_active_gates`; only those byte-identical opaque values
-may enter this task. If current admission is already exact W1 for
-`PW_COMMIT/PW_TREE`, bind `admittedW1` to that authenticated byte-identical
-result and skip Steps 1-2. Any other state raises
+evaluation through `run_active_gates`; this recovery query must reopen the
+same consumed `PayloadDispatchAuthorizationV1`, target-host payload import,
+immutable proposal pin, dispatch intent, and run-ref observations and must
+not issue a new authorization or repeat one effect. Only those byte-identical
+opaque values may enter this task. The payload authorization cannot be reused
+as, converted into, or accepted in place of
+`ProtectedRefAdvanceAuthorizationV1`. Query the service's assembly record by
+repository, lease, authenticated-bundle digest, assembly-contract digest,
+deterministic `Pw/Cw/Sw` identities, object-set digest, import key, and intent
+key. Re-entry may resume only that identity in its unprepared,
+pre-authorization, authorization-ready, target-import-pending,
+intent/CAS-pending, or attestation-pending state.
+
+If current admission is already exact W1 for `PW_COMMIT/PW_TREE`, bind
+`admittedW1` to that authenticated byte-identical result and skip Steps 2-4;
+the final authority/prose scan in Step 5 still runs.
+Any other head, payload, bundle, assembly, authorization, import, intent, CAS,
+or attestation identity raises
 `AdmissionTerminalError(terminal = quarantinedAdmission,
-reason_code = IDENTITY_MISMATCH)`.
+reason_code = IDENTITY_MISMATCH)` before a new request or host effect.
 
 The protected runner verifies the bundle's bootstrap service envelope and
 requires its opaque commitments to bind the same lease/evaluation, final
@@ -5550,7 +7510,9 @@ Swift suites, four E/A slices, exact 40/26/14 matrix, two-process Keychain CAS,
 selected shipping/lab archive observations, production reachability, external
 put/reopen, the exact operator-visible
 `anchorlessV1QuarantineRollForwardOnly` migration disposition, and custody
-destruction/no-residue receipt. Raw device/team/serial,
+destruction/no-residue receipt covering archives, DerivedData, result bundles,
+HOME, TMPDIR, package/module/tool caches, key destruction, removed roots, and
+an empty crash-recovery cleanup journal. Raw device/team/serial,
 paths, provisioning/CMS bytes, Keychain bytes, container bytes, boot identity,
 challenges, traces, credentials, and custody keys remain outside Git and
 outside the bundle.
@@ -5559,11 +7521,70 @@ outside the bundle.
 not restate its field schema, allow candidate supplementation, or serialize a
 lookalike JSON result.
 
-- [ ] **Step 2: Ask the protected service to assemble, import, and finalize**
+- [ ] **Step 2: First invocation derives and closes exact objects only in non-host quarantine**
 
-Execute this step only for the recovery oracle's admitted-W0 branch.
+Execute this step only for the recovery oracle's admitted-W0 branch when no
+matching advance authorization has already been service-reopened. Invoke the
+existing fourth method, without adding a preparation method:
 
-Call exactly:
+```text
+ProtectedAdmissionClient.assemble_import_and_finalize(
+  lease: lease,
+  gate_results: gateResults
+)
+```
+
+This pre-authorization invocation may only:
+
+```text
+authenticate the exact lease, bundle, output contract, and W1 Pw/PwTree
+derive every Cw leaf from authenticated B0 output without caller bytes
+derive deterministic one-parent Cw over Pw in non-host quarantine
+derive deterministic one-parent Sw over Cw in the same quarantine
+close and reopen the exact Pw/Cw/Sw topology and complete object set there
+freeze one evidence-object-set digest, target-host import key, and intent key
+obtain the fresh live admission-protection projection
+persist or reopen one assembly identity and one bound authorization request
+```
+
+It performs exactly zero target-host object import/reopen, zero
+object-import receipt, zero `AdmissionIntent`, zero protected-ref CAS, and
+zero final attestation. If the matching authorization is not already
+persisted and service-reopened, the only legal outcome is:
+
+```text
+AdmissionTerminalError(
+  terminal = BLOCKED_EXTERNAL_BOOTSTRAP,
+  reason_code = CEREMONY_UNAVAILABLE
+)
+```
+
+It returns no partial object and no partial `AdmittedWaveV1`. A retry before
+authorization queries/resumes the same assembly, reproduces the same request
+and typed terminal, and keeps assembly, Cw, Sw, request, and every target-host
+effect count at one, one, one, one, and zero respectively.
+
+- [ ] **Step 3: Reopen the opaque authorization, then resume the same operation**
+
+Only after Step 2 has closed the exact object set, Bootstrap's external
+append-only control plane may obtain one fresh
+`ProtectedRefAdvanceAuthorizationV1`. The service persists, authenticates,
+and freshly reopens that opaque record before the first target-host effect.
+It must bind the same repository/ref/wave, expected admitted-W0 seal, exact
+`Pw/Cw/Sw`, proposal receipt, lease, authenticated bundle, object-set digest,
+import key, intent key, fresh live protection projection, operator role,
+expiry, nonce, and signature already committed by the assembly request.
+Missing, expired, replayed, substituted, or policy-drifted authorization
+remains `BLOCKED_EXTERNAL_BOOTSTRAP/CEREMONY_UNAVAILABLE` before any host
+effect. This advance record cannot authorize or repeat the already completed
+payload-object import/reopen, immutable proposal pin, evaluation dispatch
+intent, or run-ref creation, just as the earlier
+`PayloadDispatchAuthorizationV1` cannot authorize this assembly import,
+intent, CAS, or finalization.
+
+The authorization is never passed through the client call. Once the matching
+record is freshly service-reopened, invoke the same fourth method with the
+same opaque values:
 
 ```text
 admittedW1 =
@@ -5573,26 +7594,184 @@ admittedW1 =
   )
 ```
 
-The external service alone validates the exact output set, derives every Cw
-leaf from the authenticated bundle and B0 output contracts, constructs
-deterministic Cw/Sw bytes, imports and host-reopens every object, signs the
-`ImportedCommit` receipts, persists the object-import receipt, creates the
-immutable intent, performs protected-ref CAS, and finalizes the service
-attestation. Candidate code, the controller, Artifact Mesh, the protected
-runner, and any W1 evidence builder supply no leaf, path, blob, tree, commit
-metadata, OID, ref, receipt child, intent, or CAS value.
+This normally second invocation reopens the existing non-host `Cw/Sw` object
+closure and same assembly identity; it cannot construct a second object,
+request, import identity, or intent. Only now may the service:
 
-- [ ] **Step 3: Reopen final admission or stop at the exact block**
+```text
+import the authorization-bound object set into the target Git host
+reopen every imported object and exact Pw/Cw/Sw topology from that host
+persist the one signed object-import receipt
+create the one immutable admission intent bound by the authorization
+perform one non-force expected-admitted-W0 protected-ref CAS
+finalize the same intent as an externally signed admission attestation
+return only the opaque finalized AdmittedWaveV1
+```
+
+Unknown host outcomes are queried and reconciled under the same import/intent
+identity; they are never blindly replayed. Repetition with the same
+lease/bundle after authorization is query/resume. A different lease, bundle,
+object set, authorization, assembly identity, import key, or intent key
+quarantines before a ref effect.
+
+- [ ] **Step 4: Require crash, retry, and substitution conformance**
+
+Do not create an Artifact-Mesh copy of Bootstrap's protocol or recovery
+tests. Require the active B0 service-conformance projection and its existing
+protocol/recovery suites to execute all of these cases over the W1 assembly
+contract:
+
+| Required case | Injected boundary or mutation | Required invariant |
+|---|---|---|
+| crash before authorization persistence | terminate after exact non-host closure/request publication but before the authorization record is durable | reopen one assembly and request; zero target-host import, receipt, intent, CAS, or attestation |
+| crash after authorization persistence | terminate after the signed record is durable but before the post-authorization invocation | freshly reopen the same record and resume the same assembly; no second Cw, Sw, request, or authorization |
+| pre-authorization retry | repeat the same lease and byte-identical bundle before authorization | byte-identical request and typed `CEREMONY_UNAVAILABLE`; all target-host effect counts remain zero |
+| post-authorization retry | repeat at object import, host reopen, receipt, intent, CAS, and final-attestation boundaries | query/reconcile one import and one intent; CAS/finalization effects remain at most one; final bytes are identical |
+| authorization substitution | alter repository/ref/wave, old or new OID, proposal receipt, lease, bundle, object set, import key, intent key, live protection, operator/role, expiry, nonce, or signature | reject before the first target-host effect |
+| authorization-class substitution | present the consumed `PayloadDispatchAuthorizationV1` where `ProtectedRefAdvanceAuthorizationV1` is required, or use the advance record for payload import/pin/dispatch | reject before payload or assembly target-host effect; neither record's effect count changes |
+| crash after final attestation before return | lose the client response after exact W1 finalization | `reopen_admitted_predecessor()` returns the byte-identical W1 result without repin, gate rerun, second assembly, intent, or CAS |
+
+Candidate parity runs both inherited suites only to prove positive discovery;
+the active signed service-conformance result remains authoritative:
+
+```bash
+set -euo pipefail
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  scripts/run_nonempty_python_unittest.py \
+  --minimum-tests 1 \
+  --module scripts.test_qinao_admission_protocol_v1 \
+  --module scripts.test_qinao_admission_recovery_oracle
+```
+
+Expected: both modules discover at least one test, all cases pass, and the
+active service counters prove one assembly identity, one object closure, one
+authorization request/record, at most one target-host import/intent/CAS, and
+one byte-identical final result.
+
+- [ ] **Step 5: Run the final authority-surface and prose-conflation scan**
+
+First prove the inherited client still exposes exactly four methods:
+
+```bash
+set -euo pipefail
+PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
+import inspect
+
+from scripts.qinao_admission_protocol_v1 import (
+    PayloadDispatchAuthorizationV1,
+    ProtectedAdmissionClient,
+    ProtectedRefAdvanceAuthorizationV1,
+)
+
+expected = {
+    "reopen_admitted_predecessor",
+    "pin_payload_and_issue_lease",
+    "run_active_gates",
+    "assemble_import_and_finalize",
+}
+actual = {
+    name
+    for name, value in inspect.getmembers(
+        ProtectedAdmissionClient, inspect.isfunction
+    )
+    if not name.startswith("_")
+}
+if actual != expected:
+    raise SystemExit(
+        f"ProtectedAdmissionClient surface drift: {sorted(actual)}"
+    )
+if PayloadDispatchAuthorizationV1 is ProtectedRefAdvanceAuthorizationV1:
+    raise SystemExit("payload and advance authorization types are conflated")
+if {
+    "payload_dispatch_authorization",
+    "protected_ref_advance_authorization",
+} & actual:
+    raise SystemExit("authorization leaked into the public client surface")
+PY
+
+set +e
+LOCAL_AUTH_DECLARATIONS="$(
+  rg -n \
+    --glob '*.swift' \
+    --glob '*.sql' \
+    '(struct|class|enum|protocol|typealias)[[:space:]]+(PayloadDispatchAuthorizationV1|ProtectedRefAdvanceAuthorizationV1)\b|payload_dispatch_authorization|protected_ref_advance_authorization' \
+    BehavioralAISubstrate/Sources \
+    QinaoRuntimeSDK/Sources \
+    SampleHost
+)"
+LOCAL_AUTH_DECLARATIONS_RC="$?"
+set -euo pipefail
+case "$LOCAL_AUTH_DECLARATIONS_RC" in
+  1) test -z "$LOCAL_AUTH_DECLARATIONS" ;;
+  0)
+    printf '%s\n' "$LOCAL_AUTH_DECLARATIONS" >&2
+    exit 1
+    ;;
+  *) exit "$LOCAL_AUTH_DECLARATIONS_RC" ;;
+esac
+
+python3 - <<'PY'
+from pathlib import Path
+
+plan = Path(
+    "docs/superpowers/plans/"
+    "2026-07-23-qinao-artifact-mesh-w1-task0.md"
+).read_text()
+forbidden = (
+    "construct" + "/import",
+    "construction" + "/import",
+    "constructs" + "/imports",
+    "assemble, " + "import, and finalize",
+)
+found = [token for token in forbidden if token in plan]
+if found:
+    raise SystemExit(f"one-step assembly prose remains: {found}")
+
+phase_b = plan.split(
+    "## Phase B — Final W1 `Pw` Physical Proof and Reachability Rebind",
+    1,
+)[1].split("### Task 11:", 1)[0]
+phase_b = " ".join(phase_b.split())
+ordered_payload_and_advance_markers = (
+    "`PayloadDispatchAuthorizationV1` binding that final payload transaction",
+    "import/reopen the exact payload objects at the target Git host",
+    "create/reopen their immutable content-addressed proposal pin",
+    "persist the create-once evaluation dispatch intent/run ref",
+    "`ProtectedRefAdvanceAuthorizationV1`",
+    "import and host-reopen those exact objects",
+)
+cursor = -1
+for marker in ordered_payload_and_advance_markers:
+    position = phase_b.find(marker, cursor + 1)
+    if position < 0:
+        raise SystemExit(
+            "Phase-B authorization order missing or reordered: "
+            f"{marker}"
+        )
+    cursor = position
+PY
+```
+
+Expected: exact four-method surface, distinct Bootstrap-owned payload and
+advance authorization types, no Artifact-owned production declaration/table
+for either opaque authorization, exact payload authorization → payload host
+import/reopen → immutable proposal pin → dispatch/run-ref → non-host
+assembly → advance authorization → assembly host-effect order, and no generic
+prose that collapses non-host object closure and authorized target-host
+effects into one step.
+
+- [ ] **Step 6: Reopen final admission or stop at the exact block**
 
 Require `admittedW1` to verify under the active B0 service binding, derive W1,
 name the exact prior admitted-W0 seal, and carry a final seal whose admitted
-topology binds the same immutable `Pw` and authenticated bundle. Reopen it
-again through `ProtectedAdmissionClient.reopen_admitted_predecessor()` before
-the next wave; the two authenticated results must be byte-identical.
+topology binds the same immutable `Pw`, authenticated bundle, authorized
+object import, and same-intent CAS. Reopen it again through
+`ProtectedAdmissionClient.reopen_admitted_predecessor()` before the next
+wave; the two authenticated results must be byte-identical.
 Only this finalized admission makes the already-indexed
 `artifact.mesh = implemented` proposal authoritative. The service does not
-rewrite `Pw`, the Ledger, or the owner row while assembling `Cw/Sw` or
-finalizing the seal.
+rewrite `Pw`, the Ledger, or the owner row while preparing the non-host
+`Cw/Sw` closure or while executing authorized host import/finalization.
 
 No authenticated passing bundle or admission is emitted on failure. The exact
 `BLOCKED_ARTIFACT_MESH_DEVICE_RECOVERY` reason map is: missing row →
@@ -5602,10 +7781,14 @@ fixture substitution → `FIXTURE_SUBSTITUTION`; raw reopen failure →
 `SHIPPING_REACHABILITY_VIOLATION`; candidate-module-only pass →
 `CANDIDATE_MODULE_ONLY_PROOF`; custody cleanup failure →
 `CUSTODY_CLEANUP_UNVERIFIED`; protected-data unexercisability →
-`PROTECTED_DATA_UNAVAILABLE`. Missing service capability is
-`BLOCKED_EXTERNAL_BOOTSTRAP` with its matching closed registry reason; missing
-pinned payload objects is `BLOCKED_PAYLOAD_OBJECT_AVAILABILITY` with
-`PAYLOAD_OBJECT_NOT_HOST_REOPENED`.
+`PROTECTED_DATA_UNAVAILABLE`. Missing service capability or fresh advance
+authorization is `BLOCKED_EXTERNAL_BOOTSTRAP` with its matching closed
+registry reason; missing pinned payload objects is
+`BLOCKED_PAYLOAD_OBJECT_AVAILABILITY` with
+`PAYLOAD_OBJECT_NOT_HOST_REOPENED`. A missing, expired, replayed,
+substituted, or un-reopened `PayloadDispatchAuthorizationV1` also stops before
+payload host import/pin/dispatch; it cannot be downgraded to missing payload
+bytes or replaced by an advance authorization.
 
 ---
 
@@ -5614,6 +7797,7 @@ pinned payload objects is `BLOCKED_PAYLOAD_OBJECT_AVAILABILITY` with
 Phase A, after each implementation commit:
 
 ```bash
+set -euo pipefail
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_artifact_mesh_device_recovery
 python3 scripts/run_nonempty_swift_filter.py \
@@ -5641,20 +7825,42 @@ python3 scripts/check_qinao_ea_extensions.py \
   --manifest docs/superpowers/evidence/qinao-ea-extensions/W1/artifact-mesh-task0.json \
   --payload-commit "$(git rev-parse HEAD)" \
   --payload-tree "$(git rev-parse HEAD^{tree})"
-git diff --check
+set +e
+PHASE_A_DIFF_CHECK="$(
+  git diff --check 2>&1
+)"
+PHASE_A_DIFF_CHECK_RC="$?"
+set -euo pipefail
+printf '%s\n' "$PHASE_A_DIFF_CHECK"
+test "$PHASE_A_DIFF_CHECK_RC" = 0
+test -z "$PHASE_A_DIFF_CHECK"
 ```
 
 Task 10 additionally performs Step 3A's Authority-blob equality and stable
-result-digest derivation, runs the candidate physical preflight once before
-the one-file status proposal, and then reruns this complete command set plus
-the blob/digest checks and physical preflight over the post-transition tree.
-Only the second full pass produces the unit receipt and handoff.
+result-digest derivation and its closed three-state re-entry oracle. A normal
+preimage runs the candidate physical preflight before the one-file proposal;
+an exact transition with missing/invalid transport resumes only Steps 7–9
+from `HEAD^`; an exact transition with a freshly validated OID-scoped handoff
+runs only Step 9. Only a complete post-transition pass writes the OID-scoped
+unit receipt and unchanged-shape handoff.
 
-Phase B repeats those commands over final W1 `Pw`, then obtains the signed
-proposal receipt/lease, calls the protected broker for production reachability,
-all 40 physical rows and byte-identical external reopen, and gives the returned
-authenticated bundle only to
-`ProtectedAdmissionClient.assemble_import_and_finalize`.
+Phase B freshly reopens the graph pin, service-verified admitted-W0 seal,
+Authority blobs, Ledger modes, and OID-scoped handoff transport in each Task
+11/12 process. Bootstrap first persists, authenticates, and freshly reopens
+the exact opaque `PayloadDispatchAuthorizationV1`; only then does the payload
+transaction perform target-host payload import/reopen, immutable proposal
+pin/reopen, and its create-once evaluation dispatch/run-ref before returning
+the signed proposal receipt/lease. It then calls the protected broker for
+production reachability, all 40 physical rows, byte-identical external
+reopen, and encrypted build/cache cleanup, and gives the returned
+authenticated bundle only to one idempotent
+`ProtectedAdmissionClient.assemble_import_and_finalize` identity. Its first
+invocation closes exact `Cw/Sw` in non-host quarantine and stops with zero
+target-host effect; after Bootstrap persists and freshly reopens the opaque
+advance authorization, its second same-lease/same-bundle invocation alone
+performs target-host import/reopen, receipt, intent, CAS, and finalization.
+The two authorization records are distinct and never authorize one another's
+effects.
 
 ## Plan Self-Review
 
@@ -5666,9 +7872,25 @@ authenticated bundle only to
   discovery before and after the one-path status transition, and binds their
   immutable blobs/cases/result through the existing unit-receipt digest and
   unchanged handoff field.
+- [x] **Fresh pins:** Tasks 10, 11, and 12 independently reopen the approved
+  graph commit/path/blob/SHA-256; Tasks 11 and 12 independently derive the
+  Authority checker/test blob IDs from a fresh service-verified admitted-W0
+  seal and direct-compare them with the payload and unit receipt.
+- [x] **Re-entry:** Task 10 has exactly pretransition, exact-transition with
+  freshly valid handoff, and exact-transition with missing/invalid handoff
+  paths; every other shape quarantines, and no recovery path creates a second
+  transition commit.
+- [x] **Handoff transport:** Handoff/unit files are transition-OID-scoped and
+  mode `0600`; existence is never permission. Each consumer's existing
+  B0-pinned process reruns the closed validator and retains only a
+  process-local nonserializable handle, without a new public API/type/owner/
+  wire/schema.
 - [x] **Boundary:** Anchor record/port is internal owner-private state; Keychain adapter is sole shipping writer; Qinao assembly is mechanism-only; host has one store instance.
 - [x] **Durability:** Genesis, reopen, FULL, per-connection persistent WAL/SHM, pending/commit/promotion, roots/floors, digest reopen, K3 ordering, cross-process primary-key CAS, atomic directory quarantine, crash cuts, lease, and recovery terminals are explicit.
 - [x] **Physical proof:** The lab has two real signed app products/shared schemes for a true two-process CAS race; protocol is closed; normal/fault entry paths are separate; crash victims and fault bootstrap are force-killed and identity-proven.
+- [x] **Generated project closure:** XcodeGen's pbxproj, workspace contents,
+  and two shared schemes are all committed and included in the exact 30-path
+  Phase-A/final-Pw drift comparison.
 - [x] **Matrix:** 13 operations × two cuts = 26 no-fault rows plus exactly 14 named/timed fault rows = 40.
 - [x] **Protected data:** Reboot-before-first-unlock remains a real row and blocks production when unexercisable.
 - [x] **Shipping exclusion:** Whole lab directory is excluded from SampleHost SwiftPM; source graph and selected archive must both prove no product/condition/probe/hook shipping reachability.
@@ -5677,8 +7899,41 @@ authenticated bundle only to
   and emits a non-authoritative handoff; Phase B rebinds physical proof to
   final W1 `Pw`, permits no post-`Pw` Ledger mutation, and makes the proposal
   authoritative only through admission.
-- [x] **Admission discipline:** Candidate scripts emit no leaf; the bootstrap-owned client alone returns `AuthenticatedGateResultBundle` and alone constructs/imports/reopens Cw/Sw, creates intent, performs CAS, and finalizes.
-- [x] **Raw evidence:** Physical/raw/private bytes remain in broker-provided encrypted ephemeral custody, are byte-identically reopened, then undergo verified key destruction/no-residue cleanup with crash recovery.
+- [x] **Payload authorization:** `PayloadDispatchAuthorizationV1` is an
+  opaque Bootstrap control-plane record that must be persisted,
+  authenticated, and freshly reopened before target-host payload-object
+  import/reopen, immutable proposal pin/reopen, and create-once evaluation
+  dispatch/run-ref creation. It is never a fifth client method/argument,
+  candidate value, local schema, or authority for `Cw/Sw`, intent, CAS, or
+  finalization.
+- [x] **Admission discipline:** Candidate scripts emit no leaf. The
+  bootstrap-owned client alone returns `AuthenticatedGateResultBundle`; its
+  first assembly invocation derives and closes exact `Cw/Sw` only in
+  non-host quarantine, and only a second invocation of the same identity
+  after fresh opaque advance-authorization reopen may import/reopen at the
+  target host, persist receipt/intent, CAS, and finalize.
+- [x] **Advance authorization:** `ProtectedRefAdvanceAuthorizationV1` is an
+  opaque Bootstrap control-plane record, never a fifth client method,
+  argument, candidate file, local schema, or SDK authority. Missing,
+  expired, replayed, substituted, or policy-drifted records fail before every
+  target-host effect.
+- [x] **Assembly recovery:** Crash-before/after authorization, retry at every
+  durable host boundary, authorization substitution, and lost return after
+  final attestation are covered by the active Bootstrap conformance suite;
+  one lease/bundle yields one assembly, request, authorization, import,
+  intent, CAS, and byte-identical final result.
+- [x] **Raw evidence:** Physical/raw/private bytes plus production archives,
+  DerivedData, result bundles, HOME/TMPDIR, package/module/tool caches remain
+  in broker-provided encrypted ephemeral custody, are byte-identically
+  reopened, then undergo receipt-bound key destruction/no-residue cleanup
+  with crash recovery.
+- [x] **Mechanical gates:** Every multi-command Bash gate uses
+  `set -euo pipefail`; expected failures are bounded, `rg` distinguishes
+  return codes 0/1/2, and status/diff commands cannot fail into an empty-pass
+  result.
+- [x] **Ledger modes:** Pretransition tree, index, transition postimage, and
+  final-Pw Ledger entries are each required to remain regular Git mode
+  `100644`.
 - [x] **Recovery authority:** No recovery super-owner, second registry, signer, route, profile, policy, or fallback is created.
 - [x] **Unspecified-work scan:** No implementation step delegates behavior to an unspecified future task; all external authority uses the exact Bootstrap-owned `ProtectedAdmissionClient` surface and opaque signed imports.
 - [x] **Type consistency:** Anchor, Qinao factory, operation/fault/timing/terminal, matrix, controller, handoff, and gate-result names are consistent across tasks.
