@@ -61,7 +61,7 @@ The program must preserve five distinct projections:
 |---|---|
 | G0 capability graph | Derived, read-only authority/capability view |
 | G1 semantic execution graph | Immutable per semantic Attempt; one stored `BASSemanticTurnDAG` root plus eight embedded topology values |
-| G2 context/dataflow graph | Immutable root replacement through CAS; exactly two stored roots plus twelve embedded values; never in-place mutation |
+| G2 Mission Task Graph | Workspace/Mission-scoped immutable root replacement through K3 CAS; exactly two stored roots plus twelve embedded values; never in-place mutation |
 | G3 control projection | Receipt projection of the four incumbent `ControlRing`s; never a fifth ring |
 | G4 observability graph | Read-only trace projection; never scheduling or state authority |
 
@@ -76,18 +76,18 @@ and a second graph writer are forbidden.
 
 | Wave | Graph work admitted by the existing owner/domain plan |
 |---|---|
-| W0 | Freeze reachable split-brain graph writers and legacy loop authority only; no future graph behavior |
-| W1 | Create G1 values under `runtime.semantic-dag`; bind Attempt/edge refs under `runtime.turn-operation`; no production executor |
-| W2 | G2 retrieval, grounding, context budgeting/compilation, independent contexts, and continuity values |
-| W3 | App-Agent identity/persona/session isolation and governed delegation over the immutable graph |
-| W4 | Physical Provider rows, CAS bindings, and pre-call/completion/recovery discipline; no graph executor wiring, shadow, or cutover |
-| W5 | Authorized tool/effect execution and successor-Attempt recovery; no blind retry |
-| W6 | Audit values, replay/recovery certification, intake/reachability-dark proof, and sealed cutover |
+| W0 | Freeze second graph writers/schedulers, shared mutable Agent state, direct Provider scheduling, and legacy multi-round adoption paths; extend existing hazards only and create no future graph API or behavior |
+| W1 | Complete the original `runtime.semantic-dag` M/Create with immutable G1 topology/join/delegation/terminal-receipt values and the complete G2 V1/task-join value set; bind Attempt/edge refs under `runtime.turn-operation`; freeze context/continuity/recovery and RSI contracts; atomically close Ledger/schema/fixture/consumer membership; perform no retrieval, execution, allocation, network, effect, or activation |
+| W2 | Install the sole K3 `FULL` nucleus with Workspace/Mission/Attempt roots, active-head and Provider/delegation allocation CAS, terminal facts, zero-allocation proofs, budgets, opaque continuity ordering, and the semantic-Attempt terminal receipt in the incumbent K3 receipt-factory/historical-put allowlist; retain W1 Runtime values as foreign contracts and keep production Provider allocation disabled |
+| W3 | Integrate snapshot retrieval, grounding, State Market, context compilation, structured reasoning, graph fixtures, App-Agent/session isolation, and governed delegation in shadow/test-injected mode |
+| W4 | Integrate Provider packages, execution plans, certified envelopes, K1/K2/K3 handoff, cache/prefill/decode, production grounding, and graph-bound values only; perform no semantic-DAG executor wiring, graph shadow parity, replay cutover, or activation |
+| W5 | Complete K4, isolated/remote egress, authorized tools/effects/publication/erasure, successor-Attempt remand, unknown-effect reconciliation, and durable boundary recovery; never blindly retry |
+| W6 | Install mechanical DAG wiring, two all-member barriers/per-member start gates, frozen joins, audit values, shadow parity, replay/recovery certification, intake/reachability-dark proof, retirement, and one sealed cutover in the exact dependency order below |
 
 W6 executes in this exact dependency order:
 Runtime Task 2 value prelude → Semantic Task 8 audit-value/schema prelude →
 Runtime Task 1B outcome/final-audit-envelope → Semantic Task 8 behavior →
-Runtime Tasks 2/3/4/5 remainder → Runtime Task 6 → intake A and
+Runtime Tasks 2/3/4 plus Task 5 remainder → Runtime Task 6 → intake A and
 reachability-dark → Runtime Task 7 sealed cutover. Cold 40/s and sustained
 30/s remain optional profile-qualified claims, never structural completion
 gates.
@@ -134,7 +134,7 @@ digest, or ambiguous replacement is `BLOCKED_SOURCE_DRIFT`; no task may
 silently use the worktree copy or a newer similarly named specification.
 
 The graph amendment is accepted only when the existing self-review can point
-to all ten rows above, every graph-bearing filtered suite proves positive
+to all nine rows above, every graph-bearing filtered suite proves positive
 discovery, every named scan proves a readable regular file, every candidate
 parity result has an independent B0 verdict, and W6 proves there was no
 dual-write, dual-scheduler, dual-adoption, or dual-state-writer interval.

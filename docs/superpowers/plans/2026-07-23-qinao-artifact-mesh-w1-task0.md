@@ -85,37 +85,45 @@ not a new gate or manifest.
 
 ### Exact Artifact-Mesh task insertion
 
-No Task 1-9 implementation surface changes. Task 10 adds only negative
-closure tests to the incumbent generic checker/test path; Tasks 11-13 consume
-the same final-W1 payload and physical proof. This plan consumes the
-reconstruction master's Artifact-Mesh/W1 placement without reordering W1 or
-creating a graph handoff; it returns only its incumbent Task-0 handoff.
+No Task 1-9 implementation surface changes. Authority Plan Task 10 owns,
+tests, commits, and CI-pins the generic
+`scripts/check_qinao_ea_extensions.py` and
+`scripts/test_check_qinao_ea_extensions.py` before this plan begins. Artifact
+Mesh never edits either file. Task 10 below reopens their exact admitted-W0
+blobs, proves the final Phase-A tree retains them byte-for-byte, and executes
+only their frozen non-delta cases. Tasks 11-13 consume the same final-W1
+payload and physical proof. This plan consumes the reconstruction master's
+Artifact-Mesh/W1 placement without reordering W1 or creating a graph handoff;
+it returns only its incumbent Task-0 handoff.
 
-Add to `scripts/test_check_qinao_ea_extensions.py`:
+Authority's test module freezes class
+`EAExtensionGraphNonDeltaTests` with exactly these five methods:
 
-```text
-test_artifact_mesh_graph_amendment_has_no_schema_delta
-test_artifact_mesh_graph_amendment_has_no_owner_delta
-test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta
-test_graph_values_use_ordinary_put_read_reopen
-test_graph_terms_cannot_expand_artifact_mesh_create_set
-```
+| Ordered method | One synthetic mutation | Exact diagnostic |
+|---|---|---|
+| `test_artifact_mesh_graph_amendment_has_no_schema_delta` | add one graph payload/schema root to the Artifact-Mesh owner projection | `qinao.ea-extensions.artifact-mesh-graph-schema-delta` |
+| `test_artifact_mesh_graph_amendment_has_no_owner_delta` | add owner `artifact.mesh.graph` | `qinao.ea-extensions.artifact-mesh-graph-owner-delta` |
+| `test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta` | add only `graphHandoffArtifactID` to the incumbent Task-0 projection | `qinao.ea-extensions.artifact-mesh-graph-field-or-handoff-delta` |
+| `test_graph_values_use_ordinary_put_read_reopen` | replace only `ordinaryPutReadReopen` with `graphSpecificStore` | `qinao.ea-extensions.artifact-mesh-graph-store-delta` |
+| `test_graph_terms_cannot_expand_artifact_mesh_create_set` | append only a fourth M/Create path | `qinao.ea-extensions.artifact-mesh-create-set-expanded` |
 
-Each negative fixture changes exactly one dimension. The accepted fixture
-must still show the three historical M/Create paths, four E/A slices, exact
-`artifact.mesh / converging → implemented` proposal, unchanged Phase A/B
-handoff, and ordinary storage/reopen classification.
+Every fixture is constructed in-memory inside Authority's existing test
+module; no graph fixture, schema, manifest, result, or repository path is
+added here. The shared accepted fixture has exactly the three historical
+M/Create paths, four E/A slices, unique
+`artifact.mesh / converging → implemented` proposal, unchanged Phase-A/
+Phase-B handoff identity, and storage classification
+`ordinaryPutReadReopen`. Each negative changes the single table cell above.
 
-Run:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_check_qinao_ea_extensions
-```
-
-Expected: positive discovery and all tests pass. No new Artifact Mesh path,
-schema field, owner row, manifest type, recovery route, or graph-specific
-store is permitted.
+Artifact Task 10 invokes all five methods by fully qualified name, requires
+verbose `Ran 5 tests`/`OK`, and derives a stable result digest from the domain
+`qinao-artifact-mesh-ea-non-delta-result-v1`, the Authority-owned checker/test
+blob OIDs, ordered module/method names, and the fixed
+`discovered=5/executed=5/failures=0/errors=0` outcome. That digest and the
+module/case inventory enter the existing temporary unit-preflight receipt.
+The unchanged `ArtifactMeshW1Task0HandoffV1.unit_preflight_receipt_sha256`
+then binds them transitively; no handoff field, schema, repository path, gate,
+manifest, owner, or recovery route is added.
 
 ## Execution-Root Guard
 
@@ -207,6 +215,15 @@ The last three files only adapt incumbent callers to the required mechanism conf
 - Create `scripts/run_artifact_mesh_device_recovery.py`
 - Create `scripts/check_artifact_mesh_device_recovery.py`
 - Create `scripts/test_check_artifact_mesh_device_recovery.py`
+
+### Authority-owned non-delta verifier: verify only
+
+- `scripts/check_qinao_ea_extensions.py`
+- `scripts/test_check_qinao_ea_extensions.py`
+
+Authority Plan Task 10 owns both paths and their five graph non-delta cases.
+No Artifact task stages either path; Task 10 and Phase B only reopen, execute,
+and digest them.
 
 No device result, handoff result, archive, or raw trace is checked in. Phase A writes only non-authoritative compilation/preflight handoff bytes under `/private/tmp/qinao-artifact-mesh-w1-task0/`; its sole persistent governance delta is Task 10's one-file proposed owner-row transition. Phase B gives its raw broker output only to `ProtectedAdmissionClient.run_active_gates`; Artifact Mesh does not create or hand a privacy-clean admission leaf to any candidate evidence builder.
 
@@ -310,7 +327,8 @@ recoveryComplete
 
 **Files:**
 - Create: `docs/superpowers/evidence/qinao-ea-extensions/W1/artifact-mesh-task0.json`
-- Test: `scripts/test_check_qinao_ea_extensions.py` from the admitted predecessor
+- Verify/test only: Authority Task-10-owned
+  `scripts/test_check_qinao_ea_extensions.py` from the admitted predecessor
 
 **Interfaces:**
 - Consumes: generic `qinao-extension-slice-v1` checker/schema, exact admitted W0 payload lineage, corrected historical `artifact.mesh = converging` Ledger preimage, iOS-27 floor, Section 11.2, and the four historical evidence paths.
@@ -4387,6 +4405,9 @@ Expected: exactly three paths.
 
 **Files:**
 - Verify only: all Task 1-9 files and the admitted-W0 Ledger preimage
+- Verify only, Authority Task-10-owned:
+  `scripts/check_qinao_ea_extensions.py` and
+  `scripts/test_check_qinao_ea_extensions.py`
 - Modify exactly once after the first full pass: `docs/superpowers/specs/qinao-owner-ledger-v1.json`
 - Create outside Git: `/private/tmp/qinao-artifact-mesh-w1-task0/unit-preflight-receipt-v1.json`
 - Create outside Git: `/private/tmp/qinao-artifact-mesh-w1-task0/handoff-v1.json`
@@ -4394,6 +4415,8 @@ Expected: exactly three paths.
 
 **Interfaces:**
 - Consumes: service-envelope-verified `AdmittedWaveV1` returned by `ProtectedAdmissionClient.reopen_admitted_predecessor()` and all Phase-A commits.
+- Consumes read-only: Authority Task 10's immutable generic E/A checker/test
+  blobs and its five exact `EAExtensionGraphNonDeltaTests` selectors.
 - Produces: one exact one-file candidate proposal changing only the unique
   `artifact.mesh` owner row's `status` from `converging` to `implemented`,
   followed by `ArtifactMeshW1Task0HandoffV1`. The handoff unlocks later W1
@@ -4426,6 +4449,12 @@ final W0 seal is the Phase-A base and is an ancestor of the Phase-A tip.
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_artifact_mesh_device_recovery
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_artifact_mesh_graph_amendment_has_no_schema_delta \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_artifact_mesh_graph_amendment_has_no_owner_delta \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_graph_values_use_ordinary_put_read_reopen \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_graph_terms_cannot_expand_artifact_mesh_create_set
 python3 scripts/run_nonempty_swift_filter.py \
   --package-path BehavioralAISubstrate \
   --filter BASArtifactStoreTests \
@@ -4469,6 +4498,105 @@ qinao-extension-slices: PASS mode=realized manifests=1 slices=4 wave=W1
 ```
 
 The checker derives W1 from predecessor/payload lineage; no caller passes it.
+
+- [ ] **Step 3A: Execute and bind Authority's five exact graph non-delta cases**
+
+Derive both Authority-owned blobs from the authenticated admitted-W0 seal,
+then require the current Phase-A tree to retain them byte-for-byte:
+
+```bash
+AUTH_EA_CHECKER_BLOB="$(
+  git rev-parse \
+    "$ADMITTED_W0_SEAL:scripts/check_qinao_ea_extensions.py"
+)"
+AUTH_EA_TEST_BLOB="$(
+  git rev-parse \
+    "$ADMITTED_W0_SEAL:scripts/test_check_qinao_ea_extensions.py"
+)"
+test "$(git cat-file -t "$AUTH_EA_CHECKER_BLOB")" = blob
+test "$(git cat-file -t "$AUTH_EA_TEST_BLOB")" = blob
+test "$(git rev-parse \
+  "$PHASE_A_TREE:scripts/check_qinao_ea_extensions.py")" = \
+  "$AUTH_EA_CHECKER_BLOB"
+test "$(git rev-parse \
+  "$PHASE_A_TREE:scripts/test_check_qinao_ea_extensions.py")" = \
+  "$AUTH_EA_TEST_BLOB"
+```
+
+Run only the frozen selectors and mechanically prove positive discovery:
+
+```bash
+mkdir -p /private/tmp/qinao-artifact-mesh-w1-task0
+set +e
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_artifact_mesh_graph_amendment_has_no_schema_delta \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_artifact_mesh_graph_amendment_has_no_owner_delta \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_graph_values_use_ordinary_put_read_reopen \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_graph_terms_cannot_expand_artifact_mesh_create_set \
+  >/private/tmp/qinao-artifact-mesh-w1-task0/ea-non-delta-unittest.txt \
+  2>&1
+EA_NON_DELTA_RC="$?"
+set -e
+test "$EA_NON_DELTA_RC" = 0
+python3 - <<'PY'
+from pathlib import Path
+
+cases = (
+    "test_artifact_mesh_graph_amendment_has_no_schema_delta",
+    "test_artifact_mesh_graph_amendment_has_no_owner_delta",
+    "test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta",
+    "test_graph_values_use_ordinary_put_read_reopen",
+    "test_graph_terms_cannot_expand_artifact_mesh_create_set",
+)
+text = Path(
+    "/private/tmp/qinao-artifact-mesh-w1-task0/"
+    "ea-non-delta-unittest.txt"
+).read_text()
+assert "Ran 5 tests" in text, text
+assert all(case in text for case in cases), text
+assert text.rstrip().endswith("OK"), text
+PY
+```
+
+Now derive the stable, transcript-independent result digest:
+
+```bash
+EA_NON_DELTA_RESULT_SHA256="$(
+  python3 - "$AUTH_EA_CHECKER_BLOB" "$AUTH_EA_TEST_BLOB" <<'PY'
+import hashlib
+import sys
+
+module = "scripts.test_check_qinao_ea_extensions"
+cases = (
+    "test_artifact_mesh_graph_amendment_has_no_schema_delta",
+    "test_artifact_mesh_graph_amendment_has_no_owner_delta",
+    "test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta",
+    "test_graph_values_use_ordinary_put_read_reopen",
+    "test_graph_terms_cannot_expand_artifact_mesh_create_set",
+)
+parts = [
+    b"qinao-artifact-mesh-ea-non-delta-result-v1\0",
+    sys.argv[1].encode(), b"\0",
+    sys.argv[2].encode(), b"\0",
+    module.encode(), b"\0",
+]
+for case in cases:
+    parts.extend((case.encode(), b"\0"))
+parts.append(b"discovered=5\0executed=5\0failures=0\0errors=0\0")
+print(hashlib.sha256(b"".join(parts)).hexdigest())
+PY
+)"
+test "${#EA_NON_DELTA_RESULT_SHA256}" = 64
+export AUTH_EA_CHECKER_BLOB AUTH_EA_TEST_BLOB
+export EA_NON_DELTA_RESULT_SHA256
+```
+
+Expected: both file blobs equal their Authority-owned admitted-W0 blobs, all
+five exact methods execute and pass, and one lowercase 64-hex result digest is
+derived. Missing/renamed method, full-module-only success, blob drift, a sixth
+case, or a nonzero result stops before the owner-row proposal. The temporary
+verbose transcript is diagnostic only and never enters Git or the handoff.
 
 - [ ] **Step 4: Prove the historical M set and `converging` preimage were not rewritten**
 
@@ -4611,10 +4739,13 @@ rerun cannot unlock another W1 task and cannot be admitted.
 
 - [ ] **Step 7: Rerun the complete Phase-A gate set over the post-transition tree**
 
-Rerun every command from Steps 2 and 3 with the new
-`PHASE_A_COMMIT/PHASE_A_TREE`. Then delete and recreate the candidate-preflight
-output directory and rerun Step 5 against those new OIDs. The only accepted
-result remains:
+Rerun every command from Steps 2, 3, and 3A with the new
+`PHASE_A_COMMIT/PHASE_A_TREE`; Step 3A must freshly rederive
+`AUTH_EA_CHECKER_BLOB`, `AUTH_EA_TEST_BLOB`, and
+`EA_NON_DELTA_RESULT_SHA256` rather than reuse shell state from the
+pretransition run. Then delete and recreate the candidate-preflight output
+directory and rerun Step 5 against those new OIDs. The only accepted result
+remains:
 
 ```text
 artifact-mesh-device-recovery: PREFLIGHT rows=40 disposition=exercisable
@@ -4637,14 +4768,30 @@ artifact_mesh_status_transition_sha256 =
   )
 ```
 
-Any failed unit, E/A, Ledger-row, or device check leaves Task 10 incomplete;
-there is no handoff and no consumer unlock.
+Any failed unit, exact-five non-delta, E/A, Ledger-row, or device check leaves
+Task 10 incomplete; there is no handoff and no consumer unlock.
 
 - [ ] **Step 8: Emit the post-transition unit receipt and handoff outside Git**
 
 Create `unit-preflight-receipt-v1.json` from this exact object:
 
 ```python
+import os
+
+def required_hex(name: str, length: int) -> str:
+    value = os.environ.get(name, "")
+    if (
+        len(value) != length
+        or any(c not in "0123456789abcdef" for c in value)
+    ):
+        raise SystemExit(f"missing or malformed Step-7 value: {name}")
+    return value
+
+auth_ea_checker_blob = required_hex("AUTH_EA_CHECKER_BLOB", 40)
+auth_ea_test_blob = required_hex("AUTH_EA_TEST_BLOB", 40)
+ea_non_delta_result_sha256 = required_hex(
+    "EA_NON_DELTA_RESULT_SHA256", 64
+)
 unit_receipt = {
     "schema_version": 1,
     "payload_commit_oid": phase_a_commit,
@@ -4655,6 +4802,23 @@ unit_receipt = {
     "python_failures": 0,
     "ea_slice_count": 4,
     "matrix_row_count": 40,
+    "authority_ea_non_delta": {
+        "module": "scripts.test_check_qinao_ea_extensions",
+        "checker_blob_oid": auth_ea_checker_blob,
+        "test_blob_oid": auth_ea_test_blob,
+        "case_ids": [
+            "test_artifact_mesh_graph_amendment_has_no_schema_delta",
+            "test_artifact_mesh_graph_amendment_has_no_owner_delta",
+            "test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta",
+            "test_graph_values_use_ordinary_put_read_reopen",
+            "test_graph_terms_cannot_expand_artifact_mesh_create_set",
+        ],
+        "discovered": 5,
+        "executed": 5,
+        "failures": 0,
+        "errors": 0,
+        "result_sha256": ea_non_delta_result_sha256,
+    },
 }
 ```
 
@@ -4674,6 +4838,7 @@ Every lower-case value below has one derivation and no caller/default seam:
 | `status_transition_commit` | Step 6's exact one-parent/one-path commit |
 | `phase_a_commit/tree` | fresh post-transition `git rev-parse HEAD` / `HEAD^{tree}` used by the Step-7 rerun |
 | `swift_suite_receipts`, `python_discovered` | parsed only from Step 7's post-transition executions, never Step 2's earlier run |
+| `authority_ea_non_delta` | Step 7's fresh Step-3A blobs, exact ordered five selectors/counts, and domain-separated result digest; both blobs must equal admitted-W0 Authority Task-10 blobs |
 | `ea_manifest_blob_sha256` | raw SHA-256 of the E/A manifest blob reopened from `PHASE_A_TREE` |
 | `device_preflight_disposition` | Step 7's canonical final preflight postimage; it must equal `exercisable` and bind `PHASE_A_COMMIT/TREE` |
 | `historical_create_evidence_set_digest` | the domain-separated digest below over the four raw blobs reopened from `PHASE_A_TREE` |
@@ -4684,6 +4849,13 @@ After canonicalizing and writing `unit-preflight-receipt-v1.json`, reopen its
 raw bytes, closed-parse the object, and only then derive
 `unit_preflight_receipt_sha256`. No lower-case value may be copied from an
 older `/private/tmp` run.
+
+`authority_ea_non_delta` extends only this untracked Task-0 unit-preflight
+receipt; it is not a governed Artifact payload or repository schema. The
+`ArtifactMeshW1Task0HandoffV1` field set below remains byte-for-byte unchanged:
+its existing `unit_preflight_receipt_sha256` commits to the complete canonical
+unit receipt, including the Authority module, five case IDs, two blobs, exact
+counts, and result digest. No direct non-delta field is added to the handoff.
 
 Create `handoff-v1.json` from this exact `ArtifactMeshW1Task0HandoffV1` object:
 
@@ -5005,6 +5177,7 @@ if not isinstance(unit, dict) or set(unit) != {
     "python_failures",
     "ea_slice_count",
     "matrix_row_count",
+    "authority_ea_non_delta",
 }:
     raise SystemExit("Task-0 unit-receipt field set drift")
 if (
@@ -5050,6 +5223,81 @@ for row in suite_rows:
         or row["failures"] != 0
     ):
         raise SystemExit("Task-0 suite-receipt count drift")
+
+ea_non_delta = unit["authority_ea_non_delta"]
+expected_ea_cases = (
+    "test_artifact_mesh_graph_amendment_has_no_schema_delta",
+    "test_artifact_mesh_graph_amendment_has_no_owner_delta",
+    "test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta",
+    "test_graph_values_use_ordinary_put_read_reopen",
+    "test_graph_terms_cannot_expand_artifact_mesh_create_set",
+)
+if not isinstance(ea_non_delta, dict) or set(ea_non_delta) != {
+    "module",
+    "checker_blob_oid",
+    "test_blob_oid",
+    "case_ids",
+    "discovered",
+    "executed",
+    "failures",
+    "errors",
+    "result_sha256",
+}:
+    raise SystemExit("Task-0 E/A non-delta field set drift")
+if (
+    ea_non_delta["module"] != "scripts.test_check_qinao_ea_extensions"
+    or not isinstance(ea_non_delta["case_ids"], list)
+    or tuple(ea_non_delta["case_ids"]) != expected_ea_cases
+    or type(ea_non_delta["discovered"]) is not int
+    or ea_non_delta["discovered"] != 5
+    or type(ea_non_delta["executed"]) is not int
+    or ea_non_delta["executed"] != 5
+    or type(ea_non_delta["failures"]) is not int
+    or ea_non_delta["failures"] != 0
+    or type(ea_non_delta["errors"]) is not int
+    or ea_non_delta["errors"] != 0
+    or not isinstance(ea_non_delta["result_sha256"], str)
+    or len(ea_non_delta["result_sha256"]) != 64
+    or any(
+        c not in "0123456789abcdef"
+        for c in ea_non_delta["result_sha256"]
+    )
+):
+    raise SystemExit("Task-0 E/A non-delta inventory/count drift")
+ea_paths = {
+    "checker_blob_oid": "scripts/check_qinao_ea_extensions.py",
+    "test_blob_oid": "scripts/test_check_qinao_ea_extensions.py",
+}
+for field, path in ea_paths.items():
+    oid = ea_non_delta[field]
+    if (
+        not isinstance(oid, str)
+        or len(oid) != 40
+        or any(c not in "0123456789abcdef" for c in oid)
+    ):
+        raise SystemExit("Task-0 E/A Authority blob shape drift")
+    for tree in (phase_a_tree, final_tree):
+        actual = subprocess.check_output(
+            ["git", "rev-parse", f"{tree}:{path}"], text=True
+        ).strip()
+        if actual != oid:
+            raise SystemExit("Task-0 E/A Authority blob drift")
+ea_parts = [
+    b"qinao-artifact-mesh-ea-non-delta-result-v1\0",
+    ea_non_delta["checker_blob_oid"].encode(), b"\0",
+    ea_non_delta["test_blob_oid"].encode(), b"\0",
+    ea_non_delta["module"].encode(), b"\0",
+]
+for case in expected_ea_cases:
+    ea_parts.extend((case.encode(), b"\0"))
+ea_parts.append(
+    b"discovered=5\0executed=5\0failures=0\0errors=0\0"
+)
+if (
+    hashlib.sha256(b"".join(ea_parts)).hexdigest()
+    != ea_non_delta["result_sha256"]
+):
+    raise SystemExit("Task-0 E/A non-delta result digest drift")
 
 historical_paths = (
     "docs/superpowers/evidence/qinao-owner-corrections/"
@@ -5163,11 +5411,14 @@ existing terminal `BLOCKED_ARTIFACT_MESH_DEVICE_RECOVERY` with
 
 - [ ] **Step 1: Run all unit suites from the final payload**
 
-Run the five non-empty Swift suite commands from Task 10 Step 2 plus the
-Python module and realized E/A command from Step 3, substituting final
-`PW_COMMIT` and `PW_TREE`.
+Run the five non-empty Swift suite commands from Task 10 Step 2, its
+device-recovery Python module, the realized E/A command from Step 3, and the
+five fully qualified Authority non-delta selectors plus blob/result-digest
+checks from Step 3A, substituting final `PW_COMMIT` and `PW_TREE`.
 
-Expected: all tests non-empty/green; realized E/A manifest has exactly four W1 slices.
+Expected: all tests are non-empty/green; the five non-delta methods report
+`Ran 5 tests`/`OK`, their Authority blobs and result digest equal the
+unit-receipt values, and the realized E/A manifest has exactly four W1 slices.
 
 - [ ] **Step 2: Enter the protected production broker**
 
@@ -5393,10 +5644,11 @@ python3 scripts/check_qinao_ea_extensions.py \
 git diff --check
 ```
 
-Task 10 runs the candidate physical preflight once before the one-file status
-proposal and then reruns this complete command set plus the physical preflight
-over the post-transition tree. Only the second full pass produces the unit
-receipt and handoff.
+Task 10 additionally performs Step 3A's Authority-blob equality and stable
+result-digest derivation, runs the candidate physical preflight once before
+the one-file status proposal, and then reruns this complete command set plus
+the blob/digest checks and physical preflight over the post-transition tree.
+Only the second full pass produces the unit receipt and handoff.
 
 Phase B repeats those commands over final W1 `Pw`, then obtains the signed
 proposal receipt/lease, calls the protected broker for production reachability,
@@ -5409,6 +5661,11 @@ authenticated bundle only to
 - [x] **Scope:** Only Artifact Mesh W1 Task 0 and its necessary callers/tests/lab/gates are covered; no other W1 domain task is implemented.
 - [x] **M honesty:** The three historical M paths are repaired in place; the M manifest/evidence set is neither expanded nor relabeled.
 - [x] **E/A exactness:** The manifest has exactly four singular W1 slices, incumbent owner `artifact.mesh`, correct E/A classes, exact paths/symbols, and no caller wave.
+- [x] **Graph non-delta:** Authority Task 10 owns the generic checker/tests;
+  Artifact Mesh edits neither, executes all five exact selectors with positive
+  discovery before and after the one-path status transition, and binds their
+  immutable blobs/cases/result through the existing unit-receipt digest and
+  unchanged handoff field.
 - [x] **Boundary:** Anchor record/port is internal owner-private state; Keychain adapter is sole shipping writer; Qinao assembly is mechanism-only; host has one store instance.
 - [x] **Durability:** Genesis, reopen, FULL, per-connection persistent WAL/SHM, pending/commit/promotion, roots/floors, digest reopen, K3 ordering, cross-process primary-key CAS, atomic directory quarantine, crash cuts, lease, and recovery terminals are explicit.
 - [x] **Physical proof:** The lab has two real signed app products/shared schemes for a true two-process CAS race; protocol is closed; normal/fault entry paths are separate; crash victims and fault bootstrap are force-killed and identity-proven.

@@ -119,30 +119,33 @@ handoffs already defined by this plan.
 
 | Existing task | Graph-specific insertion |
 |---|---|
-| Task 2 | Extend nine existing contract/module/corpus rows and their existing 8-wave cells; assert 19 rows and 152 cells after generation |
-| Task 3 | Expose `production_graph_reachability` only as a V0 primitive over exact-OID materialized bytes |
+| Task 2 | Freeze `production_graph_reachability` in `runtime.py`; extend nine existing contract/corpus/program rows and their existing 8-wave cells; assert 19 rows and 152 cells after generation |
+| Task 3 | Supply the exact-OID reader/materialized views to the already-frozen runtime primitive and prove candidate/helper independence |
 | Task 4 | Include amended contract/module/corpus digests in the same signed Bootstrap projection |
 | Task 5 | Run predecessor-selected modules with no workflow input or candidate module import |
 | Task 6 | Recover the same evaluation; never rerun a physical boundary or select a replacement module |
 | Task 7 | Include the amended nine rows in the same minimal B0 path closure |
 | Task 11 | Execute catalog, isolation, mutant, cardinality, output-schema, and selection tests before handoff |
 
-The `production_graph_reachability` primitive has this closed conceptual ABI
-inside `scripts/qinao_gate_modules/v0/modules/production_reachability.py`:
+The `production_graph_reachability` primitive is implemented only in
+`scripts/qinao_gate_modules/v0/runtime.py` with this closed ABI:
 
-```python
-from collections.abc import Callable
-
-def production_graph_reachability(
-    *,
-    payload_tree_oid: str,
-    read_tree_entry: Callable[[str], bytes],
-    authority_roots: tuple[str, ...],
-    build_graph_contract_bytes: bytes,
-    corpus_bytes: bytes,
-) -> dict[str, object]:
-    ...
+```text
+production_graph_reachability(
+  *,
+  payload_tree_oid: str,
+  read_tree_entry: Callable[[str], bytes],
+  authority_roots: tuple[str, ...],
+  build_graph_contract_bytes: bytes,
+  corpus_bytes: bytes
+) -> dict[str, object]
 ```
+
+The declaration above freezes the signature; Task 2 Step 3 supplies its full
+body and registers it in `run_primitive`. The generated
+`scripts/qinao_gate_modules/v0/modules/production_reachability.py` remains the
+same strict two-symbol wrapper as the other eighteen modules: only `GATE_ID`
+and `evaluate` are legal module-level symbols.
 
 `read_tree_entry` is supplied only by V0's exact-OID materializer and rejects
 absent, nonregular, symlinked, escaping, or wrong-mode entries before returning
@@ -2712,6 +2715,28 @@ EXPECTED_W1_W6_GATE_IDS = (
     "qinao.xcode27-toolchain",
 )
 
+GRAPH_GATE_IDS = (
+    "qinao.owner-ledger",
+    "qinao.production-reachability",
+    "qinao.architecture-closure",
+    "qinao.w0-open-set",
+    "qinao.contracts-layercell",
+    "qinao.semantic-statelake-context",
+    "qinao.silicon-execution-spine",
+    "qinao.sovereign-release-effects",
+    "qinao.runtime-replay-certification",
+)
+GRAPH_TEST_METHODS = {
+    "test_graph_amendment_keeps_nineteen_gates_and_152_cells",
+    "test_nine_graph_gate_ids_are_existing_rows",
+    "test_every_graph_row_has_positive_negative_and_mutation_corpus",
+    "test_every_graph_program_has_nonempty_discovery",
+    "test_candidate_cannot_select_graph_module_or_verifier",
+    "test_production_graph_reachability_is_independent_of_candidate_helper",
+    "test_w4_cells_reject_executor_shadow_and_cutover",
+    "test_w6_cells_preserve_exact_dependency_order",
+}
+
 def independently_expected_w1_w6_cw_tuples(
     wave: str,
 ) -> tuple[tuple[str, str, str, str, int], ...]:
@@ -2978,6 +3003,18 @@ def test_program_step_to_assembly_producer_projection_is_exact(self) -> None:
                 )
 ```
 
+Add one `QinaoGraphAmendmentCatalogTests` class whose discovered
+`test_*` method-name set equals `GRAPH_TEST_METHODS` exactly. Its first two
+tests independently reconstruct the full catalog/matrix and require
+`set(GRAPH_GATE_IDS)` to be an existing nine-row subset while total
+cardinality remains 19/152. Its corpus/discovery tests execute every active
+program belonging to those nine rows against its literal valid specimen,
+rejecting specimen, and mutation set and require each observation's
+discovered/executed counts to meet the non-zero contract minimum. The last
+four tests mutate candidate selector/helper bytes, W4 execution/cutover
+wiring, and the W6 dependency order one at a time and assert the stable
+diagnostic IDs frozen in Step 5.
+
 Add a coupled-mutation table test for each W1-W6 wave. In separate subtests,
 mutate exactly one row's `path`, `mode`, `producer_id`/owning
 `producer_step_id`, `evidence_class_id`, or `maximum_bytes`; update the
@@ -3114,12 +3151,15 @@ class GateContext:
     payload_root: Path
     payload_commit_oid: str
     payload_tree_oid: str
+    read_tree_entry: Callable[[str], bytes]
     predecessor_payload_root: Path | None
     predecessor_payload_commit_oid: str | None
     predecessor_payload_tree_oid: str | None
     derived_wave: str
     predecessor_chain_digest: str
+    contract_bytes: bytes
     contract: Mapping[str, object]
+    corpus_bytes: bytes
     corpus: Mapping[str, object]
     prior_gate_results: Mapping[str, object]
     bootstrap_helper_root: Path
@@ -3189,6 +3229,84 @@ architecture_closure_exact_set
 v2_quarantine_exact_set
 source_import_boundary_scan
 ```
+
+`run_primitive` dispatches `production_graph_reachability` only for the
+literal primitive ID of the same spelling and passes exactly
+`context.payload_tree_oid`, `context.read_tree_entry`, the contract's frozen
+`authority_roots`, `context.contract_bytes`, and `context.corpus_bytes`.
+Before dispatch it requires both byte arrays to parse as the already-validated
+closed objects in `context.contract`/`context.corpus` and requires their raw
+SHA-256 values to equal the predecessor-selected catalog binding. No other
+primitive receives `read_tree_entry`.
+
+The runtime implementation is pure and fail-closed. It:
+
+1. requires the exact non-empty, sorted, duplicate-free authority-root array;
+2. opens every declared Package.swift/Xcode/XcodeGen/workspace/product/
+   entrypoint root only through `read_tree_entry`;
+3. constructs source membership, import, declaration/reference, call, and
+   linked-symbol edges from those bytes with token-aware Swift/manifest
+   parsing, never from comments, strings, a candidate report, or directory
+   enumeration;
+4. follows every reachable regular source and classifies each project,
+   product, entrypoint, writer, executor, call edge, linked symbol, lab root,
+   and shadow root against the closed contract rows;
+5. requires the one incumbent `runtime.semantic-dag` mechanism to be the sole
+   writer of the G1 topology root and both named G2 stored roots, treats
+   `BASAppleTaskGraphLifecycleExecutor.refresh` only as explicitly read-only
+   or production-unreachable, and rejects a direct peer call, shared
+   scratchpad, legacy loop authority, lab/shadow shipping edge, or unknown
+   edge; and
+6. evaluates every literal nested graph corpus row and returns the existing
+   gate-result schema with sorted complete discovered/classified sets plus
+   the exact executed case IDs and non-zero discovery/execution counts.
+
+The graph-specific diagnostics are closed:
+
+```text
+graph-zero-authority-roots
+graph-zero-production-entrypoints
+graph-zero-positive-cases
+graph-zero-negative-cases
+graph-unclassified-project
+graph-unclassified-edge
+graph-second-topology-writer
+graph-direct-peer-call
+graph-shared-scratchpad
+graph-legacy-loop-authority
+graph-lab-shadow-leakage
+graph-unclassified-refresh
+graph-candidate-selector
+graph-owner-closure-partial
+graph-owner-cardinality-drift
+graph-topology-cardinality-drift
+graph-mutable-wire
+graph-invalid-execution-shape
+graph-join-boundary
+graph-aggregate-bound
+graph-input-bound
+graph-reverse-absence-query
+graph-self-adoption
+graph-parent-basis
+graph-current-attempt-required
+graph-provider-retry
+graph-envelope-mismatch
+graph-silicon-authority
+graph-remand-boundary
+graph-direct-effect
+graph-blind-retry
+graph-w4-executor-or-cutover
+graph-w6-order-drift
+```
+
+The returned detail object has exactly
+`authority_roots,projects,products,entrypoints,sources,writers,executors,
+call_edges,linked_symbols,lab_roots,shadow_roots,classified_items,
+executed_case_ids,discovered_count,executed_count`. Every collection is
+canonically sorted and duplicate-free. Zero roots, entrypoints, positive
+cases, negative cases, discovery, or execution is an error. The function
+never imports a module, invokes a helper, shells out, reads the worktree,
+accepts a selector, or writes a path.
 
 `owner_ledger_v2_exact_set`, `review_candidate_v2_exact_set`,
 `w0_open_set_v1_exact_set`, and `authority_anchor_bijection` are pure,
@@ -3305,6 +3423,95 @@ runtime.untyped-shared-agent-state
 state.split-brain-authority
 ```
 
+The positive `w0_open_set` corpus object additionally freezes this exact
+ordered array under `graph_freeze_cases`; every row has exactly
+`case_id,fixture_id,hazard_id,mutation,expected`:
+
+```json
+[
+  {
+    "case_id": "test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id",
+    "fixture_id": "graph.incumbent-owner.v1",
+    "hazard_id": "runtime.untyped-shared-agent-state",
+    "mutation": "all graph tokens and reachability predicates are attached to runtime.untyped-shared-agent-state",
+    "expected": "pass; graph hazard IDs equal [\"runtime.untyped-shared-agent-state\"]"
+  },
+  {
+    "case_id": "test_graph_freeze_keeps_exact_sixteen_ids",
+    "fixture_id": "graph.seventeenth-id.v1",
+    "hazard_id": "runtime.untyped-shared-agent-state",
+    "mutation": "append only runtime.graph-authority",
+    "expected": "reject qinao.w0-safety.safety-id-set-drift"
+  },
+  {
+    "case_id": "test_second_g1_writer_is_rejected",
+    "fixture_id": "graph.second-g1-writer.v1",
+    "hazard_id": "runtime.untyped-shared-agent-state",
+    "mutation": "activate symbol BASW0SecondG1Writer and call qinaoW0CommitSemanticGraph in the shipping fixture",
+    "expected": "reject runtime.untyped-shared-agent-state:second-g1-writer"
+  },
+  {
+    "case_id": "test_second_g2_writer_is_rejected",
+    "fixture_id": "graph.second-g2-writer.v1",
+    "hazard_id": "runtime.untyped-shared-agent-state",
+    "mutation": "activate symbol BASW0SecondG2Writer and call qinaoW0CommitTaskGraph in the shipping fixture",
+    "expected": "reject runtime.untyped-shared-agent-state:second-g2-writer"
+  },
+  {
+    "case_id": "test_main_sub_peer_call_is_rejected",
+    "fixture_id": "graph.main-sub-direct-peer.v1",
+    "hazard_id": "runtime.untyped-shared-agent-state",
+    "mutation": "activate call qinaoW0MainCallsSubDirectly",
+    "expected": "reject runtime.untyped-shared-agent-state:main-sub-direct-peer-call"
+  },
+  {
+    "case_id": "test_sub_sub_peer_call_is_rejected",
+    "fixture_id": "graph.sub-sub-direct-peer.v1",
+    "hazard_id": "runtime.untyped-shared-agent-state",
+    "mutation": "activate call qinaoW0SubCallsPeerSubDirectly",
+    "expected": "reject runtime.untyped-shared-agent-state:sub-sub-direct-peer-call"
+  },
+  {
+    "case_id": "test_shared_mutable_scratchpad_is_rejected",
+    "fixture_id": "graph.shared-scratchpad.v1",
+    "hazard_id": "runtime.untyped-shared-agent-state",
+    "mutation": "activate mutable symbol BASW0SharedMutableAgentScratchpad",
+    "expected": "reject runtime.untyped-shared-agent-state:shared-mutable-agent-scratchpad"
+  },
+  {
+    "case_id": "test_legacy_loop_authority_is_rejected",
+    "fixture_id": "graph.legacy-loop-authority.v1",
+    "hazard_id": "runtime.untyped-shared-agent-state",
+    "mutation": "activate BASW0LegacyLoopAuthority.qinaoW0RetryOutsideAttempt",
+    "expected": "reject runtime.untyped-shared-agent-state:legacy-loop-authority"
+  },
+  {
+    "case_id": "test_refresh_must_be_read_only_or_production_unreachable",
+    "fixture_id": "graph.refresh-classification.v1",
+    "hazard_id": "runtime.untyped-shared-agent-state",
+    "mutation": "remove the sole classification from the incumbent BASAppleTaskGraphLifecycleExecutor.refresh edge",
+    "expected": "reject runtime.untyped-shared-agent-state:unclassified-task-graph-refresh; accept exact read-only or production-unreachable classification"
+  },
+  {
+    "case_id": "test_future_graph_contract_is_rejected_at_w0",
+    "fixture_id": "graph.future-contract.v1",
+    "hazard_id": "runtime.untyped-shared-agent-state",
+    "mutation": "activate declaration BASSemanticTurnDAG in a shipping source root",
+    "expected": "reject runtime.untyped-shared-agent-state:future-graph-contract-at-w0"
+  }
+]
+```
+
+The same positive object contains
+`graph_freeze_cases_sha256 =
+SHA256(canonical_json(graph_freeze_cases))`, where `canonical_json` is UTF-8,
+sorted-key, compact JSON with the array order retained and no trailing LF.
+The corpus schema requires the ten rows and digest together; changing a byte,
+reordering a row, adding/removing a key, or moving the array into the outer
+negative/mutation object fails. This augments only the incumbent
+`runtime.untyped-shared-agent-state` safety row: the gate still has exactly
+16 safety IDs and 13 suites.
+
 The positive case requires all 13 non-empty suite rows, all 16 IDs exactly
 once in the regular indexed
 `docs/superpowers/specs/qinao-w0-safety-freeze-v1.json`, every row's literal
@@ -3348,7 +3555,10 @@ wrapper by exact blob-verified file path and supplies the closed context.
 Tests call `evaluate(context=verified_context)` and reject any module-level
 symbol other than `GATE_ID` and `evaluate`. Every wrapper is mode `100644`;
 only reviewed standalone entrypoints are `100755`. Candidate source paths
-never enter `sys.path`.
+never enter `sys.path`. The same assertion is applied explicitly to
+`modules/production_reachability.py`; defining/importing
+`production_graph_reachability`, a reader, parser, helper, or selector in
+that wrapper is a test failure.
 
 - [ ] **Step 5: Create the exact contract and corpus matrix**
 
@@ -3789,6 +3999,75 @@ an earlier “missing future suite” success. A mutation cannot merely rename t
 negative case; its byte patch must differ and tests assert all three class
 digests are distinct.
 
+The existing top-level 126-case count does not change. For the eight
+graph-mapped gates other than `qinao.w0-open-set`, each program's existing
+positive/negative/mutation canonical input gains a `graph_case_rows` array.
+Every nested row has exactly
+`case_id,class,first_wave,fixture_tree,expected_pass,
+expected_diagnostic_id,minimum_discovered,minimum_executed`; `fixture_tree`
+is a complete sorted path-to-regular-blob fixture map, not a prose selector
+or candidate report. The renderer includes a row only when the program wave
+is at or after `first_wave`, places it in the same named outer class, and
+retains it in every later program. The exact semantic inventory is:
+
+| Existing gate | Class / first wave | `case_id` | Exact accepted fact or single mutation | Expected diagnostic |
+|---|---|---|---|---|
+| `qinao.owner-ledger` | positive / preW0 | `graph.owner.closed-create.v1` | one `runtime.semantic-dag` Create with one G1 root/eight embedded, two evidence payloads, two G2 roots/twelve embedded, five governed members and byte-identical manifest/Ledger/receipt closure | pass |
+| `qinao.owner-ledger` | negative / preW0 | `graph.owner.partial-closure.v1` | delete only `BASTaskGraphPatchPayload` from the planned-member closure | `graph-owner-closure-partial` |
+| `qinao.owner-ledger` | mutation / preW0 | `graph.owner.second-task-owner.v1` | add only owner `runtime.task-graph` for the G2 values | `graph-owner-cardinality-drift` |
+| `qinao.production-reachability` | positive / preW0 | `graph.reachability.sole-writer-classified-refresh.v1` | every present/future G1/G2 writer maps only to the incumbent mechanism and `BASAppleTaskGraphLifecycleExecutor.refresh` is read-only or production-unreachable | pass |
+| `qinao.production-reachability` | negative / preW0 | `graph.reachability.second-writer.v1` | add one shipping-reachable second G1/G2 writer | `graph-second-topology-writer` |
+| `qinao.production-reachability` | negative / preW0 | `graph.reachability.direct-peer-call.v1` | add one Main→Sub direct peer call | `graph-direct-peer-call` |
+| `qinao.production-reachability` | negative / preW0 | `graph.reachability.shared-scratchpad.v1` | add one shipping-reachable shared mutable Agent scratchpad | `graph-shared-scratchpad` |
+| `qinao.production-reachability` | negative / preW0 | `graph.reachability.legacy-loop.v1` | add one retry/loop authority outside Attempt/RSI | `graph-legacy-loop-authority` |
+| `qinao.production-reachability` | negative / preW0 | `graph.reachability.refresh-unclassified.v1` | remove both legal classifications from `BASAppleTaskGraphLifecycleExecutor.refresh` | `graph-unclassified-refresh` |
+| `qinao.production-reachability` | mutation / preW0 | `graph.reachability.lab-shadow-leak.v1` | link one lab/shadow target into a shipping product | `graph-lab-shadow-leakage` |
+| `qinao.production-reachability` | mutation / preW0 | `graph.reachability.candidate-selector.v1` | add a candidate-selected project/root/module field | `graph-candidate-selector` |
+| `qinao.architecture-closure` | positive / preW0 | `graph.architecture.g0-g4-14-4-4-7.v1` | exact G0-G4 ownership and 14 semantic layers/four ControlRings/four kernels/seven planes | pass |
+| `qinao.architecture-closure` | negative / preW0 | `graph.architecture.fifth-ring.v1` | add one fifth ControlRing | `graph-topology-cardinality-drift` |
+| `qinao.architecture-closure` | negative / preW0 | `graph.architecture.fifth-kernel.v1` | add one fifth kernel | `graph-topology-cardinality-drift` |
+| `qinao.architecture-closure` | mutation / preW0 | `graph.architecture.eighth-plane.v1` | add one eighth plane | `graph-topology-cardinality-drift` |
+| `qinao.contracts-layercell` | positive / W1 | `graph.contracts.immutable-shape-join-bounds.v1` | immutable G1/G2, valid pure-DAG shape/join, 1,018 dispositions and 1,024 refs | pass |
+| `qinao.contracts-layercell` | negative / W1 | `graph.contracts.mutable-g1.v1` | make one G1 topology field mutable inside an Attempt | `graph-mutable-wire` |
+| `qinao.contracts-layercell` | negative / W1 | `graph.contracts.mutable-g2.v1` | mutate one admitted G2 root in place | `graph-mutable-wire` |
+| `qinao.contracts-layercell` | negative / W1 | `graph.contracts.invalid-execution-shape.v1` | substitute a ControlRing envelope for pure DAG | `graph-invalid-execution-shape` |
+| `qinao.contracts-layercell` | negative / W1 | `graph.contracts.zero-join-control-ring.v1` | admit a ControlRing source with zero joins | `graph-join-boundary` |
+| `qinao.contracts-layercell` | mutation / W1 | `graph.contracts.nonzero-source-join-pure-dag.v1` | give a pure-DAG source a nonzero input join | `graph-join-boundary` |
+| `qinao.contracts-layercell` | mutation / W1 | `graph.contracts.dispositions-1019.v1` | encode 1,019 terminal dispositions | `graph-aggregate-bound` |
+| `qinao.contracts-layercell` | mutation / W1 | `graph.contracts.refs-1025.v1` | encode 1,025 parent/input refs | `graph-input-bound` |
+| `qinao.semantic-statelake-context` | positive / W1 | `graph.semantic.one-compiler-wave-slice.v1` | one incumbent compiler owner with exact wave-appropriate absence/presence of retrieval, grounding, context, and graph slices | pass |
+| `qinao.semantic-statelake-context` | negative / W3 | `graph.semantic.reverse-absence-query.v1` | infer truth from absence by reverse query | `graph-reverse-absence-query` |
+| `qinao.semantic-statelake-context` | negative / W3 | `graph.semantic.self-adoption.v1` | let candidate output adopt itself | `graph-self-adoption` |
+| `qinao.semantic-statelake-context` | mutation / W3 | `graph.semantic.completed-parent-cancellation.v1` | use completed parent as cancellation basis | `graph-parent-basis` |
+| `qinao.semantic-statelake-context` | mutation / W3 | `graph.semantic.completion-without-current-attempt.v1` | complete a WorkUnit without the current semantic-Attempt completed receipt | `graph-current-attempt-required` |
+| `qinao.silicon-execution-spine` | positive / W1 | `graph.silicon.no-graph-authority.v1` | Silicon owns physical Provider rows/envelopes only and never owns or writes G1/G2 | pass |
+| `qinao.silicon-execution-spine` | positive / W4 | `graph.silicon.one-call-bound-envelope.v1` | one physical Provider call with row/CAS/envelope binding and no graph authority | pass |
+| `qinao.silicon-execution-spine` | negative / W4 | `graph.silicon.blind-retry.v1` | retry Provider without a successor Attempt | `graph-provider-retry` |
+| `qinao.silicon-execution-spine` | negative / W4 | `graph.silicon.envelope-shape-mismatch.v1` | mismatch execution shape and invocation envelope | `graph-envelope-mismatch` |
+| `qinao.silicon-execution-spine` | mutation / W4 | `graph.silicon.claims-graph-authority.v1` | make Silicon a G1/G2 owner or writer | `graph-silicon-authority` |
+| `qinao.sovereign-release-effects` | positive / W1 | `graph.sovereign.no-direct-boundary.v1` | future effect/remand mouths are absent until their owning slice and no direct boundary exists | pass |
+| `qinao.sovereign-release-effects` | positive / W5 | `graph.sovereign.authorized-effect-remand.v1` | effect and remand cross only their authorized K4/K3/Attempt boundaries | pass |
+| `qinao.sovereign-release-effects` | negative / W5 | `graph.sovereign.control-ring-remand-without-ring.v1` | emit ControlRing remand before a real ring invocation | `graph-remand-boundary` |
+| `qinao.sovereign-release-effects` | negative / W5 | `graph.sovereign.direct-effect.v1` | dispatch effect outside prepared outbox/authorization | `graph-direct-effect` |
+| `qinao.sovereign-release-effects` | mutation / W5 | `graph.sovereign.blind-retry.v1` | resend an unknown effect instead of query/reconcile | `graph-blind-retry` |
+| `qinao.runtime-replay-certification` | positive / W1 | `graph.runtime.mechanical-owner-only.v1` | Runtime retains mechanical readiness/replay ownership with no duplicate graph authority and exact wave-slice absence/presence | pass |
+| `qinao.runtime-replay-certification` | positive / W6 | `graph.runtime.replay-recovery-w6-order.v1` | replay/recovery and cutover follow the exact master W6 dependency order | pass |
+| `qinao.runtime-replay-certification` | negative / W4 | `graph.runtime.w4-executor-wiring.v1` | wire the semantic DAG executor during W4 | `graph-w4-executor-or-cutover` |
+| `qinao.runtime-replay-certification` | negative / W4 | `graph.runtime.w4-shadow-cutover.v1` | add graph shadow parity or production cutover during W4 | `graph-w4-executor-or-cutover` |
+| `qinao.runtime-replay-certification` | mutation / W6 | `graph.runtime.reordered-w6.v1` | move any Runtime Task 1B/Task 2/semantic-prelude/cutover dependency out of the frozen sequence | `graph-w6-order-drift` |
+| `qinao.runtime-replay-certification` | mutation / W6 | `graph.runtime.legacy-mouth-retained.v1` | retain one legacy execution/loop mouth at sealed cutover | `graph-legacy-loop-authority` |
+
+All rows use `minimum_discovered = 1` and `minimum_executed = 1`; positive
+rows use `expected_pass = true` and
+`expected_diagnostic_id = null`, while all other rows use
+`expected_pass = false` and the literal diagnostic above. For
+`qinao.w0-open-set`, the ten-row `graph_freeze_cases` plus its canonical
+digest frozen in Step 3 is the graph inventory; its existing missing-suite
+and zero-match objects remain the sole outer negative/mutation objects.
+Tests require one accepted graph-freeze row and all nine rejecting rows to
+execute, while preserving exactly 16 safety IDs, 13 suites, 19 gates, 42
+programs, 126 outer corpus cases, and 152 matrix cells.
+
 The Artifact W1 runtime/unit matrix additionally retains independent
 `missing-fault-row` and `fixture-mode-as-device-proof` failures while its
 single executable negative/mutation corpus pair is reserved for omission and
@@ -3948,8 +4227,11 @@ git commit -m "feat(qinao): freeze complete bootstrap gate catalog"
 Expected: all tests pass; exactly 68 paths are staged and one commit contains
 only the four gate schemas, service-binding schema/value, literal program
 source, deterministic generator, catalog/runtime/module/contract/corpus files,
-and their test. `bootstrap-paths-v1.json` is not created or staged until Task
-7.
+and their test. The exact eight graph catalog tests pass; all nine mapped
+gate IDs are existing rows; `w0_open_set` retains 16 safety IDs/13 suites and
+its exact ten-row graph-case digest; totals remain 19 gates, 42 programs, 126
+outer corpus cases, and 152 matrix cells. `bootstrap-paths-v1.json` is not
+created or staged until Task 7.
 
 ---
 
@@ -4023,6 +4305,29 @@ def test_commit_tree_mismatch_fails_before_module_load(self) -> None:
         verify_payload_tree(git_dir, commit_oid, other_tree_oid)
 ```
 
+Add one `QinaoGraphExactOIDIsolationTests` class whose discovered method set
+is exactly:
+
+```python
+GRAPH_EXACT_OID_TESTS = {
+    "test_graph_candidate_helper_change_does_not_change_b0_result",
+    "test_graph_contract_substitution_fails_before_runtime",
+    "test_graph_corpus_substitution_fails_before_runtime",
+    "test_graph_authority_root_symlink_is_rejected",
+    "test_graph_authority_root_nonregular_entry_is_rejected",
+    "test_graph_authority_root_wrong_mode_is_rejected",
+    "test_graph_candidate_import_attempt_is_rejected",
+    "test_graph_reader_uses_exact_payload_tree_oid",
+}
+```
+
+Each fixture changes only the named dimension. The helper-differential case
+requires the same canonical B0 result; contract/corpus substitution requires
+the corresponding digest diagnostic; symlink/nonregular/wrong-mode cases
+fail before parser/discovery; candidate import fails even when it would
+return a forged pass; and the reader test commits different bytes at the same
+path in two trees and requires only the lease-bound tree bytes.
+
 Also test absolute/`..`/NUL/non-UTF8 paths, symlink escape, submodule mode, executable-mode drift, missing blob, wrong B0 commit, contract/module/corpus substitution, timeout, output flood, inherited proxy, socket use, current-wave proposal activation, and a module writing outside its output directory.
 
 - [ ] **Step 2: Run the focused RED suite**
@@ -4065,6 +4370,19 @@ materialize_tree(*, git_dir: Path, commit_oid: str, tree_oid: str, destination: 
 ```
 
 Safe relative symlinks are created only after resolving the lexical target under the snapshot root; absolute, empty, NUL, or escaping targets fail. Submodules and special modes always fail. After creation, directories become `0555`, regular data becomes `0444`, and bootstrap executables become `0555`.
+
+Build one private `ExactOIDTreeReader` from the verified
+`MaterializedSnapshot.entries` tuple. It accepts only normalized UTF-8
+repository-relative paths present in that exact tuple, requires the
+contract-declared mode, reopens the bound blob OID with argv-only
+`git cat-file blob`, and verifies byte length plus SHA-256 before returning
+bytes. It never enumerates a worktree or follows a filesystem lookup. The
+runtime child receives a closed reader manifest and read-only exact-tree
+view; while constructing `GateContext`, the B0 runtime creates the sole
+`read_tree_entry` callable from that manifest. A path absent from the
+manifest, symlink/submodule/special entry, mode mismatch, OID mismatch, or
+post-materialization byte drift fails before
+`production_graph_reachability`.
 
 - [ ] **Step 4: Implement B0 bundle verification and isolated module execution**
 
@@ -4164,7 +4482,9 @@ Before loading Python:
    those cells, and reject any inactive/extra/unreachable program;
 6. recompute every digest in the signed lease and bootstrap projection;
 7. prove required rows equal the literal derived-wave set and every active
-   row binds the exact program, output rows, and three corpus cases; and
+   row binds the exact program, output rows, three outer corpus cases, and
+   for the nine mapped gates the exact nested graph-case rows/digests frozen
+   by Task 2; and
 8. compare B0 for `preW0`, or the authenticated predecessor seal tree for a
    later wave, to exact `Pw`; preserve every inherited prior-wave evidence
    blob/mode byte-for-byte, and reject
@@ -4206,6 +4526,15 @@ For every one of the 42 reachable program rows in every gate corpus:
 7. ask the service assembler to synthesize one missing semantic row and
    require conformance rejection.
 
+For the nine graph-mapped rows, also execute the exact nested inventory. The
+test-owned oracle derives 110 executions from the literal task table:
+3 owner-ledger + 8 reachability + 4 architecture + 10 W0 freeze +
+16 contracts + 22 semantic + 18 Silicon + 14 Sovereign + 15 Runtime. It
+requires every expected case ID once in each eligible distinct program,
+non-zero discovery/execution, the exact diagnostic, and no candidate helper
+import. A 109th/111th row, changed first-wave placement, or case hidden behind
+an outer expected failure is rejected.
+
 Run:
 
 ```bash
@@ -4215,7 +4544,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
 ```
 
 Expected: all tests pass; every one of the 42 programs executes exactly one
-positive, one negative, and one mutation case, for 126 executions; every one
+outer positive, one outer negative, and one outer mutation case, for 126
+outer executions, plus exactly 110 nested graph-case executions; every one
 of the 19 module bundles is covered and no corpus program is unreachable.
 
 - [ ] **Step 6: Commit verifier V0**
@@ -4341,9 +4671,44 @@ def test_receipt_binds_import_review_audit_root_without_new_cw_path(self) -> Non
         ],
         16,
     )
+
+def test_signed_projection_binds_nine_graph_rows_without_new_field(self) -> None:
+    catalog = load_and_validate_gate_catalog()
+    by_id = {row["gate_id"]: row for row in catalog["gate_catalog"]}
+    graph_rows = tuple(
+        (
+            row["gate_id"],
+            row["gate_contract_digest"],
+            row["bootstrap_module_bundle_digest"],
+            row["bootstrap_corpus_digest"],
+            row["evidence_output_contract_digest"],
+        )
+        for row in (by_id[gate_id] for gate_id in GRAPH_GATE_IDS)
+    )
+    self.assertEqual(tuple(row[0] for row in graph_rows), GRAPH_GATE_IDS)
+    projection = valid_signed_projection_fixture(catalog=catalog)
+    self.assertEqual(
+        projection["gate_catalog"]["catalog_digest"],
+        raw_catalog_digest(catalog),
+    )
+    self.assertEqual(
+        projection["gate_catalog"]["program_graph_digest"],
+        catalog["program_graph_digest"],
+    )
+    self.assertTrue(
+        {
+            "graph_gate_rows", "graph_contract_digest",
+            "graph_module_digest", "graph_corpus_digest",
+        }.isdisjoint(projection),
+    )
 ```
 
 Also reject missing/extra profile fields, credentials/secrets/URLs with user-info, unknown external-evidence classes, an unsigned profile, profile in the blocked manifest, catalog/profile digest mismatch, external attestation encoded in the receipt schema, a payload proposal without host-side object reopen, caller-supplied proposal ref, nondeterministic/missing Cw/Sw commit identity, Cw/Sw object import without host reopen, and any `--wave`, `--ref`, `--profile`, `--verifier`, or `--module` flag.
+The test-owned `GRAPH_GATE_IDS` tuple is the exact nine IDs frozen in Task 2.
+Mutating any one of their contract/module/corpus/program digests while
+updating only a candidate or local projection must fail through the existing
+catalog/program-graph digest chain. No graph-specific root field, schema,
+gate, selector, or attestation field is added.
 
 - [ ] **Step 2: Run the focused RED suite**
 
@@ -4576,7 +4941,9 @@ git commit -m "feat(qinao): close signed bootstrap projection"
 ```
 
 Expected: all ten schemas and the blocked projection parse; all tests pass;
-the blocked projection contains no profile; exactly thirteen paths are staged.
+the blocked projection contains no profile; the signed-fixture test binds all
+nine amended rows through the existing catalog/program-graph digests; exactly
+thirteen paths are staged.
 
 This completes Preparation Z. Return the two indexed paths and their digest
 algorithms to Authority Task 3; do not execute Bootstrap Task 3 until Input A
@@ -4632,6 +4999,24 @@ def test_workflow_has_oidc_but_no_repository_write(self) -> None:
     for forbidden in ("wave:", "ref:", "profile:", "verifier:", "module:"):
         self.assertNotIn(forbidden, workflow)
 ```
+
+Add one exact graph-selection class with only:
+
+```python
+GRAPH_RUNNER_SELECTION_TESTS = {
+    "test_runner_cannot_select_graph_module",
+    "test_lease_reopens_predecessor_selected_nine_graph_bindings",
+    "test_graph_amendment_does_not_create_gate_twenty",
+}
+```
+
+The first test injects module/verifier/gate selector data through the event,
+environment, candidate manifest, proposal receipt, and fake service response;
+every form fails before evaluation. The second requires all nine exact
+contract/module/corpus/program bindings to byte-match B0 at preW0 or the
+authenticated predecessor's finalized binding at later waves. The third
+reconstructs the complete lease set and requires 19 unique gates/152 cells
+with no twentieth gate or graph-specific admission path.
 
 Also test a non-create run-ref event, run-ref/dispatch-intent mismatch,
 payload-shaped event field, OIDC subject/audience or `runner_environment`
@@ -4777,6 +5162,14 @@ bootstrap-path blob from that commit, and only then loads verifier/runtime
 bytes. Any plan or implementation that reads `binding.bootstrap_commit_oid`
 reintroduces an impossible Git-object self-reference.
 
+Before calling `run_required_gates`, the runner reopens the predecessor-
+selected catalog, selects the nine `GRAPH_GATE_IDS` rows from that catalog
+only, and requires each lease binding's contract/module/corpus/program
+digests to match. Candidate bytes may be subjects of those programs but
+cannot add, remove, rename, reorder, or select a graph binding. The complete
+active set remains the existing 19-row/152-cell matrix; there is no graph
+gate 20, graph workflow input, or graph-specific lease field.
+
 - [ ] **Step 4: Convert the workflow into a zero-input B0 push client**
 
 `workflow_dispatch` is forbidden because GitHub only delivers that event when
@@ -4902,6 +5295,11 @@ runner invokes no git commit-tree, hash-object -w, update-index, update-ref, Git
 service final/pending/quarantine state maps to distinct exit codes
 ```
 
+The fake-service matrix runs all three exact graph-selection tests and proves
+the nine bindings survive event→lease→verifier unchanged. A candidate module
+selector, missing/replacement graph binding, twentieth gate, or 153rd matrix
+cell fails before module execution.
+
 Run:
 
 ```bash
@@ -5023,6 +5421,23 @@ def test_bootstrap_attestation_uses_canonical_bootstrap_oid_names(self) -> None:
     self.assertEqual(set(schema["required"]), set(schema["properties"]))
     self.assertFalse(schema["additionalProperties"])
 ```
+
+Add one exact graph-recovery class with:
+
+```python
+GRAPH_RECOVERY_TESTS = {
+    "test_retry_reuses_same_nine_graph_bindings_and_pw",
+    "test_retry_rejects_replacement_graph_module_contract_or_corpus",
+    "test_retry_does_not_rerun_completed_physical_boundary",
+    "test_recovery_cannot_create_graph_gate_twenty",
+}
+```
+
+The passing retry reopens the identical Pw, predecessor-selected verifier,
+nine module/contract/corpus/program bindings, result-bundle digest, and
+ordered graph-case evidence. Any replacement or added gate quarantines.
+When a completed physical projection is present, recovery reopens that exact
+receipt and never invokes the device boundary again.
 
 - [ ] **Step 2: Run focused RED tests**
 
@@ -5167,6 +5582,13 @@ it. After same-intent CAS success, deterministic signing over the frozen draft
 plus the audited CAS transaction makes retries byte-identical.
 `pendingAdmission` never activates the next verifier/module or permits another
 wave.
+
+`retrySameEvaluation` and every later recovery action preserve the exact nine
+graph bindings and the same Pw; graph binding substitution, case-set drift,
+gate 20, matrix cell 153, or a second physical execution for an already
+completed request returns `QUARANTINE`. Recovery may resume missing logical
+steps only from the immutable result/assembly record; it cannot select a
+replacement module or rerun an external effect.
 
 - [ ] **Step 4: Close all six schemas**
 
@@ -5347,6 +5769,23 @@ def test_proposal_changes_no_ref_index_or_worktree(self) -> None:
     self.assertEqual(before.worktree_digest, after.worktree_digest)
 ```
 
+Add one exact graph-minimality class with:
+
+```python
+GRAPH_B0_MINIMALITY_TESTS = {
+    "test_b0_runtime_contains_production_graph_reachability_primitive",
+    "test_b0_production_reachability_module_is_two_symbol_thin_wrapper",
+    "test_b0_contains_all_nine_amended_gate_bundles",
+    "test_b0_graph_amendment_keeps_nineteen_gates_and_152_cells",
+}
+```
+
+The tests inspect exact B0 blobs, not source-worktree paths. They require the
+primitive only in `runtime.py`, require every one of the 19 wrappers
+(explicitly including `production_reachability.py`) to expose only
+`GATE_ID/evaluate`, recompute all nine bundle/corpus/program digests, and
+reject gate 20/cell 153.
+
 Reject extra/missing path, path mode mismatch, symlink/special file, source-tree drift, merge base, wrong parent, test/plan/authority/evidence path in manifest, a concrete provider/profile instance in B0 runtime data, catalog digest mismatch, nondeterministic author/time, and a pre-existing protected ref with the wrong OID.
 
 - [ ] **Step 2: Run focused RED tests**
@@ -5513,6 +5952,12 @@ and 42 reachable program rows
 program source/catalog/program-graph digests and all 57 generated-artifact
 rows reopen from B0
 all module/contract/corpus/helper digests reopen from B0
+runtime.py contains the sole production_graph_reachability implementation
+all 19 module files, including production_reachability.py, are strict
+two-symbol GATE_ID/evaluate wrappers
+all nine graph-mapped rows and their nested graph-case digests reopen from B0
+with totals still 19 gates, 42 programs, 126 outer cases, 110 nested graph
+executions, and 152 cells
 no concrete model-Provider instance or product release-profile value exists in
 the exact bootstrap diff/active bundle closure; the credential-free admission
 service public binding is the sole service-instance exception and is checked
@@ -6150,7 +6595,13 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_bootstrap_ceremony
 ```
 
-Expected: every named module reports discovered tests and the aggregate exits 0.
+Expected: every named module reports discovered tests and the aggregate exits
+0. The graph assertions report exactly 19 gates, 152 cells, nine mapped rows,
+eight catalog tests, eight exact-OID tests, three runner-selection tests,
+four recovery tests, four B0-minimality tests, 126 outer corpus executions,
+and 110 nested graph-case executions. `w0_open_set` reports exactly 16 safety
+IDs, 13 suites, ten ordered graph-freeze rows, and a matching canonical
+digest. There is no gate 20.
 
 - [ ] **Step 2: Re-run baseline Owner-Ledger tests without absorbing its dirty change**
 
@@ -6247,6 +6698,12 @@ forge an intent or attestation
 activate a current-wave proposal
 advance while pendingAdmission
 replace a finalized attestation
+replace one of the nine predecessor-selected graph bindings
+move production_graph_reachability into its module wrapper
+delete/reorder one W0 graph_freeze_cases row or its digest
+wire the graph executor/shadow/cutover in W4
+reorder the exact W6 dependency sequence
+add gate 20 or matrix cell 153
 ```
 
 Command:

@@ -80,12 +80,87 @@ forward nor changes the master wave order.
 
 | Existing task | Added W0-only work |
 |---|---|
-| Task 2 | Extend the existing 16-ID contract row without changing ID order/count/schema |
-| Task 4 | Add source and fixture coverage for second writers, peer calls, scratchpads and legacy loop authority |
+| Task 2 | Extend only the existing `runtime.untyped-shared-agent-state` row; freeze the exact graph token/fixture matrix in `scripts/test_check_qinao_w0_safety.py`; byte-compare it with B0's indexed `scripts/qinao_gate_modules/v0/corpora/w0_open_set.json` |
+| Task 4 | Consume the Task-2 contract/tests read-only and close actual source plus transitive production reachability for second writers, peer calls, scratchpads, legacy loop authority, and `refresh` |
 | Task 11 | Run full safety, reachability, nonempty-suite and exact-set closure before freezing `Pw` |
 | Tasks 12-14 | Carry the unchanged 16-ID policy into exact `Pw`; accept only B0's `qinao.w0-open-set` result |
 
-In the existing positive fixture,
+The authoritative B0 corpus remains
+`scripts/qinao_gate_modules/v0/corpora/w0_open_set.json`. It is predecessor
+input, never a W0 edit. Its positive object contains the exact ordered
+`graph_freeze_cases` rows below beneath the existing
+`runtime.untyped-shared-agent-state` safety row. Its existing missing-suite and
+zero-match objects remain the sole outer negative/mutation cases. Task 2
+reopens the indexed corpus, rejects a missing/extra/reordered graph row, and
+compares the canonical graph-case-array SHA-256 with the identical in-test
+fixture. Candidate tests are parity evidence; only B0's
+`w0_open_set_v1_exact_set` evaluates the authoritative corpus.
+
+`scripts/test_check_w0_expected_open_set.py` remains a compatibility-parser
+regression for the two locked sequence-zero fixtures. This graph amendment
+does not modify it, does not add a successor receipt, and never treats it as
+`qinao.w0-open-set`.
+
+The exact Task-2 graph case inventory is:
+
+| Ordered test method in `W0SafetyContractTests` | Fixture ID | Single mutation or accepted fact | Exact result |
+|---|---|---|---|
+| `test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id` | `graph.incumbent-owner.v1` | all graph tokens and reachability predicates are attached to `runtime.untyped-shared-agent-state` | pass; graph hazard IDs equal `["runtime.untyped-shared-agent-state"]` |
+| `test_graph_freeze_keeps_exact_sixteen_ids` | `graph.seventeenth-id.v1` | append only `runtime.graph-authority` | reject `qinao.w0-safety.safety-id-set-drift` |
+| `test_second_g1_writer_is_rejected` | `graph.second-g1-writer.v1` | activate symbol `BASW0SecondG1Writer` and call `qinaoW0CommitSemanticGraph` in the shipping fixture | reject `runtime.untyped-shared-agent-state:second-g1-writer` |
+| `test_second_g2_writer_is_rejected` | `graph.second-g2-writer.v1` | activate symbol `BASW0SecondG2Writer` and call `qinaoW0CommitTaskGraph` in the shipping fixture | reject `runtime.untyped-shared-agent-state:second-g2-writer` |
+| `test_main_sub_peer_call_is_rejected` | `graph.main-sub-direct-peer.v1` | activate call `qinaoW0MainCallsSubDirectly` | reject `runtime.untyped-shared-agent-state:main-sub-direct-peer-call` |
+| `test_sub_sub_peer_call_is_rejected` | `graph.sub-sub-direct-peer.v1` | activate call `qinaoW0SubCallsPeerSubDirectly` | reject `runtime.untyped-shared-agent-state:sub-sub-direct-peer-call` |
+| `test_shared_mutable_scratchpad_is_rejected` | `graph.shared-scratchpad.v1` | activate mutable symbol `BASW0SharedMutableAgentScratchpad` | reject `runtime.untyped-shared-agent-state:shared-mutable-agent-scratchpad` |
+| `test_legacy_loop_authority_is_rejected` | `graph.legacy-loop-authority.v1` | activate `BASW0LegacyLoopAuthority.qinaoW0RetryOutsideAttempt` | reject `runtime.untyped-shared-agent-state:legacy-loop-authority` |
+| `test_refresh_must_be_read_only_or_production_unreachable` | `graph.refresh-classification.v1` | remove the sole classification from the incumbent `BASAppleTaskGraphLifecycleExecutor.refresh` edge | reject `runtime.untyped-shared-agent-state:unclassified-task-graph-refresh`; the same test separately accepts each of the two exact legal positive shapes below |
+| `test_future_graph_contract_is_rejected_at_w0` | `graph.future-contract.v1` | activate declaration `BASSemanticTurnDAG` in a shipping source root | reject `runtime.untyped-shared-agent-state:future-graph-contract-at-w0` |
+
+The strings above are synthetic scanner fixtures, never W0 production
+declarations. The `runtime.untyped-shared-agent-state` row appends exactly:
+
+```text
+forbidden_active_symbols:
+  BASW0SecondG1Writer
+  BASW0SecondG2Writer
+  BASW0SharedMutableAgentScratchpad
+  BASW0LegacyLoopAuthority
+  BASSemanticTurnDAG
+forbidden_active_calls:
+  qinaoW0CommitSemanticGraph
+  qinaoW0CommitTaskGraph
+  qinaoW0MainCallsSubDirectly
+  qinaoW0SubCallsPeerSubDirectly
+  qinaoW0RetryOutsideAttempt
+forbidden_reachability:
+  second-g1-writer
+  second-g2-writer
+  main-sub-direct-peer-call
+  sub-sub-direct-peer-call
+  shared-mutable-agent-scratchpad
+  legacy-loop-authority
+  future-graph-contract-at-w0
+  unclassified-task-graph-refresh
+```
+
+For that one hazard row, `positive_fixture` is exactly
+`graph.incumbent-owner.v1`; `negative_fixture` is the umbrella
+`graph.freeze-mutation-matrix.v1`, whose ordered children are the remaining
+fixture IDs in the table. `required_suites` retains only the two already-frozen
+Swift W0 suite IDs, preserving B0's exact 13 suite rows; the Python class is
+candidate parity coverage and is never serialized as a fourteenth B0 suite.
+No other hazard row gains a graph fixture, token, or suite.
+
+Each mutation fixture is an in-memory temporary repository constructed by
+`scripts/test_check_qinao_w0_safety.py`: one regular `Package.swift`, one
+shipping target/source root, one regular Swift source, one release entrypoint,
+and the incumbent positive row. It changes exactly the table cell named above.
+The same token placed only in a Swift comment, ordinary/raw/multiline string,
+or test-only target is a non-match. Missing/symlinked source, package, or
+entrypoint is exit `2`, never a clean zero-match. No additional fixture path is
+created in Git.
+
+In the incumbent reachability fixture,
 `BASAppleTaskGraphLifecycleExecutor.refresh` must have exactly one of:
 
 ```text
@@ -99,32 +174,29 @@ invocation across the transitive production call graph.
 `productionUnreachable` requires no shipping product/factory/DI/call/link
 path. A test/lab-only label without build/link closure is insufficient.
 
-Add these exact cases to `scripts/test_check_w0_expected_open_set.py`:
-
-```text
-test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id
-test_graph_freeze_keeps_exact_sixteen_ids
-test_second_g1_writer_is_rejected
-test_second_g2_writer_is_rejected
-test_main_sub_peer_call_is_rejected
-test_sub_sub_peer_call_is_rejected
-test_shared_mutable_scratchpad_is_rejected
-test_legacy_loop_authority_is_rejected
-test_refresh_must_be_read_only_or_production_unreachable
-test_future_graph_contract_is_rejected_at_w0
-```
-
-Run:
+Task 2 runs the ten methods by fully qualified name, so a renamed or absent
+method is a load error rather than a passing module with old tests:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_check_w0_expected_open_set
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_keeps_exact_sixteen_ids \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_second_g1_writer_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_second_g2_writer_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_main_sub_peer_call_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_sub_sub_peer_call_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_shared_mutable_scratchpad_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_legacy_loop_authority_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_refresh_must_be_read_only_or_production_unreachable \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_future_graph_contract_is_rejected_at_w0
 ```
 
-Expected: positive discovery, exactly 16 IDs, all ten graph-freeze cases
-execute, and the complete module passes. Missing source, a zero-match scan,
-unclassified `refresh`, or a seventeenth ID fails; none may be recorded as
-`BLOCKED_K4` because they are structural W0 failures.
+GREEN expected: `Ran 10 tests`, `OK`, exactly 16 IDs, and all ten literal
+method names in verbose output. RED uses the same exact selector list and must
+report `Ran 10 tests` before failing only on
+`qinao.w0-safety.unimplemented`. Missing source, a zero-match scan,
+unclassified `refresh`, or a seventeenth ID is a structural W0 failure; none
+may be recorded as `BLOCKED_K4`.
 
 ### Session and interruption re-entry
 
@@ -227,7 +299,8 @@ registry reason. `pendingAdmission` alone carries null.
 | `scripts/apply_qinao_import_map.py` | C0 destination-CAS prepare/apply mechanism |
 | `docs/superpowers/specs/qinao-w0-safety-freeze-v1.json` | Closed W0 hazard, allowed seam, forbidden seam, suite, and source-graph contract |
 | `scripts/check_qinao_w0_safety.py` | Comment/string-safe source and production-graph freeze checker |
-| `scripts/test_check_qinao_w0_safety.py` | Positive, negative, mutation, symlink, missing-root, and zero-discovery tests |
+| `scripts/test_check_qinao_w0_safety.py` | Positive, negative, mutation, symlink, missing-root, zero-discovery, and exact ten-case graph-freeze parity tests |
+| `scripts/qinao_gate_modules/v0/corpora/w0_open_set.json` | Verify-only B0 authority corpus; exact 13 suites, 16 IDs, and ordered ten-case graph array |
 | `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASW0SafetyFreezeTests.swift` | Current-API fail-closed behavior and access-control tests |
 | `QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoW0SafetyFreezeTests.swift` | Qinao boundary, stream, secret, persona, recognition, and fail-closed tests |
 
@@ -761,6 +834,8 @@ ancestor. `display_path` is never used to select or stage a path.
 - Create: `scripts/test_check_qinao_w0_safety.py`
 - Create: `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASW0SafetyFreezeTests.swift`
 - Create: `QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoW0SafetyFreezeTests.swift`
+- Verify only from authenticated predecessor/B0:
+  `scripts/qinao_gate_modules/v0/corpora/w0_open_set.json`
 
 **Interfaces:**
 
@@ -803,9 +878,14 @@ The `HazardRow.id` tuple is the one canonical 16-ID UTF-8-sorted list in
 constant and may not redeclare or alias it. Each row expands the literal
 production/source roots, allowed current seams, forbidden
 symbols/calls/reachability, required suites, positive/negative fixture IDs,
-and fail-closed disposition prescribed by Tasks 3–7. The Bootstrap plan
-independently freezes the same 16-ID set in B0; tests compare the indexed
-contract tuple byte-for-byte with both authorities before active evaluation.
+and fail-closed disposition prescribed by Tasks 3–7. Only
+`runtime.untyped-shared-agent-state` receives the exact graph token and
+reachability additions from the header matrix. The Bootstrap plan independently
+freezes the same 16-ID set plus the same ordered ten-case graph array in B0;
+`W0SafetyContractTests` reopens the corpus blob from the authenticated
+predecessor tree and compares the indexed contract/case tuples and canonical
+array SHA-256 before active evaluation. The corpus is read-only and is not in
+this task's staging set.
 
 - [ ] **Step 0: Re-enter through the permanent guard**
 
@@ -824,6 +904,23 @@ Then independently call `ProtectedAdmissionClient.reopen_admitted_predecessor()`
 
 Tests must cover all 16 IDs, exact fields/order, missing/extra row, absent and symlink roots, comment/string non-match, active-symbol match, active-call match, indirect factory reachability, package-product reachability, raw regex fail-closed, required-suite zero, duplicate result, and candidate result claiming a different payload.
 
+In `scripts/test_check_qinao_w0_safety.py`, declare one
+`W0SafetyContractTests(unittest.TestCase)` class. It contains the exact ten
+graph methods from the header table and an immutable `GRAPH_FREEZE_CASES`
+tuple of canonical dictionaries with exact keys
+`case_id,fixture_id,hazard_id,mutation,expected`, in that same order and with
+the table's literal values. `GRAPH_FREEZE_CASE_IDS` is derived only as
+`tuple(row["case_id"] for row in GRAPH_FREEZE_CASES)`, never independently
+declared. The fixture builder writes only to `TemporaryDirectory`, creates the
+exact one-package/one-shipping-target shape described above, and applies
+exactly one mutation per test. It also
+reopens
+`$PREW0_PW_TREE:scripts/qinao_gate_modules/v0/corpora/w0_open_set.json`
+through `git show`, rejects a non-regular/missing indexed blob before parsing,
+and compares the complete corpus `graph_freeze_cases` tuple and canonical
+digest with `GRAPH_FREEZE_CASES`. No test reads the worktree copy as
+authority.
+
 First create an importable `scripts/check_qinao_w0_safety.py` typed seam with
 the final dataclasses and signatures above. Each operation raises
 `W0SafetyError("qinao.w0-safety.unimplemented")`; the CLI parses only its
@@ -831,12 +928,76 @@ final closed arguments and raises the same diagnostic. Syntax, import,
 attribute, or zero-discovery failure is invalid RED.
 
 ```bash
+set +e
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  scripts.test_check_qinao_w0_safety
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_keeps_exact_sixteen_ids \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_second_g1_writer_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_second_g2_writer_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_main_sub_peer_call_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_sub_sub_peer_call_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_shared_mutable_scratchpad_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_legacy_loop_authority_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_refresh_must_be_read_only_or_production_unreachable \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_future_graph_contract_is_rejected_at_w0 \
+  >/private/tmp/qinao-w0-graph-red.txt 2>&1
+GRAPH_RED_RC="$?"
+set -e
+test "$GRAPH_RED_RC" = 1
+python3 - <<'PY'
+from pathlib import Path
+
+case_ids = (
+    "test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id",
+    "test_graph_freeze_keeps_exact_sixteen_ids",
+    "test_second_g1_writer_is_rejected",
+    "test_second_g2_writer_is_rejected",
+    "test_main_sub_peer_call_is_rejected",
+    "test_sub_sub_peer_call_is_rejected",
+    "test_shared_mutable_scratchpad_is_rejected",
+    "test_legacy_loop_authority_is_rejected",
+    "test_refresh_must_be_read_only_or_production_unreachable",
+    "test_future_graph_contract_is_rejected_at_w0",
+)
+text = Path("/private/tmp/qinao-w0-graph-red.txt").read_text()
+assert "Ran 10 tests" in text, text
+assert all(case_id in text for case_id in case_ids), text
+assert text.count("qinao.w0-safety.unimplemented") >= 10, text
+PY
 ```
 
-Expected: at least 18 named tests are discovered and fail only on
-`qinao.w0-safety.unimplemented`.
+Then run the complete module once:
+
+```bash
+set +e
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_check_qinao_w0_safety \
+  >/private/tmp/qinao-w0-safety-full-red.txt 2>&1
+FULL_RED_RC="$?"
+set -e
+test "$FULL_RED_RC" = 1
+python3 - <<'PY'
+import re
+from pathlib import Path
+
+text = Path("/private/tmp/qinao-w0-safety-full-red.txt").read_text()
+match = re.search(r"Ran ([0-9]+) tests?", text)
+assert match and int(match.group(1)) >= 28, text
+assert "qinao.w0-safety.unimplemented" in text, text
+for forbidden in (
+    "ModuleNotFoundError",
+    "Failed to import test module",
+    "AttributeError:",
+    "No such file or directory",
+):
+    assert forbidden not in text, (forbidden, text)
+PY
+```
+
+Expected: at least 28 named tests are discovered; the exact ten graph names
+are present; every semantic failure is
+`qinao.w0-safety.unimplemented`; there is no load, import, fixture, path, or
+zero-discovery error.
 
 - [ ] **Step 2: Write RED Swift behavior tests**
 
@@ -880,6 +1041,14 @@ Expected: each suite is discovered and fails on at least one real current hazard
 
 Use Python `tokenize` only for Python and a bounded Swift lexical scanner for Swift. The Swift scanner handles ordinary/raw/multiline strings, interpolations, line comments, and nested block comments. An unsupported raw-regex literal fails the containing source root. Build/package roots are enumerated from `Package.swift`, checked-in Xcode project/workspace/scheme files, and the Owner-Ledger active release profile set; a missing graph input fails rather than reducing scope.
 
+The checker maps every header-matrix symbol/call/reachability diagnostic to
+the existing `runtime.untyped-shared-agent-state` row. It does not accept a
+generic “graph” substring, documentation hit, fixture self-report, or
+caller-provided classification. `refresh` classification is derived from the
+transitive source/build/link graph and must be exactly `readOnly` or
+`productionUnreachable`; every other value and every absent edge is the exact
+`unclassified-task-graph-refresh` diagnostic.
+
 The two mutually exclusive invocation shapes are exactly:
 
 ```bash
@@ -902,10 +1071,25 @@ python3 scripts/check_qinao_w0_safety.py \
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_keeps_exact_sixteen_ids \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_second_g1_writer_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_second_g2_writer_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_main_sub_peer_call_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_sub_sub_peer_call_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_shared_mutable_scratchpad_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_legacy_loop_authority_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_refresh_must_be_read_only_or_production_unreachable \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_future_graph_contract_is_rejected_at_w0
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_qinao_w0_safety
 ```
 
-Expected: at least 18 tests pass; no skip.
+Expected: the focused command prints `Ran 10 tests` and `OK`; the full module
+discovers at least 28 tests and passes with no skip. Missing/renamed focused
+method is a load error. The indexed B0 corpus comparison, comment/string
+non-match rows, both legal `refresh` positive shapes, and every single-mutation
+negative all execute.
 
 - [ ] **Step 5: Commit the contract/checker/test slice**
 
@@ -1094,11 +1278,19 @@ Expected: one byte-exact reviewable correction commit; no unknown path and no ev
 ### Task 4: Freeze App-Agent, Persona, Memory, Recognition, and Split-Brain Boundaries
 
 **Files:**
-- Modify: current raw Session/persona call sites only where the W0 checker reports shipping reachability.
-- Test: both W0 safety suites.
+- Modify: current raw Session/persona and graph-lifecycle source/call sites only
+  where the Task-2 checker reports shipping reachability.
+- Verify only: `docs/superpowers/specs/qinao-w0-safety-freeze-v1.json`,
+  `scripts/check_qinao_w0_safety.py`,
+  `scripts/test_check_qinao_w0_safety.py`, the authenticated B0
+  `w0_open_set.json` corpus, and both W0 safety suites.
 
 **Interfaces:**
-- Produces: guest-only W0 recognition and presentation-only persona compatibility.
+- Consumes: the committed Task-2 16-ID contract and exact ten-case graph matrix
+  without changing either.
+- Produces: guest-only W0 recognition, presentation-only persona compatibility,
+  and one mechanically derived `refresh` classification with every discovered
+  graph writer/peer/scratchpad/loop edge closed or production-unreachable.
 - Does not create: App-Agent root, Session-selection CAS, Self owner, memory owner, context capsule authority, or recognition authority.
 
 - [ ] **Step 0: Re-enter through the permanent guard**
@@ -1114,9 +1306,58 @@ test "$(git rev-parse "$PREW0_PW^{tree}")" = "$PREW0_PW_TREE"
 
 Then independently reopen the signed admitted predecessor through the service. Expected: exact tuple equality.
 
-- [ ] **Step 1: Add the raw-string negative matrix**
+- [ ] **Step 0A: Reopen the Task-2 graph freeze and classify the real source graph**
 
-The Swift tests independently inject:
+First prove this task did not edit its input contracts and run all ten exact
+focused tests:
+
+```bash
+test -z "$(git diff --name-only -- \
+  docs/superpowers/specs/qinao-w0-safety-freeze-v1.json \
+  scripts/check_qinao_w0_safety.py \
+  scripts/test_check_qinao_w0_safety.py)"
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_graph_freeze_keeps_exact_sixteen_ids \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_second_g1_writer_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_second_g2_writer_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_main_sub_peer_call_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_sub_sub_peer_call_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_shared_mutable_scratchpad_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_legacy_loop_authority_is_rejected \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_refresh_must_be_read_only_or_production_unreachable \
+  scripts.test_check_qinao_w0_safety.W0SafetyContractTests.test_future_graph_contract_is_rejected_at_w0
+```
+
+Expected: `Ran 10 tests`, `OK`, and no input-contract diff. Next run
+`check_qinao_w0_safety.py --diagnostic-staged` over the clean index and reopen
+its canonical result. For the real
+`BehavioralAISubstrate/Sources/BASAppleLifecycleKit/AppleTaskGraphLifecycleCore.swift`
+declaration and
+`BehavioralAISubstrate/Sources/BASHostKit/HostRuntimeCore.swift` call site,
+require exactly one derived result:
+
+```text
+readOnly:
+  transitive write/CAS/schedule/retry/remand/commit/publication/effect/
+  scratchpad/Provider-call edge count = 0
+productionUnreachable:
+  shipping product/factory/DI/call/link path count = 0
+```
+
+The current callback names `saveSnapshot` and `clearSnapshot` are treated as
+write-capable until call-graph proof shows otherwise; a name or closure type
+cannot establish read-only behavior. If neither legal result is proven, use
+the checker's nonempty reviewed source-path set to remove/fence only the
+shipping reachability. In the same pass, classify every discovered G1/G2
+writer, direct Main/Sub or Sub/Sub call, mutable shared scratchpad, and
+schedule/retry/remand/commit loop. Unknown and ambiguous edges fail; this task
+does not edit the contract, corpus, checker, or fixture matrix to make them
+pass.
+
+- [ ] **Step 1: Execute the Task-2 raw-string negative matrix**
+
+The already-committed Swift tests independently inject:
 
 ```text
 different BASOrganRequest.sessionID
@@ -1175,7 +1416,7 @@ python3 scripts/run_nonempty_swift_filter.py \
 git diff --name-only | LC_ALL=C sort \
   > /private/tmp/qinao-w0-app-agent-reviewed-paths.txt
 test -s /private/tmp/qinao-w0-app-agent-reviewed-paths.txt
-python3 -c 'from pathlib import Path; rows=Path("/private/tmp/qinao-w0-app-agent-reviewed-paths.txt").read_text().splitlines(); roots=("BehavioralAISubstrate/Sources/","QinaoRuntimeSDK/Sources/","BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASW0SafetyFreezeTests.swift","QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoW0SafetyFreezeTests.swift"); assert rows==sorted(set(rows)); assert all(any(row==root or row.startswith(root) for root in roots) for row in rows)'
+python3 -c 'from pathlib import Path; rows=Path("/private/tmp/qinao-w0-app-agent-reviewed-paths.txt").read_text().splitlines(); roots=("BehavioralAISubstrate/Sources/","QinaoRuntimeSDK/Sources/"); assert rows==sorted(set(rows)); assert all(any(row.startswith(root) for root in roots) for row in rows)'
 git add --pathspec-from-file=/private/tmp/qinao-w0-app-agent-reviewed-paths.txt
 git diff --cached --name-only | LC_ALL=C sort \
   > /private/tmp/qinao-w0-app-agent-staged.txt
@@ -1190,7 +1431,10 @@ git commit -m "fix(qinao): isolate W0 agent identity and persona"
 test -z "$(git status --porcelain=v1)"
 ```
 
-Expected: suites pass, checker passes the staged tree, commit contains no result JSON.
+Expected: suites pass, the checker reports one legal `refresh`
+classification and zero forbidden graph/peer/scratchpad/loop reachability,
+the Task-2 contract/checker/tests and B0 corpus remain byte-identical, and the
+commit contains source only with no result JSON.
 
 ---
 
@@ -2574,7 +2818,9 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_check_k4_platform_proof
 ```
 
-Expected: every named module exists, at least 286 total tests pass, zero failure/skip.
+Expected: every named module exists, at least 296 total tests pass, zero
+failure/skip; all ten fully qualified `W0SafetyContractTests` selectors from
+Task 2 are present in the verbose transcript.
 `scripts.test_check_w0_expected_open_set` is a compatibility-parser regression
 only; passing it does not satisfy `qinao.w0-open-set`, and this task never
 invokes the legacy checker CLI.
@@ -2676,7 +2922,9 @@ it in W0.
 
 Reopen the B0 `w0_open_set` corpus and validate its literal positive,
 negative, and mutation objects structurally. The positive object has all 13
-suites and all 16 safety IDs; the negative removes only
+suites, all 16 safety IDs, and the exact ordered ten-row
+`graph_freeze_cases` array plus its Task-2-matching canonical SHA-256; the
+negative removes only
 `BASRoutedMemoryFlipTests` and expects `missing-freeze-suite`; the mutation
 keeps that indexed path but replaces its exact filter with
 `__QINAO_W0_INTENTIONAL_ZERO_MATCH__` and expects `zero-match-filter`. The three canonical

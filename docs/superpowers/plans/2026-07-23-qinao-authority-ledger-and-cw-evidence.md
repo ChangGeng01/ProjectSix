@@ -96,17 +96,186 @@ name it as graph authority.
   immutable root replacement/CAS; G3 is a receipt projection of the four
   existing ControlRings; G4 is read-only trace projection.
 
-Task 3's Owner-Ledger draft must encode the `runtime.semantic-dag` M/Create
-transition and reciprocal catalog references under these incumbent owners,
-without changing the 29-owner cardinality. Task 4's source/entrypoint
-classifier and Task 5's reachability closure must identify every production
-graph writer, executor, direct peer path, shared scratchpad, legacy loop
-authority, and graph-shaped Swift source. Task 7's incumbent convergence
-checker must enforce the root path, owner pins, G0-G4 mutability, exact
-14/4/4/7/W0-W6 counts, and absence of duplicate authority. Its mutant corpus
-must include second writer, reverse absence query, mutable G2 update, fifth
-ring, peer call, shared scratchpad, wrong execution shape, invalid
-source-zero-join, missing control-ring join, and unauthorized graph owner.
+The `runtime.semantic-dag` Create is one atomic planned-member closure, pinned
+to the approved dynamic-graph commit/blob/SHA in Global Constraints. “Root”
+has a precise meaning here: G1 has exactly one stored topology root, not five.
+The two associated G1 evidence payloads below are governed schema members of
+the same Create, but they are not topology roots.
+
+```python
+GRAPH_G1_TOPOLOGY_ROOTS = (
+    "BASSemanticTurnDAG",
+)
+
+GRAPH_G1_EMBEDDED_TOPOLOGY_VALUES = (
+    "BASSemanticTurnNodeContract",
+    "BASSemanticTurnEdge",
+    "BASSemanticTurnInputPortContract",
+    "BASSemanticTurnAlternativeGroupContract",
+    "BASSemanticTurnNodeApplicabilityContract",
+    "BASDelegationSlotContract",
+    "BASSemanticTurnJoinContract",
+    "BASSemanticTurnJoinMemberContract",
+)
+
+GRAPH_G1_ASSOCIATED_EVIDENCE_PAYLOADS = (
+    "BASSemanticAttemptTerminalReceiptPayload",
+    "BASSemanticJoinMemberDispositionPayload",
+)
+
+GRAPH_G2_STORED_ROOTS = (
+    "BASTaskGraphJoinEvidencePayload",
+    "BASTaskGraphPatchPayload",
+)
+
+GRAPH_G2_EMBEDDED_VALUES = (
+    "BASTaskNodeContract",
+    "BASTaskGraphEdge",
+    "BASTaskGraphChildHead",
+    "BASTaskGraphTerminalBasis",
+    "BASTaskGraphParentTerminalOutcome",
+    "BASTaskGraphParentAttemptBasis",
+    "BASTaskNodeStatusTransition",
+    "BASTaskGraphReadPredicate",
+    "BASTaskGraphWriteIntent",
+    "BASTaskGraphPrecondition",
+    "BASTaskBudgetDelta",
+    "BASTaskAuthorityDelta",
+)
+```
+
+Only these five governed schema members receive independent `1.0.0`
+registry/current/future-rejection coverage:
+
+```python
+GRAPH_GOVERNED_SCHEMA_MEMBERS = (
+    (
+        "runtime.semantic-turn-dag",
+        "BASSemanticTurnDAG",
+        "SemanticTurnDAG",
+        "graph.g1.semantic-turn-dag.v1",
+    ),
+    (
+        "runtime.semantic-attempt-terminal-receipt",
+        "BASSemanticAttemptTerminalReceiptPayload",
+        "SemanticAttemptTerminalReceipt",
+        "graph.g1.attempt-terminal-receipt.v1",
+    ),
+    (
+        "runtime.semantic-join-member-disposition",
+        "BASSemanticJoinMemberDispositionPayload",
+        "SemanticJoinMemberDisposition",
+        "graph.g1.join-member-disposition.v1",
+    ),
+    (
+        "runtime.task-graph-join-evidence",
+        "BASTaskGraphJoinEvidencePayload",
+        "TaskGraphJoinEvidence",
+        "graph.g2.task-join-evidence.v1",
+    ),
+    (
+        "runtime.task-graph-patch",
+        "BASTaskGraphPatchPayload",
+        "TaskGraphPatch",
+        "graph.g2.task-patch.v1",
+    ),
+)
+```
+
+Every row above has `version = 1.0.0`, `owner_id =
+runtime.semantic-dag`, declaration path
+`BehavioralAISubstrate/Sources/BASRuntimeCore/BASSemanticTurnDAG.swift`,
+`status = approved_missing`, `introduction_wave = W1`,
+`activation_wave = W6`, and `schema_only_prelude_allowed = true` in Input A.
+Its `contract_id`, declaration symbol, registry ID, and required-term ID are
+the four tuple members in that order. The root/associated-evidence distinction
+does not change catalog membership.
+
+The eight G1 and twelve G2 embedded values have no independent catalog row,
+`schemaVersion`, registry entry, ordinary-put factory, or standalone fixture.
+The G1 eight are exercised only through the
+`BASSemanticTurnDAG` canonical/negative fixtures. Taken together, the two G2
+root suites exercise all twelve G2 embedded values. The two associated G1
+evidence payload suites exercise their closed outcome/evidence grammars and
+future-version rejection without reclassifying either payload as a topology
+root.
+
+The `runtime.semantic-dag` Create-permission row, W1 candidate manifest, and
+stable create receipt must carry one byte-identical
+`planned_member_closure_v1` object with exactly:
+
+```text
+spec_commit
+spec_blob
+spec_sha256
+topology_roots
+embedded_topology_values
+associated_evidence_payloads
+g2_stored_roots
+g2_embedded_values
+governed_schema_members
+schema_registry_rows
+fixture_rows
+consumer_rows
+```
+
+The three spec fields equal the Global-Constraints pin. The next five arrays
+equal the constants above. `governed_schema_members` equals the five exact
+tuples above after projection into the catalog row fields. The registry and
+fixture identities are literal; no task derives either ID from a symbol:
+
+| schema member | current registry test | future-rejection registry test | canonical fixture | missing-version fixture | future-version fixture | cross-target default-version fixture |
+|---|---|---|---|---|---|---|
+| `runtime.semantic-turn-dag` | `schema.semantic_turn_dag.current` | `schema.semantic_turn_dag.future_rejection` | `semantic_turn_dag.canonical_round_trip` | `semantic_turn_dag.missing_version` | `semantic_turn_dag.future_version` | `semantic_turn_dag.cross_target_default_version_initializer` |
+| `runtime.semantic-attempt-terminal-receipt` | `schema.semantic_attempt_terminal_receipt.current` | `schema.semantic_attempt_terminal_receipt.future_rejection` | `semantic_attempt_terminal_receipt.canonical_round_trip` | `semantic_attempt_terminal_receipt.missing_version` | `semantic_attempt_terminal_receipt.future_version` | `semantic_attempt_terminal_receipt.cross_target_default_version_initializer` |
+| `runtime.semantic-join-member-disposition` | `schema.semantic_join_member_disposition.current` | `schema.semantic_join_member_disposition.future_rejection` | `semantic_join_member_disposition.canonical_round_trip` | `semantic_join_member_disposition.missing_version` | `semantic_join_member_disposition.future_version` | `semantic_join_member_disposition.cross_target_default_version_initializer` |
+| `runtime.task-graph-join-evidence` | `schema.task_graph_join_evidence.current` | `schema.task_graph_join_evidence.future_rejection` | `task_graph_join_evidence.canonical_round_trip` | `task_graph_join_evidence.missing_version` | `task_graph_join_evidence.future_version` | `task_graph_join_evidence.cross_target_default_version_initializer` |
+| `runtime.task-graph-patch` | `schema.task_graph_patch.current` | `schema.task_graph_patch.future_rejection` | `task_graph_patch.canonical_round_trip` | `task_graph_patch.missing_version` | `task_graph_patch.future_version` | `task_graph_patch.cross_target_default_version_initializer` |
+
+`schema_registry_rows` contains exactly the ten registry-test identities in
+the table. `fixture_rows` contains exactly its twenty fixture identities,
+all owned by
+`BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASSemanticTurnDAGTests.swift`.
+`consumer_rows` is exactly the sorted, duplicate-free closure:
+
+```text
+BehavioralAISubstrate/Sources/BASAdmin/EBrainSchemaGovernanceRegistry.swift
+BehavioralAISubstrate/Sources/BASRuntimeCore/BASSemanticTurnDAG.swift
+BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASEBrainSchemaGovernanceRegistryTests.swift
+BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASSemanticTurnDAGTests.swift
+docs/superpowers/evidence/qinao-owner-create/runtime--semantic-dag.json
+docs/superpowers/specs/qinao-owner-ledger-v1.json
+scripts/check_qinao_owner_ledger.py
+scripts/test_check_qinao_owner_ledger.py
+```
+
+The closure digest is exactly
+`SHA256("QINAO-RUNTIME-SEMANTIC-DAG-PLANNED-MEMBER-CLOSURE-V1\0" ||
+canonical_json(planned_member_closure_v1))`, where `canonical_json` is
+UTF-8 JSON with sorted object keys, no insignificant whitespace, no NaN, and
+arrays retained in the literal order above. The digest is stored beside that
+object under `planned_member_closure_digest` in the Ledger Create-permission
+row, candidate manifest, and stable receipt. A missing, extra, renamed,
+reordered, or independently registered embedded value; a different consumer;
+or a partial digest match fails before the M Create can pass. The
+semantic-Attempt terminal receipt is additionally consumed only by the
+incumbent addendum K3 receipt factory plus its existing
+`BASArtifactHistoricalPutPort` allowlist; that historical consumer does not
+become an owner, topology root, or sixth schema member.
+
+Task 1's convergence checker enforces the sole authority/root/spec pins and
+exact 7+4 placement. Task 3's draft binds the already-complete Input-A catalog
+without adding a verdict. Task 4 validates the byte-identical
+planned-member/schema/fixture/consumer closure and the unchanged 29-owner
+postimage. Task 7's source/entrypoint classifier and production-reachability
+closure identify every production graph writer, executor, direct peer path,
+shared scratchpad, legacy loop authority, and graph-shaped Swift source.
+Task 8's architecture-closure checker enforces G0-G4 mutability, exact
+14/4/4/7/W0-W6 counts, and absence of duplicate authority. The Task 1, Task
+4, Task 7, and Task 8 mutant suites collectively include second writer,
+reverse absence query, mutable G2 update, fifth ring, peer call, shared
+scratchpad, wrong execution shape, invalid source-zero-join, missing
+control-ring join, and unauthorized graph owner.
 
 These checks extend `scripts/check_qinao_owner_ledger.py`,
 `scripts/test_check_qinao_owner_ledger.py`, the existing candidate-side
@@ -120,7 +289,8 @@ Provider pre-call/completion/recovery order; no blind retry; pure-DAG remand
 only to a successor Attempt; ControlRing remand only through a real ring
 invocation; exact completion and cancellation bases; the 1,018/1,024 bounds;
 and W6's pinned dependency order. Run them through the existing nonempty
-`unittest` and Swift-filter mechanisms already specified in Tasks 7-9.
+`unittest` and Swift-filter mechanisms already specified in Tasks 1, 4, and
+7-9.
 
 ### Exact task insertion, files, and handoffs
 
@@ -682,6 +852,12 @@ EXPECTED_TESTS = {
     "test_ios27_floor_includes_rust_xcframework_script",
     "test_schema_v1_catalog_draft_is_explicitly_transitional",
     "test_schema_v1_catalog_rows_equal_reciprocal_authority_refs",
+    "test_graph_contracts_have_exactly_one_incumbent_authority",
+    "test_graph_amendment_rejects_twelfth_authority_document",
+    "test_graph_amendment_rejects_new_owner_or_owner_cardinality_change",
+    "test_runtime_semantic_dag_root_path_and_symbol_are_exact",
+    "test_silicon_cannot_claim_graph_authority",
+    "test_control_projection_cannot_create_fifth_ring",
 }
 ```
 
@@ -716,7 +892,7 @@ python3 -m unittest -v \
   scripts.test_check_qinao_authority_convergence.QinaoAuthorityConvergenceTests
 ```
 
-Expected: 22 tests discovered; the repository fixture fails on
+Expected: exactly 28 tests discovered; the repository fixture fails on
 `qinao.authority-convergence.unimplemented` and mutation cases remain RED on
 their asserted semantics. No failure is an import, syntax, or missing-fixture
 error.
@@ -871,7 +1047,50 @@ mode-`100644` file. Parse only the `## Executable Child Plans` section of
 duplicate, or aliased path. Extend the existing path-boundary test with
 subtests that delete/rename each child, change its index mode, add a sixth
 child, duplicate a child, and point the master at an unindexed lookalike; all
-must fail while the total authority-test discovery count remains 22.
+must fail while the total authority-test discovery count remains exactly 28.
+
+For the six graph tests, freeze these literals in the checker rather than
+matching descriptive prose:
+
+```python
+GRAPH_SPEC_PIN = {
+    "commit": "9d484befb4a4593d93789457ebddfd7cde358e3b",
+    "path": "docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md",
+    "blob": "e2c59656f9eb184efc3ab933fe442c9dd0b7d507",
+    "sha256": "5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5",
+}
+GRAPH_AUTHORITY_RESPONSIBILITIES = {
+    "architecture": "G0-G4, 14/4/4/7 invariants, cross-axis boundaries",
+    "convergence-master": "W0-W6 dependency, cutover, proof order",
+    "contracts": "immutable wire values and fixtures",
+    "runtime": "mechanical readiness, barrier, replay, recovery, retirement",
+    "semantic": "snapshot, retrieval, grounding, context inputs",
+    "silicon": "physical Provider execution and envelopes, no graph authority",
+    "sovereign": "authorization, effect/recovery boundaries, terminal seal",
+    "k3-provider-addendum": "roots, CAS, bindings, branch identity, unknown-effect rules",
+    "agent-context-addendum": "delegation, independent context, continuity, loops",
+    "app-agent-addendum": "Session/App-Agent identity, persona and writable-state isolation",
+    "governed-learning-addendum": "evidence flywheel, candidate strategy, operator adoption",
+}
+GRAPH_OWNER_ID = "runtime.semantic-dag"
+GRAPH_ROOT_PATH = "BehavioralAISubstrate/Sources/BASRuntimeCore/BASSemanticTurnDAG.swift"
+GRAPH_ROOT_SYMBOL = "BASSemanticTurnDAG"
+```
+
+Resolve the pinned commit with `git cat-file -e <commit>^{commit}`, resolve
+`<commit>:<path>` to `GRAPH_SPEC_PIN["blob"]`, hash those blob bytes to
+`GRAPH_SPEC_PIN["sha256"]`, and reject any missing or substituted object.
+Parse Section 19.2 of those pinned bytes and require the exact eleven-key
+responsibility map above. Require the indexed 7+4 documents to contain their
+one matching graph responsibility/required-term anchor, no unlisted document
+to claim an authority anchor, and the Owner Ledger to retain exactly 29
+owners with one `runtime.semantic-dag` Create permission at the exact root
+path/symbol. A mutation that gives Silicon a graph owner/writer, changes the
+root symbol/path, adds an owner or twelfth authority text, calls a G1 evidence
+payload or either G2 stored value a G1 topology root, or introduces a fifth
+ControlRing must fail its named graph test. This task validates authority
+placement only; production source discovery and graph reachability remain
+Task 7 responsibilities.
 
 - [ ] **Step 5: Run the test module and commit the checker slice**
 
@@ -882,7 +1101,8 @@ python3 -m unittest -v \
   scripts.test_check_qinao_authority_convergence.QinaoAuthorityConvergenceTests
 ```
 
-Expected: all checker-unit fixtures pass; repository-positive remains RED until Task 2 changes the authority bytes.
+Expected: exactly 28 tests are discovered; all checker-unit fixtures pass;
+repository-positive remains RED until Task 2 changes the authority bytes.
 
 Commit only:
 
@@ -915,7 +1135,9 @@ Expected: one preparation commit with exactly three paths.
   children in the frozen order.
 
 **Interfaces:**
-- Consumes: Task 1 checker and the approved correction design's Sections 3-13.
+- Consumes: Task 1 checker, the approved correction design's Sections 3-13,
+  and the exact dynamic-graph commit/blob/SHA plus closed Create inventory in
+  Global Constraints and “Existing-owner pins”.
 - Produces: one internally consistent authority draft with exact 7+4
   membership, owner-private recovery, Decision-Gate precedence,
   non-executable CoreAI traceability, and one schema-v1 transitional
@@ -1295,14 +1517,61 @@ wave_admission_v1 is absent
 Every catalog row already has the final exact `CONTRACT_FIELDS` and
 `AUTHORITY_REF_FIELDS` shape from Task 4. Build the incumbent row identities
 from the indexed `BASEBrainSchemaGovernanceRegistry` plus the
-release-condition-aware governed declaration scan, then add only the exact
-new/vNext contract identities named by the correction design and this plan's
-Task-5 E/A roster. Owner, version, declaration path/symbol, registry,
-lifecycle waves/status, prelude flag, and authority refs are literal reviewed
-values in the resulting indexed array; no later task is allowed to infer or
-choose a replacement. Sort uniquely by `(contract_id, version)`, require the
-row union to equal the independently derived incumbent-plus-exact-delta set,
-and review the generated diff row by row.
+release-condition-aware governed declaration scan, then add only:
+
+1. the exact new/vNext identities named by the correction design;
+2. this plan's Task-5 E/A roster; and
+3. the five governed graph schema-member identities below, which are derived
+   only from the pinned dynamic-graph specification and cannot be omitted,
+   inferred from source discovery, or renamed.
+
+All five graph rows share:
+
+```text
+version = 1.0.0
+owner_id = runtime.semantic-dag
+declaration_path = BehavioralAISubstrate/Sources/BASRuntimeCore/BASSemanticTurnDAG.swift
+status = approved_missing
+introduction_wave = W1
+activation_wave = W6
+schema_only_prelude_allowed = true
+```
+
+Their remaining fields and authority references are exact:
+
+| `contract_id` | `declaration_symbol` | `registry_id` | authority document IDs | `required_term_id` |
+|---|---|---|---|---|
+| `runtime.semantic-turn-dag` | `BASSemanticTurnDAG` | `SemanticTurnDAG` | `contracts`, `runtime`, `semantic` | `graph.g1.semantic-turn-dag.v1` |
+| `runtime.semantic-attempt-terminal-receipt` | `BASSemanticAttemptTerminalReceiptPayload` | `SemanticAttemptTerminalReceipt` | `contracts`, `runtime`, `k3-provider-addendum` | `graph.g1.attempt-terminal-receipt.v1` |
+| `runtime.semantic-join-member-disposition` | `BASSemanticJoinMemberDispositionPayload` | `SemanticJoinMemberDisposition` | `contracts`, `runtime`, `semantic` | `graph.g1.join-member-disposition.v1` |
+| `runtime.task-graph-join-evidence` | `BASTaskGraphJoinEvidencePayload` | `TaskGraphJoinEvidence` | `contracts`, `runtime`, `semantic` | `graph.g2.task-join-evidence.v1` |
+| `runtime.task-graph-patch` | `BASTaskGraphPatchPayload` | `TaskGraphPatch` | `contracts`, `runtime`, `semantic` | `graph.g2.task-patch.v1` |
+
+For each document ID in a row, `authority_refs` contains exactly one
+`{document_id, required_term_id}` pair using that row's term ID; no other
+graph authority ref is legal. The 7+4 amendment in Step 2 must install those
+anchors in the named incumbent documents before this catalog is generated.
+
+In the same indexed edit, add the exact `planned_member_closure_v1` object
+from “Existing-owner pins” to the sole `runtime.semantic-dag`
+Create-permission row. Task 2's amendment to Runtime Task 1 must make its
+candidate manifest and stable receipt carry that same canonical object and
+digest. The transitional checker validates all five governed rows, exactly
+one topology root, exactly eight embedded G1 topology values, exactly two G2
+stored roots, exactly twelve G2 embedded values, the two associated evidence
+payloads, five registry rows, twenty fixture rows, and the exact eight
+consumer paths. It rejects any embedded-value catalog/registry/standalone-
+fixture row and any partial closure. The candidate manifest still names
+`authority_symbol = BASSemanticTurnDAG`; an associated evidence payload or G2
+stored root cannot replace the Create authority symbol.
+
+Owner, version, declaration path/symbol, registry, lifecycle waves/status,
+prelude flag, authority refs, closure object, and closure digest are literal
+reviewed values in the resulting indexed array; no later task is allowed to
+infer or choose a replacement. Sort uniquely by `(contract_id, version)`,
+require the row union to equal the independently derived
+incumbent-plus-correction-plus-E/A-plus-graph exact set, and review the
+generated diff row by row.
 
 Extend the incumbent Owner-Ledger checker with one fail-closed transitional
 dispatch. It accepts the extra catalog field only for the exact status above,
@@ -1341,7 +1610,7 @@ exactly once in that document, and the Ledger-side refs sort by
 `(document_id, required_term_id)`.
 
 Run the two new Task-1 authority tests plus the one new incumbent-Ledger test.
-Expected: 22 authority tests and 102 incumbent Ledger tests are discovered;
+Expected: exactly 28 authority tests and 102 incumbent Ledger tests are discovered;
 all pass, the Ledger reports only its transitional mode, and changing one
 catalog/ref/anchor byte fails exact reciprocal equality.
 
@@ -1699,7 +1968,9 @@ them judge or activate themselves.
 
 **Interfaces:**
 - Consumes: indexed 7+4 bytes, the exact schema-v1 transitional raw Owner
-  Ledger and its already-installed catalog rows, the
+  Ledger and its already-installed catalog rows, the pinned graph
+  commit/blob/SHA and byte-identical `runtime.semantic-dag`
+  `planned_member_closure_v1` object/digest installed by Task 2, the
   Preparation-Z-frozen bootstrap contract schema, and exact indexed
   `scripts/qinao_gate_modules/v0/catalog-v1.json`.
 - Produces: the exact handoff-A object; it carries no bootstrap projection or candidate/evidence result.
@@ -1716,6 +1987,10 @@ worktree/index byte drift
 symlink, executable, or non-stage-0 document
 Ledger schema/status other than exact schema-v1 transitional Input-A state
 catalog row missing/extra/reordered or different from reciprocal 7+4 refs
+graph spec commit/blob/SHA differs from the Global-Constraints pin
+runtime.semantic-dag planned-member closure missing, partial, reordered, or digest-mismatched
+graph closure has other than one G1 root/eight G1 embedded/two G2 roots/twelve G2 embedded/two G1 evidence/five governed members/ten registry tests/twenty fixtures/eight consumers
+embedded G1/G2 value has an independent catalog, registry, ordinary-put, or standalone-fixture row
 missing/extra top-level field
 bootstrap projection or attestation field
 candidate commit/tree field
@@ -1800,6 +2075,15 @@ def authority_bundle_digest(rows: list[dict[str, str]]) -> str:
 and indexed raw bytes. Require the indexed Ledger to remain
 `schema_version = 1`, `status = transitional_unadmitted_input_a`, and to
 contain the exact reciprocal catalog installed by Task 2.
+Before computing either Ledger digest, validate its
+`runtime.semantic-dag` Create permission, candidate-manifest projection, and
+stable-receipt projection against the literal closure arrays/tables in
+“Existing-owner pins”. Require their canonical closure bytes and stored
+closure digest to be equal, then require the five graph catalog rows and
+their 7+4 reference anchors to be the exact corresponding projection.
+The handoff acquires no additional graph field: its raw
+`owner_ledger_draft_digest`, catalog digest, and eleven-document bundle digest
+jointly bind the complete graph closure and spec pin.
 `owner_ledger_draft_digest` is raw SHA-256 of that complete indexed Ledger
 blob. `controlled_contract_catalog_digest` is computed from the rows inside
 that same blob as
@@ -1885,11 +2169,14 @@ authenticated handoff B.
 **Interfaces:**
 - Consumes: authenticated bootstrap handoff B, indexed 7+4 authority bytes, `BASEBrainSchemaGovernanceRegistry`, independently derived declared-contract and production-reachable sets, and the prior finalized Ledger for W0-W6 transitions.
 - Consumes additionally: immutable Input A and its exact schema-v1
-  transitional raw-Ledger/catalog digests.
+  transitional raw-Ledger/catalog digests, including the pinned
+  dynamic-graph spec identity and complete `runtime.semantic-dag`
+  `planned_member_closure_v1`.
 - Produces: one valid Ledger v2 whose catalog row bytes are identical to
   Input A, `validate_v2_ledger -> list[str]`,
-  `expected_contract_sets`, `active_shipping_profiles`, and a
-  schema-v2 dispatch in the existing Owner-Ledger CLI.
+  `validate_runtime_semantic_dag_closure -> list[str]`,
+  `expected_contract_sets`, `active_shipping_profiles`, and a schema-v2
+  dispatch in the existing Owner-Ledger CLI.
 
 - [ ] **Step 1: Preserve and repair the existing 102-test baseline**
 
@@ -1988,6 +2275,17 @@ CREATE_GATE_TESTS = (
     "comments strings and documentation names are not authority candidates",
 )
 
+GRAPH_CREATE_CLOSURE_TESTS = (
+    "graph spec commit blob and sha256 pin are exact",
+    "G1 has one topology root and eight embedded topology values",
+    "G1 associated evidence payloads are governed but are not topology roots",
+    "G2 has two stored roots and twelve embedded values",
+    "embedded graph values have no independent catalog registry put or fixture",
+    "five governed graph catalog rows byte match immutable Input A",
+    "candidate manifest ledger and stable receipt carry one byte-identical closure",
+    "schema fixture and consumer closure rejects every partial postimage",
+)
+
 ADMISSION_TESTS = (
     "wave_admission_v1 byte matches projection with policy but no attestation instance digest or status",
     "verification toolchain profile is non-shipping and requires fresh host quote beyond labels",
@@ -2001,7 +2299,7 @@ ADMISSION_TESTS = (
 ```
 
 Every string above maps to one concrete `test_...` method; the test module
-asserts its discovered method-name set equals the derived 48-case set.
+asserts its discovered method-name set equals the derived 56-case set.
 Create the importable `qinao_owner_ledger_v2.py` final-signature stub in this
 same RED step; every new entry point returns
 `qinao.owner-ledger-v2.unimplemented`.
@@ -2014,7 +2312,7 @@ Run:
 python3 -m unittest -v scripts.test_qinao_owner_ledger_v2
 ```
 
-Expected: 48 tests discovered and fail on the specific asserted predicate or
+Expected: exactly 56 tests are discovered and fail on the specific asserted predicate or
 `qinao.owner-ledger-v2.unimplemented`; the existing 102-test module remains
 green. No new-test import or fixture is missing.
 
@@ -2049,6 +2347,66 @@ CONTRACT_FIELDS = {
     "authority_refs",
 }
 AUTHORITY_REF_FIELDS = {"document_id", "required_term_id"}
+
+PLANNED_MEMBER_CLOSURE_FIELDS = {
+    "spec_commit",
+    "spec_blob",
+    "spec_sha256",
+    "topology_roots",
+    "embedded_topology_values",
+    "associated_evidence_payloads",
+    "g2_stored_roots",
+    "g2_embedded_values",
+    "governed_schema_members",
+    "schema_registry_rows",
+    "fixture_rows",
+    "consumer_rows",
+}
+GRAPH_CLOSURE_CARDINALITIES = {
+    "topology_roots": 1,
+    "embedded_topology_values": 8,
+    "associated_evidence_payloads": 2,
+    "g2_stored_roots": 2,
+    "g2_embedded_values": 12,
+    "governed_schema_members": 5,
+    "schema_registry_rows": 10,
+    "fixture_rows": 20,
+    "consumer_rows": 8,
+}
+GRAPH_SCHEMA_REGISTRY_TEST_IDS = (
+    "schema.semantic_turn_dag.current",
+    "schema.semantic_turn_dag.future_rejection",
+    "schema.semantic_attempt_terminal_receipt.current",
+    "schema.semantic_attempt_terminal_receipt.future_rejection",
+    "schema.semantic_join_member_disposition.current",
+    "schema.semantic_join_member_disposition.future_rejection",
+    "schema.task_graph_join_evidence.current",
+    "schema.task_graph_join_evidence.future_rejection",
+    "schema.task_graph_patch.current",
+    "schema.task_graph_patch.future_rejection",
+)
+GRAPH_FIXTURE_IDS = (
+    "semantic_turn_dag.canonical_round_trip",
+    "semantic_turn_dag.missing_version",
+    "semantic_turn_dag.future_version",
+    "semantic_turn_dag.cross_target_default_version_initializer",
+    "semantic_attempt_terminal_receipt.canonical_round_trip",
+    "semantic_attempt_terminal_receipt.missing_version",
+    "semantic_attempt_terminal_receipt.future_version",
+    "semantic_attempt_terminal_receipt.cross_target_default_version_initializer",
+    "semantic_join_member_disposition.canonical_round_trip",
+    "semantic_join_member_disposition.missing_version",
+    "semantic_join_member_disposition.future_version",
+    "semantic_join_member_disposition.cross_target_default_version_initializer",
+    "task_graph_join_evidence.canonical_round_trip",
+    "task_graph_join_evidence.missing_version",
+    "task_graph_join_evidence.future_version",
+    "task_graph_join_evidence.cross_target_default_version_initializer",
+    "task_graph_patch.canonical_round_trip",
+    "task_graph_patch.missing_version",
+    "task_graph_patch.future_version",
+    "task_graph_patch.cross_target_default_version_initializer",
+)
 
 SHIPPING_PROFILE_FIELDS = {
     "profile_id",
@@ -2206,6 +2564,40 @@ if {
 ```
 
 Never use a loose substring scan for this equality.
+
+Implement
+`validate_runtime_semantic_dag_closure(data, root, input_a_projection)` in
+this step. It must:
+
+1. locate exactly one `runtime.semantic-dag` owner and exactly one M/Create
+   permission; require `authority_path` and `authority_symbol` to equal
+   `GRAPH_ROOT_PATH` and `GRAPH_ROOT_SYMBOL`;
+2. require the closure object's key set to equal
+   `PLANNED_MEMBER_CLOSURE_FIELDS`, each array to equal the literal
+   root/embedded/member/registry/fixture/consumer sequence in
+   “Existing-owner pins”, and every array count to equal
+   `GRAPH_CLOSURE_CARDINALITIES`;
+3. recompute
+   `SHA256("QINAO-RUNTIME-SEMANTIC-DAG-PLANNED-MEMBER-CLOSURE-V1\0" ||
+   canonical_json(closure))` and require exact equality with
+   `planned_member_closure_digest`;
+4. require the closure object and digest to byte-match the immutable Input-A
+   projection, the candidate-manifest projection, and stable-create-receipt
+   projection; absence of any projection is an error;
+5. project `governed_schema_members` to the five immutable catalog rows,
+   require `schema_registry_rows == GRAPH_SCHEMA_REGISTRY_TEST_IDS`,
+   `fixture_rows == GRAPH_FIXTURE_IDS`, and require their declaration/test
+   owners to be the exact two paths frozen above; and
+6. independently scan the catalog, registry, factory/put allowlists, and
+   fixture IDs to reject a standalone row for any of the eight G1 or twelve
+   G2 embedded values, a second G1 topology root, a third G2 root, a sixth
+   governed graph member, or a consumer outside the exact eight-path
+   `consumer_rows`.
+
+The validator uses parsed structure and exact symbols/IDs. Comments,
+docstrings, and fixture prose cannot satisfy or violate a declaration check.
+Its positive result contributes no new owner, store, registry authority,
+ControlRing, or verdict.
 
 - [ ] **Step 7: Implement closed lifecycle transitions and absent-row insertion**
 
@@ -2421,6 +2813,7 @@ Delete `SCHEMA_V2_PRE_ADOPTION_BLOCKERS` only when `validate_ledger` calls, in o
 ```python
 errors.extend(validate_schema_v2_documents(data, root))
 errors.extend(validate_schema_v2_contract_catalog(data, root))
+errors.extend(validate_runtime_semantic_dag_closure(data, root, input_a_projection))
 errors.extend(validate_schema_v2_reciprocal_refs(data, root))
 errors.extend(validate_schema_v2_recovery_profiles(data))
 errors.extend(validate_schema_v2_shipping_profiles(data, predecessor, derived_wave))
@@ -2487,7 +2880,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_qinao_owner_ledger_v2
 ```
 
-Expected: 150 tests discovered, 150 passed.
+Expected: exactly 158 tests are discovered, 158 passed.
 
 - [ ] **Step 13: Commit only the Ledger-v2 preparation slice**
 
@@ -4188,6 +4581,8 @@ skipping, reopening a forensic/source worktree, or reading a deleted raw path.
 
 **Files:**
 - Modify: `.github/workflows/test.yml`
+- Modify: `scripts/check_qinao_ea_extensions.py`
+- Modify: `scripts/test_check_qinao_ea_extensions.py`
 - Modify: `scripts/test_check_w0_expected_open_set.py`
 - Modify: `scripts/test_test_workflow_owner_ledger.py`
 - Create: `scripts/run_nonempty_python_unittest.py`
@@ -4206,6 +4601,69 @@ skipping, reopening a forensic/source worktree, or reading a deleted raw path.
 - Produces: non-vacuous candidate CI and the final authority-finalization
   handoff; Bootstrap Task 10 alone forms the clean `Pw` whose sole parent is
   `B0`, and this task later verifies the returned transaction.
+
+- [ ] **Step 0: Freeze the Artifact-Mesh graph non-delta contract before admitted W0**
+
+Extend the generic Task-5 checker/test pair without changing the 12-manifest/
+25-slice identity catalog. Add one test class named exactly
+`EAExtensionGraphNonDeltaTests` whose discovered methods equal this ordered
+tuple:
+
+```python
+EA_GRAPH_NON_DELTA_TESTS = (
+    "test_artifact_mesh_graph_amendment_has_no_schema_delta",
+    "test_artifact_mesh_graph_amendment_has_no_owner_delta",
+    "test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta",
+    "test_graph_values_use_ordinary_put_read_reopen",
+    "test_graph_terms_cannot_expand_artifact_mesh_create_set",
+)
+```
+
+The shared accepted in-memory projection has exactly the three historical
+Artifact-Mesh M/Create paths, four E/A slices, the unique
+`artifact.mesh / converging → implemented` proposal, unchanged Phase-A/
+Phase-B handoff identity, and
+`storage_classification = ordinaryPutReadReopen`. Each method changes only
+the listed cell and asserts its exact diagnostic:
+
+| Method | Single mutation | Exact diagnostic |
+|---|---|---|
+| `test_artifact_mesh_graph_amendment_has_no_schema_delta` | add one graph payload/schema root to the Artifact-Mesh owner projection | `qinao.ea-extensions.artifact-mesh-graph-schema-delta` |
+| `test_artifact_mesh_graph_amendment_has_no_owner_delta` | add owner `artifact.mesh.graph` | `qinao.ea-extensions.artifact-mesh-graph-owner-delta` |
+| `test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta` | add only `graphHandoffArtifactID` | `qinao.ea-extensions.artifact-mesh-graph-field-or-handoff-delta` |
+| `test_graph_values_use_ordinary_put_read_reopen` | replace only `ordinaryPutReadReopen` with `graphSpecificStore` | `qinao.ea-extensions.artifact-mesh-graph-store-delta` |
+| `test_graph_terms_cannot_expand_artifact_mesh_create_set` | append only a fourth M/Create path | `qinao.ea-extensions.artifact-mesh-create-set-expanded` |
+
+Implement the predicates in the generic checker over parsed structured input;
+free text cannot satisfy or trigger them. Graph terms may use only the
+incumbent ordinary put/read/reopen mechanism and cannot add an Artifact-Mesh
+schema member, owner, field, handoff, store, path, or Create. Run:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_artifact_mesh_graph_amendment_has_no_schema_delta \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_artifact_mesh_graph_amendment_has_no_owner_delta \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_graph_values_use_ordinary_put_read_reopen \
+  scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests.test_graph_terms_cannot_expand_artifact_mesh_create_set
+```
+
+Expected: `Ran 5 tests` and `OK`. Then commit exactly the two immutable
+producer paths:
+
+```bash
+git add \
+  scripts/check_qinao_ea_extensions.py \
+  scripts/test_check_qinao_ea_extensions.py
+test "$(git diff --cached --name-only | wc -l | tr -d ' ')" -eq 2
+git diff --cached --check
+git commit -m "test(qinao): freeze artifact mesh graph non-delta"
+```
+
+The Artifact-Mesh plan is a read-only consumer: it reopens these two blobs
+from admitted W0, invokes the five fully qualified selectors above, and
+byte-compares them through final Phase A. It never edits the checker/test,
+adds a graph fixture path, or creates another gate.
 
 - [ ] **Step 1: Write RED tests for CI discovery and failure propagation**
 
@@ -4580,6 +5038,15 @@ Until that proof exists, stop with
 the authority-finalization handoff or admit preW0.
 
 - [ ] **Step 6: Freeze the preparation tip and return its exact tree**
+
+Locate exactly one first-parent commit with subject
+`test(qinao): freeze artifact mesh graph non-delta`. Require the blob OIDs of
+`scripts/check_qinao_ea_extensions.py` and
+`scripts/test_check_qinao_ea_extensions.py` at the current tip to equal that
+commit's blob OIDs, then rerun
+`scripts.test_check_qinao_ea_extensions.EAExtensionGraphNonDeltaTests` and
+require exactly five passing tests. Any later edit, missing class, extra
+method, zero discovery, or changed diagnostic stops before finalization.
 
 Require:
 

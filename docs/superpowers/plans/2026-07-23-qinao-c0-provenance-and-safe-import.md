@@ -65,30 +65,33 @@ following assertions:
 
 | Existing task | Added assertion |
 |---|---|
-| Task 3 | Stable double-read inventories the pinned graph plan/spec bytes like ordinary held source |
-| Task 4 | Generated import map leaves graph-only source rows `hold`; C1 selected count remains exactly 10 |
-| Task 6 | `SourceProvenanceV1` binds the post-six-plan-amendment source HEAD/tree and inventory/map digests |
-| Task 7 | Reopen proves six amended plan paths are present, the graph spec tuple matches, and no C1 refreeze occurred |
+| Task 3 | Keep the existing generic stable double-read inventory unchanged; it records the spec and six plan paths like every other source path |
+| Task 4 | Keep the existing generic hold-by-default map unchanged; C0 adds no graph selector or batch semantics |
+| Task 6 | After generic capture, use plan-level read-only assertions to prove the pinned spec plus six amended plan HEAD/index/worktree bytes are committed and clean; prove the actual map leaves every row `hold` and therefore has C1 count zero; `SourceProvenanceV1` binds that source HEAD/tree and inventory/map digests |
+| Task 7 | Reopen proves the six amended plan paths and graph spec tuple remain exact, then hands the all-hold state to Bootstrap Task 1A; no C1 context exists yet and C0 cannot freeze or refreeze one |
 
-Add tests to `scripts/test_capture_qinao_candidate_inventory.py` and
-`scripts/test_qinao_import_map.py` for changed graph-spec bytes between the
-two reads, graph spec proposed as C1 row eleven, graph-specific batch/import
-mode, C1 count 11, and a changed frozen C1 context. Each must reject with the
-existing source-drift/import-review diagnostic.
+The existing Task-3 source-drift tests and Task-4 canonical-all-hold tests
+remain the mechanism tests; no graph-specific C0 API, CLI flag, fixture, or
+import branch is added. Bootstrap Task 1A, not C0, owns the fixed ten-row C1
+proposal/context, row-eleven rejection, and no-refreeze tests. Authority Task
+2 consumes that one verified C1 record. This keeps C0 all-hold and prevents a
+second C1 authority from appearing here.
 
 Run after the six-plan amendment commit and before Bootstrap freezes C1:
 
 ```bash
 test "$(git rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+test "$(git show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   scripts.test_capture_qinao_candidate_inventory \
   scripts.test_qinao_import_map \
   scripts.test_qinao_source_provenance_v1
 ```
 
-Expected: the blob assertion exits 0, all three modules have positive
-discovery, and all tests pass. This command verifies mechanics only; the
-subsequent external C1 review remains mandatory and has exactly ten rows.
+Expected: both pin assertions exit 0, all three modules have positive
+discovery, and all tests pass. C0 still has zero selected C1 rows. The
+subsequent Bootstrap-owned external C1 review remains mandatory and has
+exactly ten rows.
 
 ## File Responsibility Map
 
@@ -3390,6 +3393,65 @@ python3 scripts/capture_qinao_candidate_inventory.py \
 
 Expected: both commands print `inventory_status=complete`, `paths` is greater than zero, and `source_unchanged=true`.
 
+- [ ] **Step 1A: Inspect the graph amendment through the generic inventory**
+
+This is a plan-level read-only assertion over the existing inventory schema;
+it adds no C0 selector, field, batch, or special import path:
+
+```bash
+test "$(git -C /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+test "$(git -C /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
+python3 - <<'PY'
+import base64
+import json
+from pathlib import Path
+
+inventory_path = Path(
+    "docs/superpowers/evidence/qinao-clean-candidate/"
+    "2026-07-23-c0/source-inventory.json"
+)
+inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+required = (
+    b"docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-artifact-mesh-w1-task0.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-authority-ledger-and-cw-evidence.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-bootstrap-verifier-and-admission-lineage.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-c0-provenance-and-safe-import.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-clean-candidate-reconstruction-and-controlled-convergence.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-w0-safety-and-k4-proof.md",
+)
+rows = {
+    base64.b64decode(row["path_b64"], validate=True): row
+    for row in inventory["paths"]
+}
+assert set(required) <= set(rows)
+for raw_path in required:
+    row = rows[raw_path]
+    head = row["head"]
+    index = row["index"]
+    worktree = row["worktree"]
+    assert head["present"] and head["mode"] == "100644"
+    assert index["present"] and index["stage"] == 0 and index["mode"] == "100644"
+    assert worktree["present"] and worktree["kind"] == "regular"
+    assert worktree["mode"] == "100644"
+    assert head["sha256"] == index["sha256"] == worktree["sha256"]
+    assert row["status_xy"] in (None, "  ")
+assert (
+    rows[required[0]]["head"]["git_oid"]
+    == "e2c59656f9eb184efc3ab933fe442c9dd0b7d507"
+)
+print("dynamic_graph_inventory_status=verified paths=7")
+PY
+```
+
+Expected: both immutable spec-pin checks exit 0 and the generic inventory
+assertion prints exactly
+`dynamic_graph_inventory_status=verified paths=7`. A missing path, dirty
+plan, wrong mode, spec substitution, or HEAD/index/worktree mismatch stops
+C0. The generic stable-double-read test already proves that a byte changed
+between captures is `source_drift`; no graph-specific production code is
+added.
+
 - [ ] **Step 2: Generate the initial map with no selected byte**
 
 ```bash
@@ -3400,6 +3462,61 @@ python3 scripts/build_qinao_import_map.py \
 python3 scripts/check_qinao_import_map.py \
   --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
   --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
+python3 - <<'PY'
+import base64
+import json
+from pathlib import Path
+
+root = Path("docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0")
+inventory = json.loads((root / "source-inventory.json").read_text(encoding="utf-8"))
+mapping = json.loads((root / "import-map.json").read_text(encoding="utf-8"))
+required = (
+    b"docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-artifact-mesh-w1-task0.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-authority-ledger-and-cw-evidence.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-bootstrap-verifier-and-admission-lineage.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-c0-provenance-and-safe-import.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-clean-candidate-reconstruction-and-controlled-convergence.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-w0-safety-and-k4-proof.md",
+)
+inventory_rows = {
+    base64.b64decode(row["path_b64"], validate=True): row
+    for row in inventory["paths"]
+}
+map_rows = {
+    base64.b64decode(row["path_b64"], validate=True): row
+    for row in mapping["rows"]
+}
+assert set(required) <= set(inventory_rows) == set(map_rows)
+for raw_path in required:
+    source = inventory_rows[raw_path]
+    assert source["head"]["present"] and source["head"]["mode"] == "100644"
+    assert (
+        source["index"]["present"]
+        and source["index"]["stage"] == 0
+        and source["index"]["mode"] == "100644"
+    )
+    assert (
+        source["worktree"]["present"]
+        and source["worktree"]["kind"] == "regular"
+        and source["worktree"]["mode"] == "100644"
+    )
+    assert (
+        source["head"]["sha256"]
+        == source["index"]["sha256"]
+        == source["worktree"]["sha256"]
+    )
+    assert source["status_xy"] in (None, "  ")
+    assert map_rows[raw_path]["decision"] == "hold"
+    assert map_rows[raw_path]["destination_batch"] == "hold"
+assert (
+    inventory_rows[required[0]]["head"]["git_oid"]
+    == "e2c59656f9eb184efc3ab933fe442c9dd0b7d507"
+)
+assert all(row["decision"] == "hold" for row in mapping["rows"])
+assert not any(row["destination_batch"] == "C1" for row in mapping["rows"])
+print("dynamic_graph_c0_handoff_status=verified paths=7 c1=0")
+PY
 ```
 
 Expected: `import_map_status=valid`, `import=0`, `omit=0`, and `hold` equals the inventory path count.
@@ -3445,6 +3562,81 @@ Expected: exactly two files are committed and the candidate is clean.
 - Produces: a completed C0 mechanism with zero real source imports and one
   durable canonical `SourceProvenanceV1` handoff.
 - Later owning plans may review rows and invoke the same tool; this C0 plan does not choose or import authority, production, K4, admission, or Artifact Mesh bytes.
+
+- [ ] **Step 0: Reopen the exact committed graph source state**
+
+```bash
+test "$(git -C /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+test "$(git -C /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
+python3 scripts/capture_qinao_candidate_inventory.py \
+  --root /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 \
+  --verify docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json
+python3 scripts/check_qinao_import_map.py \
+  --inventory docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/source-inventory.json \
+  --map docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0/import-map.json
+python3 - <<'PY'
+import base64
+import json
+from pathlib import Path
+
+root = Path("docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0")
+inventory = json.loads((root / "source-inventory.json").read_text(encoding="utf-8"))
+mapping = json.loads((root / "import-map.json").read_text(encoding="utf-8"))
+required = (
+    b"docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-artifact-mesh-w1-task0.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-authority-ledger-and-cw-evidence.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-bootstrap-verifier-and-admission-lineage.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-c0-provenance-and-safe-import.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-clean-candidate-reconstruction-and-controlled-convergence.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-w0-safety-and-k4-proof.md",
+)
+inventory_rows = {
+    base64.b64decode(row["path_b64"], validate=True): row
+    for row in inventory["paths"]
+}
+map_rows = {
+    base64.b64decode(row["path_b64"], validate=True): row
+    for row in mapping["rows"]
+}
+assert set(required) <= set(inventory_rows) == set(map_rows)
+for raw_path in required:
+    source = inventory_rows[raw_path]
+    assert source["head"]["present"] and source["head"]["mode"] == "100644"
+    assert (
+        source["index"]["present"]
+        and source["index"]["stage"] == 0
+        and source["index"]["mode"] == "100644"
+    )
+    assert (
+        source["worktree"]["present"]
+        and source["worktree"]["kind"] == "regular"
+        and source["worktree"]["mode"] == "100644"
+    )
+    assert (
+        source["head"]["sha256"]
+        == source["index"]["sha256"]
+        == source["worktree"]["sha256"]
+    )
+    assert source["status_xy"] in (None, "  ")
+    assert map_rows[raw_path]["decision"] == "hold"
+    assert map_rows[raw_path]["destination_batch"] == "hold"
+assert (
+    inventory_rows[required[0]]["head"]["git_oid"]
+    == "e2c59656f9eb184efc3ab933fe442c9dd0b7d507"
+)
+assert all(row["decision"] == "hold" for row in mapping["rows"])
+assert not any(row["destination_batch"] == "C1" for row in mapping["rows"])
+print("dynamic_graph_c0_handoff_status=verified paths=7 c1=0")
+PY
+```
+
+Expected: both independent spec-pin checks exit 0; inventory verification
+positively discovers the six committed clean plan paths plus the spec; the
+initial map reports `import=0`, `omit=0`, and no C1 row; the final assertion
+prints `dynamic_graph_c0_handoff_status=verified paths=7 c1=0`. This is the
+post-six-plan-amendment source state. A missing/dirty plan, changed spec,
+selected graph row, or substituted pin stops C0 before handoff.
 
 - [ ] **Step 1: Prove every initial decision remains canonical `hold`**
 
@@ -3607,6 +3799,63 @@ git merge-base --is-ancestor \
   59c26f508262d7c25869faac0ec0abf968ec1e02 HEAD
 git merge-base --is-ancestor \
   486e1ec5983ad4390c5b07f04607f1345b912c4c HEAD
+test "$(git -C /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+test "$(git -C /Users/changgeng/Project/Project06/Project06/.worktrees/qinao-w0 show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
+python3 - <<'PY'
+import base64
+import json
+from pathlib import Path
+
+root = Path("docs/superpowers/evidence/qinao-clean-candidate/2026-07-23-c0")
+inventory = json.loads((root / "source-inventory.json").read_text(encoding="utf-8"))
+mapping = json.loads((root / "import-map.json").read_text(encoding="utf-8"))
+required = (
+    b"docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-artifact-mesh-w1-task0.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-authority-ledger-and-cw-evidence.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-bootstrap-verifier-and-admission-lineage.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-c0-provenance-and-safe-import.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-clean-candidate-reconstruction-and-controlled-convergence.md",
+    b"docs/superpowers/plans/2026-07-23-qinao-w0-safety-and-k4-proof.md",
+)
+inventory_rows = {
+    base64.b64decode(row["path_b64"], validate=True): row
+    for row in inventory["paths"]
+}
+map_rows = {
+    base64.b64decode(row["path_b64"], validate=True): row
+    for row in mapping["rows"]
+}
+assert set(required) <= set(inventory_rows) == set(map_rows)
+for raw_path in required:
+    source = inventory_rows[raw_path]
+    assert source["head"]["present"] and source["head"]["mode"] == "100644"
+    assert (
+        source["index"]["present"]
+        and source["index"]["stage"] == 0
+        and source["index"]["mode"] == "100644"
+    )
+    assert (
+        source["worktree"]["present"]
+        and source["worktree"]["kind"] == "regular"
+        and source["worktree"]["mode"] == "100644"
+    )
+    assert (
+        source["head"]["sha256"]
+        == source["index"]["sha256"]
+        == source["worktree"]["sha256"]
+    )
+    assert source["status_xy"] in (None, "  ")
+    assert map_rows[raw_path]["decision"] == "hold"
+    assert map_rows[raw_path]["destination_batch"] == "hold"
+assert (
+    inventory_rows[required[0]]["head"]["git_oid"]
+    == "e2c59656f9eb184efc3ab933fe442c9dd0b7d507"
+)
+assert all(row["decision"] == "hold" for row in mapping["rows"])
+assert not any(row["destination_batch"] == "C1" for row in mapping["rows"])
+print("dynamic_graph_c0_completion_status=verified paths=7 c1=0")
+PY
 ```
 
 Expected:
@@ -3614,6 +3863,8 @@ Expected:
 - every test module has positive discovery and passes;
 - source inventory still byte-matches the preserved source;
 - import map is exact-set valid;
+- all six amended plan HEAD rows are committed/clean, the pinned graph spec
+  matches commit/blob/SHA-256, and the actual C0 map still has zero C1 rows;
 - `SourceProvenanceV1` reopens from the final one-path C0 handoff commit and
   byte-matches its sole parent, inventory, and all-hold map;
 - no unreviewed row was imported;
@@ -3634,10 +3885,17 @@ Expected:
   closed.
 - [x] Source inventory is read-only and uses a copied index plus temporary object directory for `write-tree`.
 - [x] Full stable double-read covers HEAD, tree, branch, index bytes/tree/entries, status, staged patch, unstaged patch, all selected Git blobs, and filesystem bytes/modes.
+- [x] Plan-level read-only assertions reopen the generic stable inventory,
+  bind the graph commit/path/blob/SHA-256, and require all six amended plan
+  paths to be committed, clean, regular mode-`100644`
+  HEAD/index/worktree peers without changing C0 semantics.
 - [x] Base, HEAD, index, worktree, untracked, deletion, executable, safe symlink, special-file, and non-UTF-8 path behavior has named tests.
 - [x] Raw path bytes, not lossy display strings, are the identity and sort key.
 - [x] Every map row begins at `hold`; no tool chooses a source stratum, batch,
   rationale, reviewer identity, or review timestamp.
+- [x] C0's actual map has zero selected C1 rows and keeps the graph spec plus
+  six plans held; only Bootstrap Task 1A may later freeze the sole fixed
+  ten-row C1 context, so C0 cannot create row eleven or refreeze C1.
 - [x] Imported rows bind exact source digest/mode; deletion is a real absent postimage.
 - [x] Raw private C4 classes and production-before-C3 selections fail.
 - [x] The checked-in map avoids destination self-reference; the separate ephemeral apply plan binds the live destination HEAD/tree/index/status and per-path preimages.
