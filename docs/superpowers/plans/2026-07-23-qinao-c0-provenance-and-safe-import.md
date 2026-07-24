@@ -56,6 +56,40 @@ Inventory verifies the pinned graph commit/path/blob/SHA tuple; C1 continues
 to select exactly its existing ten rows. Any mismatch is source drift, not
 permission to regenerate a context or choose “latest.”
 
+### Exact C0 task insertion and verification
+
+No new file is created for this amendment. This plan consumes the
+reconstruction master's graph order but owns only the source-inventory/
+provenance handoff; it cannot advance a wave or reorder C1. Insert the
+following assertions:
+
+| Existing task | Added assertion |
+|---|---|
+| Task 3 | Stable double-read inventories the pinned graph plan/spec bytes like ordinary held source |
+| Task 4 | Generated import map leaves graph-only source rows `hold`; C1 selected count remains exactly 10 |
+| Task 6 | `SourceProvenanceV1` binds the post-six-plan-amendment source HEAD/tree and inventory/map digests |
+| Task 7 | Reopen proves six amended plan paths are present, the graph spec tuple matches, and no C1 refreeze occurred |
+
+Add tests to `scripts/test_capture_qinao_candidate_inventory.py` and
+`scripts/test_qinao_import_map.py` for changed graph-spec bytes between the
+two reads, graph spec proposed as C1 row eleven, graph-specific batch/import
+mode, C1 count 11, and a changed frozen C1 context. Each must reject with the
+existing source-drift/import-review diagnostic.
+
+Run after the six-plan amendment commit and before Bootstrap freezes C1:
+
+```bash
+test "$(git rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_capture_qinao_candidate_inventory \
+  scripts.test_qinao_import_map \
+  scripts.test_qinao_source_provenance_v1
+```
+
+Expected: the blob assertion exits 0, all three modules have positive
+discovery, and all tests pass. This command verifies mechanics only; the
+subsequent external C1 review remains mandatory and has exactly ten rows.
+
 ## File Responsibility Map
 
 | Path | Responsibility |

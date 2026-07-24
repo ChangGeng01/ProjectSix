@@ -83,6 +83,40 @@ also prove that no graph-specific Artifact-Mesh owner/schema/field/handoff was
 introduced. This is a negative closure assertion inside the existing checks,
 not a new gate or manifest.
 
+### Exact Artifact-Mesh task insertion
+
+No Task 1-9 implementation surface changes. Task 10 adds only negative
+closure tests to the incumbent generic checker/test path; Tasks 11-13 consume
+the same final-W1 payload and physical proof. This plan consumes the
+reconstruction master's Artifact-Mesh/W1 placement without reordering W1 or
+creating a graph handoff; it returns only its incumbent Task-0 handoff.
+
+Add to `scripts/test_check_qinao_ea_extensions.py`:
+
+```text
+test_artifact_mesh_graph_amendment_has_no_schema_delta
+test_artifact_mesh_graph_amendment_has_no_owner_delta
+test_artifact_mesh_graph_amendment_has_no_field_or_handoff_delta
+test_graph_values_use_ordinary_put_read_reopen
+test_graph_terms_cannot_expand_artifact_mesh_create_set
+```
+
+Each negative fixture changes exactly one dimension. The accepted fixture
+must still show the three historical M/Create paths, four E/A slices, exact
+`artifact.mesh / converging → implemented` proposal, unchanged Phase A/B
+handoff, and ordinary storage/reopen classification.
+
+Run:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_check_qinao_ea_extensions
+```
+
+Expected: positive discovery and all tests pass. No new Artifact Mesh path,
+schema field, owner row, manifest type, recovery route, or graph-specific
+store is permitted.
+
 ## Execution-Root Guard
 
 Run this before every task and after every context/session restart:

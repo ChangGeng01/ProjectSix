@@ -111,6 +111,85 @@ parent/input refs, W4 executor/cutover wiring, and reordered W6 cutover.
 These mutations are added to existing gate corpora and matrix rows; the
 catalog cardinalities remain 19 modules and 152 cells.
 
+### Exact Bootstrap task insertion and anti-vacuity contract
+
+The master order is consumed unchanged. Bootstrap performs graph work only in
+Tasks 2-7/11 and returns the same signed projection, B0, admission and lineage
+handoffs already defined by this plan.
+
+| Existing task | Graph-specific insertion |
+|---|---|
+| Task 2 | Extend nine existing contract/module/corpus rows and their existing 8-wave cells; assert 19 rows and 152 cells after generation |
+| Task 3 | Expose `production_graph_reachability` only as a V0 primitive over exact-OID materialized bytes |
+| Task 4 | Include amended contract/module/corpus digests in the same signed Bootstrap projection |
+| Task 5 | Run predecessor-selected modules with no workflow input or candidate module import |
+| Task 6 | Recover the same evaluation; never rerun a physical boundary or select a replacement module |
+| Task 7 | Include the amended nine rows in the same minimal B0 path closure |
+| Task 11 | Execute catalog, isolation, mutant, cardinality, output-schema, and selection tests before handoff |
+
+The `production_graph_reachability` primitive has this closed conceptual ABI
+inside `scripts/qinao_gate_modules/v0/modules/production_reachability.py`:
+
+```python
+from collections.abc import Callable
+
+def production_graph_reachability(
+    *,
+    payload_tree_oid: str,
+    read_tree_entry: Callable[[str], bytes],
+    authority_roots: tuple[str, ...],
+    build_graph_contract_bytes: bytes,
+    corpus_bytes: bytes,
+) -> dict[str, object]:
+    ...
+```
+
+`read_tree_entry` is supplied only by V0's exact-OID materializer and rejects
+absent, nonregular, symlinked, escaping, or wrong-mode entries before returning
+bytes. The primitive consumes no worktree path, shell command, candidate report, environment
+selector, branch name, or candidate Python module. Its result uses the
+existing gate-output schema and reports the complete discovered/classified
+root, project, product, entrypoint, writer, executor, call-edge and linked
+symbol sets plus corpus case IDs. Zero authority roots, zero production
+entrypoints, zero positive cases, zero negative cases, or an unclassified
+item is an error result, never a pass.
+
+Add these exact tests to `scripts/test_qinao_gate_catalog_v0.py`:
+
+```text
+test_graph_amendment_keeps_nineteen_gates_and_152_cells
+test_nine_graph_gate_ids_are_existing_rows
+test_every_graph_row_has_positive_negative_and_mutation_corpus
+test_every_graph_program_has_nonempty_discovery
+test_candidate_cannot_select_graph_module_or_verifier
+test_production_graph_reachability_is_independent_of_candidate_helper
+test_w4_cells_reject_executor_shadow_and_cutover
+test_w6_cells_preserve_exact_dependency_order
+```
+
+Add exact-OID isolation and substitution cases to
+`scripts/test_qinao_wave_verifier_v0.py`: changed candidate helper with
+unchanged B0 module, replaced corpus, replaced contract, wrong predecessor
+catalog, module digest substitution, symlink/nonregular root, and an
+attempted candidate import. Every mutation must fail for its named diagnostic,
+not due to import or fixture absence.
+
+Run:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_qinao_gate_catalog_v0 \
+  scripts.test_qinao_wave_verifier_v0 \
+  scripts.test_qinao_protected_admission_runner \
+  scripts.test_qinao_admission_recovery_oracle
+```
+
+Expected: positive discovery for all four modules, 19 catalog rows, 152
+program cells, all nine existing graph-mapped gate IDs present exactly once,
+and all tests pass. A twentieth row, a 153rd cell, empty corpus, candidate
+selection input, candidate helper execution, or graph-specific admission
+path fails closed.
+
 ### Program terminal envelope
 
 This child emits only the master-owned program terminals:

@@ -72,6 +72,60 @@ wires, graph execution, shadow comparison, cutover, or future-wave tests. The
 existing `qinao.w0-open-set` module and closed 16-ID manifest remain the sole
 authoritative gate.
 
+### Exact W0 task insertion and fixtures
+
+This plan consumes the reconstruction master's W0 row and returns only the
+existing immutable W0 `Pw`/K4/admission handoffs. It neither pulls W1 work
+forward nor changes the master wave order.
+
+| Existing task | Added W0-only work |
+|---|---|
+| Task 2 | Extend the existing 16-ID contract row without changing ID order/count/schema |
+| Task 4 | Add source and fixture coverage for second writers, peer calls, scratchpads and legacy loop authority |
+| Task 11 | Run full safety, reachability, nonempty-suite and exact-set closure before freezing `Pw` |
+| Tasks 12-14 | Carry the unchanged 16-ID policy into exact `Pw`; accept only B0's `qinao.w0-open-set` result |
+
+In the existing positive fixture,
+`BASAppleTaskGraphLifecycleExecutor.refresh` must have exactly one of:
+
+```text
+classification = readOnly
+classification = productionUnreachable
+```
+
+`readOnly` requires zero writes, CAS, scheduling, retry, remand, commit,
+publication, tool/effect dispatch, shared scratchpad mutation, and Provider
+invocation across the transitive production call graph.
+`productionUnreachable` requires no shipping product/factory/DI/call/link
+path. A test/lab-only label without build/link closure is insufficient.
+
+Add these exact cases to `scripts/test_check_w0_expected_open_set.py`:
+
+```text
+test_graph_freeze_reuses_runtime_untyped_shared_agent_state_id
+test_graph_freeze_keeps_exact_sixteen_ids
+test_second_g1_writer_is_rejected
+test_second_g2_writer_is_rejected
+test_main_sub_peer_call_is_rejected
+test_sub_sub_peer_call_is_rejected
+test_shared_mutable_scratchpad_is_rejected
+test_legacy_loop_authority_is_rejected
+test_refresh_must_be_read_only_or_production_unreachable
+test_future_graph_contract_is_rejected_at_w0
+```
+
+Run:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_check_w0_expected_open_set
+```
+
+Expected: positive discovery, exactly 16 IDs, all ten graph-freeze cases
+execute, and the complete module passes. Missing source, a zero-match scan,
+unclassified `refresh`, or a seventeenth ID fails; none may be recorded as
+`BLOCKED_K4` because they are structural W0 failures.
+
 ### Session and interruption re-entry
 
 No task relies on shell variables surviving an old session. At every new shell, after the exact root guard and applied-lineage verifier, rederive the local comparison values:

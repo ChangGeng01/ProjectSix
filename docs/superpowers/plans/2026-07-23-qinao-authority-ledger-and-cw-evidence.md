@@ -122,6 +122,86 @@ invocation; exact completion and cancellation bases; the 1,018/1,024 bounds;
 and W6's pinned dependency order. Run them through the existing nonempty
 `unittest` and Swift-filter mechanisms already specified in Tasks 7-9.
 
+### Exact task insertion, files, and handoffs
+
+This table is normative. It inserts work into existing tasks and does not add
+a Task 13. It consumes the reconstruction master's “Program-order acceptance
+crosswalk” unchanged; this plan may emit only the already-defined authority
+draft/finalization, candidate-parity, `Pw`, and admission handoffs.
+
+| Existing task | Exact graph delta | Produces for the next task |
+|---|---|---|
+| Task 1 | Add the 7+4 responsibility matrix, exact terms, forbidden duplicates, and pinned-spec identity to `scripts/check_qinao_authority_convergence.py` and its tests | One syntax-valid RED checker with positive discovery |
+| Task 2 | Amend the seven controlled documents and four addenda; demote 2026-07-19 graph prose to traceability | Indexed 7+4 bytes with one owner per graph contract |
+| Task 3 | Extend the draft schema/builder with graph responsibility and incumbent-owner projections only | Input A that records no verdict |
+| Task 4 | Atomically complete the existing `runtime.semantic-dag` planned-member/schema/fixture/consumer closure and reciprocal rows | Schema-v2 Ledger with 29 owners |
+| Task 6 | Bind final controlled-document, addenda, Ledger, graph-spec and catalog digests | Final authority bundle consumed by B0 |
+| Task 7 | Extend `qinao_build_graph.py` and production-reachability generator/checker/tests | Candidate-side classified graph evidence |
+| Task 8 | Extend architecture closure with G0-G4 and 14/4/4/7/W0-W6; keep graph behavior out of V2 activation | Candidate-side closure parity |
+| Task 9 | Admit only content-free graph finding identities and existing-gate evidence paths | No graph-specific Cw schema |
+| Task 10 | Add nonempty CI commands for the amended checkers/tests | Exact clean `Pw` inputs |
+| Tasks 11-12 | Compare candidate parity with predecessor-selected B0 results, then admit only through the external service | Existing authenticated handoff/terminal |
+
+Task 1's RED suite must name and discover at least these tests in
+`scripts/test_check_qinao_authority_convergence.py`:
+
+```text
+test_graph_contracts_have_exactly_one_incumbent_authority
+test_graph_amendment_rejects_twelfth_authority_document
+test_graph_amendment_rejects_new_owner_or_owner_cardinality_change
+test_runtime_semantic_dag_root_path_and_symbol_are_exact
+test_silicon_cannot_claim_graph_authority
+test_control_projection_cannot_create_fifth_ring
+```
+
+Task 4's `scripts/test_qinao_owner_ledger_v2.py` and
+`scripts/test_check_qinao_owner_ledger.py` additions must accept the exact
+29-owner postimage and independently reject partial first-wire closure,
+second TaskNode/patch/join owner, missing schema/fixture/consumer member,
+wrong root symbol/path, `runtime.turn-operation` edge-binding theft,
+continuity/compiler theft, and K3 semantic ownership.
+
+Task 7's graph/reachability corpora must have literal positive and negative
+fixture inventories. Every production root, project, generated project,
+Package.swift product, factory/DI seam, call edge, AST/SIL/index symbol, and
+linked symbol is classified. The negative corpus independently mutates:
+
+```text
+second_g1_writer
+second_g2_writer
+mutable_graph_patch
+reverse_consumer_absence_query
+direct_main_sub_peer_call
+direct_sub_sub_peer_call
+shared_mutable_scratchpad
+legacy_loop_scheduler
+unclassified_refresh_entrypoint
+w4_graph_executor
+w4_shadow_or_cutover
+```
+
+Run:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  scripts.test_check_qinao_authority_convergence \
+  scripts.test_qinao_owner_ledger_v2 \
+  scripts.test_check_qinao_owner_ledger \
+  scripts.test_qinao_build_graph \
+  scripts.test_check_qinao_production_reachability \
+  scripts.test_check_qinao_architecture_closure
+```
+
+Expected: positive discovery is reported for every named module and every
+test passes. Import failure, zero discovery, missing fixture, an unclassified
+edge, or “all negative fixtures rejected” without one accepted positive
+fixture is failure.
+
+Task 10 must place those same modules behind the existing
+`scripts/run_nonempty_python_unittest.py` CI mechanism. It must not add a
+parallel graph workflow. Task 11 compares their disposable outputs to the
+existing B0 gate IDs; byte equality does not promote a candidate result.
+
 ## Interleaved Plan Interfaces
 
 This plan interleaves with

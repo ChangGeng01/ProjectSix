@@ -105,6 +105,71 @@ cutover proof must flow through the existing child plans and existing gate
 IDs. The five executable children and all existing terminal/handoff types
 remain unchanged.
 
+### Program-order acceptance crosswalk
+
+Each child consumes this table rather than restating or reordering it:
+
+| Obligation | Owning existing plan/task | Required existing gate |
+|---|---|---|
+| Six-plan source commit, held inventory, fixed C1 | C0 Tasks 3/6/7 plus Bootstrap Task 1A | `qinao.review-candidate` |
+| G0-G4 authority, owner pins, 7+4 convergence | Authority Tasks 1-4/6/8 | `qinao.owner-ledger`, `qinao.architecture-closure` |
+| Production graph/source/entrypoint closure | Authority Task 7 | `qinao.production-reachability` |
+| W0 second-writer/shared-state freeze | W0 Tasks 2/4/11 | `qinao.w0-open-set` |
+| G1/G2 wires and topology proof | Contracts and Semantic W1 tasks | `qinao.contracts-layercell`, `qinao.semantic-statelake-context` |
+| Physical rows, Provider order, no W4 activation | Silicon W2-W4 tasks | `qinao.silicon-execution-spine` |
+| Authorization, effects, unknown-state recovery | Sovereign W5 tasks | `qinao.sovereign-release-effects` |
+| Barriers, replay, recovery, retirement, sealed cutover | Runtime W6 tasks | `qinao.runtime-replay-certification` |
+| Ordinary durable storage only | Artifact Mesh Tasks 1-13 | incumbent Artifact Mesh gates |
+
+Before any child executes a graph-bearing step it must reopen the pinned
+specification and verify all three identities:
+
+```bash
+test "$(git rev-parse 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md)" = e2c59656f9eb184efc3ab933fe442c9dd0b7d507
+test "$(git show 9d484befb4a4593d93789457ebddfd7cde358e3b:docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md | shasum -a 256 | awk '{print $1}')" = 5f36d0b04579f805a3a69254325e62e22625f4ddd31663e03cbf78b1a39460d5
+```
+
+Expected: both commands exit 0. A missing object, changed blob, changed
+digest, or ambiguous replacement is `BLOCKED_SOURCE_DRIFT`; no task may
+silently use the worktree copy or a newer similarly named specification.
+
+The graph amendment is accepted only when the existing self-review can point
+to all ten rows above, every graph-bearing filtered suite proves positive
+discovery, every named scan proves a readable regular file, every candidate
+parity result has an independent B0 verdict, and W6 proves there was no
+dual-write, dual-scheduler, dual-adoption, or dual-state-writer interval.
+
+### Complete graph proof-family assignment
+
+The following closes specification §20 without inventing a generic
+“graph tests” bucket:
+
+| Proof family | Incumbent implementation owner | Required proof form |
+|---|---|---|
+| G1 acyclicity, canonical order, edge IDs, edge/input bijection, applicability, alternative groups | `runtime.semantic-dag`, Contracts W1 | boundary/plus-one fixtures, randomized bounded DAG property tests, independent mutation oracle |
+| Join membership, exact received/missing partition, conflict vector, zero-join, frozen execution shape | `runtime.semantic-dag`, Contracts W1 | exhaustive policy matrix for `all`, `quorum`, `best-effort-with-coverage` |
+| Semantic-Attempt terminal receipt, terminal-no-progress, remand precedence and historical reconstruction | `runtime.semantic-dag` plus sole K3 receipt factory, Contracts W1/Silicon W2 | canonical-byte fixtures, row-pinned reconstruction, orphan-artifact and future-version mutations |
+| G2 Mission/Objective/WorkUnit hierarchy, two stored roots/twelve embedded values, completion/cancellation CAS | `runtime.semantic-dag`, Semantic W1-W3 | state-transition table, competing-CAS stress, cross-Attempt evidence rejection |
+| Task Graph preimage/counters/transitive patch footprint/current child generation | `runtime.semantic-dag`, Semantic W1-W3 | initial/successor root tests, no-wrap boundary, simulated non-root recheck |
+| K1/K3 concurrency, allocation, ABA, lost reply and durable row→Artifact recovery | K3/Provider, Silicon W2-W5 | duplicate/stale/ABA stress plus every-before/every-after crash cutpoint |
+| Provider descriptor/reservation/allocation/materialization/call/completion order | K3/Provider and Silicon W4-W5 | exact ordered trace, route matrix, unknown-state query/reconcile-only mutations |
+| Two all-member barriers, per-member start recheck, deterministic frontier, sibling non-rerun | Runtime W6 pre-cutover slices | differential scheduler, barrier mutation, restart/replay tests |
+| Terminal prefix, verifier barrier, release/publication/continuity suffix | Runtime and Sovereign W5-W6 | exhaustive cutpoint/presence-shape oracle and byte-identical replay |
+| ControlRing cycle/no-progress/budget/deadline/currentness | Agent/Context/RSI and Runtime W3-W6 | bounded loop property tests, v1→v2 migration, explicit-null/future-version rejection |
+| Session Main Agent, App Agent, Sub-Agent attenuation, persona isolation | App-Agent and Agent/Context/RSI W1-W3 | cross-scope SQL/FTS/vector/cache/trace/Provider negative corpus |
+| Per-model effective context ceiling and incompatible-profile rebuild | `state.context-compiler`, Semantic W2-W3 | exact min/reserve boundary tests, tokenizer/template/profile substitution |
+| Source, CI, build/link/factory closure and no legacy production authority | Authority Task 7 and Bootstrap Task 2/3 | regular-file guards, nonempty discovery, exact-OID independent reachability |
+| W6 activation and no dual interval | `production.cutover`, Runtime Task 7 | sealed cutover trace proving one writer/scheduler/adopter before and after CAS |
+| Optional physical throughput | Silicon profile certification only | separately requested two-device/thermal/memory evidence; `.notRequested` otherwise |
+
+Every crash matrix row records the exact
+`A/M/T/use/permit/pending/anchor/B/Q/P/O/At/C/Srow/S/R/lineage` presence
+shape and selects only the incumbent continuation outcome
+`restoreCompleted | resumeSameAttempt | reconcileSameOperation |
+rebuildAfterTerminal | awaitUser | quarantine`. “Retry with a new
+generation,” “run everything again,” absence-after-call as proof of no start,
+and adoption of an orphan Artifact are invalid oracles.
+
 ## Current Reality
 
 | Role | Exact value | Current disposition |
