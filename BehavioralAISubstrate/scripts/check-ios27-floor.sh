@@ -8,7 +8,6 @@ SWIFT_BIN="${QINAO_SWIFT:-swift}"
 XCODEBUILD_BIN="${QINAO_XCODEBUILD:-xcodebuild}"
 PROJECT="$ROOT/BehavioralAISubstrate/DeviceTestApp/BASDeviceTest.xcodeproj"
 SCHEME="BASDeviceTestApp"
-DERIVED_DATA="${QINAO_IOS27_DERIVED_DATA_PATH:-${TMPDIR:-/tmp}/qinao-ios27-floor-derived-data}"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/qinao-ios27-floor.XXXXXX")"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
@@ -17,10 +16,57 @@ fail() {
   exit 1
 }
 
+if [[ "${QINAO_RG+x}" == x ]]; then
+  RG_BIN="$QINAO_RG"
+  [[ -n "$RG_BIN" ]] || fail "QINAO_RG must be a non-empty absolute executable path"
+  case "$RG_BIN" in
+    /*) ;;
+    *) fail "QINAO_RG must be a non-empty absolute executable path" ;;
+  esac
+  case "$RG_BIN" in
+    *[$' \t\r\n']*) fail "QINAO_RG must name one executable without whitespace" ;;
+  esac
+  [[ -f "$RG_BIN" && -x "$RG_BIN" && ! -L "$RG_BIN" ]] || {
+    fail "QINAO_RG must be a regular non-symlink executable"
+  }
+  rg_directory="$(cd -- "$(dirname -- "$RG_BIN")" && pwd -P)"
+  [[ "$RG_BIN" == "$rg_directory/$(basename -- "$RG_BIN")" ]] || {
+    fail "QINAO_RG must not use a path alias"
+  }
+else
+  RG_BIN="rg"
+fi
+
+if [[ -n "${QINAO_IOS27_DERIVED_DATA_PATH:-}" ]]; then
+  DERIVED_DATA="$QINAO_IOS27_DERIVED_DATA_PATH"
+else
+  DERIVED_DATA="$WORK_DIR/DerivedData"
+fi
+
 require_file() {
   local file="$1"
   local label="$2"
   [[ -f "$file" && -s "$file" ]] || fail "$label is missing or empty: $file"
+}
+
+require_pattern() {
+  local file="$1"
+  local pattern="$2"
+  local missing_diagnostic="$3"
+  local scanner_status
+
+  require_file "$file" "$missing_diagnostic input"
+  set +e
+  "$RG_BIN" -q -- "$pattern" "$file" 2>"$WORK_DIR/rg-error"
+  scanner_status=$?
+  set -e
+  case "$scanner_status" in
+    0) ;;
+    1) fail "$missing_diagnostic" ;;
+    *)
+      fail "$missing_diagnostic scanner failed with exit $scanner_status: $(<"$WORK_DIR/rg-error")"
+      ;;
+  esac
 }
 
 require_only_declaration() {
@@ -30,10 +76,11 @@ require_only_declaration() {
   local label="$4"
   local declarations
   local scanner_status
+  local inverse_status
 
   require_file "$file" "$label"
   set +e
-  declarations="$(rg -- "$key_pattern" "$file" 2>"$WORK_DIR/rg-error")"
+  declarations="$("$RG_BIN" -- "$key_pattern" "$file" 2>"$WORK_DIR/rg-error")"
   scanner_status=$?
   set -e
   case "$scanner_status" in
@@ -43,9 +90,18 @@ require_only_declaration() {
       fail "$label scanner failed with exit $scanner_status: $(<"$WORK_DIR/rg-error")"
       ;;
   esac
-  if printf '%s\n' "$declarations" | rg -q -v -- "$expected_pattern"; then
-    fail "$label must declare only iOS 27.0"
-  fi
+  set +e
+  printf '%s\n' "$declarations" |
+    "$RG_BIN" -q -v -- "$expected_pattern" 2>"$WORK_DIR/rg-error"
+  inverse_status=$?
+  set -e
+  case "$inverse_status" in
+    0) fail "$label must declare only iOS 27.0" ;;
+    1) ;;
+    *)
+      fail "$label scanner failed with exit $inverse_status: $(<"$WORK_DIR/rg-error")"
+      ;;
+  esac
 }
 
 verify_swift_manifest() {
@@ -729,20 +785,22 @@ then
   exit 1
 fi
 
-rg -q '^[[:space:]]+com\.apple\.developer\.kernel\.increased-memory-limit: true$' "$XCODEGEN_SPEC" || {
-  fail 'XcodeGen spec would erase the increased-memory-limit entitlement'
-}
-rg -q '^[[:space:]]+BGTaskSchedulerPermittedIdentifiers:$' "$XCODEGEN_SPEC" || {
-  fail 'XcodeGen spec would erase the background-task identifier'
-}
-rg -q '<key>com\.apple\.developer\.kernel\.increased-memory-limit</key>' \
-  "$ROOT/BehavioralAISubstrate/DeviceTestApp/Resources/BASDeviceTestApp.entitlements" || {
-  fail 'generated entitlements lost increased-memory-limit'
-}
-rg -q '<key>BGTaskSchedulerPermittedIdentifiers</key>' \
-  "$ROOT/BehavioralAISubstrate/DeviceTestApp/Resources/Info.plist" || {
-  fail 'generated Info.plist lost the background-task identifier'
-}
+require_pattern \
+  "$XCODEGEN_SPEC" \
+  '^[[:space:]]+com\.apple\.developer\.kernel\.increased-memory-limit: true$' \
+  'XcodeGen spec would erase the increased-memory-limit entitlement'
+require_pattern \
+  "$XCODEGEN_SPEC" \
+  '^[[:space:]]+BGTaskSchedulerPermittedIdentifiers:$' \
+  'XcodeGen spec would erase the background-task identifier'
+require_pattern \
+  "$ROOT/BehavioralAISubstrate/DeviceTestApp/Resources/BASDeviceTestApp.entitlements" \
+  '<key>com\.apple\.developer\.kernel\.increased-memory-limit</key>' \
+  'generated entitlements lost increased-memory-limit'
+require_pattern \
+  "$ROOT/BehavioralAISubstrate/DeviceTestApp/Resources/Info.plist" \
+  '<key>BGTaskSchedulerPermittedIdentifiers</key>' \
+  'generated Info.plist lost the background-task identifier'
 
 require_file "$PROJECT/project.pbxproj" "BASDeviceTest Xcode project"
 mkdir -p "$DERIVED_DATA"
@@ -1321,7 +1379,7 @@ do
   [[ -d "$directory" ]] || fail "release fallback scan path is missing: $directory"
 done
 set +e
-rg -n 'release.*(inProcessK4|legacyK4)|(inProcessK4|legacyK4).*release' \
+"$RG_BIN" -n 'release.*(inProcessK4|legacyK4)|(inProcessK4|legacyK4).*release' \
   "$ROOT/BehavioralAISubstrate" "$ROOT/SampleHost" "$ROOT/QinaoRuntimeSDK" \
   --glob '*.swift' >"$WORK_DIR/release-fallback.matches" \
   2>"$WORK_DIR/release-fallback.error"

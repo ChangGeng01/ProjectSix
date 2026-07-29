@@ -659,6 +659,16 @@ READ_ONLY_GIT_SUBCOMMANDS = {
     "ls-tree",
     "rev-parse",
 }
+GIT_TIMEOUT_SECONDS = 30
+GIT_SUBPROCESS_ENVIRONMENT = {
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_TERMINAL_PROMPT": "0",
+    "HOME": "/nonexistent",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+}
 DANGEROUS_ALIAS_MODULES = {
     "builtins",
     "json",
@@ -721,6 +731,8 @@ ALLOWED_DIRECT_CALL_NAMES = {
     "isinstance",
     "len",
     "list",
+    "max",
+    "min",
     "next",
     "pow",
     "print",
@@ -737,10 +749,12 @@ ALLOWED_QUALIFIED_CALLS = {
     "ast.parse",
     "ast.walk",
     "base64.b64decode",
+    "base64.b64encode",
     "hashlib.sha256",
     "hashlib.sha512",
     "json.dumps",
     "json.load",
+    "json.loads",
     "re.compile",
     "re.escape",
     "re.findall",
@@ -812,6 +826,7 @@ ALLOWED_METHOD_CALLS = {
     "parse_args",
     "partition",
     "read_text",
+    "read",
     "relative_to",
     "removesuffix",
     "removeprefix",
@@ -860,6 +875,8 @@ def parse_args() -> argparse.Namespace:
         choices=[f"W{index}" for index in range(7)],
         required=True,
     )
+    parser.add_argument("--wave-slice-id", required=True)
+    parser.add_argument("--sequence-ordinal", type=int, required=True)
     parser.add_argument(
         "--create-manifest-or-disposition",
         type=Path,
@@ -919,8 +936,10 @@ def git_commit_exists(root: Path, object_id: str) -> bool:
             stderr=subprocess.DEVNULL,
             text=True,
             check=False,
+            env=GIT_SUBPROCESS_ENVIRONMENT,
+            timeout=GIT_TIMEOUT_SECONDS,
         )
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return False
     return completed.returncode == 0 and completed.stdout.strip() == "commit"
 
@@ -1532,8 +1551,16 @@ def subprocess_call_is_read_only(call: ast.Call) -> bool:
     if len(keyword_values) != len(call.keywords):
         return False
     if set(keyword_values) not in (
-        {"check", "cwd", "stderr", "stdout", "text"},
-        {"check", "cwd", "stderr", "stdout"},
+        {
+            "check",
+            "cwd",
+            "env",
+            "stderr",
+            "stdout",
+            "text",
+            "timeout",
+        },
+        {"check", "cwd", "env", "stderr", "stdout", "timeout"},
     ):
         return False
     cwd = keyword_values["cwd"]
@@ -1541,6 +1568,8 @@ def subprocess_call_is_read_only(call: ast.Call) -> bool:
     stderr = keyword_values["stderr"]
     text_mode = keyword_values.get("text")
     check = keyword_values["check"]
+    environment = keyword_values["env"]
+    timeout = keyword_values["timeout"]
     return (
         isinstance(cwd, ast.Name)
         and cwd.id == "root"
@@ -1556,6 +1585,10 @@ def subprocess_call_is_read_only(call: ast.Call) -> bool:
         )
         and isinstance(check, ast.Constant)
         and check.value is False
+        and isinstance(environment, ast.Name)
+        and environment.id == "GIT_SUBPROCESS_ENVIRONMENT"
+        and isinstance(timeout, ast.Name)
+        and timeout.id == "GIT_TIMEOUT_SECONDS"
     )
 
 
@@ -2909,12 +2942,15 @@ WAVE_CATEGORY_FIELDS = {
     "schema",
     "repositoryIdentity",
     "wave",
+    "waveSliceID",
+    "sequenceOrdinal",
     "category",
     "status",
     "baseTree",
     "approvedDesignBlob",
     "productionDiffRoot",
     "reviewedRows",
+    "reviewedRowsRoot",
     "anchors",
     "reason",
     "issuedAt",
@@ -2935,19 +2971,56 @@ WAVE_CATEGORY_ROW_FIELDS = {
     "authorityClaims",
 }
 SOURCE_SELECTION_FIELDS = {
-    "schema",
+    "schemaVersion",
     "repositoryIdentity",
-    "selectedCommit",
+    "selectedHEAD",
     "selectedTree",
-    "approvedDesignBlob",
-    "externalVerifierSHA256",
+    "approvedDesign",
+    "candidateComparisons",
+    "reviewerPrincipal",
+    "reviewerRole",
     "issuedAt",
     "expiresAt",
     "nonce",
-    "signer",
-    "role",
     "signatureAlgorithm",
     "signature",
+}
+APPROVED_DESIGN_FIELDS = {
+    "path",
+    "commit",
+    "tree",
+    "blob",
+    "byteLength",
+    "sha256",
+}
+CANDIDATE_COMPARISON_FIELDS = {
+    "candidateID",
+    "comparisonBaseHEAD",
+    "head",
+    "tree",
+    "selected",
+    "committedRows",
+    "stagedRows",
+    "unstagedRows",
+    "untrackedRows",
+}
+SOURCE_STATUS_ROW_FIELDS = {"path", "change", "scope"}
+SOURCE_STATUS_CHANGES = {
+    "add",
+    "modify",
+    "delete",
+    "replace",
+    "typeChange",
+    "unmerged",
+    "untracked",
+}
+SOURCE_STATUS_SCOPES = {
+    "controlledDocument",
+    "ownerLedger",
+    "checker",
+    "ci",
+    "productionSource",
+    "other",
 }
 TRUST_ROOT_FIELDS = {
     "schema",
@@ -2957,10 +3030,139 @@ TRUST_ROOT_FIELDS = {
     "keys",
     "revokedNonces",
 }
-TRUST_KEY_FIELDS = {"keyID", "role", "publicKey"}
+TRUST_KEY_FIELDS = {
+    "keyID",
+    "principalID",
+    "role",
+    "schemaScope",
+    "publicKey",
+    "publicKeyFingerprintSHA256",
+    "notBefore",
+    "notAfter",
+}
+FROZEN_SIGNING_ROLES = {
+    "source-selector",
+    "root-admission-signer",
+    "design-edge-admission-signer",
+    "wave-bundle-reviewer",
+    "wave-admission-signer",
+    "k4-evidence-signer",
+    "runtime-chain-signer",
+}
+FROZEN_ROLE_SCHEMA_SCOPES = {
+    ("source-selector", "QinaoDualSpaceSourceSelectionV1"),
+    ("root-admission-signer", "QinaoRootAdmissionReceiptV1"),
+    (
+        "design-edge-admission-signer",
+        "QinaoDesignEdgeAdmissionReceiptV1",
+    ),
+    ("wave-bundle-reviewer", "QinaoWaveCategoryEvidenceV1"),
+    ("wave-bundle-reviewer", "QinaoWaveBundleV1"),
+    ("wave-admission-signer", "QinaoWaveAdmissionReceiptV1"),
+    ("k4-evidence-signer", "QinaoK4PhysicalDeviceProfileV1"),
+    ("k4-evidence-signer", "QinaoK4IOS27PlatformSpikeV1"),
+    ("runtime-chain-signer", "QinaoW6RuntimeReceiptChainV1"),
+}
 WAVE_CATEGORIES = ("create", "extension", "adapter", "fixture")
+ORDERED_WAVE_SCHEDULE_SHA256 = (
+    "72ce48359d4d6fb93be11bcd441414770e9de18108f41672a8ded4efe95bffaa"
+)
+
+
+def validate_ordered_wave_schedule(
+    schedule: object,
+) -> tuple[tuple[str, str, int], ...]:
+    if not isinstance(schedule, tuple) or len(schedule) != 16:
+        raise ValueError(
+            "ordered wave schedule must contain exactly 16 frozen rows"
+        )
+    wave_slice_keys: list[tuple[str, str]] = []
+    wave_ordinal_keys: list[tuple[str, int]] = []
+    wave_order: list[str] = []
+    ordinals_by_wave: dict[str, list[int]] = {}
+    previous_wave: str | None = None
+    for row in schedule:
+        if (
+            not isinstance(row, tuple)
+            or len(row) != 3
+            or not isinstance(row[0], str)
+            or not isinstance(row[1], str)
+            or type(row[2]) is not int
+            or re.fullmatch(r"W[0-6]", row[0]) is None
+            or re.fullmatch(r"[a-z0-9][a-z0-9.-]*", row[1]) is None
+            or row[2] < 1
+        ):
+            raise ValueError("ordered wave schedule row shape is invalid")
+        wave, wave_slice_id, sequence_ordinal = row
+        wave_slice_keys.append((wave, wave_slice_id))
+        wave_ordinal_keys.append((wave, sequence_ordinal))
+        if wave != previous_wave:
+            if wave in wave_order:
+                raise ValueError(
+                    "ordered wave schedule wave blocks must be contiguous"
+                )
+            wave_order.append(wave)
+            previous_wave = wave
+        wave_ordinals = ordinals_by_wave.get(wave)
+        if wave_ordinals is None:
+            wave_ordinals = []
+            ordinals_by_wave[wave] = wave_ordinals
+        wave_ordinals.append(sequence_ordinal)
+    if len(wave_slice_keys) != len(set(wave_slice_keys)):
+        raise ValueError(
+            "ordered wave schedule has duplicate wave/slice rows"
+        )
+    if len(wave_ordinal_keys) != len(set(wave_ordinal_keys)):
+        raise ValueError(
+            "ordered wave schedule has duplicate wave/ordinal rows"
+        )
+    if wave_order != [f"W{index}" for index in range(7)]:
+        raise ValueError("ordered wave schedule wave order is not W0-W6")
+    for wave, ordinals in ordinals_by_wave.items():
+        if ordinals != list(range(1, len(ordinals) + 1)):
+            raise ValueError(
+                "ordered wave schedule ordinals must be contiguous from 1 "
+                f"for {wave}"
+            )
+    encoded = json.dumps(
+        schedule,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    if hashlib.sha256(encoded).hexdigest() != ORDERED_WAVE_SCHEDULE_SHA256:
+        raise ValueError(
+            "ordered wave schedule does not match the frozen authority"
+        )
+    return schedule
+
+
+ORDERED_WAVE_SCHEDULE = validate_ordered_wave_schedule((
+    ("W0", "w0.gates", 1),
+    ("W0", "w0.controlled", 2),
+    ("W1", "w1.dual-space", 1),
+    ("W2", "w2.persistence", 1),
+    ("W3", "w3.state", 1),
+    ("W3", "w3.context", 2),
+    ("W4", "w4.model-execution", 1),
+    ("W5", "w5.inspection-publication-apple", 1),
+    ("W6", "w6.runtime.observation-values", 1),
+    ("W6", "w6.semantic.audit-schema", 2),
+    ("W6", "w6.runtime.audit-envelope-freeze", 3),
+    ("W6", "w6.semantic.coordinator-behavior", 4),
+    ("W6", "w6.runtime.integration-population", 5),
+    ("W6", "w6.runtime.engine-cutover", 6),
+    ("W6", "w6.apple-lab", 7),
+    ("W6", "w6.certification", 8),
+))
+WAVE_SCHEDULE = {
+    (wave, wave_slice_id): sequence_ordinal
+    for wave, wave_slice_id, sequence_ordinal in ORDERED_WAVE_SCHEDULE
+}
 HEX_DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}")
 GIT_OBJECT_PATTERN = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
+CANONICAL_TIMESTAMP_PATTERN = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"
+)
 FORBIDDEN_AUTOMATION_AUTHORITIES = {
     "AutomationAgent",
     "AutomationDB",
@@ -2979,7 +3181,24 @@ ED25519_I = pow(2, (ED25519_Q - 1) // 4, ED25519_Q)
 
 
 def validate_canonical_json_value(value: object) -> None:
-    if value is None or type(value) in {bool, int, str}:
+    if value is None or type(value) is bool:
+        return
+    if type(value) is int:
+        if not -(2**53 - 1) <= value <= 2**53 - 1:
+            raise ValueError(
+                "canonical governance JSON integers must be exactly "
+                "representable IEEE-754 safe integers"
+            )
+        return
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+            value.encode("utf-16-be")
+        except UnicodeEncodeError as error:
+            raise ValueError(
+                "canonical governance JSON strings must contain only "
+                "Unicode scalar values"
+            ) from error
         return
     if isinstance(value, list):
         for item in value:
@@ -2997,20 +3216,64 @@ def validate_canonical_json_value(value: object) -> None:
     )
 
 
+def render_canonical_json_value(item: object) -> bytes:
+    if item is None:
+        return b"null"
+    if item is True:
+        return b"true"
+    if item is False:
+        return b"false"
+    if type(item) is int:
+        return json.dumps(item).encode("ascii")
+    if isinstance(item, str):
+        return json.dumps(
+            item,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    if isinstance(item, list):
+        return (
+            b"["
+            + b",".join(render_canonical_json_value(entry) for entry in item)
+            + b"]"
+        )
+    if isinstance(item, dict):
+        keys = sorted(
+            item,
+            key=lambda key: key.encode("utf-16-be"),
+        )
+        return (
+            b"{"
+            + b",".join(
+                render_canonical_json_value(key)
+                + b":"
+                + render_canonical_json_value(item[key])
+                for key in keys
+            )
+            + b"}"
+        )
+    raise ValueError("canonical JSON value was not validated")
+
+
 def canonical_json_bytes(value: object) -> bytes:
+    """Return RFC 8785 bytes for the governance JSON type subset.
+
+    Governance schemas intentionally exclude floating-point values. Safe
+    integers therefore use their decimal JSON spelling, while object member
+    names use RFC 8785's UTF-16 code-unit ordering.
+    """
+
     validate_canonical_json_value(value)
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        allow_nan=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
+    return render_canonical_json_value(value)
 
 
 def parse_utc_timestamp(value: object, label: str) -> tuple[datetime | None, str | None]:
-    if not isinstance(value, str) or not value.endswith("Z"):
-        return None, f"{label} must be an RFC 3339 UTC timestamp ending in Z"
+    if (
+        not isinstance(value, str)
+        or CANONICAL_TIMESTAMP_PATTERN.fullmatch(value) is None
+    ):
+        return None, f"{label} must be canonical RFC 3339 UTC seconds"
     try:
         parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
     except ValueError:
@@ -3018,6 +3281,16 @@ def parse_utc_timestamp(value: object, label: str) -> tuple[datetime | None, str
     if parsed.tzinfo is None:
         return None, f"{label} must carry a UTC offset"
     return parsed.astimezone(timezone.utc), None
+
+
+def is_nonce(value: object) -> bool:
+    if not isinstance(value, str) or not 1 <= len(value) <= 128:
+        return False
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def ed25519_xrecover(y: int) -> int:
@@ -3086,6 +3359,8 @@ def ed25519_decode_point(encoded: bytes) -> tuple[int, int]:
     if x == 0 and sign:
         raise ValueError("non-canonical Ed25519 sign bit")
     point = (x, y)
+    if point == (0, 1):
+        raise ValueError("Ed25519 identity/small-order point is forbidden")
     if ed25519_multiply(point, ED25519_L) != (0, 1):
         raise ValueError("Ed25519 point is not in the prime-order subgroup")
     return point
@@ -3117,7 +3392,11 @@ def verify_ed25519_signature(
     )
 
 
-def validate_trust_root(document: dict) -> list[str]:
+def validate_trust_root(
+    document: dict,
+    *,
+    verification_time: datetime,
+) -> list[str]:
     errors: list[str] = []
     if set(document) != TRUST_ROOT_FIELDS:
         errors.append(
@@ -3141,9 +3420,12 @@ def validate_trust_root(document: dict) -> list[str]:
         errors.append(issued_error)
     if expires_error is not None:
         errors.append(expires_error)
+    now = verification_time
+    if issued is not None and issued > now:
+        errors.append("trust root issuedAt must not be in the future")
     if issued is not None and expires is not None and expires <= issued:
         errors.append("trust root expiresAt must be later than issuedAt")
-    if expires is not None and expires <= datetime.now(timezone.utc):
+    if expires is not None and expires <= now:
         errors.append("trust root is expired")
 
     keys_value = document.get("keys")
@@ -3152,7 +3434,10 @@ def validate_trust_root(document: dict) -> list[str]:
         keys: list[object] = []
     else:
         keys = keys_value
-    identities: list[tuple[str, str]] = []
+    key_ids: list[str] = []
+    fingerprints: dict[str, tuple[str, str]] = {}
+    source_windows: list[tuple[str, str, str, datetime, datetime]] = []
+    key_fingerprints: list[bytes] = []
     for index, key in enumerate(keys):
         if not isinstance(key, dict):
             errors.append(f"trust root keys[{index}] must be an object")
@@ -3160,11 +3445,50 @@ def validate_trust_root(document: dict) -> list[str]:
         if set(key) != TRUST_KEY_FIELDS:
             errors.append(f"trust root keys[{index}] fields mismatch")
         key_id = key.get("keyID")
+        principal_id = key.get("principalID")
         role = key.get("role")
-        if not is_nonempty_string(key_id) or not is_nonempty_string(role):
-            errors.append(f"trust root keys[{index}] keyID/role must be non-empty")
+        schema_scope = key.get("schemaScope")
+        if (
+            not is_nonempty_string(key_id)
+            or not is_nonempty_string(principal_id)
+            or not is_nonempty_string(role)
+            or not is_nonempty_string(schema_scope)
+        ):
+            errors.append(
+                f"trust root keys[{index}] keyID/principalID/role/"
+                "schemaScope must be non-empty"
+            )
         else:
-            identities.append((key_id, role))
+            key_ids.append(key_id)
+            if role not in FROZEN_SIGNING_ROLES:
+                errors.append(
+                    f"trust root keys[{index}] role is not one of the seven "
+                    "frozen signing role families"
+                )
+            if (role, schema_scope) not in FROZEN_ROLE_SCHEMA_SCOPES:
+                errors.append(
+                    f"trust root keys[{index}] role/schemaScope is not frozen"
+                )
+        not_before, not_before_error = parse_utc_timestamp(
+            key.get("notBefore"),
+            f"trust root keys[{index}] notBefore",
+        )
+        not_after, not_after_error = parse_utc_timestamp(
+            key.get("notAfter"),
+            f"trust root keys[{index}] notAfter",
+        )
+        if not_before_error is not None:
+            errors.append(not_before_error)
+        if not_after_error is not None:
+            errors.append(not_after_error)
+        if (
+            not_before is not None
+            and not_after is not None
+            and not_after <= not_before
+        ):
+            errors.append(
+                f"trust root keys[{index}] notAfter must be later than notBefore"
+            )
         encoded_key = key.get("publicKey")
         try:
             decoded_key = base64.b64decode(encoded_key, validate=True)
@@ -3175,24 +3499,102 @@ def validate_trust_root(document: dict) -> list[str]:
                 f"trust root keys[{index}] publicKey must be canonical Base64 "
                 "for exactly 32 Ed25519 bytes"
             )
-    if len(identities) != len(set(identities)):
-        errors.append("trust root keyID/role pairs must be unique")
+            continue
+        try:
+            ed25519_decode_point(decoded_key)
+        except ValueError as error:
+            errors.append(
+                f"trust root keys[{index}] publicKey is not a strict "
+                f"Ed25519 public key: {error}"
+            )
+            continue
+        if base64.b64encode(decoded_key).decode("ascii") != encoded_key:
+            errors.append(
+                f"trust root keys[{index}] publicKey must use canonical padded Base64"
+            )
+        fingerprint = hashlib.sha256(decoded_key).hexdigest()
+        if key.get("publicKeyFingerprintSHA256") != fingerprint:
+            errors.append(
+                f"trust root keys[{index}] publicKeyFingerprintSHA256 mismatch"
+            )
+        if is_nonempty_string(role) and is_nonempty_string(schema_scope):
+            authorization = (role, schema_scope)
+            prior_authorization = fingerprints.setdefault(
+                fingerprint,
+                authorization,
+            )
+            if prior_authorization != authorization:
+                errors.append(
+                    "trust root public-key fingerprint may belong to exactly "
+                    "one role/schemaScope globally: "
+                    f"fingerprint={fingerprint}"
+                )
+        if (
+            role == "source-selector"
+            and schema_scope == "QinaoDualSpaceSourceSelectionV1"
+            and is_nonempty_string(principal_id)
+            and not_before is not None
+            and not_after is not None
+        ):
+            source_windows.append(
+                (
+                    principal_id,
+                    role,
+                    schema_scope,
+                    not_before,
+                    not_after,
+                )
+            )
+        try:
+            key_fingerprints.append(canonical_json_bytes(key))
+        except ValueError as error:
+            errors.append(f"trust root keys[{index}] cannot be canonicalized: {error}")
+    if len(key_ids) != len(set(key_ids)):
+        errors.append("trust root keyID values must be globally unique")
+    present_role_scopes = {
+        (key.get("role"), key.get("schemaScope"))
+        for key in keys
+        if isinstance(key, dict)
+    }
+    missing_role_scopes = FROZEN_ROLE_SCHEMA_SCOPES - present_role_scopes
+    if missing_role_scopes:
+        errors.append(
+            "trust root must cover every frozen role/schemaScope pair: "
+            f"missing={sorted(missing_role_scopes)!r}"
+        )
+    if key_fingerprints != sorted(key_fingerprints):
+        errors.append("trust root keys must be sorted by RFC 8785 encoding")
+    for index, left in enumerate(source_windows):
+        for right in source_windows[index + 1 :]:
+            if left[:3] == right[:3] and max(left[3], right[3]) < min(
+                left[4],
+                right[4],
+            ):
+                errors.append(
+                    "trust root source-selector windows may not overlap for "
+                    "one principalID/role/schemaScope"
+                )
     revoked = document.get("revokedNonces")
     if not isinstance(revoked, list) or any(
-        not is_nonempty_string(nonce) for nonce in revoked
+        not is_nonce(nonce) for nonce in revoked
     ):
-        errors.append("trust root revokedNonces must be a string list")
+        errors.append("trust root revokedNonces must be a Nonce list")
     elif len(revoked) != len(set(revoked)):
         errors.append("trust root revokedNonces must be unique")
+    elif revoked != sorted(revoked, key=canonical_json_bytes):
+        errors.append("trust root revokedNonces must be RFC 8785 sorted")
     return errors
 
 
-def trusted_public_key(
+def trusted_key(
     trust_root: dict,
     *,
     signer: object,
+    principal: object,
     role: object,
-) -> bytes | None:
+    schema_scope: object,
+    issued_at: datetime | None,
+) -> tuple[dict, bytes] | None:
     keys = trust_root.get("keys")
     if not isinstance(keys, list):
         return None
@@ -3200,17 +3602,44 @@ def trusted_public_key(
         key
         for key in keys
         if isinstance(key, dict)
-        and key.get("keyID") == signer
         and key.get("role") == role
+        and key.get("schemaScope") == schema_scope
+        and (
+            key.get("keyID") == signer
+            if signer is not None
+            else key.get("principalID") == principal
+        )
     ]
-    if len(matches) != 1:
+    active_matches: list[dict] = []
+    for key in matches:
+        not_before, _error = parse_utc_timestamp(
+            key.get("notBefore"),
+            "key notBefore",
+        )
+        not_after, _error = parse_utc_timestamp(
+            key.get("notAfter"),
+            "key notAfter",
+        )
+        if (
+            issued_at is not None
+            and not_before is not None
+            and not_after is not None
+            and not_before <= issued_at < not_after
+        ):
+            active_matches.append(key)
+    if len(active_matches) != 1:
         return None
-    encoded_key = matches[0].get("publicKey")
+    encoded_key = active_matches[0].get("publicKey")
     try:
         public_key = base64.b64decode(encoded_key, validate=True)
     except (TypeError, ValueError):
         return None
-    return public_key if len(public_key) == 32 else None
+    if (
+        len(public_key) != 32
+        or base64.b64encode(public_key).decode("ascii") != encoded_key
+    ):
+        return None
+    return active_matches[0], public_key
 
 
 def validate_signed_document(
@@ -3219,17 +3648,45 @@ def validate_signed_document(
     *,
     expected_role: str,
     label: str,
+    expected_schema_scope: str | None = None,
+    signer_field: str | None = "signer",
+    principal_field: str | None = None,
+    role_field: str = "role",
+    verification_time: datetime,
 ) -> list[str]:
     errors: list[str] = []
-    signer = document.get("signer")
-    role = document.get("role")
+    signer = document.get(signer_field) if signer_field is not None else None
+    principal = (
+        document.get(principal_field)
+        if principal_field is not None
+        else None
+    )
+    role = document.get(role_field)
+    schema_scope = (
+        document.get("schema")
+        if expected_schema_scope is None
+        else expected_schema_scope
+    )
+    if document.get("repositoryIdentity") != trust_root.get(
+        "repositoryIdentity"
+    ):
+        errors.append(f"{label} repositoryIdentity does not match trust root")
+    if (
+        signer_field is not None
+        and expected_schema_scope is not None
+        and document.get("schema") != expected_schema_scope
+    ):
+        errors.append(
+            f"{label} schema does not match trusted schemaScope "
+            f"{expected_schema_scope!r}"
+        )
     if role != expected_role:
         errors.append(f"{label} role must be exactly {expected_role!r}")
     if document.get("signatureAlgorithm") != "Ed25519":
         errors.append(f"{label} signatureAlgorithm must be Ed25519")
     nonce = document.get("nonce")
-    if not is_nonempty_string(nonce):
-        errors.append(f"{label} nonce must be non-empty")
+    if not is_nonce(nonce):
+        errors.append(f"{label} nonce must contain 1–128 Unicode scalars")
     revoked = trust_root.get("revokedNonces")
     if isinstance(revoked, list) and nonce in revoked:
         errors.append(f"{label} nonce is revoked/replayed")
@@ -3242,27 +3699,68 @@ def validate_signed_document(
         errors.append(issued_error)
     if expires_error is not None:
         errors.append(expires_error)
+    now = verification_time
+    trust_issued, _trust_issued_error = parse_utc_timestamp(
+        trust_root.get("issuedAt"),
+        "trust root issuedAt",
+    )
+    trust_expires, _trust_expires_error = parse_utc_timestamp(
+        trust_root.get("expiresAt"),
+        "trust root expiresAt",
+    )
+    if issued is not None and issued > now:
+        errors.append(f"{label} issuedAt must not be in the future")
+    if (
+        issued is not None
+        and trust_issued is not None
+        and issued < trust_issued
+    ):
+        errors.append(f"{label} issuedAt predates trust root")
     if issued is not None and expires is not None and expires <= issued:
         errors.append(f"{label} expiresAt must be later than issuedAt")
-    if expires is not None and expires <= datetime.now(timezone.utc):
+    if expires is not None and expires <= now:
         errors.append(f"{label} is expired")
-    public_key = trusted_public_key(
+    resolved_key = trusted_key(
         trust_root,
         signer=signer,
+        principal=principal,
         role=role,
+        schema_scope=schema_scope,
+        issued_at=issued,
     )
-    if public_key is None:
-        errors.append(f"{label} signer/role is not trusted")
+    if resolved_key is None:
+        errors.append(
+            f"{label} signer/principal role/schemaScope is not uniquely trusted"
+        )
         return errors
+    key, public_key = resolved_key
+    key_not_after, _key_not_after_error = parse_utc_timestamp(
+        key.get("notAfter"),
+        "key notAfter",
+    )
+    if (
+        key_not_after is not None
+        and now >= key_not_after
+    ):
+        errors.append(f"{label} signing key is not active at verification time")
+    if trust_expires is not None and now >= trust_expires:
+        errors.append(f"{label} trust root is not active at verification time")
     encoded_signature = document.get("signature")
     try:
         signature = base64.b64decode(encoded_signature, validate=True)
     except (TypeError, ValueError):
         signature = b""
+    if (
+        len(signature) != 64
+        or base64.b64encode(signature).decode("ascii") != encoded_signature
+    ):
+        errors.append(
+            f"{label} signature must be canonical padded Base64 over 64 bytes"
+        )
     unsigned = dict(document)
     unsigned.pop("signature", None)
     try:
-        message = canonical_json_bytes(unsigned)
+        message = hashlib.sha256(canonical_json_bytes(unsigned)).digest()
     except ValueError as error:
         errors.append(f"{label} cannot be canonicalized: {error}")
         return errors
@@ -3274,32 +3772,143 @@ def validate_signed_document(
 def git_tree_exists(root: Path, object_id: str) -> bool:
     if GIT_OBJECT_PATTERN.fullmatch(object_id) is None:
         return False
-    completed = subprocess.run(
-        ["git", "cat-file", "-t", object_id],
-        cwd=root,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        text=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            ["git", "cat-file", "-t", object_id],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=False,
+            env=GIT_SUBPROCESS_ENVIRONMENT,
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
     return completed.returncode == 0 and completed.stdout.strip() == "tree"
 
 
 def git_commit_tree(root: Path, commit: str) -> str | None:
     if GIT_OBJECT_PATTERN.fullmatch(commit) is None:
         return None
-    completed = subprocess.run(
-        ["git", "rev-parse", f"{commit}^{{tree}}"],
-        cwd=root,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        check=False,
-    )
+    try:
+        object_type = subprocess.run(
+            ["git", "cat-file", "-t", commit],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=False,
+            env=GIT_SUBPROCESS_ENVIRONMENT,
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if object_type.returncode != 0 or object_type.stdout.strip() != "commit":
+        return None
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", f"{commit}^{{tree}}"],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+            env=GIT_SUBPROCESS_ENVIRONMENT,
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
     if completed.returncode != 0:
         return None
     tree = completed.stdout.strip()
     return tree if GIT_OBJECT_PATTERN.fullmatch(tree) is not None else None
+
+
+def git_tree_blob(
+    root: Path,
+    tree: str,
+    path: str,
+) -> tuple[str, bytes] | None:
+    if (
+        not git_tree_exists(root, tree)
+        or not is_normalized_workspace_path(path)
+    ):
+        return None
+    try:
+        listing = subprocess.run(
+            ["git", "ls-tree", "-z", tree, "--", path],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            env=GIT_SUBPROCESS_ENVIRONMENT,
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if listing.returncode != 0:
+        return None
+    rows = [row for row in listing.stdout.split(b"\0") if row]
+    if len(rows) != 1:
+        return None
+    try:
+        metadata, encoded_path = rows[0].split(b"\t", 1)
+        mode, object_type, object_id = metadata.decode("ascii").split(" ")
+        listed_path = encoded_path.decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return None
+    if (
+        listed_path != path
+        or mode not in {"100644", "100755"}
+        or object_type != "blob"
+        or GIT_OBJECT_PATTERN.fullmatch(object_id) is None
+    ):
+        return None
+    try:
+        blob = subprocess.run(
+            ["git", "cat-file", "blob", object_id],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            env=GIT_SUBPROCESS_ENVIRONMENT,
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if blob.returncode != 0:
+        return None
+    return object_id, blob.stdout
+
+
+def validate_source_status_rows(
+    value: object,
+    label: str,
+) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(value, list):
+        return [f"{label} must be an array"]
+    fingerprints: list[bytes] = []
+    for index, row in enumerate(value):
+        if not isinstance(row, dict) or set(row) != SOURCE_STATUS_ROW_FIELDS:
+            errors.append(f"{label}[{index}] fields mismatch")
+            continue
+        if not is_normalized_workspace_path(row.get("path")):
+            errors.append(f"{label}[{index}] path is not normalized")
+        if row.get("change") not in SOURCE_STATUS_CHANGES:
+            errors.append(f"{label}[{index}] change is not frozen")
+        if row.get("scope") not in SOURCE_STATUS_SCOPES:
+            errors.append(f"{label}[{index}] scope is not frozen")
+        try:
+            fingerprints.append(canonical_json_bytes(row))
+        except ValueError as error:
+            errors.append(f"{label}[{index}] cannot be canonicalized: {error}")
+    if len(fingerprints) != len(set(fingerprints)):
+        errors.append(f"{label} must not contain duplicates")
+    if fingerprints != sorted(fingerprints):
+        errors.append(f"{label} must be RFC 8785 sorted")
+    return errors
 
 
 def validate_source_selection(
@@ -3307,6 +3916,7 @@ def validate_source_selection(
     trust_root: dict,
     *,
     root: Path,
+    verification_time: datetime,
 ) -> list[str]:
     errors: list[str] = []
     if set(document) != SOURCE_SELECTION_FIELDS:
@@ -3315,11 +3925,11 @@ def validate_source_selection(
             f"missing={sorted(SOURCE_SELECTION_FIELDS - set(document))!r}, "
             f"extra={sorted(set(document) - SOURCE_SELECTION_FIELDS)!r}"
         )
-    if document.get("schema") != "QinaoSourceSelectionV1":
-        errors.append("source selection schema must be QinaoSourceSelectionV1")
+    if not is_schema_version_one(document.get("schemaVersion")):
+        errors.append("source selection schemaVersion must be exactly integer 1")
     if document.get("repositoryIdentity") != trust_root.get("repositoryIdentity"):
         errors.append("source selection repositoryIdentity does not match trust root")
-    selected_commit = document.get("selectedCommit")
+    selected_commit = document.get("selectedHEAD")
     selected_tree = document.get("selectedTree")
     if not isinstance(selected_commit, str) or not isinstance(selected_tree, str):
         errors.append("source selection selectedCommit/selectedTree must be Git IDs")
@@ -3327,18 +3937,136 @@ def validate_source_selection(
         errors.append(
             "source selection/root admission is not bound to the selected commit/tree"
         )
-    for field in ("approvedDesignBlob", "externalVerifierSHA256"):
+    approved_design = document.get("approvedDesign")
+    if (
+        not isinstance(approved_design, dict)
+        or set(approved_design) != APPROVED_DESIGN_FIELDS
+    ):
+        errors.append("source selection approvedDesign fields mismatch")
+    else:
+        design_commit = approved_design.get("commit")
+        design_tree = approved_design.get("tree")
+        design_path = approved_design.get("path")
         if (
-            not isinstance(document.get(field), str)
-            or HEX_DIGEST_PATTERN.fullmatch(document[field]) is None
+            not isinstance(design_commit, str)
+            or not isinstance(design_tree, str)
+            or git_commit_tree(root, design_commit) != design_tree
         ):
-            errors.append(f"source selection {field} must be 64 lowercase hex")
+            errors.append(
+                "source selection approvedDesign commit/tree binding is invalid"
+            )
+        blob_binding = (
+            git_tree_blob(root, design_tree, design_path)
+            if isinstance(design_tree, str) and isinstance(design_path, str)
+            else None
+        )
+        if blob_binding is None:
+            errors.append(
+                "source selection approvedDesign path/blob is absent from its tree"
+            )
+        else:
+            object_id, raw = blob_binding
+            if approved_design.get("blob") != object_id:
+                errors.append("source selection approvedDesign blob OID mismatch")
+            if (
+                type(approved_design.get("byteLength")) is not int
+                or approved_design.get("byteLength") < 0
+                or approved_design.get("byteLength") != len(raw)
+            ):
+                errors.append(
+                    "source selection approvedDesign byteLength mismatch"
+                )
+            if approved_design.get("sha256") != hashlib.sha256(raw).hexdigest():
+                errors.append("source selection approvedDesign sha256 mismatch")
+    comparisons_value = document.get("candidateComparisons")
+    if not isinstance(comparisons_value, list) or not comparisons_value:
+        errors.append("source selection candidateComparisons must be non-empty")
+        comparisons: list[object] = []
+    else:
+        comparisons = comparisons_value
+    candidate_ids: list[str] = []
+    selected_rows: list[dict] = []
+    comparison_fingerprints: list[bytes] = []
+    for index, comparison in enumerate(comparisons):
+        label = f"source selection candidateComparisons[{index}]"
+        if (
+            not isinstance(comparison, dict)
+            or set(comparison) != CANDIDATE_COMPARISON_FIELDS
+        ):
+            errors.append(f"{label} fields mismatch")
+            continue
+        candidate_id = comparison.get("candidateID")
+        if not is_nonempty_string(candidate_id):
+            errors.append(f"{label} candidateID must be non-empty")
+        else:
+            candidate_ids.append(candidate_id)
+        head = comparison.get("head")
+        tree = comparison.get("tree")
+        comparison_base = comparison.get("comparisonBaseHEAD")
+        if (
+            not isinstance(comparison_base, str)
+            or git_commit_tree(root, comparison_base) is None
+        ):
+            errors.append(f"{label} comparisonBaseHEAD must be a commit")
+        if (
+            not isinstance(head, str)
+            or not isinstance(tree, str)
+            or git_commit_tree(root, head) != tree
+        ):
+            errors.append(f"{label} head/tree binding is invalid")
+        if type(comparison.get("selected")) is not bool:
+            errors.append(f"{label} selected must be boolean")
+        elif comparison["selected"]:
+            selected_rows.append(comparison)
+        for field in (
+            "committedRows",
+            "stagedRows",
+            "unstagedRows",
+            "untrackedRows",
+        ):
+            errors.extend(
+                validate_source_status_rows(
+                    comparison.get(field),
+                    f"{label}.{field}",
+                )
+            )
+        try:
+            comparison_fingerprints.append(canonical_json_bytes(comparison))
+        except ValueError as error:
+            errors.append(f"{label} cannot be canonicalized: {error}")
+    if len(candidate_ids) != len(set(candidate_ids)):
+        errors.append("source selection candidateID values must be unique")
+    if comparison_fingerprints != sorted(comparison_fingerprints):
+        errors.append(
+            "source selection candidateComparisons must be RFC 8785 sorted"
+        )
+    if len(selected_rows) != 1:
+        errors.append("source selection must select exactly one candidate")
+    else:
+        selected = selected_rows[0]
+        if (
+            selected.get("head") != selected_commit
+            or selected.get("tree") != selected_tree
+        ):
+            errors.append(
+                "source selection selected candidate does not bind selectedHEAD/tree"
+            )
+        for field in ("stagedRows", "unstagedRows", "untrackedRows"):
+            if selected.get(field) != []:
+                errors.append(
+                    f"source selection selected candidate {field} must be empty"
+                )
     errors.extend(
         validate_signed_document(
             document,
             trust_root,
             expected_role="source-selector",
             label="source selection",
+            expected_schema_scope="QinaoDualSpaceSourceSelectionV1",
+            signer_field=None,
+            principal_field="reviewerPrincipal",
+            role_field="reviewerRole",
+            verification_time=verification_time,
         )
     )
     return errors
@@ -3347,9 +4075,22 @@ def validate_source_selection(
 def load_governance_document(path: Path, label: str) -> tuple[dict | None, list[str]]:
     errors: list[str] = []
     try:
-        if path.stat().st_size == 0:
+        if path.stat().st_size > MAX_JSON_BYTES:
+            return None, [f"{label} document exceeds {MAX_JSON_BYTES} bytes"]
+        with path.open("rb") as handle:
+            raw = handle.read(MAX_JSON_BYTES + 1)
+        if not raw:
             return None, [f"{label} category document is empty"]
-        document = load_bounded_json_object(path.resolve())
+        document = json.loads(
+            raw,
+            object_pairs_hook=reject_duplicate_json_keys,
+        )
+        if not isinstance(document, dict):
+            return None, [f"{label} root must be an object"]
+        if raw != canonical_json_bytes(document) + b"\n":
+            return None, [
+                f"{label} bytes must be RFC 8785 JSON followed by one LF"
+            ]
     except (
         OSError,
         json.JSONDecodeError,
@@ -3362,36 +4103,75 @@ def load_governance_document(path: Path, label: str) -> tuple[dict | None, list[
 
 def resolve_anchor_paths(
     root: Path,
-    anchors: list[str],
+    candidate_tree: str,
+    anchors: list[object],
 ) -> tuple[list[str], list[str]]:
     resolved: list[str] = []
     errors: list[str] = []
-    for anchor in anchors:
-        if not isinstance(anchor, str) or not anchor:
-            errors.append("anchor must be a non-empty string")
-            continue
-        path = PurePosixPath(anchor)
-        if path.is_absolute() or ".." in path.parts or "\\" in anchor:
-            errors.append(f"anchor is not normalized/workspace-relative: {anchor!r}")
-            continue
-        wildcard = any(token in anchor for token in ("*", "?", "["))
-        try:
-            matches = sorted(
-                candidate
-                for candidate in root.glob(anchor)
-                if candidate.is_file()
-            )
-        except OSError as error:
-            errors.append(f"anchor scanner tool error for {anchor!r}: {error}")
-            continue
-        if not matches:
-            kind = "empty glob" if wildcard else "missing anchored file"
-            errors.append(f"{kind}: {anchor}")
-            continue
-        resolved.extend(
-            match.relative_to(root).as_posix()
-            for match in matches
+    try:
+        completed = subprocess.run(
+            ["git", "ls-tree", "-r", "-z", candidate_tree],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            env=GIT_SUBPROCESS_ENVIRONMENT,
+            timeout=GIT_TIMEOUT_SECONDS,
         )
+    except (OSError, subprocess.TimeoutExpired):
+        return [], ["anchor scanner tool error: git ls-tree unavailable or timed out"]
+    if completed.returncode != 0:
+        return [], ["anchor scanner tool error: git ls-tree failed"]
+    candidate_paths: list[str] = []
+    for record in completed.stdout.split(b"\0"):
+        if not record:
+            continue
+        try:
+            metadata, encoded_path = record.split(b"\t", 1)
+            mode, object_type, _object_id = metadata.decode("ascii").split(" ")
+            candidate_path = encoded_path.decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return [], ["anchor scanner tool error: malformed git ls-tree output"]
+        if (
+            mode in {"100644", "100755"}
+            and object_type == "blob"
+            and is_normalized_workspace_path(candidate_path)
+        ):
+            candidate_paths.append(candidate_path)
+    anchor_fingerprints: list[bytes] = []
+    for anchor in anchors:
+        if not isinstance(anchor, dict) or set(anchor) != {"path", "blob"}:
+            errors.append("anchor fields must be exactly path/blob")
+            continue
+        anchor_path = anchor.get("path")
+        anchor_blob = anchor.get("blob")
+        if not is_normalized_workspace_path(anchor_path):
+            errors.append(
+                f"anchor path is not normalized/workspace-relative: {anchor_path!r}"
+            )
+            continue
+        if (
+            not isinstance(anchor_blob, str)
+            or GIT_OBJECT_PATTERN.fullmatch(anchor_blob) is None
+        ):
+            errors.append(f"anchor blob is not a canonical Git OID: {anchor_blob!r}")
+            continue
+        if anchor_path not in candidate_paths:
+            errors.append(f"missing anchored candidate-tree blob: {anchor_path}")
+            continue
+        binding = git_tree_blob(root, candidate_tree, anchor_path)
+        if binding is None or binding[0] != anchor_blob:
+            errors.append(f"anchor blob binding mismatch: {anchor_path}")
+            continue
+        resolved.append(anchor_path)
+        try:
+            anchor_fingerprints.append(canonical_json_bytes(anchor))
+        except ValueError as error:
+            errors.append(f"anchor cannot be canonicalized: {error}")
+    if len(anchor_fingerprints) != len(set(anchor_fingerprints)):
+        errors.append("anchors must be duplicate-free")
+    if anchor_fingerprints != sorted(anchor_fingerprints):
+        errors.append("anchors must be RFC 8785 sorted")
     return resolved, errors
 
 
@@ -3450,23 +4230,28 @@ def git_tree_diff(
     base_tree: str,
     candidate_tree: str,
 ) -> tuple[list[dict], list[str]]:
-    completed = subprocess.run(
-        [
-            "git",
-            "diff-tree",
-            "--no-commit-id",
-            "--no-renames",
-            "--raw",
-            "-r",
-            "-z",
-            base_tree,
-            candidate_tree,
-        ],
-        cwd=root,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "diff-tree",
+                "--no-commit-id",
+                "--no-renames",
+                "--raw",
+                "-r",
+                "-z",
+                base_tree,
+                candidate_tree,
+            ],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            env=GIT_SUBPROCESS_ENVIRONMENT,
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return [], ["git diff-tree unavailable or timed out"]
     if completed.returncode != 0:
         return [], ["git diff-tree tool error while deriving production diff"]
     records = completed.stdout.split(b"\0")
@@ -3613,12 +4398,16 @@ def validate_category_evidence(
     *,
     category: str,
     wave: str,
+    wave_slice_id: str,
+    sequence_ordinal: int,
     base_tree: str,
     production_diff_root: str,
     derived_rows: list[dict],
     ledger: dict,
     root: Path,
+    candidate_tree: str,
     trust_root: dict,
+    verification_time: datetime,
 ) -> list[str]:
     errors: list[str] = []
     label = f"{category} category"
@@ -3637,6 +4426,22 @@ def validate_category_evidence(
             f"{category} cross-wave reuse: expected {wave!r}, "
             f"found={document.get('wave')!r}"
         )
+    if (
+        document.get("wave"),
+        document.get("waveSliceID"),
+        document.get("sequenceOrdinal"),
+    ) != (wave, wave_slice_id, sequence_ordinal):
+        errors.append(
+            f"{label} does not equal the requested wave schedule tuple"
+        )
+    schedule_ordinal = WAVE_SCHEDULE.get(
+        (document.get("wave"), document.get("waveSliceID"))
+    )
+    if (
+        schedule_ordinal is None
+        or document.get("sequenceOrdinal") != schedule_ordinal
+    ):
+        errors.append(f"{label} waveSliceID/sequenceOrdinal is not scheduled")
     if document.get("category") != category:
         errors.append(
             f"{label} category discriminator must be exactly {category!r}"
@@ -3714,6 +4519,19 @@ def validate_category_evidence(
         errors.append(f"{label} reviewedRows contains duplicate candidate rows")
     if row_fingerprints != sorted(row_fingerprints):
         errors.append(f"{label} reviewedRows must be canonically sorted")
+    try:
+        expected_reviewed_root = hashlib.sha256(
+            canonical_json_bytes(
+                sorted(rows, key=canonical_json_bytes)
+                if all(isinstance(row, dict) for row in rows)
+                else []
+            )
+        ).hexdigest()
+    except ValueError as error:
+        errors.append(f"{label} reviewedRowsRoot cannot be derived: {error}")
+        expected_reviewed_root = None
+    if document.get("reviewedRowsRoot") != expected_reviewed_root:
+        errors.append(f"{label} reviewedRowsRoot mismatch")
 
     status = document.get("status")
     if derived_rows:
@@ -3735,6 +4553,8 @@ def validate_category_evidence(
                 )
         if not rows:
             errors.append(f"{label} present manifest must be non-empty")
+        if document.get("reason") != "":
+            errors.append(f"{label} present reason must be the empty string")
     else:
         if status != "notApplicable":
             errors.append(
@@ -3764,14 +4584,19 @@ def validate_category_evidence(
     if not isinstance(anchors, list):
         errors.append(f"{label} anchors must be a list")
     else:
-        _resolved, anchor_errors = resolve_anchor_paths(root, anchors)
+        _resolved, anchor_errors = resolve_anchor_paths(
+            root,
+            candidate_tree,
+            anchors,
+        )
         errors.extend(f"{label} {error}" for error in anchor_errors)
     errors.extend(
         validate_signed_document(
             document,
             trust_root,
-            expected_role="wave-category-reviewer",
+            expected_role="wave-bundle-reviewer",
             label=label,
+            verification_time=verification_time,
         )
     )
     return errors
@@ -3786,13 +4611,19 @@ def validate_changed_swift_sources(
         path = row["path"]
         if row["change"] == "delete" or not path.endswith(".swift"):
             continue
-        completed = subprocess.run(
-            ["git", "cat-file", "blob", row["newBlob"]],
-            cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                ["git", "cat-file", "blob", row["newBlob"]],
+                cwd=root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                env=GIT_SUBPROCESS_ENVIRONMENT,
+                timeout=GIT_TIMEOUT_SECONDS,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            errors.append(f"{path}: git cat-file unavailable or timed out")
+            continue
         if completed.returncode != 0:
             errors.append(f"{path}: git cat-file tool error")
             continue
@@ -3908,8 +4739,9 @@ def validate_candidate(candidate: dict, ledger: dict) -> list[str]:
 
 def main() -> int:
     args = parse_args()
+    verification_time = datetime.now(timezone.utc)
     root = args.root.resolve()
-    ledger_path = args.ledger.resolve()
+    ledger_path = args.ledger
     errors: list[str] = []
     try:
         data = load_bounded_json_object(ledger_path)
@@ -3925,7 +4757,12 @@ def main() -> int:
     )
     errors.extend(trust_errors)
     if trust_root is not None:
-        errors.extend(validate_trust_root(trust_root))
+        errors.extend(
+            validate_trust_root(
+                trust_root,
+                verification_time=verification_time,
+            )
+        )
 
     source_selection, source_errors = load_governance_document(
         args.source_selection,
@@ -3938,13 +4775,16 @@ def main() -> int:
                 source_selection,
                 trust_root,
                 root=root,
+                verification_time=verification_time,
             )
         )
-        if source_selection.get("selectedTree") != args.base_tree:
-            errors.append(
-                "source selection selectedTree does not bind --base-tree"
-            )
-
+    if (
+        WAVE_SCHEDULE.get((args.wave, args.wave_slice_id))
+        != args.sequence_ordinal
+    ):
+        errors.append(
+            "requested wave/slice/ordinal is not an exact schedule tuple"
+        )
     if not git_tree_exists(root, args.base_tree):
         errors.append("--base-tree must name an existing canonical Git tree")
     if not git_tree_exists(root, args.candidate_tree):
@@ -3998,18 +4838,26 @@ def main() -> int:
                     document,
                     category=category,
                     wave=args.wave,
+                    wave_slice_id=args.wave_slice_id,
+                    sequence_ordinal=args.sequence_ordinal,
                     base_tree=args.base_tree,
                     production_diff_root=production_diff_root,
                     derived_rows=categorized[category],
                     ledger=data,
                     root=root,
+                    candidate_tree=args.candidate_tree,
                     trust_root=trust_root,
+                    verification_time=verification_time,
                 )
             )
         if (
             source_selection is not None
             and document.get("approvedDesignBlob")
-            != source_selection.get("approvedDesignBlob")
+            != (
+                source_selection.get("approvedDesign", {}).get("sha256")
+                if isinstance(source_selection.get("approvedDesign"), dict)
+                else None
+            )
         ):
             errors.append(
                 f"{category} category approvedDesignBlob does not match "

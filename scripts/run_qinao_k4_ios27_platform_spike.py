@@ -21,6 +21,7 @@ import re
 import stat
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 try:
@@ -50,6 +51,35 @@ ALLOWED_STATUSES = {
     "disabledMissingEntitlement",
     "disabledMissingDeviceProof",
 }
+PROFILE_TOP_LEVEL_PROJECTION_FIELDS = (
+    "repositoryIdentity",
+    "approvedDesignBlob",
+    "candidateCommit",
+    "candidateTree",
+    "platform",
+    "environment",
+    "deviceIdentityDigest",
+    "osVersion",
+    "osBuild",
+    "xcodeVersion",
+    "xcodeBuild",
+    "sdkCanonicalName",
+    "sdkVersion",
+    "sdkBuild",
+    "signingIdentityClass",
+    "entitlementInventory",
+)
+PROFILE_MATRIX_PROJECTION_FIELDS = (
+    ("probeDeviceIdentityDigest", "deviceIdentityDigest"),
+    ("frameworkAPIs", "frameworkAPIs"),
+    ("target", "target"),
+    ("requiredEntitlements", "requiredEntitlements"),
+    ("sqlite", "sqlite"),
+    ("transport", "transport"),
+    ("lifecycle", "lifecycle"),
+    ("resultBundleDigest", "resultBundleDigest"),
+    ("supportedProfileDigest", "supportedProfileDigest"),
+)
 LIFECYCLE_EVENTS = (
     "launch",
     "interruption",
@@ -108,14 +138,17 @@ FRAMEWORK_QUERY_FIELDS = {
     "declarationToken",
     "framework",
 }
-FRAMEWORK_OBSERVATION_FIELDS = {
+FRAMEWORK_OBSERVATION_COMMON_FIELDS = {
     "api",
-    "declarationDigest",
     "declarationPresence",
     "entitlementSupportInference",
     "framework",
     "processSupportInference",
 }
+FRAMEWORK_PRESENT_OBSERVATION_FIELDS = (
+    FRAMEWORK_OBSERVATION_COMMON_FIELDS | {"declarationDigest"}
+)
+FRAMEWORK_ABSENT_OBSERVATION_FIELDS = FRAMEWORK_OBSERVATION_COMMON_FIELDS
 SQLITE_FIELDS = {"fileProtection", "open", "wal"}
 TRANSPORT_FIELDS = {"feasibility", "kind"}
 LIFECYCLE_FIELDS = {"event", "observation"}
@@ -141,6 +174,7 @@ COLLECTION_REPORT_FIELDS = {
     "deviceProfileDigest",
     "entitlementInventory",
     "environment",
+    "frameworkAPIs",
     "frameworkAPIAvailability",
     "lifecycle",
     "osBuild",
@@ -155,6 +189,7 @@ COLLECTION_REPORT_FIELDS = {
     "sdkBuild",
     "sdkCanonicalName",
     "sdkSettingsDigest",
+    "sdkSystemVersionDigest",
     "sdkVersion",
     "signaturePresent",
     "signingIdentityClass",
@@ -169,6 +204,16 @@ COLLECTION_REPORT_FIELDS = {
 EVIDENCE_FIELDS = (
     COLLECTION_REPORT_FIELDS - COLLECTION_ONLY_FIELDS
 ) | SIGNATURE_METADATA_FIELDS
+GIT_TIMEOUT_SECONDS = 30
+GIT_SUBPROCESS_ENVIRONMENT = {
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_TERMINAL_PROMPT": "0",
+    "HOME": "/nonexistent",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+}
 
 
 class GateError(RuntimeError):
@@ -196,21 +241,35 @@ def path_is_within(path: Path, root: Path) -> bool:
 
 
 def run_git(root: Path, *arguments: str) -> str:
-    completed = subprocess.run(
-        ["git", *arguments],
-        cwd=root,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        check=False,
-    )
+    return run_git_bytes(root, *arguments).decode(
+        "utf-8",
+        errors="strict",
+    ).strip()
+
+
+def run_git_bytes(root: Path, *arguments: str) -> bytes:
+    try:
+        completed = subprocess.run(
+            ["git", *arguments],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            env=GIT_SUBPROCESS_ENVIRONMENT,
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        fail(f"Git command unavailable or timed out ({' '.join(arguments)})")
     if completed.returncode != 0:
-        diagnostic = completed.stderr.strip()
+        diagnostic = completed.stderr.decode(
+            "utf-8",
+            errors="replace",
+        ).strip()
         fail(
             f"Git command failed ({' '.join(arguments)}): "
             f"{diagnostic or f'exit {completed.returncode}'}"
         )
-    return completed.stdout.strip()
+    return completed.stdout
 
 
 def ensure_repository(
@@ -268,49 +327,146 @@ def read_external_file(
     path_argument: Path,
     root: Path,
     label: str,
-) -> tuple[Path, bytes]:
+) -> tuple[Path, bytes, tuple[int, int]]:
     try:
-        metadata = path_argument.lstat()
+        parent = path_argument.parent.resolve(strict=True)
     except OSError as error:
-        fail(f"{label} does not exist: {error}")
-    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
-        fail(f"{label} must be a regular non-symlink file")
-    if stat.S_IMODE(metadata.st_mode) != 0o600:
-        fail(f"{label} must have mode 0600")
-    try:
-        path = path_argument.resolve(strict=True)
-    except OSError as error:
-        fail(f"{label} cannot be resolved: {error}")
+        fail(f"{label} parent cannot be resolved: {error}")
+    path = parent / path_argument.name
     if path_is_within(path, root):
         fail(f"{label} must be outside the repository")
+    return read_bound_file(path, label=label, require_mode_0600=True)
+
+
+def read_bound_file(
+    path: Path,
+    *,
+    label: str,
+    require_mode_0600: bool,
+) -> tuple[Path, bytes, tuple[int, int]]:
+    if not hasattr(os, "O_NOFOLLOW"):
+        fail(f"{label} cannot be opened safely: O_NOFOLLOW is unavailable")
+    descriptor: int | None = None
     try:
-        raw = path.read_bytes()
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+        )
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            fail(f"{label} must be a regular non-symlink file")
+        if require_mode_0600 and stat.S_IMODE(before.st_mode) != 0o600:
+            fail(f"{label} must have mode 0600")
+        if before.st_nlink != 1:
+            fail(f"{label} must have exactly one hard link")
+        chunks: list[bytes] = []
+        byte_count = 0
+        while True:
+            chunk = os.read(descriptor, 64 * 1024)
+            if not chunk:
+                break
+            byte_count += len(chunk)
+            if byte_count > 8 * 1024 * 1024:
+                fail(f"{label} must be at most 8 MiB")
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+        before_binding = (
+            before.st_dev,
+            before.st_ino,
+            before.st_mode,
+            before.st_nlink,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        )
+        after_binding = (
+            after.st_dev,
+            after.st_ino,
+            after.st_mode,
+            after.st_nlink,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        )
+        if before_binding != after_binding or byte_count != before.st_size:
+            fail(f"{label} changed while its bound descriptor was read")
+        return path, b"".join(chunks), (before.st_dev, before.st_ino)
     except OSError as error:
         fail(f"{label} cannot be read: {error}")
-    return path, raw
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 
 
 def read_evidence_file(
     path_argument: Path,
     root: Path,
-) -> tuple[Path, bytes]:
+) -> tuple[Path, bytes, tuple[object, object]]:
+    return read_evidence_file_from_tree(
+        path_argument,
+        root,
+        run_git(root, "rev-parse", "HEAD^{tree}"),
+    )
+
+
+def read_evidence_file_from_tree(
+    path_argument: Path,
+    root: Path,
+    repository_tree: str,
+) -> tuple[Path, bytes, tuple[object, object]]:
     try:
-        metadata = path_argument.lstat()
+        parent = path_argument.parent.resolve(strict=True)
     except OSError as error:
-        fail(f"evidence does not exist: {error}")
-    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
-        fail("evidence must be a regular non-symlink file")
+        fail(f"evidence parent cannot be resolved: {error}")
+    absolute = parent / path_argument.name
     try:
-        path = path_argument.resolve(strict=True)
-    except OSError as error:
-        fail(f"evidence cannot be resolved: {error}")
-    if not path_is_within(path, root) and stat.S_IMODE(metadata.st_mode) != 0o600:
-        fail("external evidence must have mode 0600")
+        relative = absolute.relative_to(root).as_posix()
+    except ValueError:
+        return read_external_file(path_argument, root, "evidence")
+    if (
+        not relative
+        or not path_is_within(absolute, root)
+        or PurePosixPath(relative).is_absolute()
+        or ".." in PurePosixPath(relative).parts
+        or "\\" in relative
+    ):
+        fail("repository evidence path must be normalized and workspace-relative")
+    listing = run_git_bytes(
+        root,
+        "ls-tree",
+        "-z",
+        repository_tree,
+        "--",
+        relative,
+    )
+    rows = [row for row in listing.split(b"\0") if row]
+    if len(rows) != 1:
+        fail(f"evidence is missing from repository tree: {relative}")
     try:
-        raw = path.read_bytes()
+        metadata, encoded_path = rows[0].split(b"\t", 1)
+        mode, object_type, object_id = metadata.decode("ascii").split(" ")
+        listed_path = encoded_path.decode("utf-8")
+    except (ValueError, UnicodeDecodeError) as error:
+        fail(f"evidence has invalid repository-tree metadata: {error}")
+    if (
+        listed_path != relative
+        or mode not in {"100644", "100755"}
+        or object_type != "blob"
+        or GIT_ID.fullmatch(object_id) is None
+    ):
+        fail("evidence must be one unambiguous regular repository-tree blob")
+    raw = run_git_bytes(root, "cat-file", "blob", object_id)
+    return absolute, raw, ("git-blob", object_id)
+    try:
+        parent = path_argument.parent.resolve(strict=True)
     except OSError as error:
-        fail(f"evidence cannot be read: {error}")
-    return path, raw
+        fail(f"evidence parent cannot be resolved: {error}")
+    path = parent / path_argument.name
+    return read_bound_file(
+        path,
+        label="evidence",
+        require_mode_0600=not path_is_within(path, root),
+    )
 
 
 def require_exact_fields(document: dict, expected: set[str], label: str) -> None:
@@ -392,8 +548,10 @@ def validate_framework_queries(value: object) -> list[dict]:
         )
         identities.append((query["framework"], query["api"]))
         result.append(query)
-    if identities != sorted(set(identities)):
-        fail("probe matrix frameworkAPIs must be sorted and unique by framework/API")
+    if len(identities) != len(set(identities)):
+        fail("probe matrix frameworkAPIs must be unique by framework/API")
+    if result != sorted(result, key=canonical_json_bytes):
+        fail("probe matrix frameworkAPIs must use global RFC 8785 element order")
     return result
 
 
@@ -440,6 +598,7 @@ def validate_transport(
 
 def supported_profile_digest(
     *,
+    framework_apis: list[dict],
     target: dict,
     required_entitlements: list[str],
     sqlite: dict,
@@ -449,6 +608,7 @@ def supported_profile_digest(
     return sha256(
         canonical_json_bytes(
             {
+                "frameworkAPIs": framework_apis,
                 "target": target,
                 "requiredEntitlements": required_entitlements,
                 "sqlite": sqlite,
@@ -468,6 +628,7 @@ def validate_status_derivation(
     sqlite: dict,
     transport: dict,
     lifecycle: list[dict],
+    framework_observations: list[dict] | None = None,
     label: str,
 ) -> str:
     if status_value not in ALLOWED_STATUSES:
@@ -477,30 +638,28 @@ def validate_status_derivation(
         set(required_entitlements) - set(entitlement_inventory)
     )
     target_missing = target["processModel"] == "missing"
+    framework_missing = framework_observations is not None and any(
+        row["declarationPresence"] == "absent"
+        for row in framework_observations
+    )
     device_proof_missing = (
         any(row["observation"] != "passed" for row in lifecycle)
         or any(sqlite[field] != "passed" for field in SQLITE_FIELDS)
         or transport["feasibility"] != "passed"
     )
-    if status == "supportedExactProfile":
-        if missing_entitlements:
-            fail(
-                f"{label} supportedExactProfile makes an impossible entitlement "
-                f"claim; missing={missing_entitlements!r}"
-            )
-        if target_missing:
-            fail(f"{label} supportedExactProfile requires an observed target")
-        if device_proof_missing:
-            fail(
-                f"{label} supportedExactProfile requires complete passed physical "
-                "device observations"
-            )
-    elif status == "disabledMissingTarget" and not target_missing:
-        fail(f"{label} disabledMissingTarget requires processModel 'missing'")
-    elif status == "disabledMissingEntitlement" and not missing_entitlements:
-        fail(f"{label} disabledMissingEntitlement requires a missing entitlement")
-    elif status == "disabledMissingDeviceProof" and not device_proof_missing:
-        fail(f"{label} disabledMissingDeviceProof requires missing device proof")
+    if target_missing or framework_missing:
+        expected = "disabledMissingTarget"
+    elif missing_entitlements:
+        expected = "disabledMissingEntitlement"
+    elif device_proof_missing:
+        expected = "disabledMissingDeviceProof"
+    else:
+        expected = "supportedExactProfile"
+    if status != expected:
+        fail(
+            f"{label} status does not follow deterministic precedence: "
+            f"expected {expected}"
+        )
     return status
 
 
@@ -525,7 +684,7 @@ def validate_probe_matrix(
             "profile deviceIdentityDigest"
         )
     target = validate_target(matrix.get("target"), "probe matrix target")
-    validate_framework_queries(matrix.get("frameworkAPIs"))
+    framework_apis = validate_framework_queries(matrix.get("frameworkAPIs"))
     required_entitlements = require_sorted_unique_strings(
         matrix.get("requiredEntitlements"),
         "probe matrix requiredEntitlements",
@@ -539,6 +698,7 @@ def validate_probe_matrix(
         "probe matrix supportedProfileDigest",
     )
     derived_profile_digest = supported_profile_digest(
+        framework_apis=framework_apis,
         target=target,
         required_entitlements=required_entitlements,
         sqlite=sqlite,
@@ -546,7 +706,10 @@ def validate_probe_matrix(
         lifecycle=lifecycle,
     )
     if claimed_profile_digest != derived_profile_digest:
-        fail("probe matrix supportedProfileDigest does not match exact profile")
+        fail(
+            "probe matrix supportedProfileDigest does not include the exact "
+            "framework/API declarations"
+        )
     validate_status_derivation(
         status_value=matrix.get("status"),
         target=target,
@@ -560,13 +723,25 @@ def validate_probe_matrix(
     return matrix
 
 
-def load_trust_root(path_argument: Path, root: Path) -> tuple[Path, bytes, dict]:
-    path, raw = read_external_file(path_argument, root, "trust root")
+def load_trust_root(
+    path_argument: Path,
+    root: Path,
+    *,
+    verification_time: datetime,
+) -> tuple[Path, bytes, dict, tuple[int, int]]:
+    path, raw, identity = read_external_file(
+        path_argument,
+        root,
+        "trust root",
+    )
     document = load_json_bytes(raw, "trust root")
-    errors = validate_trust_root(document)
+    errors = validate_trust_root(
+        document,
+        verification_time=verification_time,
+    )
     if errors:
         fail("; ".join(errors))
-    return path, raw, document
+    return path, raw, document, identity
 
 
 def load_device_profile(
@@ -576,8 +751,13 @@ def load_device_profile(
     trust_root: dict,
     commit: str,
     tree: str,
-) -> tuple[Path, bytes, dict]:
-    path, raw = read_external_file(path_argument, root, "device profile")
+    verification_time: datetime,
+) -> tuple[Path, bytes, dict, tuple[int, int]]:
+    path, raw, identity = read_external_file(
+        path_argument,
+        root,
+        "device profile",
+    )
     profile = load_json_bytes(raw, "device profile")
     if "signature" not in profile:
         fail("device profile signature is required")
@@ -589,8 +769,9 @@ def load_device_profile(
     errors = validate_signed_document(
         profile,
         trust_root,
-        expected_role="k4-device-profile-signer",
+        expected_role="k4-evidence-signer",
         label="device profile",
+        verification_time=verification_time,
     )
     if errors:
         fail("; ".join(errors))
@@ -635,13 +816,13 @@ def load_device_profile(
         device_identity_digest=device_digest,
         entitlement_inventory=inventory,
     )
-    return path, raw, profile
+    return path, raw, profile, identity
 
 
 def inspect_installed_sdk(
     developer_argument: Path,
     profile: dict,
-) -> tuple[str, list[dict]]:
+) -> tuple[str, str, list[dict]]:
     try:
         developer = developer_argument.resolve(strict=True)
     except OSError as error:
@@ -658,7 +839,7 @@ def inspect_installed_sdk(
         fail("installed Xcode version.plist must contain a dictionary")
     if version.get("CFBundleShortVersionString") != profile["xcodeVersion"]:
         fail("installed Xcode version does not match signed device profile")
-    if version.get("CFBundleVersion") != profile["xcodeBuild"]:
+    if version.get("ProductBuildVersion") != profile["xcodeBuild"]:
         fail("installed Xcode build does not match signed device profile")
 
     sdk_parent = (
@@ -669,34 +850,50 @@ def inspect_installed_sdk(
         sdk_candidates = sorted(sdk_parent.glob("*.sdk"))
     except OSError as error:
         fail(f"installed iPhoneOS SDKs cannot be enumerated: {error}")
-    matches: list[tuple[Path, bytes]] = []
+    resolved_sdks: dict[Path, Path] = {}
     for candidate in sdk_candidates:
         try:
             sdk = candidate.resolve(strict=True)
             sdk.relative_to(developer)
+            if not sdk.is_dir():
+                continue
+        except (OSError, ValueError):
+            continue
+        resolved_sdks.setdefault(sdk, candidate)
+
+    matches: list[tuple[Path, bytes, bytes]] = []
+    for sdk in sorted(resolved_sdks):
+        try:
             settings_path = sdk / "SDKSettings.json"
             settings_raw = settings_path.read_bytes()
             settings = json.loads(settings_raw)
+            system_version_raw = (
+                sdk
+                / "System/Library/CoreServices/SystemVersion.plist"
+            ).read_bytes()
+            system_version = plistlib.loads(system_version_raw)
         except (
             OSError,
             ValueError,
             json.JSONDecodeError,
+            plistlib.InvalidFileException,
         ):
             continue
-        if not isinstance(settings, dict):
+        if not isinstance(settings, dict) or not isinstance(system_version, dict):
             continue
         if (
             settings.get("CanonicalName") == profile["sdkCanonicalName"]
             and settings.get("Version") == profile["sdkVersion"]
-            and settings.get("ProductBuildVersion") == profile["sdkBuild"]
+            and system_version.get("ProductVersion") == profile["sdkVersion"]
+            and system_version.get("ProductBuildVersion") == profile["sdkBuild"]
         ):
-            matches.append((sdk, settings_raw))
+            matches.append((sdk, settings_raw, system_version_raw))
     if len(matches) != 1:
         fail(
             "signed device profile must match exactly one installed iPhoneOS SDK; "
             f"matched={len(matches)}"
         )
-    sdk, settings_raw = matches[0]
+    sdk, settings_raw, system_version_raw = matches[0]
     observations: list[dict] = []
     for query in profile["probeMatrix"]["frameworkAPIs"]:
         relative = normalized_sdk_relative_path(
@@ -717,17 +914,64 @@ def inspect_installed_sdk(
             digest = sha256(raw)
             token = query["declarationToken"].encode("utf-8")
             presence = "present" if token in raw else "absent"
-        observations.append(
-            {
-                "framework": query["framework"],
-                "api": query["api"],
-                "declarationDigest": digest,
-                "declarationPresence": presence,
-                "processSupportInference": "notInferred",
-                "entitlementSupportInference": "notInferred",
-            }
-        )
-    return sha256(settings_raw), observations
+        observation = {
+            "framework": query["framework"],
+            "api": query["api"],
+            "declarationPresence": presence,
+            "processSupportInference": "notInferred",
+            "entitlementSupportInference": "notInferred",
+        }
+        if digest is not None:
+            observation["declarationDigest"] = digest
+        observations.append(observation)
+    return (
+        sha256(settings_raw),
+        sha256(system_version_raw),
+        sorted(observations, key=canonical_json_bytes),
+    )
+
+
+def validate_profile_to_spike_projection(
+    report: dict,
+    *,
+    profile: dict,
+    profile_raw: bytes,
+) -> None:
+    matrix = profile["probeMatrix"]
+    for field in PROFILE_TOP_LEVEL_PROJECTION_FIELDS:
+        if report.get(field) != profile.get(field):
+            fail(f"collection report profile projection mismatch: {field}")
+    for spike_field, matrix_field in PROFILE_MATRIX_PROJECTION_FIELDS:
+        if report.get(spike_field) != matrix.get(matrix_field):
+            fail(
+                "collection report probeMatrix projection mismatch: "
+                f"{spike_field}"
+            )
+    if report.get("deviceProfileDigest") != sha256(profile_raw):
+        fail("collection report deviceProfileDigest mismatch")
+    if report.get("probeMatrixDigest") != sha256(canonical_json_bytes(matrix)):
+        fail("collection report probeMatrixDigest mismatch")
+
+    projected_fields = set(PROFILE_TOP_LEVEL_PROJECTION_FIELDS) | {
+        spike_field
+        for spike_field, _matrix_field in PROFILE_MATRIX_PROJECTION_FIELDS
+    }
+    only_derived_or_envelope_fields = {
+        "collectionStatus",
+        "deviceProfileDigest",
+        "frameworkAPIAvailability",
+        "probeMatrixDigest",
+        "schema",
+        "sdkSettingsDigest",
+        "sdkSystemVersionDigest",
+        "signaturePresent",
+        "status",
+    }
+    if (
+        set(report) - projected_fields
+        != only_derived_or_envelope_fields
+    ):
+        fail("collection report only-derived field whitelist mismatch")
 
 
 def derive_collection_report(
@@ -737,9 +981,34 @@ def derive_collection_report(
     profile_raw: bytes,
     profile: dict,
     sdk_settings_digest: str,
+    sdk_system_version_digest: str,
     framework_observations: list[dict],
 ) -> dict:
     matrix = profile["probeMatrix"]
+    validate_status_derivation(
+        status_value=matrix["status"],
+        target=matrix["target"],
+        entitlement_inventory=profile["entitlementInventory"],
+        required_entitlements=matrix["requiredEntitlements"],
+        sqlite=matrix["sqlite"],
+        transport=matrix["transport"],
+        lifecycle=matrix["lifecycle"],
+        framework_observations=framework_observations,
+        label="probe matrix",
+    )
+    derived_profile_digest = supported_profile_digest(
+        framework_apis=matrix["frameworkAPIs"],
+        target=matrix["target"],
+        required_entitlements=matrix["requiredEntitlements"],
+        sqlite=matrix["sqlite"],
+        transport=matrix["transport"],
+        lifecycle=matrix["lifecycle"],
+    )
+    if matrix["supportedProfileDigest"] != derived_profile_digest:
+        fail(
+            "probe matrix supportedProfileDigest does not include the exact "
+            "framework/API declarations"
+        )
     report = {
         "schema": "QinaoK4IOS27PlatformSpikeCandidateV1",
         "collectionStatus": "unsignedUnadmitted",
@@ -761,6 +1030,8 @@ def derive_collection_report(
         "sdkVersion": profile["sdkVersion"],
         "sdkBuild": profile["sdkBuild"],
         "sdkSettingsDigest": sdk_settings_digest,
+        "sdkSystemVersionDigest": sdk_system_version_digest,
+        "frameworkAPIs": matrix["frameworkAPIs"],
         "frameworkAPIAvailability": framework_observations,
         "target": matrix["target"],
         "signingIdentityClass": profile["signingIdentityClass"],
@@ -776,6 +1047,11 @@ def derive_collection_report(
     }
     if set(report) != COLLECTION_REPORT_FIELDS:
         fail("internal collection report field contract drifted")
+    validate_profile_to_spike_projection(
+        report,
+        profile=profile,
+        profile_raw=profile_raw,
+    )
     return report
 
 
@@ -851,18 +1127,25 @@ def validate_framework_observations(value: object) -> list[dict]:
         label = f"evidence frameworkAPIAvailability[{index}]"
         if not isinstance(row, dict):
             fail(f"{label} must be an object")
-        require_exact_fields(row, FRAMEWORK_OBSERVATION_FIELDS, label)
         for field in ("framework", "api"):
             if not is_nonempty_string(row.get(field)):
                 fail(f"{label} {field} must be non-empty")
         presence = row.get("declarationPresence")
-        digest = row.get("declarationDigest")
         if presence not in {"present", "absent"}:
             fail(f"{label} declarationPresence is invalid")
         if presence == "present":
-            require_hex(digest, f"{label} declarationDigest")
-        elif digest is not None:
-            require_hex(digest, f"{label} declarationDigest")
+            require_exact_fields(
+                row,
+                FRAMEWORK_PRESENT_OBSERVATION_FIELDS,
+                label,
+            )
+            require_hex(row.get("declarationDigest"), f"{label} declarationDigest")
+        else:
+            require_exact_fields(
+                row,
+                FRAMEWORK_ABSENT_OBSERVATION_FIELDS,
+                label,
+            )
         if (
             row.get("processSupportInference") != "notInferred"
             or row.get("entitlementSupportInference") != "notInferred"
@@ -873,9 +1156,34 @@ def validate_framework_observations(value: object) -> list[dict]:
             )
         identities.append((row["framework"], row["api"]))
         rows.append(row)
-    if identities != sorted(set(identities)):
-        fail("evidence frameworkAPIAvailability must be sorted and unique")
+    if len(identities) != len(set(identities)):
+        fail("evidence frameworkAPIAvailability identities must be unique")
+    if rows != sorted(rows, key=canonical_json_bytes):
+        fail(
+            "evidence frameworkAPIAvailability must use global RFC 8785 "
+            "element order"
+        )
     return rows
+
+
+def validate_supported_framework_facts(
+    *,
+    status_value: object,
+    observations: list[dict],
+    label: str,
+) -> None:
+    if status_value != "supportedExactProfile":
+        return
+    absent = [
+        f"{row['framework']}/{row['api']}"
+        for row in observations
+        if row["declarationPresence"] != "present"
+    ]
+    if absent:
+        fail(
+            f"{label} supportedExactProfile requires every declared framework "
+            f"API fact to be present; absent={absent!r}"
+        )
 
 
 def validate_evidence_bindings(
@@ -908,6 +1216,7 @@ def validate_evidence_bindings(
         "deviceIdentityDigest",
         "probeDeviceIdentityDigest",
         "sdkSettingsDigest",
+        "sdkSystemVersionDigest",
         "probeMatrixDigest",
         "resultBundleDigest",
         "supportedProfileDigest",
@@ -935,7 +1244,21 @@ def validate_evidence_bindings(
     ):
         if not is_nonempty_string(evidence.get(field)):
             fail(f"evidence {field} must be non-empty")
-    validate_framework_observations(evidence.get("frameworkAPIAvailability"))
+    framework_observations = validate_framework_observations(
+        evidence.get("frameworkAPIAvailability")
+    )
+    framework_apis = validate_framework_queries(evidence.get("frameworkAPIs"))
+    declared_identities = [
+        (row["framework"], row["api"]) for row in framework_apis
+    ]
+    observed_identities = [
+        (row["framework"], row["api"]) for row in framework_observations
+    ]
+    if set(observed_identities) != set(declared_identities):
+        fail(
+            "evidence framework/API identities are not a bijection with "
+            "the declared profile"
+        )
     target = validate_target(evidence.get("target"), "evidence target")
     inventory = require_sorted_unique_strings(
         evidence.get("entitlementInventory"),
@@ -949,6 +1272,7 @@ def validate_evidence_bindings(
     transport = validate_transport(evidence.get("transport"), "evidence transport")
     lifecycle = validate_lifecycle(evidence.get("lifecycle"), "evidence lifecycle")
     exact_profile_digest = supported_profile_digest(
+        framework_apis=framework_apis,
         target=target,
         required_entitlements=required,
         sqlite=sqlite,
@@ -965,6 +1289,7 @@ def validate_evidence_bindings(
         sqlite=sqlite,
         transport=transport,
         lifecycle=lifecycle,
+        framework_observations=framework_observations,
         label="evidence",
     )
 
@@ -983,29 +1308,45 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    verification_time = datetime.now(timezone.utc)
     try:
         collecting = args.unsigned_output is not None
         root, commit, tree = ensure_repository(
             args.root,
             require_clean=collecting,
         )
-        trust_path, _trust_raw, trust_root = load_trust_root(args.trust_root, root)
+        trust_path, _trust_raw, trust_root, trust_identity = load_trust_root(
+            args.trust_root,
+            root,
+            verification_time=verification_time,
+        )
         if args.unsigned_output is not None:
             if args.device_profile is None or args.xcode_developer_dir is None:
                 fail(
                     "collection requires --device-profile and "
                     "--xcode-developer-dir"
                 )
-            profile_path, profile_raw, profile = load_device_profile(
+            profile_path, profile_raw, profile, profile_identity = load_device_profile(
                 args.device_profile,
                 root=root,
                 trust_root=trust_root,
                 commit=commit,
                 tree=tree,
+                verification_time=verification_time,
             )
-            if profile_path == trust_path:
-                fail("trust root and device profile paths must be distinct")
-            sdk_digest, framework_observations = inspect_installed_sdk(
+            if (
+                profile_path == trust_path
+                or profile_identity == trust_identity
+            ):
+                fail(
+                    "trust root and device profile path/device-inode "
+                    "bindings must be distinct"
+                )
+            (
+                sdk_settings_digest,
+                sdk_system_version_digest,
+                framework_observations,
+            ) = inspect_installed_sdk(
                 args.xcode_developer_dir,
                 profile,
             )
@@ -1014,7 +1355,8 @@ def main() -> int:
                 tree=tree,
                 profile_raw=profile_raw,
                 profile=profile,
-                sdk_settings_digest=sdk_digest,
+                sdk_settings_digest=sdk_settings_digest,
+                sdk_system_version_digest=sdk_system_version_digest,
                 framework_observations=framework_observations,
             )
             output = validate_output_path(args.unsigned_output, root)
@@ -1028,12 +1370,21 @@ def main() -> int:
                     "verification accepts only --verify, --trust-root, and "
                     "the repository binding"
                 )
-            evidence_path, evidence_raw = read_evidence_file(
-                args.verify,
-                root,
+            evidence_path, evidence_raw, evidence_identity = (
+                read_evidence_file_from_tree(
+                    args.verify,
+                    root,
+                    tree,
+                )
             )
-            if evidence_path == trust_path:
-                fail("trust root and evidence paths must be distinct")
+            if (
+                evidence_path == trust_path
+                or evidence_identity == trust_identity
+            ):
+                fail(
+                    "trust root and evidence path/device-inode bindings "
+                    "must be distinct"
+                )
             evidence = load_json_bytes(evidence_raw, "evidence")
             require_exact_fields(evidence, EVIDENCE_FIELDS, "evidence")
             errors = validate_signed_document(
@@ -1041,6 +1392,7 @@ def main() -> int:
                 trust_root,
                 expected_role="k4-evidence-signer",
                 label="evidence",
+                verification_time=verification_time,
             )
             if errors:
                 fail("; ".join(errors))

@@ -140,6 +140,8 @@ jobs:
       QINAO_ADMISSION_TRUST_ROOT: ${{ vars.QINAO_ADMISSION_TRUST_ROOT }}
       QINAO_PREVIOUS_ADMISSION_RECEIPT: ${{ vars.QINAO_PREVIOUS_ADMISSION_RECEIPT }}
       QINAO_EXTERNAL_PREREQUISITES: ${{ vars.QINAO_EXTERNAL_PREREQUISITES }}
+      QINAO_PRIOR_ADMISSION_RECEIPTS: ${{ vars.QINAO_PRIOR_ADMISSION_RECEIPTS }}
+      QINAO_RUNTIME_ENTRY_PREDECESSOR: ${{ vars.QINAO_RUNTIME_ENTRY_PREDECESSOR }}
       QINAO_UNSIGNED_ADMISSION_REPORT: ${{ vars.QINAO_UNSIGNED_ADMISSION_REPORT }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -155,14 +157,9 @@ jobs:
           scripts.test_run_nonempty_swift_filter
           scripts.test_run_qinao_wave_admission
           scripts.test_run_qinao_k4_ios27_platform_spike
+          scripts.test_qinao_admission_canonical_vectors
           scripts.test_qinao_plan_remediation
           scripts.test_test_workflow_owner_ledger
-      - name: Run iOS 27 floor unit tests
-        run: >-
-          python3 -m unittest
-          BehavioralAISubstrate.scripts.test_check_ios27_floor
-      - name: Run local iOS 27 floor check
-        run: BehavioralAISubstrate/scripts/check-ios27-floor.sh
       - name: Run repository report replay only with external inputs
         if: ${{ env.QINAO_EXTERNAL_REPLAY_INPUTS_READY == 'true' }}
         shell: bash
@@ -185,6 +182,92 @@ jobs:
               prerequisite_args+=(--external-prerequisite "$prerequisite")
             done <<< "$QINAO_EXTERNAL_PREREQUISITES"
           fi
+          expected_prior_wave_slice_ids=(
+            w6.runtime.observation-values
+            w6.semantic.audit-schema
+            w6.runtime.audit-envelope-freeze
+            w6.semantic.coordinator-behavior
+            w6.runtime.integration-population
+          )
+          canonical_external_path() {
+            /usr/bin/python3 -c 'from pathlib import Path; import sys; path=Path(sys.argv[1]).resolve(strict=True); roots=[Path(value).resolve(strict=True) for value in sys.argv[2:]]; sys.exit(1) if any(path == root or root in path.parents for root in roots) else print(path)' "$@"
+          }
+          prior_receipt_args=()
+          prior_receipt_bindings=()
+          prior_receipt_fds=()
+          prior_receipt_index=0
+          if test -n "$QINAO_PRIOR_ADMISSION_RECEIPTS"; then
+            while IFS= read -r prior_receipt; do
+              test -n "$prior_receipt"
+              case "$prior_receipt" in
+                *$'\r'*|*=*=*|=*) exit 1 ;;
+                *=*) ;;
+                *) exit 1 ;;
+              esac
+              prior_wave_slice_id="${prior_receipt%%=*}"
+              prior_receipt_path="${prior_receipt#*=}"
+              test "$prior_receipt_index" -lt "${#expected_prior_wave_slice_ids[@]}"
+              test "$prior_wave_slice_id" = "${expected_prior_wave_slice_ids[$prior_receipt_index]}"
+              test -n "$prior_receipt_path"
+              case "$prior_receipt_path" in
+                /*) ;;
+                *) exit 1 ;;
+              esac
+              test -f "$prior_receipt_path"
+              test ! -L "$prior_receipt_path"
+              prior_receipt_path="$(canonical_external_path "$prior_receipt_path" "$GITHUB_WORKSPACE")"
+              prior_receipt_path_binding="$(stat -L -f '%d:%i' "$prior_receipt_path")"
+              case "$prior_receipt_index" in
+                0) prior_receipt_fd=20; exec 20<"$prior_receipt_path" ;;
+                1) prior_receipt_fd=21; exec 21<"$prior_receipt_path" ;;
+                2) prior_receipt_fd=22; exec 22<"$prior_receipt_path" ;;
+                3) prior_receipt_fd=23; exec 23<"$prior_receipt_path" ;;
+                4) prior_receipt_fd=24; exec 24<"$prior_receipt_path" ;;
+                *) exit 1 ;;
+              esac
+              prior_receipt_metadata="$(/usr/bin/python3 -c 'import os,stat,sys; value=os.fstat(int(sys.argv[1])); print(f"{value.st_dev}:{value.st_ino} {value.st_nlink} {stat.S_IMODE(value.st_mode):o} {int(stat.S_ISREG(value.st_mode))}")' "$prior_receipt_fd")"
+              read -r prior_receipt_binding prior_receipt_link_count prior_receipt_mode prior_receipt_regular <<< "$prior_receipt_metadata"
+              test "$prior_receipt_path_binding" = "$prior_receipt_binding"
+              test "$prior_receipt_link_count" -eq 1
+              test "$prior_receipt_mode" = 600
+              test "$prior_receipt_regular" -eq 1
+              test ! -L "$prior_receipt_path"
+              for seen_prior_receipt_binding in ${prior_receipt_bindings[@]+"${prior_receipt_bindings[@]}"}; do
+                test "$seen_prior_receipt_binding" != "$prior_receipt_binding"
+              done
+              prior_receipt_bindings+=("$prior_receipt_binding")
+              prior_receipt_fds+=("$prior_receipt_fd")
+              prior_receipt_args+=(--prior-admission-receipt "${prior_wave_slice_id}=/dev/fd/${prior_receipt_fd}")
+              prior_receipt_index=$((prior_receipt_index + 1))
+            done <<< "$QINAO_PRIOR_ADMISSION_RECEIPTS"
+          fi
+          runtime_entry_args=()
+          if test -n "$QINAO_RUNTIME_ENTRY_PREDECESSOR"; then
+            case "$QINAO_RUNTIME_ENTRY_PREDECESSOR" in
+              *$'\n'*|*$'\r'*|*=*) exit 1 ;;
+            esac
+            case "$QINAO_RUNTIME_ENTRY_PREDECESSOR" in
+              /*) ;;
+              *) exit 1 ;;
+            esac
+            test -f "$QINAO_RUNTIME_ENTRY_PREDECESSOR"
+            test ! -L "$QINAO_RUNTIME_ENTRY_PREDECESSOR"
+            runtime_entry_path="$(canonical_external_path "$QINAO_RUNTIME_ENTRY_PREDECESSOR" "$GITHUB_WORKSPACE")"
+            runtime_entry_path_binding="$(stat -L -f '%d:%i' "$runtime_entry_path")"
+            runtime_entry_fd=25
+            exec 25<"$runtime_entry_path"
+            runtime_entry_metadata="$(/usr/bin/python3 -c 'import os,stat,sys; value=os.fstat(int(sys.argv[1])); print(f"{value.st_dev}:{value.st_ino} {value.st_nlink} {stat.S_IMODE(value.st_mode):o} {int(stat.S_ISREG(value.st_mode))}")' "$runtime_entry_fd")"
+            read -r runtime_entry_binding runtime_entry_link_count runtime_entry_mode runtime_entry_regular <<< "$runtime_entry_metadata"
+            test "$runtime_entry_path_binding" = "$runtime_entry_binding"
+            test "$runtime_entry_link_count" -eq 1
+            test "$runtime_entry_mode" = 600
+            test "$runtime_entry_regular" -eq 1
+            test ! -L "$QINAO_RUNTIME_ENTRY_PREDECESSOR"
+            for prior_receipt_binding in ${prior_receipt_bindings[@]+"${prior_receipt_bindings[@]}"}; do
+              test "$prior_receipt_binding" != "$runtime_entry_binding"
+            done
+            runtime_entry_args+=(--runtime-entry-predecessor "/dev/fd/$runtime_entry_fd")
+          fi
           QINAO_CANDIDATE_TREE="$(git rev-parse HEAD^{tree})"
           python3 scripts/run_qinao_wave_admission.py report \
             --root "$GITHUB_WORKSPACE" \
@@ -193,5 +276,42 @@ jobs:
             --trust-root "$QINAO_ADMISSION_TRUST_ROOT" \
             --previous-receipt "$QINAO_PREVIOUS_ADMISSION_RECEIPT" \
             --candidate-tree "$QINAO_CANDIDATE_TREE" \
-            "${prerequisite_args[@]}" \
+            ${prerequisite_args[@]+"${prerequisite_args[@]}"} \
+            ${prior_receipt_args[@]+"${prior_receipt_args[@]}"} \
+            ${runtime_entry_args[@]+"${runtime_entry_args[@]}"} \
             --unsigned-report "$QINAO_UNSIGNED_ADMISSION_REPORT"
+          exec 20<&-
+          exec 21<&-
+          exec 22<&-
+          exec 23<&-
+          exec 24<&-
+          exec 25<&-
+
+  qinao-ios27-floor:
+    name: Qinao Xcode 27 floor
+    needs: qinao-gates
+    runs-on: xcode-27
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12"
+      - name: Assert Xcode 27 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcode_version="$(xcodebuild -version | sed -n '1s/^Xcode //p')"
+          test "${xcode_version%%.*}" = "27"
+          swift --version
+      - name: Run iOS 27 floor unit tests
+        run: >-
+          python3 -m unittest
+          BehavioralAISubstrate.scripts.test_check_ios27_floor
+      - name: Run local iOS 27 floor check
+        run: BehavioralAISubstrate/scripts/check-ios27-floor.sh

@@ -12,55 +12,145 @@ on:
         required: true
         type: string
       current_wave_bundle:
-        description: Current reviewed wave bundle path
-        required: true
-        type: string
-      source_selection:
-        description: Externally supplied source-selection path
-        required: true
-        type: string
-      trust_root:
-        description: Externally supplied trust-root path
-        required: true
-        type: string
-      previous_receipt:
-        description: Externally supplied previous-receipt path
-        required: true
-        type: string
-      external_prerequisites:
-        description: Optional newline-delimited NAME=PATH prerequisite records
-        required: false
-        default: ""
-        type: string
-      unsigned_report:
-        description: Fresh external path for the unsigned report
-        required: true
-        type: string
-      current_receipt:
-        description: Fresh external path for the admitted receipt
+        description: Normalized current wave-bundle path in the candidate tree
         required: true
         type: string
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
 
 jobs:
-  admit-current-wave:
+  candidate-validation:
     if: ${{ github.ref == 'refs/heads/qinao-admission-bootstrap-v1' }}
-    environment: qinao-admission
-    runs-on: [self-hosted, macOS, qinao-admission]
+    runs-on: xcode-27
     timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_service_digest: ${{ steps.upload.outputs.artifact-digest }}
+      envelope_sha256: ${{ steps.snapshot.outputs.envelope_sha256 }}
+      envelope_size: ${{ steps.snapshot.outputs.envelope_size }}
+      log_sha256: ${{ steps.snapshot.outputs.log_sha256 }}
+      log_size: ${{ steps.snapshot.outputs.log_size }}
+      manifest_sha256: ${{ steps.snapshot.outputs.manifest_sha256 }}
+      manifest_size: ${{ steps.snapshot.outputs.manifest_size }}
     env:
       QINAO_CANDIDATE_COMMIT: ${{ inputs.candidate_commit }}
       QINAO_CANDIDATE_TREE: ${{ inputs.candidate_tree }}
-      QINAO_CURRENT_WAVE_BUNDLE: ${{ inputs.current_wave_bundle }}
-      QINAO_SOURCE_SELECTION: ${{ inputs.source_selection }}
-      QINAO_ADMISSION_TRUST_ROOT: ${{ inputs.trust_root }}
-      QINAO_PREVIOUS_ADMISSION_RECEIPT: ${{ inputs.previous_receipt }}
-      QINAO_EXTERNAL_PREREQUISITES: ${{ inputs.external_prerequisites }}
-      QINAO_UNSIGNED_ADMISSION_REPORT: ${{ inputs.unsigned_report }}
-      QINAO_CURRENT_ADMISSION_RECEIPT: ${{ inputs.current_receipt }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.candidate_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Validate candidate without admission authority
+        id: snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/qinao-admission-bootstrap-v1"
+          test "$(git rev-parse HEAD)" = "$QINAO_CANDIDATE_COMMIT"
+          test "$(git rev-parse HEAD^{tree})" = "$QINAO_CANDIDATE_TREE"
+          test -z "$(git status --porcelain)"
+
+          artifact_root="$RUNNER_TEMP/qinao-candidate-validation"
+          mkdir -m 0700 "$artifact_root"
+          raw_log="$RUNNER_TEMP/qinao-candidate-validation.raw.log"
+          if ! /usr/bin/env \
+            -u GITHUB_OUTPUT \
+            -u GITHUB_ENV \
+            -u GITHUB_PATH \
+            -u GITHUB_STEP_SUMMARY \
+            /bin/bash -c '
+              set -euo pipefail
+              python3 -m unittest \
+                scripts.test_check_qinao_owner_ledger \
+                scripts.test_run_nonempty_swift_filter \
+                scripts.test_run_qinao_wave_admission \
+                scripts.test_run_qinao_k4_ios27_platform_spike \
+                scripts.test_qinao_admission_canonical_vectors \
+                scripts.test_qinao_plan_remediation \
+                scripts.test_test_workflow_owner_ledger
+              BehavioralAISubstrate/scripts/check-ios27-floor.sh
+            ' >"$raw_log" 2>&1
+          then
+            printf '%s\n' "candidate validation failed; raw log withheld"
+            exit 1
+          fi
+          test "$(wc -c < "$raw_log" | tr -d ' ')" -le 8388608
+          install -m 0600 "$raw_log" "$artifact_root/validation.log"
+
+          printf '%s\n' \
+            "{\"candidateCommit\":\"$QINAO_CANDIDATE_COMMIT\",\"candidateTree\":\"$QINAO_CANDIDATE_TREE\",\"outcome\":\"validated\",\"schema\":\"QinaoCandidateValidationEnvelopeV1\"}" \
+            > "$artifact_root/validation-envelope.json"
+          chmod 0600 "$artifact_root/validation-envelope.json"
+
+          envelope_sha256="$(shasum -a 256 "$artifact_root/validation-envelope.json" | cut -d ' ' -f 1)"
+          envelope_size="$(wc -c < "$artifact_root/validation-envelope.json" | tr -d ' ')"
+          log_sha256="$(shasum -a 256 "$artifact_root/validation.log" | cut -d ' ' -f 1)"
+          log_size="$(wc -c < "$artifact_root/validation.log" | tr -d ' ')"
+          printf '%s\n' \
+            "{\"files\":[{\"byteLength\":$envelope_size,\"path\":\"validation-envelope.json\",\"sha256\":\"$envelope_sha256\"},{\"byteLength\":$log_size,\"path\":\"validation.log\",\"sha256\":\"$log_sha256\"}],\"schema\":\"QinaoCandidateValidationArtifactV1\"}" \
+            > "$artifact_root/artifact-manifest.json"
+          chmod 0600 "$artifact_root/artifact-manifest.json"
+          manifest_sha256="$(shasum -a 256 "$artifact_root/artifact-manifest.json" | cut -d ' ' -f 1)"
+          manifest_size="$(wc -c < "$artifact_root/artifact-manifest.json" | tr -d ' ')"
+
+          test "$(git rev-parse HEAD)" = "$QINAO_CANDIDATE_COMMIT"
+          test "$(git rev-parse HEAD^{tree})" = "$QINAO_CANDIDATE_TREE"
+          test -z "$(git status --porcelain)"
+          {
+            printf 'envelope_sha256=%s\n' "$envelope_sha256"
+            printf 'envelope_size=%s\n' "$envelope_size"
+            printf 'log_sha256=%s\n' "$log_sha256"
+            printf 'log_size=%s\n' "$log_size"
+            printf 'manifest_sha256=%s\n' "$manifest_sha256"
+            printf 'manifest_size=%s\n' "$manifest_size"
+          } >> "$GITHUB_OUTPUT"
+      - name: Upload exact candidate-validation artifact
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qinao-candidate-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qinao-candidate-validation
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 1
+
+  admit-current-wave:
+    needs: candidate-validation
+    if: ${{ github.ref == 'refs/heads/qinao-admission-bootstrap-v1' }}
+    environment: qinao-admission
+    runs-on: [self-hosted, macOS, qinao-admission]
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      QINAO_CANDIDATE_COMMIT: ${{ inputs.candidate_commit }}
+      QINAO_CANDIDATE_TREE: ${{ inputs.candidate_tree }}
+      QINAO_CURRENT_WAVE_BUNDLE_RELATIVE: ${{ inputs.current_wave_bundle }}
+      QINAO_CANDIDATE_ARTIFACT_ID: ${{ needs.candidate-validation.outputs.artifact_id }}
+      QINAO_CANDIDATE_ARTIFACT_SERVICE_DIGEST: ${{ needs.candidate-validation.outputs.artifact_service_digest }}
+      QINAO_CANDIDATE_ENVELOPE_SHA256: ${{ needs.candidate-validation.outputs.envelope_sha256 }}
+      QINAO_CANDIDATE_ENVELOPE_SIZE: ${{ needs.candidate-validation.outputs.envelope_size }}
+      QINAO_CANDIDATE_LOG_SHA256: ${{ needs.candidate-validation.outputs.log_sha256 }}
+      QINAO_CANDIDATE_LOG_SIZE: ${{ needs.candidate-validation.outputs.log_size }}
+      QINAO_CANDIDATE_MANIFEST_SHA256: ${{ needs.candidate-validation.outputs.manifest_sha256 }}
+      QINAO_CANDIDATE_MANIFEST_SIZE: ${{ needs.candidate-validation.outputs.manifest_size }}
+      QINAO_SOURCE_SELECTION: ${{ vars.QINAO_SOURCE_SELECTION }}
+      QINAO_ADMISSION_TRUST_ROOT: ${{ vars.QINAO_ADMISSION_TRUST_ROOT }}
+      QINAO_ADMISSION_TRUST_ROOT_SHA256: ${{ vars.QINAO_ADMISSION_TRUST_ROOT_SHA256 }}
+      QINAO_PREVIOUS_ADMISSION_RECEIPT: ${{ vars.QINAO_PREVIOUS_ADMISSION_RECEIPT }}
+      QINAO_EXTERNAL_PREREQUISITES: ${{ vars.QINAO_EXTERNAL_PREREQUISITES }}
+      QINAO_PRIOR_ADMISSION_RECEIPTS: ${{ vars.QINAO_PRIOR_ADMISSION_RECEIPTS }}
+      QINAO_RUNTIME_ENTRY_PREDECESSOR: ${{ vars.QINAO_RUNTIME_ENTRY_PREDECESSOR }}
+      QINAO_REPOSITORY_RUNNER_SHA256: ${{ vars.QINAO_REPOSITORY_RUNNER_SHA256 }}
+      QINAO_OWNER_LEDGER_CHECKER_SHA256: ${{ vars.QINAO_OWNER_LEDGER_CHECKER_SHA256 }}
+      QINAO_PROTECTED_WORKFLOW_SHA256: ${{ vars.QINAO_PROTECTED_WORKFLOW_SHA256 }}
       QINAO_EXTERNAL_ADMISSION_VERIFIER: ${{ vars.QINAO_EXTERNAL_ADMISSION_VERIFIER }}
       QINAO_EXTERNAL_ADMISSION_VERIFIER_SHA256: ${{ vars.QINAO_EXTERNAL_ADMISSION_VERIFIER_SHA256 }}
       QINAO_WAVE_ADMISSION_SIGNING_PROVIDER: ${{ vars.QINAO_WAVE_ADMISSION_SIGNING_PROVIDER }}
@@ -68,28 +158,58 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          ref: ${{ github.sha }}
+          path: trusted-tools
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
           ref: ${{ inputs.candidate_commit }}
+          path: candidate-data
           fetch-depth: 0
-      - name: Run protected current-wave admission sequence
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Download exact candidate-validation artifact by service ID
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.candidate-validation.outputs.artifact_id }}
+          path: ${{ runner.temp }}/qinao-candidate-validation
+      - name: Run only pinned admission tools over candidate data
         shell: bash
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/qinao-admission-bootstrap-v1"
-          case "$QINAO_CANDIDATE_COMMIT" in
-            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
-            *) exit 1 ;;
-          esac
-          case "$QINAO_CANDIDATE_TREE" in
-            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
-            *) exit 1 ;;
-          esac
+          candidate_root="$GITHUB_WORKSPACE/candidate-data"
+          trusted_root="$GITHUB_WORKSPACE/trusted-tools"
+          QINAO_REPOSITORY_RUNNER="$trusted_root/scripts/run_qinao_wave_admission.py"
+          QINAO_OWNER_LEDGER_CHECKER="$trusted_root/scripts/check_qinao_owner_ledger.py"
+          QINAO_PROTECTED_WORKFLOW="$trusted_root/.github/workflows/qinao-wave-admission.yml"
+          QINAO_UNSIGNED_ADMISSION_REPORT="$RUNNER_TEMP/qinao-unsigned-report.json"
+          QINAO_CURRENT_ADMISSION_RECEIPT="$RUNNER_TEMP/qinao-current-receipt.json"
+          artifact_root="$RUNNER_TEMP/qinao-candidate-validation"
+
           for variable in \
-            QINAO_CURRENT_WAVE_BUNDLE \
+            QINAO_CANDIDATE_COMMIT \
+            QINAO_CANDIDATE_TREE \
+            QINAO_CURRENT_WAVE_BUNDLE_RELATIVE \
+            QINAO_CANDIDATE_ARTIFACT_ID \
+            QINAO_CANDIDATE_ARTIFACT_SERVICE_DIGEST \
+            QINAO_CANDIDATE_ENVELOPE_SHA256 \
+            QINAO_CANDIDATE_ENVELOPE_SIZE \
+            QINAO_CANDIDATE_LOG_SHA256 \
+            QINAO_CANDIDATE_LOG_SIZE \
+            QINAO_CANDIDATE_MANIFEST_SHA256 \
+            QINAO_CANDIDATE_MANIFEST_SIZE \
             QINAO_SOURCE_SELECTION \
             QINAO_ADMISSION_TRUST_ROOT \
+            QINAO_ADMISSION_TRUST_ROOT_SHA256 \
             QINAO_PREVIOUS_ADMISSION_RECEIPT \
-            QINAO_UNSIGNED_ADMISSION_REPORT \
-            QINAO_CURRENT_ADMISSION_RECEIPT \
+            QINAO_REPOSITORY_RUNNER_SHA256 \
+            QINAO_OWNER_LEDGER_CHECKER_SHA256 \
+            QINAO_PROTECTED_WORKFLOW_SHA256 \
             QINAO_EXTERNAL_ADMISSION_VERIFIER \
             QINAO_EXTERNAL_ADMISSION_VERIFIER_SHA256 \
             QINAO_WAVE_ADMISSION_SIGNING_PROVIDER \
@@ -97,16 +217,93 @@ jobs:
           do
             test -n "${!variable}"
           done
-          test "$(git rev-parse HEAD)" = "$QINAO_CANDIDATE_COMMIT"
-          test "$(git rev-parse HEAD^{tree})" = "$QINAO_CANDIDATE_TREE"
-          test -z "$(git status --porcelain)"
+          case "$QINAO_CANDIDATE_ARTIFACT_ID" in
+            *[!0-9]*|"") exit 1 ;;
+          esac
+          case "$QINAO_CANDIDATE_ARTIFACT_SERVICE_DIGEST" in
+            *[!0-9a-f]*|"") exit 1 ;;
+          esac
+          test "${#QINAO_CANDIDATE_ARTIFACT_SERVICE_DIGEST}" -eq 64
+          case "$QINAO_CURRENT_WAVE_BUNDLE_RELATIVE" in
+            ""|/*|*\\*|*..*) exit 1 ;;
+          esac
+
+          expected_files=$'artifact-manifest.json\nvalidation-envelope.json\nvalidation.log'
+          actual_files="$(
+            find "$artifact_root" -mindepth 1 -maxdepth 1 -type f -exec basename {} \; |
+              LC_ALL=C sort
+          )"
+          test "$actual_files" = "$expected_files"
+          test -z "$(
+            find "$artifact_root" -mindepth 1 -maxdepth 1 ! -type f -print -quit
+          )"
+          test "$(shasum -a 256 "$artifact_root/validation-envelope.json" | cut -d ' ' -f 1)" = "$QINAO_CANDIDATE_ENVELOPE_SHA256"
+          test "$(wc -c < "$artifact_root/validation-envelope.json" | tr -d ' ')" = "$QINAO_CANDIDATE_ENVELOPE_SIZE"
+          test "$(shasum -a 256 "$artifact_root/validation.log" | cut -d ' ' -f 1)" = "$QINAO_CANDIDATE_LOG_SHA256"
+          test "$(wc -c < "$artifact_root/validation.log" | tr -d ' ')" = "$QINAO_CANDIDATE_LOG_SIZE"
+          test "$QINAO_CANDIDATE_LOG_SIZE" -le 8388608
+          test "$(shasum -a 256 "$artifact_root/artifact-manifest.json" | cut -d ' ' -f 1)" = "$QINAO_CANDIDATE_MANIFEST_SHA256"
+          test "$(wc -c < "$artifact_root/artifact-manifest.json" | tr -d ' ')" = "$QINAO_CANDIDATE_MANIFEST_SIZE"
+
+          test "$(shasum -a 256 "$QINAO_ADMISSION_TRUST_ROOT" | cut -d ' ' -f 1)" = "$QINAO_ADMISSION_TRUST_ROOT_SHA256"
+          test "$(shasum -a 256 "$QINAO_PROTECTED_WORKFLOW" | cut -d ' ' -f 1)" = "$QINAO_PROTECTED_WORKFLOW_SHA256"
+          for script in \
+            "$QINAO_REPOSITORY_RUNNER" \
+            "$QINAO_OWNER_LEDGER_CHECKER"
+          do
+            test -f "$script"
+            test ! -L "$script"
+            test -r "$script"
+            test "$(stat -f '%l' "$script")" -eq 1
+            test "$(stat -f '%z' "$script")" -le 8388608
+            script_mode="$(stat -f '%Lp' "$script")"
+            (( (8#$script_mode & 8#22) == 0 ))
+          done
           test -x "$QINAO_EXTERNAL_ADMISSION_VERIFIER"
-          test -f "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER"
-          test "$(shasum -a 256 "$QINAO_EXTERNAL_ADMISSION_VERIFIER" | cut -d ' ' -f 1)" = "$QINAO_EXTERNAL_ADMISSION_VERIFIER_SHA256"
-          test "$(shasum -a 256 "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER" | cut -d ' ' -f 1)" = "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER_SHA256"
-          test "$QINAO_UNSIGNED_ADMISSION_REPORT" != "$QINAO_CURRENT_ADMISSION_RECEIPT"
+          test -x "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER"
+          test ! -L "$QINAO_EXTERNAL_ADMISSION_VERIFIER"
+          test ! -L "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER"
+          test "$(stat -f '%l' "$QINAO_EXTERNAL_ADMISSION_VERIFIER")" -eq 1
+          test "$(stat -f '%l' "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER")" -eq 1
+          test "$(stat -f '%z' "$QINAO_EXTERNAL_ADMISSION_VERIFIER")" -le 67108864
+          test "$(stat -f '%z' "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER")" -le 67108864
+
+          repository_runner_fd=10
+          owner_checker_fd=11
+          external_verifier_fd=12
+          signing_provider_fd=13
+          exec 10<"$QINAO_REPOSITORY_RUNNER"
+          exec 11<"$QINAO_OWNER_LEDGER_CHECKER"
+          exec 12<"$QINAO_EXTERNAL_ADMISSION_VERIFIER"
+          exec 13<"$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER"
+          test "$(shasum -a 256 "/dev/fd/$repository_runner_fd" | cut -d ' ' -f 1)" = "$QINAO_REPOSITORY_RUNNER_SHA256"
+          test "$(shasum -a 256 "/dev/fd/$owner_checker_fd" | cut -d ' ' -f 1)" = "$QINAO_OWNER_LEDGER_CHECKER_SHA256"
+          test "$(shasum -a 256 "/dev/fd/$external_verifier_fd" | cut -d ' ' -f 1)" = "$QINAO_EXTERNAL_ADMISSION_VERIFIER_SHA256"
+          test "$(shasum -a 256 "/dev/fd/$signing_provider_fd" | cut -d ' ' -f 1)" = "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER_SHA256"
+
+          rewind_fd() {
+            /usr/bin/python3 - "$1" <<'PY'
+          import os
+          import sys
+          os.lseek(int(sys.argv[1]), 0, os.SEEK_SET)
+          PY
+          }
+          rewind_fd "$repository_runner_fd"
+          rewind_fd "$owner_checker_fd"
+          rewind_fd "$external_verifier_fd"
+          rewind_fd "$signing_provider_fd"
+
+          expected_manifest="{\"files\":[{\"byteLength\":$QINAO_CANDIDATE_ENVELOPE_SIZE,\"path\":\"validation-envelope.json\",\"sha256\":\"$QINAO_CANDIDATE_ENVELOPE_SHA256\"},{\"byteLength\":$QINAO_CANDIDATE_LOG_SIZE,\"path\":\"validation.log\",\"sha256\":\"$QINAO_CANDIDATE_LOG_SHA256\"}],\"schema\":\"QinaoCandidateValidationArtifactV1\"}"
+          expected_manifest_path="$RUNNER_TEMP/qinao-expected-artifact-manifest.json"
+          printf '%s\n' "$expected_manifest" > "$expected_manifest_path"
+          cmp -s "$expected_manifest_path" "$artifact_root/artifact-manifest.json"
+
+          test "$(git -C "$candidate_root" rev-parse HEAD)" = "$QINAO_CANDIDATE_COMMIT"
+          test "$(git -C "$candidate_root" rev-parse HEAD^{tree})" = "$QINAO_CANDIDATE_TREE"
+          test -z "$(git -C "$candidate_root" status --porcelain)"
           test ! -e "$QINAO_UNSIGNED_ADMISSION_REPORT"
           test ! -e "$QINAO_CURRENT_ADMISSION_RECEIPT"
+
           prerequisite_args=()
           if test -n "$QINAO_EXTERNAL_PREREQUISITES"; then
             while IFS= read -r prerequisite; do
@@ -114,35 +311,156 @@ jobs:
               prerequisite_args+=(--external-prerequisite "$prerequisite")
             done <<< "$QINAO_EXTERNAL_PREREQUISITES"
           fi
-          python3 scripts/run_qinao_wave_admission.py report \
-            --root "$GITHUB_WORKSPACE" \
-            --bundle "$QINAO_CURRENT_WAVE_BUNDLE" \
+          expected_prior_wave_slice_ids=(
+            w6.runtime.observation-values
+            w6.semantic.audit-schema
+            w6.runtime.audit-envelope-freeze
+            w6.semantic.coordinator-behavior
+            w6.runtime.integration-population
+          )
+          canonical_external_path() {
+            /usr/bin/python3 -c 'from pathlib import Path; import sys; path=Path(sys.argv[1]).resolve(strict=True); roots=[Path(value).resolve(strict=True) for value in sys.argv[2:]]; sys.exit(1) if any(path == root or root in path.parents for root in roots) else print(path)' "$@"
+          }
+          prior_receipt_args=()
+          prior_receipt_bindings=()
+          prior_receipt_fds=()
+          prior_receipt_index=0
+          if test -n "$QINAO_PRIOR_ADMISSION_RECEIPTS"; then
+            while IFS= read -r prior_receipt; do
+              test -n "$prior_receipt"
+              case "$prior_receipt" in
+                *$'\r'*|*=*=*|=*) exit 1 ;;
+                *=*) ;;
+                *) exit 1 ;;
+              esac
+              prior_wave_slice_id="${prior_receipt%%=*}"
+              prior_receipt_path="${prior_receipt#*=}"
+              test "$prior_receipt_index" -lt "${#expected_prior_wave_slice_ids[@]}"
+              test "$prior_wave_slice_id" = "${expected_prior_wave_slice_ids[$prior_receipt_index]}"
+              test -n "$prior_receipt_path"
+              case "$prior_receipt_path" in
+                /*) ;;
+                *) exit 1 ;;
+              esac
+              test -f "$prior_receipt_path"
+              test ! -L "$prior_receipt_path"
+              prior_receipt_path="$(canonical_external_path "$prior_receipt_path" "$candidate_root" "$trusted_root")"
+              prior_receipt_path_binding="$(stat -L -f '%d:%i' "$prior_receipt_path")"
+              case "$prior_receipt_index" in
+                0) prior_receipt_fd=20; exec 20<"$prior_receipt_path" ;;
+                1) prior_receipt_fd=21; exec 21<"$prior_receipt_path" ;;
+                2) prior_receipt_fd=22; exec 22<"$prior_receipt_path" ;;
+                3) prior_receipt_fd=23; exec 23<"$prior_receipt_path" ;;
+                4) prior_receipt_fd=24; exec 24<"$prior_receipt_path" ;;
+                *) exit 1 ;;
+              esac
+              prior_receipt_metadata="$(/usr/bin/python3 -c 'import os,stat,sys; value=os.fstat(int(sys.argv[1])); print(f"{value.st_dev}:{value.st_ino} {value.st_nlink} {stat.S_IMODE(value.st_mode):o} {int(stat.S_ISREG(value.st_mode))}")' "$prior_receipt_fd")"
+              read -r prior_receipt_binding prior_receipt_link_count prior_receipt_mode prior_receipt_regular <<< "$prior_receipt_metadata"
+              test "$prior_receipt_path_binding" = "$prior_receipt_binding"
+              test "$prior_receipt_link_count" -eq 1
+              test "$prior_receipt_mode" = 600
+              test "$prior_receipt_regular" -eq 1
+              test ! -L "$prior_receipt_path"
+              for seen_prior_receipt_binding in ${prior_receipt_bindings[@]+"${prior_receipt_bindings[@]}"}; do
+                test "$seen_prior_receipt_binding" != "$prior_receipt_binding"
+              done
+              prior_receipt_bindings+=("$prior_receipt_binding")
+              prior_receipt_fds+=("$prior_receipt_fd")
+              prior_receipt_args+=(--prior-admission-receipt "${prior_wave_slice_id}=/dev/fd/${prior_receipt_fd}")
+              prior_receipt_index=$((prior_receipt_index + 1))
+            done <<< "$QINAO_PRIOR_ADMISSION_RECEIPTS"
+          fi
+          runtime_entry_args=()
+          if test -n "$QINAO_RUNTIME_ENTRY_PREDECESSOR"; then
+            case "$QINAO_RUNTIME_ENTRY_PREDECESSOR" in
+              *$'\n'*|*$'\r'*|*=*) exit 1 ;;
+            esac
+            case "$QINAO_RUNTIME_ENTRY_PREDECESSOR" in
+              /*) ;;
+              *) exit 1 ;;
+            esac
+            test -f "$QINAO_RUNTIME_ENTRY_PREDECESSOR"
+            test ! -L "$QINAO_RUNTIME_ENTRY_PREDECESSOR"
+            runtime_entry_path="$(canonical_external_path "$QINAO_RUNTIME_ENTRY_PREDECESSOR" "$candidate_root" "$trusted_root")"
+            runtime_entry_path_binding="$(stat -L -f '%d:%i' "$runtime_entry_path")"
+            runtime_entry_fd=25
+            exec 25<"$runtime_entry_path"
+            runtime_entry_metadata="$(/usr/bin/python3 -c 'import os,stat,sys; value=os.fstat(int(sys.argv[1])); print(f"{value.st_dev}:{value.st_ino} {value.st_nlink} {stat.S_IMODE(value.st_mode):o} {int(stat.S_ISREG(value.st_mode))}")' "$runtime_entry_fd")"
+            read -r runtime_entry_binding runtime_entry_link_count runtime_entry_mode runtime_entry_regular <<< "$runtime_entry_metadata"
+            test "$runtime_entry_path_binding" = "$runtime_entry_binding"
+            test "$runtime_entry_link_count" -eq 1
+            test "$runtime_entry_mode" = 600
+            test "$runtime_entry_regular" -eq 1
+            test ! -L "$QINAO_RUNTIME_ENTRY_PREDECESSOR"
+            for prior_receipt_binding in ${prior_receipt_bindings[@]+"${prior_receipt_bindings[@]}"}; do
+              test "$prior_receipt_binding" != "$runtime_entry_binding"
+            done
+            runtime_entry_args+=(--runtime-entry-predecessor "/dev/fd/$runtime_entry_fd")
+          fi
+          QINAO_PINNED_REPOSITORY_RUNNER="/dev/fd/$repository_runner_fd" \
+          QINAO_PINNED_OWNER_LEDGER_CHECKER="/dev/fd/$owner_checker_fd" \
+          PYTHONPATH="$trusted_root" \
+          /usr/bin/python3 "/dev/fd/$repository_runner_fd" report \
+            --root "$candidate_root" \
+            --bundle "$candidate_root/$QINAO_CURRENT_WAVE_BUNDLE_RELATIVE" \
             --source-selection "$QINAO_SOURCE_SELECTION" \
             --trust-root "$QINAO_ADMISSION_TRUST_ROOT" \
             --previous-receipt "$QINAO_PREVIOUS_ADMISSION_RECEIPT" \
             --candidate-tree "$QINAO_CANDIDATE_TREE" \
-            "${prerequisite_args[@]}" \
+            ${prerequisite_args[@]+"${prerequisite_args[@]}"} \
+            ${prior_receipt_args[@]+"${prior_receipt_args[@]}"} \
+            ${runtime_entry_args[@]+"${runtime_entry_args[@]}"} \
             --unsigned-report "$QINAO_UNSIGNED_ADMISSION_REPORT"
-          "$QINAO_EXTERNAL_ADMISSION_VERIFIER" admit-wave \
+          rewind_fd "$external_verifier_fd"
+          rewind_fd "$signing_provider_fd"
+          "/dev/fd/$external_verifier_fd" admit-wave \
             --report "$QINAO_UNSIGNED_ADMISSION_REPORT" \
-            --bundle "$QINAO_CURRENT_WAVE_BUNDLE" \
+            --bundle "$candidate_root/$QINAO_CURRENT_WAVE_BUNDLE_RELATIVE" \
             --source-selection "$QINAO_SOURCE_SELECTION" \
             --previous-receipt "$QINAO_PREVIOUS_ADMISSION_RECEIPT" \
-            --repository "$GITHUB_WORKSPACE" \
+            --repository "$candidate_root" \
             --candidate-tree "$QINAO_CANDIDATE_TREE" \
             --trust-root "$QINAO_ADMISSION_TRUST_ROOT" \
-            --signing-provider "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER" \
+            ${prerequisite_args[@]+"${prerequisite_args[@]}"} \
+            ${prior_receipt_args[@]+"${prior_receipt_args[@]}"} \
+            ${runtime_entry_args[@]+"${runtime_entry_args[@]}"} \
+            --signing-provider "/dev/fd/$signing_provider_fd" \
             --signing-provider-sha256 "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER_SHA256" \
             --receipt "$QINAO_CURRENT_ADMISSION_RECEIPT"
-          python3 scripts/run_qinao_wave_admission.py verify-receipt \
-            --root "$GITHUB_WORKSPACE" \
-            --bundle "$QINAO_CURRENT_WAVE_BUNDLE" \
+          rewind_fd "$repository_runner_fd"
+          rewind_fd "$owner_checker_fd"
+          QINAO_PINNED_REPOSITORY_RUNNER="/dev/fd/$repository_runner_fd" \
+          QINAO_PINNED_OWNER_LEDGER_CHECKER="/dev/fd/$owner_checker_fd" \
+          PYTHONPATH="$trusted_root" \
+          /usr/bin/python3 "/dev/fd/$repository_runner_fd" verify-receipt \
+            --root "$candidate_root" \
+            --bundle "$candidate_root/$QINAO_CURRENT_WAVE_BUNDLE_RELATIVE" \
             --source-selection "$QINAO_SOURCE_SELECTION" \
             --trust-root "$QINAO_ADMISSION_TRUST_ROOT" \
             --previous-receipt "$QINAO_PREVIOUS_ADMISSION_RECEIPT" \
             --candidate-tree "$QINAO_CANDIDATE_TREE" \
-            "${prerequisite_args[@]}" \
+            ${prerequisite_args[@]+"${prerequisite_args[@]}"} \
+            ${prior_receipt_args[@]+"${prior_receipt_args[@]}"} \
+            ${runtime_entry_args[@]+"${runtime_entry_args[@]}"} \
             --receipt "$QINAO_CURRENT_ADMISSION_RECEIPT"
-          BehavioralAISubstrate/scripts/check-ios27-floor.sh
-          test "$(git rev-parse HEAD^{tree})" = "$QINAO_CANDIDATE_TREE"
-          test -z "$(git status --porcelain)"
+          exec 20<&-
+          exec 21<&-
+          exec 22<&-
+          exec 23<&-
+          exec 24<&-
+          exec 25<&-
+          exec 10<&-
+          exec 11<&-
+          exec 12<&-
+          exec 13<&-
+
+          test "$(git -C "$candidate_root" rev-parse HEAD)" = "$QINAO_CANDIDATE_COMMIT"
+          test "$(git -C "$candidate_root" rev-parse HEAD^{tree})" = "$QINAO_CANDIDATE_TREE"
+          test -z "$(git -C "$candidate_root" status --porcelain)"
+      - name: Upload admitted receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qinao-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qinao-current-receipt.json
+          if-no-files-found: error
+          retention-days: 1

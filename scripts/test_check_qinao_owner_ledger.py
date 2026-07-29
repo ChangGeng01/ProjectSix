@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 from unittest import mock
@@ -19,6 +20,7 @@ except ModuleNotFoundError:  # Direct `python scripts/test_...py` invocation.
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "check_qinao_owner_ledger.py"
+VERIFICATION_TIME = datetime(2026, 7, 30, tzinfo=timezone.utc)
 LEDGER = ROOT / "docs" / "superpowers" / "specs" / "qinao-owner-ledger-v1.json"
 CREATE_PROOF = {
     "repository_search": "rg found no existing owner",
@@ -1979,13 +1981,114 @@ def _test_ed25519_sign(seed: bytes, message: bytes) -> bytes:
 
 
 def _canonical_test_json(value: object) -> bytes:
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        allow_nan=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
+    if value is None:
+        return b"null"
+    if value is True:
+        return b"true"
+    if value is False:
+        return b"false"
+    if type(value) is int:
+        if not -(2**53 - 1) <= value <= 2**53 - 1:
+            raise ValueError("test JSON integer is outside the safe range")
+        return str(value).encode("ascii")
+    if isinstance(value, str):
+        value.encode("utf-16-be")
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    if isinstance(value, list):
+        return (
+            b"["
+            + b",".join(_canonical_test_json(item) for item in value)
+            + b"]"
+        )
+    if isinstance(value, dict):
+        keys = sorted(value, key=lambda key: key.encode("utf-16-be"))
+        return (
+            b"{"
+            + b",".join(
+                _canonical_test_json(key)
+                + b":"
+                + _canonical_test_json(value[key])
+                for key in keys
+            )
+            + b"}"
+        )
+    raise ValueError("unsupported test JSON value")
+
+
+def _test_governance_signature_preimage(value: object) -> bytes:
+    return hashlib.sha256(_canonical_test_json(value)).digest()
+
+
+_TEST_ROLE_SCHEMA_SCOPES = (
+    ("source-selector", "QinaoDualSpaceSourceSelectionV1"),
+    ("root-admission-signer", "QinaoRootAdmissionReceiptV1"),
+    ("design-edge-admission-signer", "QinaoDesignEdgeAdmissionReceiptV1"),
+    ("wave-bundle-reviewer", "QinaoWaveCategoryEvidenceV1"),
+    ("wave-bundle-reviewer", "QinaoWaveBundleV1"),
+    ("wave-admission-signer", "QinaoWaveAdmissionReceiptV1"),
+    ("k4-evidence-signer", "QinaoK4PhysicalDeviceProfileV1"),
+    ("k4-evidence-signer", "QinaoK4IOS27PlatformSpikeV1"),
+    ("runtime-chain-signer", "QinaoW6RuntimeReceiptChainV1"),
+)
+
+
+def _test_scoped_trust_key(
+    seed: bytes,
+    key_id: str,
+    role: str,
+    schema_scope: str,
+    *,
+    principal_id: str | None = None,
+    issued_at: str = "2026-07-29T00:00:00Z",
+    expires_at: str = "2030-01-01T00:00:00Z",
+) -> dict:
+    public_key, _prefix, _scalar = _test_ed25519_key(seed)
+    return {
+        "keyID": key_id,
+        "principalID": principal_id or key_id,
+        "role": role,
+        "schemaScope": schema_scope,
+        "publicKey": base64.b64encode(public_key).decode("ascii"),
+        "publicKeyFingerprintSHA256": hashlib.sha256(public_key).hexdigest(),
+        "notBefore": issued_at,
+        "notAfter": expires_at,
+    }
+
+
+def _test_complete_trust_keys(
+    keys: list[dict],
+    *,
+    issued_at: str = "2026-07-29T00:00:00Z",
+    expires_at: str = "2030-01-01T00:00:00Z",
+) -> list[dict]:
+    completed = copy.deepcopy(keys)
+    present = {
+        (row.get("role"), row.get("schemaScope"))
+        for row in completed
+        if isinstance(row, dict)
+    }
+    for role, schema_scope in _TEST_ROLE_SCHEMA_SCOPES:
+        if (role, schema_scope) in present:
+            continue
+        seed = hashlib.sha256(
+            f"test-only-filler:{role}:{schema_scope}".encode("utf-8")
+        ).digest()
+        completed.append(
+            _test_scoped_trust_key(
+                seed,
+                f"test-only-filler-{hashlib.sha256(schema_scope.encode()).hexdigest()[:16]}",
+                role,
+                schema_scope,
+                issued_at=issued_at,
+                expires_at=expires_at,
+            )
+        )
+    return sorted(completed, key=_canonical_test_json)
 
 
 def _make_default_wave_arguments(directory: Path) -> list[str]:
@@ -1998,12 +2101,12 @@ def _make_default_wave_arguments(directory: Path) -> list[str]:
             text=True,
         ).stdout.strip()
 
-    def signed(value: dict) -> dict:
+    def signed(value: dict, seed: bytes) -> dict:
         result = copy.deepcopy(value)
         result["signature"] = base64.b64encode(
             _test_ed25519_sign(
-                QinaoWaveAuthorityGateTests.TEST_SEED,
-                _canonical_test_json(value),
+                seed,
+                _test_governance_signature_preimage(value),
             )
         ).decode("ascii")
         return result
@@ -2014,42 +2117,103 @@ def _make_default_wave_arguments(directory: Path) -> list[str]:
         return path
 
     base_tree = git("rev-parse", "HEAD^{tree}")
-    public_key, _prefix, _scalar = _test_ed25519_key(
-        QinaoWaveAuthorityGateTests.TEST_SEED
+    source_public_key, _prefix, _scalar = _test_ed25519_key(
+        QinaoWaveAuthorityGateTests.SOURCE_SELECTION_SEED
+    )
+    category_public_key, _prefix, _scalar = _test_ed25519_key(
+        QinaoWaveAuthorityGateTests.CATEGORY_REVIEW_SEED
     )
     trust_root = {
         "schema": "QinaoAdmissionTrustRootV1",
         "repositoryIdentity": QinaoWaveAuthorityGateTests.REPOSITORY_IDENTITY,
         "issuedAt": QinaoWaveAuthorityGateTests.ISSUED_AT,
         "expiresAt": QinaoWaveAuthorityGateTests.EXPIRES_AT,
-        "keys": [
-            {
-                "keyID": QinaoWaveAuthorityGateTests.TEST_KEY_ID,
-                "role": role,
-                "publicKey": base64.b64encode(public_key).decode("ascii"),
-            }
-            for role in ("source-selector", "wave-category-reviewer")
-        ],
+        "keys": _test_complete_trust_keys(
+            [
+                {
+                    "keyID": QinaoWaveAuthorityGateTests.SOURCE_SELECTION_KEY_ID,
+                    "principalID": (
+                        QinaoWaveAuthorityGateTests.SOURCE_SELECTION_KEY_ID
+                    ),
+                    "role": "source-selector",
+                    "schemaScope": "QinaoDualSpaceSourceSelectionV1",
+                    "publicKey": base64.b64encode(source_public_key).decode(
+                        "ascii"
+                    ),
+                    "publicKeyFingerprintSHA256": hashlib.sha256(
+                        source_public_key
+                    ).hexdigest(),
+                    "notBefore": QinaoWaveAuthorityGateTests.ISSUED_AT,
+                    "notAfter": QinaoWaveAuthorityGateTests.EXPIRES_AT,
+                },
+                {
+                    "keyID": QinaoWaveAuthorityGateTests.CATEGORY_REVIEW_KEY_ID,
+                    "principalID": (
+                        QinaoWaveAuthorityGateTests.CATEGORY_REVIEW_KEY_ID
+                    ),
+                    "role": "wave-bundle-reviewer",
+                    "schemaScope": "QinaoWaveCategoryEvidenceV1",
+                    "publicKey": base64.b64encode(category_public_key).decode(
+                        "ascii"
+                    ),
+                    "publicKeyFingerprintSHA256": hashlib.sha256(
+                        category_public_key
+                    ).hexdigest(),
+                    "notBefore": QinaoWaveAuthorityGateTests.ISSUED_AT,
+                    "notAfter": QinaoWaveAuthorityGateTests.EXPIRES_AT,
+                },
+            ],
+        ),
         "revokedNonces": [],
     }
     design_digest = hashlib.sha256(
         QinaoWaveAuthorityGateTests.DESIGN_PATH.read_bytes()
     ).hexdigest()
+    design_path = QinaoWaveAuthorityGateTests.DESIGN_PATH.relative_to(
+        ROOT
+    ).as_posix()
+    design_binding = checker.git_tree_blob(ROOT, base_tree, design_path)
+    if design_binding is None:
+        raise AssertionError("test approved design must be present in HEAD tree")
+    design_blob, design_bytes = design_binding
+    selected_head = git("rev-parse", "HEAD")
     source_selection = signed(
         {
-            "schema": "QinaoSourceSelectionV1",
+            "schemaVersion": 1,
             "repositoryIdentity": QinaoWaveAuthorityGateTests.REPOSITORY_IDENTITY,
-            "selectedCommit": git("rev-parse", "HEAD"),
+            "selectedHEAD": selected_head,
             "selectedTree": base_tree,
-            "approvedDesignBlob": design_digest,
-            "externalVerifierSHA256": "a" * 64,
+            "approvedDesign": {
+                "path": design_path,
+                "commit": selected_head,
+                "tree": base_tree,
+                "blob": design_blob,
+                "byteLength": len(design_bytes),
+                "sha256": design_digest,
+            },
+            "candidateComparisons": [
+                {
+                    "candidateID": "selected-worktree",
+                    "comparisonBaseHEAD": selected_head,
+                    "head": selected_head,
+                    "tree": base_tree,
+                    "selected": True,
+                    "committedRows": [],
+                    "stagedRows": [],
+                    "unstagedRows": [],
+                    "untrackedRows": [],
+                }
+            ],
+            "reviewerPrincipal": (
+                QinaoWaveAuthorityGateTests.SOURCE_SELECTION_KEY_ID
+            ),
+            "reviewerRole": "source-selector",
             "issuedAt": QinaoWaveAuthorityGateTests.ISSUED_AT,
             "expiresAt": QinaoWaveAuthorityGateTests.EXPIRES_AT,
             "nonce": "legacy-source-selection-test-nonce",
-            "signer": QinaoWaveAuthorityGateTests.TEST_KEY_ID,
-            "role": "source-selector",
             "signatureAlgorithm": "Ed25519",
-        }
+        },
+        QinaoWaveAuthorityGateTests.SOURCE_SELECTION_SEED,
     )
     empty_diff_root = hashlib.sha256(_canonical_test_json([])).hexdigest()
     categories: dict[str, Path] = {}
@@ -2063,21 +2227,25 @@ def _make_default_wave_arguments(directory: Path) -> list[str]:
                         QinaoWaveAuthorityGateTests.REPOSITORY_IDENTITY
                     ),
                     "wave": "W0",
+                    "waveSliceID": "w0.gates",
+                    "sequenceOrdinal": 1,
                     "category": category,
                     "status": "notApplicable",
                     "baseTree": base_tree,
                     "approvedDesignBlob": design_digest,
                     "productionDiffRoot": empty_diff_root,
                     "reviewedRows": [],
+                    "reviewedRowsRoot": empty_diff_root,
                     "anchors": [],
                     "reason": "legacy checker tests carry no production tree diff",
                     "issuedAt": QinaoWaveAuthorityGateTests.ISSUED_AT,
                     "expiresAt": QinaoWaveAuthorityGateTests.EXPIRES_AT,
                     "nonce": f"legacy-{category}-test-nonce",
-                    "signer": QinaoWaveAuthorityGateTests.TEST_KEY_ID,
-                    "role": "wave-category-reviewer",
+                    "signer": QinaoWaveAuthorityGateTests.CATEGORY_REVIEW_KEY_ID,
+                    "role": "wave-bundle-reviewer",
                     "signatureAlgorithm": "Ed25519",
-                }
+                },
+                QinaoWaveAuthorityGateTests.CATEGORY_REVIEW_SEED,
             ),
         )
     trust_path = write("legacy-trust-root.json", trust_root)
@@ -2093,6 +2261,10 @@ def _make_default_wave_arguments(directory: Path) -> list[str]:
         base_tree,
         "--wave",
         "W0",
+        "--wave-slice-id",
+        "w0.gates",
+        "--sequence-ordinal",
+        "1",
         "--create-manifest-or-disposition",
         str(categories["create"]),
         "--extension-manifest-or-disposition",
@@ -2102,6 +2274,433 @@ def _make_default_wave_arguments(directory: Path) -> list[str]:
         "--fixture-set-or-disposition",
         str(categories["fixture"]),
     ]
+
+
+class QinaoStrictEd25519AndTrustRootTests(unittest.TestCase):
+    """Critical RED coverage for strict signature and role separation."""
+
+    def test_rfc8032_ed25519_vector_verifies(self) -> None:
+        public_key = bytes.fromhex(
+            "d75a980182b10ab7d54bfed3c964073a"
+            "0ee172f3daa62325af021a68f707511a"
+        )
+        signature = bytes.fromhex(
+            "e5564300c360ac729086e2cc806e828a"
+            "84877f1eb8e5d974d873e06522490155"
+            "5fb8821590a33bacc61e39701cf9b46b"
+            "d25bf5f0595bbe24655141438e7a100b"
+        )
+
+        self.assertTrue(
+            checker.verify_ed25519_signature(public_key, b"", signature)
+        )
+
+    def test_tree_object_cannot_masquerade_as_selected_commit(self) -> None:
+        tree = subprocess.run(
+            ["git", "rev-parse", "HEAD^{tree}"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+        self.assertIsNone(checker.git_commit_tree(ROOT, tree))
+
+    def test_git_object_checks_ignore_attacker_controlled_environment(self) -> None:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        expected_tree = subprocess.run(
+            ["git", "rev-parse", "HEAD^{tree}"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        poison = {
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES": str(ROOT / "attacker-objects"),
+            "GIT_DIR": str(ROOT / "attacker.git"),
+            "GIT_INDEX_FILE": str(ROOT / "attacker-index"),
+            "GIT_OBJECT_DIRECTORY": str(ROOT / "attacker-object-dir"),
+            "GIT_WORK_TREE": str(ROOT / "attacker-worktree"),
+        }
+
+        with mock.patch.dict(os.environ, poison, clear=False):
+            actual_tree = checker.git_commit_tree(ROOT, commit)
+
+        self.assertEqual(actual_tree, expected_tree)
+
+    def test_git_object_checks_fail_closed_on_timeout(self) -> None:
+        with mock.patch.object(
+            checker.subprocess,
+            "run",
+            side_effect=subprocess.TimeoutExpired(["git"], 30),
+        ):
+            self.assertIsNone(checker.git_commit_tree(ROOT, "a" * 40))
+            self.assertFalse(checker.git_tree_exists(ROOT, "a" * 40))
+
+    def test_identity_public_key_forgery_is_rejected(self) -> None:
+        identity_public_key = b"\x01" + (b"\0" * 31)
+        encoded_basepoint = _ed25519_encode(_ED25519_B)
+        forged_signature = encoded_basepoint + (1).to_bytes(32, "little")
+
+        self.assertFalse(
+            checker.verify_ed25519_signature(
+                identity_public_key,
+                b"arbitrary attacker-selected message",
+                forged_signature,
+            )
+        )
+
+    def test_identity_point_is_not_a_valid_public_key_or_signature_point(self) -> None:
+        identity = b"\x01" + (b"\0" * 31)
+
+        with self.assertRaisesRegex(ValueError, "identity|small-order|subgroup"):
+            checker.ed25519_decode_point(identity)
+
+    def test_small_order_and_noncanonical_points_and_scalar_are_rejected(
+        self,
+    ) -> None:
+        order_two = (_ED25519_Q - 1).to_bytes(32, "little")
+        noncanonical_y = _ED25519_Q.to_bytes(32, "little")
+        public_key, _prefix, _scalar = _test_ed25519_key(bytes(range(32)))
+        encoded_basepoint = _ed25519_encode(_ED25519_B)
+
+        with self.assertRaises(ValueError):
+            checker.ed25519_decode_point(order_two)
+        with self.assertRaises(ValueError):
+            checker.ed25519_decode_point(noncanonical_y)
+        self.assertFalse(
+            checker.verify_ed25519_signature(
+                public_key,
+                b"strict scalar boundary",
+                encoded_basepoint + _ED25519_L.to_bytes(32, "little"),
+            )
+        )
+
+    @staticmethod
+    def trust_root(keys: list[dict]) -> dict:
+        keys = _test_complete_trust_keys(keys)
+        return {
+            "schema": "QinaoAdmissionTrustRootV1",
+            "repositoryIdentity": "qinao/test-strict-trust-root",
+            "issuedAt": "2026-07-29T00:00:00Z",
+            "expiresAt": "2030-01-01T00:00:00Z",
+            "keys": keys,
+            "revokedNonces": [],
+        }
+
+    @staticmethod
+    def trust_key(
+        seed: bytes,
+        key_id: str,
+        role: str,
+        schema_scope: str | None = None,
+        principal_id: str | None = None,
+    ) -> dict:
+        default_scopes = {
+            "source-selector": "QinaoDualSpaceSourceSelectionV1",
+            "root-admission-signer": "QinaoRootAdmissionReceiptV1",
+            (
+                "design-edge-admission-signer"
+            ): "QinaoDesignEdgeAdmissionReceiptV1",
+            "wave-bundle-reviewer": "QinaoWaveCategoryEvidenceV1",
+            "wave-admission-signer": "QinaoWaveAdmissionReceiptV1",
+            "k4-evidence-signer": "QinaoK4PhysicalDeviceProfileV1",
+            "runtime-chain-signer": "QinaoW6RuntimeReceiptChainV1",
+        }
+        return _test_scoped_trust_key(
+            seed,
+            key_id,
+            role,
+            schema_scope or default_scopes.get(role, "invalid"),
+            principal_id=principal_id,
+        )
+
+    def test_public_key_fingerprint_cannot_cross_roles(self) -> None:
+        source_key = self.trust_key(
+            b"\x11" * 32,
+            "source-key",
+            "source-selector",
+        )
+        reused_key = dict(source_key)
+        reused_key["keyID"] = "root-key-alias"
+        reused_key["role"] = "root-admission-signer"
+
+        errors = checker.validate_trust_root(
+            self.trust_root([source_key, reused_key]),
+            verification_time=VERIFICATION_TIME,
+        )
+
+        self.assertTrue(
+            any(
+                "fingerprint" in error and "role/schemaScope" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_only_the_seven_frozen_role_families_are_accepted(self) -> None:
+        for invented_role in (
+            "wave-category-reviewer",
+            "k4-device-profile-signer",
+        ):
+            with self.subTest(role=invented_role):
+                errors = checker.validate_trust_root(
+                    self.trust_root(
+                        [
+                            self.trust_key(
+                                b"\x22" * 32,
+                                "invented-role-key",
+                                invented_role,
+                            )
+                        ]
+                    ),
+                    verification_time=VERIFICATION_TIME,
+                )
+                self.assertTrue(
+                    any("role" in error and "frozen" in error for error in errors),
+                    errors,
+                )
+
+    def test_distinct_schema_keys_may_share_one_frozen_role_family(self) -> None:
+        errors = checker.validate_trust_root(
+            self.trust_root(
+                [
+                    self.trust_key(
+                        b"\x33" * 32,
+                        "bundle-category-key",
+                        "wave-bundle-reviewer",
+                        "QinaoWaveCategoryEvidenceV1",
+                    ),
+                    self.trust_key(
+                        b"\x44" * 32,
+                        "bundle-envelope-key",
+                        "wave-bundle-reviewer",
+                        "QinaoWaveBundleV1",
+                    ),
+                ]
+            ),
+            verification_time=VERIFICATION_TIME,
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_future_issued_trust_root_and_signed_document_are_rejected(
+        self,
+    ) -> None:
+        seed = b"\x45" * 32
+        key_id = "future-issued-root-key"
+        trust_root = self.trust_root(
+            [self.trust_key(seed, key_id, "root-admission-signer")]
+        )
+        future_root = copy.deepcopy(trust_root)
+        future_root["issuedAt"] = "2099-01-01T00:00:00Z"
+        future_root["expiresAt"] = "2100-01-01T00:00:00Z"
+        unsigned = {
+            "schema": "QinaoRootAdmissionReceiptV1",
+            "repositoryIdentity": trust_root["repositoryIdentity"],
+            "issuedAt": "2099-01-01T00:00:00Z",
+            "expiresAt": "2100-01-01T00:00:00Z",
+            "nonce": "test-only-future-issued-document",
+            "signer": key_id,
+            "role": "root-admission-signer",
+            "signatureAlgorithm": "Ed25519",
+        }
+        document = {
+            **unsigned,
+            "signature": base64.b64encode(
+                _test_ed25519_sign(
+                    seed,
+                    _test_governance_signature_preimage(unsigned),
+                )
+            ).decode("ascii"),
+        }
+
+        root_errors = checker.validate_trust_root(
+            future_root,
+            verification_time=VERIFICATION_TIME,
+        )
+        document_errors = checker.validate_signed_document(
+            document,
+            trust_root,
+            expected_role="root-admission-signer",
+            label="future-issued document",
+            expected_schema_scope="QinaoRootAdmissionReceiptV1",
+            verification_time=VERIFICATION_TIME,
+        )
+
+        self.assertTrue(
+            any("issuedAt" in error and "future" in error for error in root_errors),
+            root_errors,
+        )
+        self.assertTrue(
+            any(
+                "issuedAt" in error and "future" in error
+                for error in document_errors
+            ),
+            document_errors,
+        )
+
+    def test_rfc8785_utf16_property_order_is_canonical(self) -> None:
+        value = {
+            "\u20ac": "Euro Sign",
+            "\r": "Carriage Return",
+            "\ufb33": "Hebrew Letter Dalet With Dagesh",
+            "1": "One",
+            "\U0001f600": "Emoji: Grinning Face",
+            "\u0080": "Control",
+            "\u00f6": "Latin Small Letter O With Diaeresis",
+        }
+        expected = (
+            '{"\\r":"Carriage Return","1":"One",'
+            '"\u0080":"Control","\u00f6":"Latin Small Letter O With Diaeresis",'
+            '"\u20ac":"Euro Sign","\U0001f600":"Emoji: Grinning Face",'
+            '"\ufb33":"Hebrew Letter Dalet With Dagesh"}'
+        ).encode("utf-8")
+
+        self.assertEqual(checker.canonical_json_bytes(value), expected)
+
+    def test_signed_document_uses_sha256_of_rfc8785_bytes_not_raw_json(
+        self,
+    ) -> None:
+        seed = b"\x54" * 32
+        key_id = "digest-preimage-root-key"
+        trust_root = self.trust_root(
+            [self.trust_key(seed, key_id, "root-admission-signer")]
+        )
+        unsigned = {
+            "schema": "QinaoRootAdmissionReceiptV1",
+            "repositoryIdentity": trust_root["repositoryIdentity"],
+            "issuedAt": "2026-07-29T00:00:00Z",
+            "expiresAt": "2030-01-01T00:00:00Z",
+            "nonce": "test-only-rfc8785-sha256-preimage",
+            "signer": key_id,
+            "role": "root-admission-signer",
+            "signatureAlgorithm": "Ed25519",
+            "payload": {"\U0001f600": 2, "\uffff": 1},
+        }
+        canonical = checker.canonical_json_bytes(unsigned)
+        digest_signed = {
+            **unsigned,
+            "signature": base64.b64encode(
+                _test_ed25519_sign(
+                    seed,
+                    hashlib.sha256(canonical).digest(),
+                )
+            ).decode("ascii"),
+        }
+        raw_signed = {
+            **unsigned,
+            "signature": base64.b64encode(
+                _test_ed25519_sign(seed, canonical)
+            ).decode("ascii"),
+        }
+
+        self.assertEqual(
+            checker.validate_signed_document(
+                digest_signed,
+                trust_root,
+                expected_role="root-admission-signer",
+                label="digest preimage",
+                expected_schema_scope="QinaoRootAdmissionReceiptV1",
+                verification_time=VERIFICATION_TIME,
+            ),
+            [],
+        )
+        raw_errors = checker.validate_signed_document(
+                raw_signed,
+                trust_root,
+            expected_role="root-admission-signer",
+            label="raw preimage",
+            expected_schema_scope="QinaoRootAdmissionReceiptV1",
+            verification_time=VERIFICATION_TIME,
+            )
+        self.assertTrue(
+            any("signature is invalid" in error for error in raw_errors),
+            raw_errors,
+        )
+
+    def test_exact_task0_source_selection_schema_is_accepted(self) -> None:
+        seed = b"\x55" * 32
+        key_id = "independent-source-selector"
+        selected_head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        selected_tree = subprocess.run(
+            ["git", "rev-parse", "HEAD^{tree}"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        trust_root = self.trust_root(
+            [self.trust_key(seed, key_id, "source-selector")]
+        )
+        unsigned_selection = {
+            "schemaVersion": 1,
+            "repositoryIdentity": trust_root["repositoryIdentity"],
+            "selectedHEAD": selected_head,
+            "selectedTree": selected_tree,
+            "approvedDesign": {
+                "path": (
+                    "docs/superpowers/specs/"
+                    "2026-07-29-qinao-dual-space-automation-"
+                    "apple-ecosystem-design.md"
+                ),
+                "commit": "c4e6cf23fd28d01abea3b9c5d8b282ba9dd9f271",
+                "tree": "deef57197db409d6e4b33d5bfe9f7521eacefa12",
+                "blob": "bbc586cb5787d872f8980f95a766f8afa90f9221",
+                "byteLength": 113470,
+                "sha256": (
+                    "50338e28492cd8dc7a81f28a07a871d70f02020af"
+                    "56549cb1384b9431bd5fcf6"
+                ),
+            },
+            "candidateComparisons": [
+                {
+                    "candidateID": "selected-worktree",
+                    "comparisonBaseHEAD": selected_head,
+                    "head": selected_head,
+                    "tree": selected_tree,
+                    "selected": True,
+                    "committedRows": [],
+                    "stagedRows": [],
+                    "unstagedRows": [],
+                    "untrackedRows": [],
+                }
+            ],
+            "reviewerPrincipal": key_id,
+            "reviewerRole": "source-selector",
+            "issuedAt": "2026-07-29T00:00:00Z",
+            "expiresAt": "2030-01-01T00:00:00Z",
+            "nonce": "task0-exact-selection-test",
+            "signatureAlgorithm": "Ed25519",
+        }
+        selection = dict(unsigned_selection)
+        selection["signature"] = base64.b64encode(
+            _test_ed25519_sign(
+                seed,
+                _test_governance_signature_preimage(unsigned_selection),
+            )
+        ).decode("ascii")
+
+        errors = checker.validate_source_selection(
+            selection,
+            trust_root,
+            root=ROOT,
+            verification_time=VERIFICATION_TIME,
+        )
+
+        self.assertEqual(errors, [])
 
 
 class QinaoWaveAuthorityGateTests(unittest.TestCase):
@@ -2115,8 +2714,10 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
         / "specs"
         / "2026-07-29-qinao-dual-space-automation-apple-ecosystem-design.md"
     )
-    TEST_SEED = bytes(range(32))
-    TEST_KEY_ID = "test-wave-review-key"
+    SOURCE_SELECTION_SEED = bytes(range(32))
+    CATEGORY_REVIEW_SEED = bytes(reversed(range(32)))
+    SOURCE_SELECTION_KEY_ID = "test-source-selection-key"
+    CATEGORY_REVIEW_KEY_ID = "test-category-review-key"
     ISSUED_AT = "2026-07-29T00:00:00Z"
     EXPIRES_AT = "2030-01-01T00:00:00Z"
 
@@ -2127,42 +2728,95 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
         self.base_tree = self.git("rev-parse", "HEAD^{tree}")
         self.candidate_tree = self.base_tree
         self.design_digest = hashlib.sha256(self.DESIGN_PATH.read_bytes()).hexdigest()
+        design_binding = checker.git_tree_blob(
+            ROOT,
+            self.base_tree,
+            self.DESIGN_PATH.relative_to(ROOT).as_posix(),
+        )
+        self.assertIsNotNone(design_binding)
+        assert design_binding is not None
+        self.design_blob, self.design_bytes = design_binding
         self.empty_diff_root = hashlib.sha256(_canonical_test_json([])).hexdigest()
-        public_key, _prefix, _scalar = _test_ed25519_key(self.TEST_SEED)
+        source_public_key, _prefix, _scalar = _test_ed25519_key(
+            self.SOURCE_SELECTION_SEED
+        )
+        category_public_key, _prefix, _scalar = _test_ed25519_key(
+            self.CATEGORY_REVIEW_SEED
+        )
         self.trust_root = {
             "schema": "QinaoAdmissionTrustRootV1",
             "repositoryIdentity": self.REPOSITORY_IDENTITY,
             "issuedAt": self.ISSUED_AT,
             "expiresAt": self.EXPIRES_AT,
-            "keys": [
-                {
-                    "keyID": self.TEST_KEY_ID,
-                    "role": "wave-category-reviewer",
-                    "publicKey": base64.b64encode(public_key).decode("ascii"),
-                },
-                {
-                    "keyID": self.TEST_KEY_ID,
-                    "role": "source-selector",
-                    "publicKey": base64.b64encode(public_key).decode("ascii"),
-                },
-            ],
+            "keys": _test_complete_trust_keys(
+                [
+                    {
+                        "keyID": self.CATEGORY_REVIEW_KEY_ID,
+                        "principalID": self.CATEGORY_REVIEW_KEY_ID,
+                        "role": "wave-bundle-reviewer",
+                        "schemaScope": "QinaoWaveCategoryEvidenceV1",
+                        "publicKey": base64.b64encode(category_public_key).decode(
+                            "ascii"
+                        ),
+                        "publicKeyFingerprintSHA256": hashlib.sha256(
+                            category_public_key
+                        ).hexdigest(),
+                        "notBefore": self.ISSUED_AT,
+                        "notAfter": self.EXPIRES_AT,
+                    },
+                    {
+                        "keyID": self.SOURCE_SELECTION_KEY_ID,
+                        "principalID": self.SOURCE_SELECTION_KEY_ID,
+                        "role": "source-selector",
+                        "schemaScope": "QinaoDualSpaceSourceSelectionV1",
+                        "publicKey": base64.b64encode(source_public_key).decode(
+                            "ascii"
+                        ),
+                        "publicKeyFingerprintSHA256": hashlib.sha256(
+                            source_public_key
+                        ).hexdigest(),
+                        "notBefore": self.ISSUED_AT,
+                        "notAfter": self.EXPIRES_AT,
+                    },
+                ],
+            ),
             "revokedNonces": [],
         }
         self.source_selection = self.signed(
             {
-                "schema": "QinaoSourceSelectionV1",
+                "schemaVersion": 1,
                 "repositoryIdentity": self.REPOSITORY_IDENTITY,
-                "selectedCommit": self.git("rev-parse", "HEAD"),
+                "selectedHEAD": self.git("rev-parse", "HEAD"),
                 "selectedTree": self.base_tree,
-                "approvedDesignBlob": self.design_digest,
-                "externalVerifierSHA256": "a" * 64,
+                "approvedDesign": {
+                    "path": self.DESIGN_PATH.relative_to(ROOT).as_posix(),
+                    "commit": self.git("rev-parse", "HEAD"),
+                    "tree": self.base_tree,
+                    "blob": self.design_blob,
+                    "byteLength": len(self.design_bytes),
+                    "sha256": self.design_digest,
+                },
+                "candidateComparisons": [
+                    {
+                        "candidateID": "selected-worktree",
+                        "comparisonBaseHEAD": self.git("rev-parse", "HEAD"),
+                        "head": self.git("rev-parse", "HEAD"),
+                        "tree": self.base_tree,
+                        "selected": True,
+                        "committedRows": [],
+                        "stagedRows": [],
+                        "unstagedRows": [],
+                        "untrackedRows": [],
+                    }
+                ],
+                "reviewerPrincipal": self.SOURCE_SELECTION_KEY_ID,
+                "reviewerRole": "source-selector",
                 "issuedAt": self.ISSUED_AT,
                 "expiresAt": self.EXPIRES_AT,
                 "nonce": "source-selection-test-nonce",
-                "signer": self.TEST_KEY_ID,
-                "role": "source-selector",
                 "signatureAlgorithm": "Ed25519",
-            }
+            },
+            seed=self.SOURCE_SELECTION_SEED,
         )
         self.documents: dict[str, dict] = {
             category: self.category_document(category)
@@ -2179,10 +2833,13 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             text=True,
         ).stdout.strip()
 
-    def signed(self, value: dict) -> dict:
+    def signed(self, value: dict, *, seed: bytes | None = None) -> dict:
         signed = copy.deepcopy(value)
         signed["signature"] = base64.b64encode(
-            _test_ed25519_sign(self.TEST_SEED, _canonical_test_json(value))
+            _test_ed25519_sign(
+                self.CATEGORY_REVIEW_SEED if seed is None else seed,
+                _test_governance_signature_preimage(value),
+            )
         ).decode("ascii")
         return signed
 
@@ -2192,7 +2849,7 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
         *,
         status: str = "notApplicable",
         rows: list[dict] | None = None,
-        anchors: list[str] | None = None,
+        anchors: list[object] | None = None,
     ) -> dict:
         rows = [] if rows is None else rows
         return self.signed(
@@ -2200,23 +2857,30 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
                 "schema": "QinaoWaveCategoryEvidenceV1",
                 "repositoryIdentity": self.REPOSITORY_IDENTITY,
                 "wave": "W0",
+                "waveSliceID": "w0.gates",
+                "sequenceOrdinal": 1,
                 "category": category,
                 "status": status,
                 "baseTree": self.base_tree,
                 "approvedDesignBlob": self.design_digest,
                 "productionDiffRoot": self.empty_diff_root,
                 "reviewedRows": rows,
+                "reviewedRowsRoot": hashlib.sha256(
+                    _canonical_test_json(
+                        sorted(rows, key=_canonical_test_json)
+                    )
+                ).hexdigest(),
                 "anchors": [] if anchors is None else anchors,
                 "reason": (
                     "W0 changes governance and floor tooling only"
                     if status == "notApplicable"
-                    else None
+                    else ""
                 ),
                 "issuedAt": self.ISSUED_AT,
                 "expiresAt": self.EXPIRES_AT,
                 "nonce": f"{category}-test-nonce",
-                "signer": self.TEST_KEY_ID,
-                "role": "wave-category-reviewer",
+                "signer": self.CATEGORY_REVIEW_KEY_ID,
+                "role": "wave-bundle-reviewer",
                 "signatureAlgorithm": "Ed25519",
             }
         )
@@ -2253,6 +2917,10 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             self.candidate_tree,
             "--wave",
             "W0",
+            "--wave-slice-id",
+            "w0.gates",
+            "--sequence-ordinal",
+            "1",
             "--create-manifest-or-disposition",
             str(paths["create"]),
             "--extension-manifest-or-disposition",
@@ -2324,6 +2992,166 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
         self.assertIn("extension=0", result.stdout)
         self.assertIn("adapter=0", result.stdout)
         self.assertIn("fixture=0", result.stdout)
+
+    def test_ordered_wave_schedule_is_the_exact_frozen_authority(self) -> None:
+        expected = (
+            ("W0", "w0.gates", 1),
+            ("W0", "w0.controlled", 2),
+            ("W1", "w1.dual-space", 1),
+            ("W2", "w2.persistence", 1),
+            ("W3", "w3.state", 1),
+            ("W3", "w3.context", 2),
+            ("W4", "w4.model-execution", 1),
+            ("W5", "w5.inspection-publication-apple", 1),
+            ("W6", "w6.runtime.observation-values", 1),
+            ("W6", "w6.semantic.audit-schema", 2),
+            ("W6", "w6.runtime.audit-envelope-freeze", 3),
+            ("W6", "w6.semantic.coordinator-behavior", 4),
+            ("W6", "w6.runtime.integration-population", 5),
+            ("W6", "w6.runtime.engine-cutover", 6),
+            ("W6", "w6.apple-lab", 7),
+            ("W6", "w6.certification", 8),
+        )
+        self.assertEqual(checker.ORDERED_WAVE_SCHEDULE, expected)
+        self.assertEqual(len(expected), len(set(expected)))
+        self.assertEqual(
+            checker.ORDERED_WAVE_SCHEDULE_SHA256,
+            hashlib.sha256(
+                json.dumps(
+                    expected,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest(),
+        )
+        self.assertEqual(
+            checker.validate_ordered_wave_schedule(expected),
+            expected,
+        )
+        self.assertEqual(
+            checker.WAVE_SCHEDULE,
+            {
+                (wave, wave_slice_id): sequence_ordinal
+                for wave, wave_slice_id, sequence_ordinal in expected
+            },
+        )
+
+    def test_schedule_source_mutations_fail_during_module_initialization(
+        self,
+    ) -> None:
+        source_path = Path(checker.__file__).resolve()
+        source = source_path.read_text(encoding="utf-8")
+        state_row = '    ("W3", "w3.state", 1),\n'
+        context_row = '    ("W3", "w3.context", 2),\n'
+        mutations = {
+            "duplicate ordinal": source.replace(
+                '    ("W0", "w0.controlled", 2),\n',
+                '    ("W0", "w0.controlled", 1),\n',
+                1,
+            ),
+            "reordered rows": source.replace(
+                state_row + context_row,
+                context_row + state_row,
+                1,
+            ),
+            "skipped row": source.replace(
+                '    ("W2", "w2.persistence", 1),\n',
+                "",
+                1,
+            ),
+            "extra row": source.replace(
+                '    ("W2", "w2.persistence", 1),\n',
+                (
+                    '    ("W2", "w2.persistence", 1),\n'
+                    '    ("W2", "w2.extra", 2),\n'
+                ),
+                1,
+            ),
+        }
+        for label, mutated_source in mutations.items():
+            with self.subTest(label=label):
+                self.assertNotEqual(mutated_source, source)
+                namespace = {
+                    "__file__": str(source_path),
+                    "__name__": f"test_schedule_mutation_{label}",
+                }
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "ordered wave schedule",
+                ):
+                    exec(
+                        compile(
+                            mutated_source,
+                            str(source_path),
+                            "exec",
+                        ),
+                        namespace,
+                    )
+
+    def test_exact_slice_and_ordinal_arguments_are_mandatory(self) -> None:
+        for option in ("--wave-slice-id", "--sequence-ordinal"):
+            with self.subTest(option=option):
+                command = self.command()
+                index = command.index(option)
+                del command[index:index + 2]
+                result = self.run_gate(command)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("required", result.stderr)
+
+    def test_mixed_valid_slices_within_one_wave_are_rejected(self) -> None:
+        self.mutate_document(
+            "create",
+            lambda document: document.update(
+                {
+                    "waveSliceID": "w0.controlled",
+                    "sequenceOrdinal": 2,
+                }
+            ),
+        )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requested wave schedule tuple", result.stderr)
+
+    def test_uniform_but_wrong_valid_slice_is_rejected(self) -> None:
+        for category in self.documents:
+            self.mutate_document(
+                category,
+                lambda document: document.update(
+                    {
+                        "waveSliceID": "w0.controlled",
+                        "sequenceOrdinal": 2,
+                    }
+                ),
+            )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requested wave schedule tuple", result.stderr)
+
+    def test_checker_main_captures_one_verification_time(self) -> None:
+        class CountingDateTime(datetime):
+            calls = 0
+
+            @classmethod
+            def now(cls, tz=None):
+                cls.calls += 1
+                return VERIFICATION_TIME
+
+        command = self.command()
+        with mock.patch.object(
+            checker,
+            "datetime",
+            CountingDateTime,
+        ), mock.patch.object(
+            sys,
+            "argv",
+            [str(SCRIPT), *command[2:]],
+        ):
+            self.assertEqual(checker.main(), 0)
+        self.assertEqual(CountingDateTime.calls, 1)
 
     def test_missing_extension_category_argument_is_rejected(self) -> None:
         command = self.command()
@@ -2462,12 +3290,16 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             self.documents["extension"],
             category="extension",
             wave="W0",
+            wave_slice_id="w0.gates",
+            sequence_ordinal=1,
             base_tree=self.base_tree,
             production_diff_root=diff_root,
             derived_rows=[row],
             ledger=ledger,
             root=ROOT,
+            candidate_tree=self.candidate_tree,
             trust_root=self.trust_root,
+            verification_time=VERIFICATION_TIME,
         )
 
         self.assertTrue(any("unknown.owner" in error for error in errors), errors)
@@ -2556,12 +3388,16 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             self.documents["create"],
             category="create",
             wave="W0",
+            wave_slice_id="w0.gates",
+            sequence_ordinal=1,
             base_tree=self.base_tree,
             production_diff_root=diff_root,
             derived_rows=[row],
             ledger=ledger,
             root=ROOT,
+            candidate_tree=self.candidate_tree,
             trust_root=self.trust_root,
+            verification_time=VERIFICATION_TIME,
         )
 
         self.assertTrue(
@@ -2575,8 +3411,16 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
         self.documents["fixture"] = self.category_document(
             "fixture",
             anchors=[
-                "BehavioralAISubstrate/Tests/DefinitelyMissing.swift",
-                "BehavioralAISubstrate/Tests/NoSuchSuite*.swift",
+                {
+                    "path": (
+                        "BehavioralAISubstrate/Tests/DefinitelyMissing.swift"
+                    ),
+                    "blob": "a" * 40,
+                },
+                {
+                    "path": "BehavioralAISubstrate/Tests/NoSuchSuite.swift",
+                    "blob": "b" * 40,
+                },
             ],
         )
 
@@ -2584,7 +3428,7 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("DefinitelyMissing.swift", result.stderr)
-        self.assertIn("NoSuchSuite*.swift", result.stderr)
+        self.assertIn("NoSuchSuite.swift", result.stderr)
         self.assertIn("anchor", result.stderr)
 
     def test_anchor_tool_errors_cannot_be_reported_as_no_match(self) -> None:
@@ -2592,12 +3436,99 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             hasattr(checker, "resolve_anchor_paths"),
             "the authority gate needs a fail-closed anchor resolver",
         )
-        with mock.patch.object(Path, "glob", side_effect=OSError("scanner failed")):
+        with mock.patch.object(
+            checker.subprocess,
+            "run",
+            side_effect=subprocess.TimeoutExpired(["git", "ls-tree"], 30),
+        ):
             _paths, errors = checker.resolve_anchor_paths(
                 ROOT,
-                ["BehavioralAISubstrate/Tests/*.swift"],
+                self.candidate_tree,
+                [
+                    {
+                        "path": "BehavioralAISubstrate/Tests/Example.swift",
+                        "blob": "a" * 40,
+                    }
+                ],
             )
         self.assertTrue(any("tool error" in error for error in errors), errors)
+
+    def test_anchors_are_resolved_only_from_candidate_tree(self) -> None:
+        repository = self.directory / "anchor-repository"
+        repository.mkdir()
+        subprocess.run(
+            ["git", "init", "-q"],
+            cwd=repository,
+            check=True,
+        )
+        (repository / "README.md").write_text("anchor fixture\n", encoding="utf-8")
+        subprocess.run(
+            ["git", "add", "README.md"],
+            cwd=repository,
+            check=True,
+        )
+        base_tree = subprocess.run(
+            ["git", "write-tree"],
+            cwd=repository,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        candidate_only_path = "docs/test-only-candidate-anchor.txt"
+        object_id = subprocess.run(
+            ["git", "hash-object", "-w", "--stdin"],
+            cwd=repository,
+            input=b"candidate-only anchor\n",
+            check=True,
+            capture_output=True,
+        ).stdout.decode("ascii").strip()
+        subprocess.run(
+            [
+                "git",
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                f"100644,{object_id},{candidate_only_path}",
+            ],
+            cwd=repository,
+            check=True,
+        )
+        candidate_tree = subprocess.run(
+            ["git", "write-tree"],
+            cwd=repository,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        self.assertNotEqual(candidate_tree, base_tree)
+
+        resolved, errors = checker.resolve_anchor_paths(
+            repository,
+            candidate_tree,
+            [{"path": candidate_only_path, "blob": object_id}],
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(resolved, [candidate_only_path])
+        self.assertFalse((repository / candidate_only_path).exists())
+
+        live_only_path = repository / "test-only-live-anchor.txt"
+        live_only_path.write_text("live-only anchor\n", encoding="utf-8")
+        resolved, errors = checker.resolve_anchor_paths(
+            repository,
+            candidate_tree,
+            [
+                {
+                    "path": live_only_path.relative_to(repository).as_posix(),
+                    "blob": object_id,
+                }
+            ],
+        )
+
+        self.assertEqual(resolved, [])
+        self.assertTrue(
+            any("missing anchored candidate-tree blob" in error for error in errors)
+        )
 
     def test_forbidden_second_automation_authority_is_rejected(self) -> None:
         path = "BehavioralAISubstrate/Sources/BASRuntimeCore/AutomationStore.swift"

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import plistlib
+import shutil
 import stat
 import subprocess
 import tempfile
@@ -118,13 +119,38 @@ print(
 )
 """
 
+FAKE_RG = r"""#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import sys
+
+arguments = sys.argv[1:]
+log = Path(os.environ["QINAO_TEST_RG_LOG"])
+with log.open("a", encoding="utf-8") as handle:
+    handle.write(json.dumps(arguments) + "\n")
+call = len(log.read_text(encoding="utf-8").splitlines())
+fail_call = int(os.environ.get("QINAO_TEST_RG_FAIL_CALL", "0"))
+if fail_call == call:
+    status = int(os.environ.get("QINAO_TEST_RG_FAIL_STATUS", "2"))
+    print(f"test-only rg failure on call {call}", file=sys.stderr)
+    raise SystemExit(status)
+real_rg = os.environ["QINAO_TEST_REAL_RG"]
+os.execv(real_rg, [real_rg, *arguments])
+"""
+
 FAKE_XCODEBUILD = r"""#!/usr/bin/env python3
 import json
 import os
+import plistlib
 import sys
 from pathlib import Path
 
 arguments = sys.argv[1:]
+log_path = os.environ.get("QINAO_TEST_XCODEBUILD_LOG")
+if log_path:
+    with Path(log_path).open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(arguments) + "\n")
 requested_exit = int(os.environ.get("QINAO_TEST_XCODEBUILD_EXIT", "0"))
 if requested_exit:
     print("test-only xcodebuild failure", file=sys.stderr)
@@ -222,8 +248,6 @@ if "-enumerate-tests" in arguments:
     )
     output.write_text(json.dumps(document), encoding="utf-8")
     raise SystemExit(0)
-if "-showBuildSettings" not in arguments:
-    raise SystemExit(0)
 if "-sdk" in arguments:
     sdk = arguments[arguments.index("-sdk") + 1]
     variant = "iphoneos" if sdk == "iphoneos" else "iphonesimulator"
@@ -232,9 +256,31 @@ elif actual_destination == expected_simulator_destination:
 else:
     print("test-only unable to infer build-settings variant", file=sys.stderr)
     raise SystemExit(6)
-root = Path(os.environ["QINAO_TEST_ROOT"])
-products = root / "DerivedData" / "Build" / "Products" / f"Debug-{variant}"
+derived_data = Path(
+    arguments[arguments.index("-derivedDataPath") + 1]
+)
+products = derived_data / "Build" / "Products" / f"Debug-{variant}"
 floor = os.environ.get("QINAO_TEST_BUILD_FLOOR", "27.0")
+if (
+    "build-for-testing" in arguments
+    and os.environ.get("QINAO_TEST_CREATE_BUILD_PRODUCTS") == "1"
+):
+    for wrapper in ("BASDeviceTestApp.app", "BASDeviceTests.xctest"):
+        info = products / wrapper / "Info.plist"
+        info.parent.mkdir(parents=True, exist_ok=True)
+        with info.open("wb") as handle:
+            plistlib.dump(
+                {
+                    "CFBundleIdentifier": (
+                        f"test-only.{variant}.{wrapper}"
+                    ),
+                    "MinimumOSVersion": floor,
+                },
+                handle,
+                sort_keys=True,
+            )
+if "-showBuildSettings" not in arguments:
+    raise SystemExit(0)
 print(
     json.dumps(
         [
@@ -318,8 +364,21 @@ class IOS27FloorGateTests(unittest.TestCase):
         self.root = Path(self.temp_directory.name)
         self.tools = self.root / "test-only-tools"
         self.tools.mkdir()
+        self.injected_tools = self.root / "injected-only-tools"
+        self.injected_tools.mkdir()
+        self.runtime_tmp = self.root / "runtime-tmp"
+        self.runtime_tmp.mkdir()
+        self.rg_log = self.root / "rg-invocations.jsonl"
+        self.xcodebuild_log = self.root / "xcodebuild-invocations.jsonl"
+        self.real_rg = shutil.which("rg")
+        self.assertIsNotNone(self.real_rg)
 
         self.write("test-only-tools/swift", FAKE_SWIFT, mode=0o755)
+        self.write(
+            "injected-only-tools/rg",
+            FAKE_RG,
+            mode=0o755,
+        )
         self.write("test-only-tools/xcodebuild", FAKE_XCODEBUILD, mode=0o755)
         self.write("test-only-tools/otool", FAKE_OTOOL, mode=0o755)
         self.write("test-only-tools/xcrun", FAKE_XCRUN, mode=0o755)
@@ -512,6 +571,40 @@ targets:
         with path.open("wb") as handle:
             plistlib.dump(value, handle, sort_keys=True)
 
+    def write_floor_products(self, derived_data: Path) -> None:
+        for variant in ("iphoneos", "iphonesimulator"):
+            products = (
+                derived_data
+                / "Build"
+                / "Products"
+                / f"Debug-{variant}"
+            )
+            for wrapper in (
+                "BASDeviceTestApp.app",
+                "BASDeviceTests.xctest",
+            ):
+                self.write_plist(
+                    products / wrapper / "Info.plist",
+                    {
+                        "CFBundleIdentifier": (
+                            f"test-only.{variant}.{wrapper}"
+                        ),
+                        "MinimumOSVersion": "27.0",
+                    },
+                )
+
+    def logged_derived_data_paths(self) -> set[str]:
+        paths: set[str] = set()
+        for line in self.xcodebuild_log.read_text(
+            encoding="utf-8"
+        ).splitlines():
+            arguments = json.loads(line)
+            if "-derivedDataPath" in arguments:
+                paths.add(
+                    arguments[arguments.index("-derivedDataPath") + 1]
+                )
+        return paths
+
     def write_xcframework(
         self,
         *,
@@ -649,12 +742,16 @@ let package = Package(
         self,
         *,
         overrides: dict[str, str] | None = None,
+        unset: tuple[str, ...] = (),
     ) -> subprocess.CompletedProcess[str]:
+        self.rg_log.write_text("", encoding="utf-8")
+        self.xcodebuild_log.write_text("", encoding="utf-8")
         environment = dict(os.environ)
         environment.update(
             {
                 "PATH": f"{self.tools}:{environment['PATH']}",
                 "QINAO_SWIFT": str(self.tools / "swift"),
+                "QINAO_RG": str((self.injected_tools / "rg").resolve()),
                 "QINAO_XCODEBUILD": str(self.tools / "xcodebuild"),
                 "QINAO_OTOOL": str(self.tools / "otool"),
                 "QINAO_IOS27_DERIVED_DATA_PATH": str(
@@ -674,11 +771,16 @@ let package = Package(
                     "platform=iOS Simulator,"
                     "id=AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
                 ),
+                "QINAO_TEST_REAL_RG": str(self.real_rg),
+                "QINAO_TEST_RG_LOG": str(self.rg_log),
+                "QINAO_TEST_XCODEBUILD_LOG": str(self.xcodebuild_log),
                 "QINAO_TEST_REQUIRE_CONCRETE_SIMULATOR": "1",
                 "QINAO_TEST_REJECT_SIMULATOR_SDK_OVERRIDE": "1",
             }
         )
         environment.update(overrides or {})
+        for name in unset:
+            environment.pop(name, None)
         return subprocess.run(
             ["bash", str(GATE), str(self.root)],
             check=False,
@@ -692,6 +794,126 @@ let package = Package(
     ) -> None:
         result = self.run_gate()
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_injected_rg_classifies_no_match_and_tool_error(self) -> None:
+        cases = (
+            (
+                "no-match",
+                {
+                    "QINAO_TEST_RG_FAIL_CALL": "1",
+                    "QINAO_TEST_RG_FAIL_STATUS": "1",
+                },
+                "has no deployment declaration",
+            ),
+            (
+                "tool-error",
+                {
+                    "QINAO_TEST_RG_FAIL_CALL": "1",
+                    "QINAO_TEST_RG_FAIL_STATUS": "2",
+                },
+                "scanner failed with exit 2",
+            ),
+            (
+                "inverse-tool-error",
+                {
+                    "QINAO_TEST_RG_FAIL_CALL": "2",
+                    "QINAO_TEST_RG_FAIL_STATUS": "2",
+                },
+                "scanner failed with exit 2",
+            ),
+            (
+                "required-marker-tool-error",
+                {
+                    "QINAO_TEST_RG_FAIL_CALL": "7",
+                    "QINAO_TEST_RG_FAIL_STATUS": "2",
+                },
+                "scanner failed with exit 2",
+            ),
+        )
+        for label, overrides, diagnostic in cases:
+            with self.subTest(label=label):
+                result = self.run_gate(overrides=overrides)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(diagnostic, result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+
+    def test_rg_override_rejects_empty_multiword_relative_and_symlink_values(
+        self,
+    ) -> None:
+        symlink = self.injected_tools / "rg-alias"
+        symlink.symlink_to(self.injected_tools / "rg")
+        cases = {
+            "empty": "",
+            "multiword": f"{self.injected_tools / 'rg'} --hidden",
+            "relative": "injected-only-tools/rg",
+            "symlink": str(symlink),
+        }
+        for label, value in cases.items():
+            with self.subTest(label=label):
+                result = self.run_gate(overrides={"QINAO_RG": value})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("QINAO_RG", result.stderr)
+
+        default_result = self.run_gate(unset=("QINAO_RG",))
+        self.assertEqual(default_result.returncode, 0, default_result.stderr)
+
+    def test_release_scan_uses_injected_rg_and_rejects_exit_two(self) -> None:
+        valid = self.run_gate()
+        self.assertEqual(valid.returncode, 0, valid.stderr)
+        call_count = len(
+            self.rg_log.read_text(encoding="utf-8").splitlines()
+        )
+        self.assertGreater(call_count, 7)
+
+        result = self.run_gate(
+            overrides={
+                "QINAO_TEST_RG_FAIL_CALL": str(call_count),
+                "QINAO_TEST_RG_FAIL_STATUS": "2",
+            }
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("release fallback scanner failed with exit 2", result.stderr)
+
+    def test_default_derived_data_path_is_fresh_for_every_run(self) -> None:
+        overrides = {
+            "QINAO_IOS27_DERIVED_DATA_PATH": "",
+            "QINAO_TEST_CREATE_BUILD_PRODUCTS": "1",
+            "TMPDIR": str(self.runtime_tmp),
+        }
+        first = self.run_gate(overrides=overrides)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        first_paths = self.logged_derived_data_paths()
+        self.assertEqual(len(first_paths), 1)
+
+        second = self.run_gate(overrides=overrides)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        second_paths = self.logged_derived_data_paths()
+        self.assertEqual(len(second_paths), 1)
+
+        self.assertNotEqual(first_paths, second_paths)
+
+    def test_explicit_derived_data_override_is_preserved(self) -> None:
+        expected = str(self.root / "DerivedData")
+
+        result = self.run_gate()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.logged_derived_data_paths(), {expected})
+
+    def test_default_path_cannot_reuse_stale_legacy_derived_data(self) -> None:
+        stale = self.runtime_tmp / "qinao-ios27-floor-derived-data"
+        self.write_floor_products(stale)
+
+        result = self.run_gate(
+            overrides={
+                "QINAO_IOS27_DERIVED_DATA_PATH": "",
+                "TMPDIR": str(self.runtime_tmp),
+            }
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("built product is missing", result.stderr)
 
     def test_manifest_comment_cannot_spoof_legacy_floor(self) -> None:
         self.write(

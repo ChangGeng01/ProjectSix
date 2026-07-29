@@ -187,8 +187,12 @@ class QinaoPlanRemediationTests(unittest.TestCase):
         self.assertIn('[[ -f "$file" && -s "$file" ]]', floor)
         self.assertIn('if [[ "$swift_status" -ne 0 ]]', floor)
         checker = OWNER_CHECKER.read_text(encoding="utf-8")
-        self.assertIn('"empty glob" if wildcard else "missing anchored file"', checker)
-        self.assertIn("resolve_anchor_paths", checker)
+        self.assertIn("def resolve_anchor_paths(", checker)
+        self.assertIn(
+            '["git", "ls-tree", "-r", "-z", candidate_tree]',
+            checker,
+        )
+        self.assertIn("missing anchored candidate-tree blob", checker)
 
     def test_all_four_candidate_category_cli_inputs_are_mandatory(self) -> None:
         checker = OWNER_CHECKER.read_text(encoding="utf-8")
