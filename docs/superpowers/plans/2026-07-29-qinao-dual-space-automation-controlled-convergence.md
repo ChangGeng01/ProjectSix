@@ -91,10 +91,59 @@ Event/Artifact/Task/receipt authorities.
 
 ## Execution Status and Stop Conditions
 
-This convergence plan is **BLOCKED before Task 0D** until an operator/reviewer
-selects and signs the exact committed predecessor. Planning, publication, and
-read-only verification are allowed before that point; production edits are
-not. Tasks 3-10 cannot be executed from this file under any status.
+### Operator-pinned development bootstrap overlay
+
+**Scope and authority.** The operator has authorized exactly commit
+`7e4aa2d626e2c94b1b1f3405fb8454e73448514f` with tree
+`47304602b7d1c1eba8eed571dbc65ee36c3a5f21` as the development baseline.
+This is a narrowly scoped development-bootstrap authorization, not an external
+cryptographic admission, a replacement for one, or a release approval. It
+creates the linked worktree
+`/Users/changgeng/Project/Project06/Project06/.worktrees/qinao-dual-space-controlled-convergence`
+on `codex/qinao-dual-space-controlled-convergence` from that exact commit.
+The base already contains the exact approved-design blob, so this overlay
+requires no design-edge commit.
+
+**Unadmitted development history.** The development branch and every commit
+after the pinned base are explicitly **unadmitted**. They are review input
+only: they must not be described as admitted, complete, certified, merged,
+released, or capability-enabling. No task may use this overlay to enable a
+production capability, clear a stop condition, substitute a local result for a
+receipt, or create/sign/forge a selection, trust root, verifier identity,
+provider, bundle, or receipt.
+
+**Required development checks.** During development, Tasks 1 and 2 still run
+their RED -> meaningful-failure -> GREEN discipline, closed path-set equality,
+candidate-tree computation, unsigned/local deterministic gates, focused and
+cumulative tests, `git diff --check`, post-commit `HEAD^{tree}` equality, and
+clean-worktree checks. A local result is evidence only. It does not supply an
+admission outcome or a completion/capability claim.
+
+**Deferred external gate.** Until pre-merge/pre-release replay, do not run or
+claim completion from any command that requires the external source selection,
+trust root, previous/current receipt, protected provider, external
+bundle-review, `admit-wave`, `verify-receipt`, or evidence-signature operation.
+In particular, the Task 1/2 external bundle-review/admit/verify/signature
+commands are deferred; repository code and ordinary development CI continue
+to have no signing credential.
+
+**Pre-merge/pre-release replay is mandatory.** An independently reviewed
+external verifier must start at the pinned base commit/tree above and replay
+the unadmitted commits in their immutable reviewed commit/tree order. It must
+first issue the original signed source-selection/root-admission receipt, then
+recreate and verify every original wave bundle and receipt in predecessor to
+candidate-tree order, using the original trust-root, verifier, role-scoped
+provider, path-list, candidate-tree, and receipt-chain rules below. Every
+post-commit `HEAD^{tree}` must equal that wave's admitted candidate tree, and
+each next wave must use the preceding admitted receipt/tree. Any commit/tree,
+path-list, blob, signer, verifier digest, sequence, predecessor, or receipt
+mismatch blocks merge and release. This overlay never weakens or deletes the
+external verifier/trust-root/provider/receipt design; it defers its execution
+only.
+
+Under this overlay Tasks 0A-0B and the pinned development-worktree setup may
+proceed. Production edits remain subject to the original owner, gate, and
+wave rules, and Tasks 3-10 cannot be executed from this file under any status.
 
 The following capabilities remain disabled until their named stop condition clears:
 
@@ -286,7 +335,13 @@ commit/tree may then be signed.
   selected staged/unstaged/untracked bytes must first be externally committed
   and reviewed as a new candidate before Step 0C.
 
-- [ ] **Step 0C: Obtain independent selection**
+- [ ] **Step 0C: Obtain independent selection (mandatory at pre-merge/pre-release replay; deferred for the operator-pinned development bootstrap)**
+
+  The operator-pinned development bootstrap authorizes only the exact base
+  commit/tree stated in the Execution Status overlay. It does not satisfy this
+  step, create a signed selection, or produce a root receipt. Before merge or
+  release, the external replay must execute this original step and obtain its
+  `accepted` result exactly as written below.
 
   The operator/reviewer signs exactly one
   `QinaoDualSpaceSourceSelectionV1`. The execution environment supplies the
@@ -317,7 +372,18 @@ commit/tree may then be signed.
   `accepted`, report `BLOCKED_SOURCE_SELECTION` and stop. Do not convert this
   into a coder choice.
 
-- [ ] **Step 0D: Create the isolated execution branch/worktree**
+- [ ] **Step 0D: Create the isolated execution branch/worktree (ordinary admitted path; development bootstrap exception below)**
+
+  For the operator-pinned development bootstrap only, the linked worktree and
+  branch named in the Execution Status overlay are created directly from
+  `7e4aa2d626e2c94b1b1f3405fb8454e73448514f` /
+  `47304602b7d1c1eba8eed571dbc65ee36c3a5f21` and remain unadmitted. No root
+  receipt is implied. The pre-merge/pre-release replay must verify the signed
+  selection/root receipt and the original commit/tree checks below; it must
+  not reinterpret the bootstrap worktree as an admitted result or recreate it
+  from any other base. The retained `git worktree add` command is the ordinary
+  admitted-path reference and is not run against this already-created bootstrap
+  branch; replay verifies the immutable branch history from the pinned base.
 
   From the selected commit only. Read the verified values from the external
   signed root receipt, compare them with both the signed selection and Git,
@@ -350,6 +416,11 @@ commit/tree may then be signed.
   Expected: clean worktree; branch base equals the signed selection.
 
 - [ ] **Step 0E: Commit the approved design source as an admitted single-purpose edge if absent**
+
+  The operator-pinned base already contains the exact approved design blob
+  recorded in Global Constraints. Therefore this bootstrap creates no
+  design-edge commit; the eventual external replay records `alreadyPresent` or
+  blocks if that exact blob is not present.
 
   If and only if the selected predecessor does not already contain the exact
   approved design blob, import that one exact file and no other
