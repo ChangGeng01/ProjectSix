@@ -92,7 +92,7 @@ public enum BASRustCoreBridge {
     /// XCFramework reproducibility via two clean
     /// rebuilds (chapter 七百一 RED FLAG #1)。
     public static let rustToolchainChannel: String =
-        "stable"
+        "1.96.0"
 
     /// XCFramework binary blob expected on-disk path
     /// (relative to repo root)。 Tests pin against this
@@ -138,8 +138,10 @@ public enum BASRustCoreBridge {
     ///     tie-break (#4) + event-extractor faithful classify semantics
     ///     (#5) + importance-scorer no-history=0.5 fix now IN the binary
     ///     (un-skips the byte-parity test)。 Cold ×2 byte-identical。
+    ///   - iOS-27 floor cut: exact Rust 1.96.0 + source-built iOS std;
+    ///     device/simulator members carry minos 27.0. Cold ×2 byte-identical。
     public static let macosArm64SliceSHA256: String =
-        "941e8480119a72e856332a526f353f9ed4dab181703c1b5d9f1df6cf6e2c6cef"
+        "ff5ddb61507917f5cb9274576267d26dc3700a8565b73a1e5188739c5559adff"
 
     /// XCFramework ios-arm64 slice byte-equality SHA256。
     /// Bumped: chapter 七百八十三 / M2566 (+atom-lifecycle); "latest-languages"
@@ -147,14 +149,14 @@ public enum BASRustCoreBridge {
     /// (canonical-bytes ABI v2 + cold-rebuild reproducibility pin);
     /// audit M-l MED-4 (+atomic vector topk atom_ids)。
     public static let iosArm64SliceSHA256: String =
-        "0a56286f0f17c8e3c5e07ce61c9b793a7c6258676944852183a86997be50cac6"
+        "345a4b1699bee28d41cf93c35606bacdc6ac2a31dc215d7d70817852132fb8cf"
 
     /// XCFramework ios-arm64-simulator slice byte-equality
     /// SHA256。 Bumped: chapter 七百八十三 / M2566; "latest-languages" cut;
     /// 全面进化 T2.1a (canonical-bytes ABI v2 + cold-rebuild pin);
     /// audit M-l MED-4 (+atomic vector topk atom_ids)。
     public static let iosArm64SimulatorSliceSHA256: String =
-        "18c2a32c9a604fd0d103351883791bf0d92ae18a74ecf0c5228c50880689b6d2"
+        "09af4b7668bcc2d3ee2270181b9e0a1bd6a40eef357c08e965ade9e63b2f8767"
 
     /// Total per-slice SHA256 count = shippedSlices
     /// .count。 Cross-mirror invariant pinned in tests

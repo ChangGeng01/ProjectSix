@@ -27,6 +27,7 @@ final class BASEventLogTests: XCTestCase {
 
     private var tempURL: URL?
 
+    #if os(macOS)
     private func removingSwiftLineComments(
         _ source: String
     ) -> String {
@@ -100,6 +101,7 @@ final class BASEventLogTests: XCTestCase {
             .map(String.init)
             .joined(separator: " ")
     }
+    #endif
 
     override func setUpWithError() throws {
         tempURL = FileManager.default
@@ -284,6 +286,7 @@ final class BASEventLogTests: XCTestCase {
             -1)
     }
 
+    #if os(macOS)
     func testEventLogHeadHasOneSourceOwnerAndNoGovernanceEntry()
         throws
     {
@@ -604,6 +607,7 @@ final class BASEventLogTests: XCTestCase {
                 forbiddenPattern)
         }
     }
+    #endif
 
     // MARK: - BASInMemoryEventLogStorage
 

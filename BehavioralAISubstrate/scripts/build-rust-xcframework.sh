@@ -15,7 +15,7 @@
 #   - SOURCE_DATE_EPOCH = git commit timestamp
 #   - codegen-units = 1
 #   - panic = abort
-#   - strip = symbols
+#   - compile-time strip = none (Xcode 27 host proc-macro compatibility)
 #   - lto = false (avoids LLVM cross-compile non-determinism)
 #
 # Verify reproducibility:run the script twice with
@@ -50,11 +50,13 @@ set -euo pipefail
 # cross-compile targets (aarch64-apple-ios + aarch64-
 # apple-ios-sim),so the iOS slices only build when this
 # script picks up rustup's cargo first。 rust-toolchain
-# .toml in repo root pins the rustup channel to stable
-# 1.84+。
+# .toml beside the package pins the rustup channel; exporting
+# the same fully qualified toolchain here makes that pin apply
+# even when this script is launched from another directory。
 if [ -x "${HOME}/.cargo/bin/cargo" ]; then
     export PATH="${HOME}/.cargo/bin:${PATH}"
 fi
+export RUSTUP_TOOLCHAIN="1.96.0-aarch64-apple-darwin"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CARGO_ROOT="${REPO_ROOT}/Cargo"
@@ -70,17 +72,22 @@ SDE=$(cd "${REPO_ROOT}" && git log -1 --format=%ct 2>/dev/null \
       || echo "1700000000")
 export SOURCE_DATE_EPOCH="${SDE}"
 
-# Reproducibility flags layered on top of profile.release
-# in Cargo.toml。 Explicit even though the profile sets
-# them — defensive against future Cargo.toml drift。
-export RUSTFLAGS="-C codegen-units=1 -C strip=symbols"
+# Reproducibility flags layered on top of profile.release. Xcode 27's loader
+# rejects release proc-macro dylibs produced with Cargo's compile-time
+# strip=symbols as a malformed LINKEDIT string pool. Disable compile-time
+# stripping for the complete build so host proc macros remain loadable; the
+# shipped static archives are still deterministic and are verified byte-wise.
+export RUSTFLAGS="-C codegen-units=1"
+export CARGO_PROFILE_RELEASE_STRIP="none"
 export CARGO_TERM_COLOR=always
 
-# Pin the iOS/macOS slices to the package minimums (Package.swift: .iOS(.v18), .macOS(.v14)). Rust's
+# Pin the iOS slices to the first-party shipping minimum and keep the
+# independent macOS slice at its package minimum. Rust's
 # *-apple-ios / *-apple-darwin targets honor these deployment-target env vars for the per-object min-OS load
-# command. WITHOUT them, a build under a newer Xcode SDK bakes in that SDK's default (e.g. iOS 26.5), which then
-# mismatches the iOS-18 app deployment target at link time ("built for newer 'iOS' version than being linked").
-export IPHONEOS_DEPLOYMENT_TARGET="18.0"
+# command. The simulator variable is explicit as well so clang-built members
+# cannot silently inherit a different simulator floor.
+export IPHONEOS_DEPLOYMENT_TARGET="27.0"
+export IPHONESIMULATOR_DEPLOYMENT_TARGET="27.0"
 export MACOSX_DEPLOYMENT_TARGET="14.0"
 
 # 全面进化 T2.1a audit fix — pin the C COMPILER, not just the Rust
@@ -91,8 +98,18 @@ export MACOSX_DEPLOYMENT_TARGET="14.0"
 # across script runs — so "run the script twice" was structurally
 # unable to detect the drift (audited 2026-06-11: 456/458 archive
 # members reproducible,sqlite3.o the sole exception)。 DEVELOPER_DIR
-# resolves /usr/bin/cc → this Xcode's clang for the cc crate。
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+# resolves /usr/bin/cc → this Xcode's clang for the cc crate. The active
+# developer directory must itself be Xcode 27+; an older Xcode cannot attest
+# an iOS 27 rebuild.
+export DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
+XCODE_MAJOR="$(
+  DEVELOPER_DIR="${DEVELOPER_DIR}" xcodebuild -version |
+    awk '/^Xcode / { split($2, version, "."); print version[1]; exit }'
+)"
+if [ -z "${XCODE_MAJOR}" ] || [ "${XCODE_MAJOR}" -lt 27 ]; then
+  echo "ERROR: Xcode 27+ is required; DEVELOPER_DIR=${DEVELOPER_DIR}" >&2
+  exit 1
+fi
 
 # Targets shipped。 Three slices since M2191 chapter
 # 七百七 第一刀 (expanded from host-only at M2187)。
@@ -101,6 +118,29 @@ TARGETS=(
   "aarch64-apple-ios"
   "aarch64-apple-ios-sim"
 )
+
+PINNED_RUST_SYSROOT="$(rustc --print sysroot)"
+PINNED_RUST_SOURCE="${PINNED_RUST_SYSROOT}/lib/rustlib/src/rust/library/Cargo.toml"
+if [ ! -f "${PINNED_RUST_SOURCE}" ]; then
+  echo "ERROR: rust-src is required for the pinned toolchain: ${PINNED_RUST_SOURCE}" >&2
+  echo "       rustup component add --toolchain 1.96.0-aarch64-apple-darwin rust-src" >&2
+  exit 1
+fi
+for ios_target in "aarch64-apple-ios" "aarch64-apple-ios-sim"; do
+  target_libdir="$(rustc --print target-libdir --target "${ios_target}")"
+  if [ ! -d "${target_libdir}" ] || ! compgen -G "${target_libdir}/libcore-*.rlib" >/dev/null; then
+    echo "ERROR: pinned Rust target is missing: ${ios_target}" >&2
+    exit 1
+  fi
+done
+if ! CARGO_UNSTABLE_HELP="$(RUSTC_BOOTSTRAP=1 cargo -Z help 2>&1)"; then
+  echo "ERROR: pinned cargo failed while probing the required -Z build-std operation" >&2
+  exit 1
+fi
+if [[ "${CARGO_UNSTABLE_HELP}" != *"-Z build-std"* ]]; then
+  echo "ERROR: pinned cargo cannot execute the required -Z build-std operation" >&2
+  exit 1
+fi
 
 echo "==> SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}"
 echo "==> RUSTFLAGS=${RUSTFLAGS}"
@@ -114,6 +154,12 @@ echo ""
 # The doctrine check is two CLEAN rebuilds hashing identically;
 # warm re-runs only prove the cache works。
 if [ "${BAS_CLEAN_REBUILD:-0}" = "1" ]; then
+  # Proc-macros and build scripts are host artifacts under target/release,
+  # outside each target-specific directory. Leaving them warm made the
+  # documented "cold" rebuild incomplete and could reuse corrupt or
+  # differently-tooled dylibs.
+  echo "==> BAS_CLEAN_REBUILD: rm -rf target/release"
+  rm -rf "${CARGO_ROOT}/target/release"
   for t in "${TARGETS[@]}"; do
     echo "==> BAS_CLEAN_REBUILD: rm -rf target/${t}/release"
     rm -rf "${CARGO_ROOT}/target/${t}/release"
@@ -127,11 +173,26 @@ for t in "${TARGETS[@]}"; do
     cd "${CARGO_ROOT}"
     # deep-audit P2-23 (2026-07-13): --locked pins to the committed Cargo.lock so the reproducible
     # XCFramework build never silently resolves a newer dependency (byte-reproducibility invariant).
-    cargo build \
-      --locked \
-      --release \
-      --target "${t}" \
-      --manifest-path bas-memory-usage-tracker/Cargo.toml
+    case "${t}" in
+      aarch64-apple-ios|aarch64-apple-ios-sim)
+        # The distributed Rust std artifacts carry older Apple load
+        # commands. Recompile std and panic_abort from pinned rust-src under
+        # the exact iOS 27 environment; never silently fall back to them.
+        RUSTC_BOOTSTRAP=1 cargo build \
+          -Z build-std=std,panic_abort \
+          --locked \
+          --release \
+          --target "${t}" \
+          --manifest-path bas-memory-usage-tracker/Cargo.toml
+        ;;
+      *)
+        cargo build \
+          --locked \
+          --release \
+          --target "${t}" \
+          --manifest-path bas-memory-usage-tracker/Cargo.toml
+        ;;
+    esac
   )
 done
 

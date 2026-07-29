@@ -1,0 +1,148 @@
+name: Qinao protected current-wave admission
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_commit:
+        description: Exact candidate commit to evaluate
+        required: true
+        type: string
+      candidate_tree:
+        description: Exact candidate tree expected for that commit
+        required: true
+        type: string
+      current_wave_bundle:
+        description: Current reviewed wave bundle path
+        required: true
+        type: string
+      source_selection:
+        description: Externally supplied source-selection path
+        required: true
+        type: string
+      trust_root:
+        description: Externally supplied trust-root path
+        required: true
+        type: string
+      previous_receipt:
+        description: Externally supplied previous-receipt path
+        required: true
+        type: string
+      external_prerequisites:
+        description: Optional newline-delimited NAME=PATH prerequisite records
+        required: false
+        default: ""
+        type: string
+      unsigned_report:
+        description: Fresh external path for the unsigned report
+        required: true
+        type: string
+      current_receipt:
+        description: Fresh external path for the admitted receipt
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  admit-current-wave:
+    if: ${{ github.ref == 'refs/heads/qinao-admission-bootstrap-v1' }}
+    environment: qinao-admission
+    runs-on: [self-hosted, macOS, qinao-admission]
+    timeout-minutes: 45
+    env:
+      QINAO_CANDIDATE_COMMIT: ${{ inputs.candidate_commit }}
+      QINAO_CANDIDATE_TREE: ${{ inputs.candidate_tree }}
+      QINAO_CURRENT_WAVE_BUNDLE: ${{ inputs.current_wave_bundle }}
+      QINAO_SOURCE_SELECTION: ${{ inputs.source_selection }}
+      QINAO_ADMISSION_TRUST_ROOT: ${{ inputs.trust_root }}
+      QINAO_PREVIOUS_ADMISSION_RECEIPT: ${{ inputs.previous_receipt }}
+      QINAO_EXTERNAL_PREREQUISITES: ${{ inputs.external_prerequisites }}
+      QINAO_UNSIGNED_ADMISSION_REPORT: ${{ inputs.unsigned_report }}
+      QINAO_CURRENT_ADMISSION_RECEIPT: ${{ inputs.current_receipt }}
+      QINAO_EXTERNAL_ADMISSION_VERIFIER: ${{ vars.QINAO_EXTERNAL_ADMISSION_VERIFIER }}
+      QINAO_EXTERNAL_ADMISSION_VERIFIER_SHA256: ${{ vars.QINAO_EXTERNAL_ADMISSION_VERIFIER_SHA256 }}
+      QINAO_WAVE_ADMISSION_SIGNING_PROVIDER: ${{ vars.QINAO_WAVE_ADMISSION_SIGNING_PROVIDER }}
+      QINAO_WAVE_ADMISSION_SIGNING_PROVIDER_SHA256: ${{ vars.QINAO_WAVE_ADMISSION_SIGNING_PROVIDER_SHA256 }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.candidate_commit }}
+          fetch-depth: 0
+      - name: Run protected current-wave admission sequence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/qinao-admission-bootstrap-v1"
+          case "$QINAO_CANDIDATE_COMMIT" in
+            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+            *) exit 1 ;;
+          esac
+          case "$QINAO_CANDIDATE_TREE" in
+            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+            *) exit 1 ;;
+          esac
+          for variable in \
+            QINAO_CURRENT_WAVE_BUNDLE \
+            QINAO_SOURCE_SELECTION \
+            QINAO_ADMISSION_TRUST_ROOT \
+            QINAO_PREVIOUS_ADMISSION_RECEIPT \
+            QINAO_UNSIGNED_ADMISSION_REPORT \
+            QINAO_CURRENT_ADMISSION_RECEIPT \
+            QINAO_EXTERNAL_ADMISSION_VERIFIER \
+            QINAO_EXTERNAL_ADMISSION_VERIFIER_SHA256 \
+            QINAO_WAVE_ADMISSION_SIGNING_PROVIDER \
+            QINAO_WAVE_ADMISSION_SIGNING_PROVIDER_SHA256
+          do
+            test -n "${!variable}"
+          done
+          test "$(git rev-parse HEAD)" = "$QINAO_CANDIDATE_COMMIT"
+          test "$(git rev-parse HEAD^{tree})" = "$QINAO_CANDIDATE_TREE"
+          test -z "$(git status --porcelain)"
+          test -x "$QINAO_EXTERNAL_ADMISSION_VERIFIER"
+          test -f "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER"
+          test "$(shasum -a 256 "$QINAO_EXTERNAL_ADMISSION_VERIFIER" | cut -d ' ' -f 1)" = "$QINAO_EXTERNAL_ADMISSION_VERIFIER_SHA256"
+          test "$(shasum -a 256 "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER" | cut -d ' ' -f 1)" = "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER_SHA256"
+          test "$QINAO_UNSIGNED_ADMISSION_REPORT" != "$QINAO_CURRENT_ADMISSION_RECEIPT"
+          test ! -e "$QINAO_UNSIGNED_ADMISSION_REPORT"
+          test ! -e "$QINAO_CURRENT_ADMISSION_RECEIPT"
+          prerequisite_args=()
+          if test -n "$QINAO_EXTERNAL_PREREQUISITES"; then
+            while IFS= read -r prerequisite; do
+              test -n "$prerequisite"
+              prerequisite_args+=(--external-prerequisite "$prerequisite")
+            done <<< "$QINAO_EXTERNAL_PREREQUISITES"
+          fi
+          python3 scripts/run_qinao_wave_admission.py report \
+            --root "$GITHUB_WORKSPACE" \
+            --bundle "$QINAO_CURRENT_WAVE_BUNDLE" \
+            --source-selection "$QINAO_SOURCE_SELECTION" \
+            --trust-root "$QINAO_ADMISSION_TRUST_ROOT" \
+            --previous-receipt "$QINAO_PREVIOUS_ADMISSION_RECEIPT" \
+            --candidate-tree "$QINAO_CANDIDATE_TREE" \
+            "${prerequisite_args[@]}" \
+            --unsigned-report "$QINAO_UNSIGNED_ADMISSION_REPORT"
+          "$QINAO_EXTERNAL_ADMISSION_VERIFIER" admit-wave \
+            --report "$QINAO_UNSIGNED_ADMISSION_REPORT" \
+            --bundle "$QINAO_CURRENT_WAVE_BUNDLE" \
+            --source-selection "$QINAO_SOURCE_SELECTION" \
+            --previous-receipt "$QINAO_PREVIOUS_ADMISSION_RECEIPT" \
+            --repository "$GITHUB_WORKSPACE" \
+            --candidate-tree "$QINAO_CANDIDATE_TREE" \
+            --trust-root "$QINAO_ADMISSION_TRUST_ROOT" \
+            --signing-provider "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER" \
+            --signing-provider-sha256 "$QINAO_WAVE_ADMISSION_SIGNING_PROVIDER_SHA256" \
+            --receipt "$QINAO_CURRENT_ADMISSION_RECEIPT"
+          python3 scripts/run_qinao_wave_admission.py verify-receipt \
+            --root "$GITHUB_WORKSPACE" \
+            --bundle "$QINAO_CURRENT_WAVE_BUNDLE" \
+            --source-selection "$QINAO_SOURCE_SELECTION" \
+            --trust-root "$QINAO_ADMISSION_TRUST_ROOT" \
+            --previous-receipt "$QINAO_PREVIOUS_ADMISSION_RECEIPT" \
+            --candidate-tree "$QINAO_CANDIDATE_TREE" \
+            "${prerequisite_args[@]}" \
+            --receipt "$QINAO_CURRENT_ADMISSION_RECEIPT"
+          BehavioralAISubstrate/scripts/check-ios27-floor.sh
+          test "$(git rev-parse HEAD^{tree})" = "$QINAO_CANDIDATE_TREE"
+          test -z "$(git status --porcelain)"

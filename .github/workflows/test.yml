@@ -20,6 +20,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: BAS test
@@ -31,6 +33,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Qinao test
         working-directory: QinaoRuntimeSDK
         run: swift test
@@ -48,6 +52,8 @@ jobs:
     # to satisfy SPM-canonical layout)。
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Build SampleHost for iOS Simulator
@@ -71,6 +77,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Qinao import boundaries
         run: bash scripts/check_qinao_import_boundaries.sh
       - name: Sovereign redaction
@@ -90,6 +98,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -109,8 +119,79 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: cargo build + test (locked, pinned toolchain)
         working-directory: BehavioralAISubstrate/Cargo
         run: |
           cargo build --locked --release
           cargo test --locked
+
+  qinao-gates:
+    name: Qinao gate contracts and unsigned report smoke
+    runs-on: macos-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      QINAO_EXTERNAL_REPLAY_INPUTS_READY: ${{ vars.QINAO_EXTERNAL_REPLAY_INPUTS_READY }}
+      QINAO_CURRENT_WAVE_BUNDLE: ${{ vars.QINAO_CURRENT_WAVE_BUNDLE }}
+      QINAO_SOURCE_SELECTION: ${{ vars.QINAO_SOURCE_SELECTION }}
+      QINAO_ADMISSION_TRUST_ROOT: ${{ vars.QINAO_ADMISSION_TRUST_ROOT }}
+      QINAO_PREVIOUS_ADMISSION_RECEIPT: ${{ vars.QINAO_PREVIOUS_ADMISSION_RECEIPT }}
+      QINAO_EXTERNAL_PREREQUISITES: ${{ vars.QINAO_EXTERNAL_PREREQUISITES }}
+      QINAO_UNSIGNED_ADMISSION_REPORT: ${{ vars.QINAO_UNSIGNED_ADMISSION_REPORT }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12"
+      - name: Run Qinao gate units and real report-fixture smoke
+        run: >-
+          python3 -m unittest
+          scripts.test_check_qinao_owner_ledger
+          scripts.test_run_nonempty_swift_filter
+          scripts.test_run_qinao_wave_admission
+          scripts.test_run_qinao_k4_ios27_platform_spike
+          scripts.test_qinao_plan_remediation
+          scripts.test_test_workflow_owner_ledger
+      - name: Run iOS 27 floor unit tests
+        run: >-
+          python3 -m unittest
+          BehavioralAISubstrate.scripts.test_check_ios27_floor
+      - name: Run local iOS 27 floor check
+        run: BehavioralAISubstrate/scripts/check-ios27-floor.sh
+      - name: Run repository report replay only with external inputs
+        if: ${{ env.QINAO_EXTERNAL_REPLAY_INPUTS_READY == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for variable in \
+            QINAO_CURRENT_WAVE_BUNDLE \
+            QINAO_SOURCE_SELECTION \
+            QINAO_ADMISSION_TRUST_ROOT \
+            QINAO_PREVIOUS_ADMISSION_RECEIPT \
+            QINAO_UNSIGNED_ADMISSION_REPORT
+          do
+            test -n "${!variable}"
+          done
+          test ! -e "$QINAO_UNSIGNED_ADMISSION_REPORT"
+          prerequisite_args=()
+          if test -n "$QINAO_EXTERNAL_PREREQUISITES"; then
+            while IFS= read -r prerequisite; do
+              test -n "$prerequisite"
+              prerequisite_args+=(--external-prerequisite "$prerequisite")
+            done <<< "$QINAO_EXTERNAL_PREREQUISITES"
+          fi
+          QINAO_CANDIDATE_TREE="$(git rev-parse HEAD^{tree})"
+          python3 scripts/run_qinao_wave_admission.py report \
+            --root "$GITHUB_WORKSPACE" \
+            --bundle "$QINAO_CURRENT_WAVE_BUNDLE" \
+            --source-selection "$QINAO_SOURCE_SELECTION" \
+            --trust-root "$QINAO_ADMISSION_TRUST_ROOT" \
+            --previous-receipt "$QINAO_PREVIOUS_ADMISSION_RECEIPT" \
+            --candidate-tree "$QINAO_CANDIDATE_TREE" \
+            "${prerequisite_args[@]}" \
+            --unsigned-report "$QINAO_UNSIGNED_ADMISSION_REPORT"

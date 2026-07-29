@@ -34,6 +34,7 @@ enum BASCoreAIDuetProbe {
 
     private static func mark(_ s: String) { print(s); fflush(stdout) }
 
+    #if canImport(CoreAI)
     @available(iOS 27, macOS 27, *)
     private static func copyF16(_ a: NDArray) -> [Float16] {
         let n = a.shape.reduce(1, *)
@@ -41,6 +42,7 @@ enum BASCoreAIDuetProbe {
         a.view(as: Float16.self).withUnsafePointer { p, _, _ in for k in 0..<n { out[k] = p[k] } }
         return out
     }
+    #endif
 
     static func run() async {
         mark(String(format: "🎻 duet START footprint0=%.0fMB (STEP 5/6/7: does the device DUET reproduce the host decode?)", footprintMB()))

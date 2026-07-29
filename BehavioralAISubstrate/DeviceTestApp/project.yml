@@ -156,6 +156,8 @@ targets:
       - package: BehavioralAISubstrate
         product: BASAppleAdapters
       - package: BehavioralAISubstrate
+        product: BASAppleEdgeWiring
+      - package: BehavioralAISubstrate
         product: BASChatCompletionsAdapter
       - package: BehavioralAISubstrate
         product: BASEvaluation

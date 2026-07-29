@@ -31,6 +31,7 @@ enum BASCoreAIPrefillProbe {
 
     private static func mark(_ s: String) { print(s); fflush(stdout) }
 
+    #if canImport(CoreAI)
     @available(iOS 27, macOS 27, *)
     private static func ndStats(_ a: NDArray) -> (norm: Double, sum: Double, head: [Float]) {
         let count = a.shape.reduce(1, *)
@@ -49,6 +50,7 @@ enum BASCoreAIPrefillProbe {
         }
         return (sumsq.squareRoot(), sum, head)
     }
+    #endif
 
     static func run() async {
         mark(String(format: "🧩 prefill START footprint0=%.0fMB (STEP 2: does the prefill asset run+match on the A19 GPU?)", footprintMB()))

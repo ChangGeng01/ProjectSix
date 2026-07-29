@@ -5,11 +5,14 @@ from __future__ import annotations
 
 import argparse
 import ast
+import base64
 import hashlib
 import json
 import re
 import subprocess
 import sys
+from datetime import datetime, timezone
+from fnmatch import fnmatchcase
 from pathlib import Path, PurePosixPath
 
 
@@ -650,7 +653,12 @@ SUBPROCESS_CALLS = {
     "subprocess.Popen",
     "subprocess.run",
 }
-READ_ONLY_SUBPROCESS_PREFIX = ("git", "cat-file", "-t")
+READ_ONLY_GIT_SUBCOMMANDS = {
+    "cat-file",
+    "diff-tree",
+    "ls-tree",
+    "rev-parse",
+}
 DANGEROUS_ALIAS_MODULES = {
     "builtins",
     "json",
@@ -683,6 +691,7 @@ DANGEROUS_ALIAS_TARGETS = (
 ALLOWED_MODULE_IMPORTS = {
     "argparse",
     "ast",
+    "base64",
     "hashlib",
     "json",
     "re",
@@ -691,6 +700,8 @@ ALLOWED_MODULE_IMPORTS = {
 }
 ALLOWED_FROM_IMPORTS = {
     "__future__": {("annotations", None)},
+    "datetime": {("datetime", None), ("timezone", None)},
+    "fnmatch": {("fnmatchcase", None)},
     "pathlib": {("Path", None), ("PurePosixPath", None)},
 }
 ALLOWED_DIRECT_CALL_NAMES = {
@@ -701,10 +712,17 @@ ALLOWED_DIRECT_CALL_NAMES = {
     "all",
     "any",
     "bool",
+    "bytes",
+    "dict",
+    "datetime",
     "enumerate",
+    "fnmatchcase",
+    "int",
     "isinstance",
     "len",
     "list",
+    "next",
+    "pow",
     "print",
     "range",
     "set",
@@ -718,7 +736,9 @@ ALLOWED_QUALIFIED_CALLS = {
     "ast.iter_child_nodes",
     "ast.parse",
     "ast.walk",
+    "base64.b64decode",
     "hashlib.sha256",
+    "hashlib.sha512",
     "json.dumps",
     "json.load",
     "re.compile",
@@ -743,6 +763,9 @@ PROTECTED_QUALIFIED_ROOTS = {
 PROTECTED_IMPORTED_NAMES = ALLOWED_MODULE_IMPORTS | {
     "Path",
     "PurePosixPath",
+    "datetime",
+    "fnmatchcase",
+    "timezone",
 }
 FORBIDDEN_REFLECTION_REGISTRIES = {
     "sys.meta_path",
@@ -757,6 +780,8 @@ ALLOWED_METHOD_CALLS = {
     "as_posix",
     "casefold",
     "count",
+    "decode",
+    "digest",
     "encode",
     "end",
     "endswith",
@@ -765,6 +790,9 @@ ALLOWED_METHOD_CALLS = {
     "find",
     "findall",
     "finditer",
+    "fullmatch",
+    "from_bytes",
+    "fromisoformat",
     "get",
     "glob",
     "group",
@@ -778,21 +806,31 @@ ALLOWED_METHOD_CALLS = {
     "join",
     "lower",
     "match",
+    "now",
+    "isoformat",
+    "pop",
     "parse_args",
     "partition",
     "read_text",
     "relative_to",
+    "removesuffix",
     "removeprefix",
     "resolve",
     "rfind",
     "rstrip",
     "split",
     "splitlines",
+    "sort",
     "start",
     "startswith",
     "stat",
     "strip",
+    "setdefault",
+    "to_bytes",
     "update",
+    "values",
+    "astimezone",
+    "search",
 }
 
 
@@ -813,6 +851,35 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--ledger", type=Path, required=True)
+    parser.add_argument("--source-selection", type=Path, required=True)
+    parser.add_argument("--trust-root", type=Path, required=True)
+    parser.add_argument("--base-tree", required=True)
+    parser.add_argument("--candidate-tree", required=True)
+    parser.add_argument(
+        "--wave",
+        choices=[f"W{index}" for index in range(7)],
+        required=True,
+    )
+    parser.add_argument(
+        "--create-manifest-or-disposition",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--extension-manifest-or-disposition",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--adapter-manifest-or-disposition",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--fixture-set-or-disposition",
+        type=Path,
+        required=True,
+    )
     parser.add_argument(
         "--candidate-manifest",
         type=Path,
@@ -872,14 +939,7 @@ def sha256_utf8(value: str) -> str:
 
 
 def canonical_json_digest(value: object) -> str:
-    return sha256_utf8(
-        json.dumps(
-            value,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-    )
+    return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
 
 
 def owner_boundary_digest(owner: dict) -> str:
@@ -1452,17 +1512,16 @@ def subprocess_call_is_read_only(call: ast.Call) -> bool:
     if len(call.args) != 1 or not isinstance(call.args[0], (ast.List, ast.Tuple)):
         return False
     command = call.args[0].elts
-    if len(command) != len(READ_ONLY_SUBPROCESS_PREFIX) + 1:
+    if len(command) < 2:
         return False
-    prefix: list[str] = []
-    for element in command[: len(READ_ONLY_SUBPROCESS_PREFIX)]:
-        if not isinstance(element, ast.Constant) or not isinstance(element.value, str):
-            return False
-        prefix.append(element.value)
-    if tuple(prefix) != READ_ONLY_SUBPROCESS_PREFIX:
-        return False
-    object_id = command[-1]
-    if not isinstance(object_id, ast.Name) or object_id.id != "object_id":
+    executable = command[0]
+    subcommand = command[1]
+    if (
+        not isinstance(executable, ast.Constant)
+        or executable.value != "git"
+        or not isinstance(subcommand, ast.Constant)
+        or subcommand.value not in READ_ONLY_GIT_SUBCOMMANDS
+    ):
         return False
 
     keyword_values = {
@@ -1470,26 +1529,31 @@ def subprocess_call_is_read_only(call: ast.Call) -> bool:
         for keyword in call.keywords
         if keyword.arg is not None
     }
-    if len(keyword_values) != len(call.keywords) or set(keyword_values) != {
-        "check",
-        "cwd",
-        "stderr",
-        "stdout",
-        "text",
-    }:
+    if len(keyword_values) != len(call.keywords):
+        return False
+    if set(keyword_values) not in (
+        {"check", "cwd", "stderr", "stdout", "text"},
+        {"check", "cwd", "stderr", "stdout"},
+    ):
         return False
     cwd = keyword_values["cwd"]
     stdout = keyword_values["stdout"]
     stderr = keyword_values["stderr"]
-    text_mode = keyword_values["text"]
+    text_mode = keyword_values.get("text")
     check = keyword_values["check"]
     return (
         isinstance(cwd, ast.Name)
         and cwd.id == "root"
         and qualified_ast_name(stdout) == "subprocess.PIPE"
-        and qualified_ast_name(stderr) == "subprocess.DEVNULL"
-        and isinstance(text_mode, ast.Constant)
-        and text_mode.value is True
+        and qualified_ast_name(stderr)
+        in {"subprocess.DEVNULL", "subprocess.PIPE"}
+        and (
+            text_mode is None
+            or (
+                isinstance(text_mode, ast.Constant)
+                and text_mode.value is True
+            )
+        )
         and isinstance(check, ast.Constant)
         and check.value is False
     )
@@ -1734,7 +1798,7 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
             if call_name != "subprocess.run" or not subprocess_call_is_read_only(node):
                 errors.append(
                     "owner gate must remain read-only; subprocess execution is "
-                    f"limited to git cat-file at {location}"
+                    f"limited to audited read-only Git subcommands at {location}"
                 )
             continue
         if (
@@ -2841,6 +2905,906 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
     return errors
 
 
+WAVE_CATEGORY_FIELDS = {
+    "schema",
+    "repositoryIdentity",
+    "wave",
+    "category",
+    "status",
+    "baseTree",
+    "approvedDesignBlob",
+    "productionDiffRoot",
+    "reviewedRows",
+    "anchors",
+    "reason",
+    "issuedAt",
+    "expiresAt",
+    "nonce",
+    "signer",
+    "role",
+    "signatureAlgorithm",
+    "signature",
+}
+WAVE_CATEGORY_ROW_FIELDS = {
+    "path",
+    "blob",
+    "change",
+    "ownerID",
+    "classification",
+    "symbol",
+    "authorityClaims",
+}
+SOURCE_SELECTION_FIELDS = {
+    "schema",
+    "repositoryIdentity",
+    "selectedCommit",
+    "selectedTree",
+    "approvedDesignBlob",
+    "externalVerifierSHA256",
+    "issuedAt",
+    "expiresAt",
+    "nonce",
+    "signer",
+    "role",
+    "signatureAlgorithm",
+    "signature",
+}
+TRUST_ROOT_FIELDS = {
+    "schema",
+    "repositoryIdentity",
+    "issuedAt",
+    "expiresAt",
+    "keys",
+    "revokedNonces",
+}
+TRUST_KEY_FIELDS = {"keyID", "role", "publicKey"}
+WAVE_CATEGORIES = ("create", "extension", "adapter", "fixture")
+HEX_DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}")
+GIT_OBJECT_PATTERN = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
+FORBIDDEN_AUTOMATION_AUTHORITIES = {
+    "AutomationAgent",
+    "AutomationDB",
+    "AutomationEventLog",
+    "AutomationManager",
+    "AutomationRegistry",
+    "AutomationScheduler",
+    "AutomationStore",
+    "RunRegistry",
+    "SkillRegistry",
+}
+ED25519_Q = 2**255 - 19
+ED25519_L = 2**252 + 27742317777372353535851937790883648493
+ED25519_D = -121665 * pow(121666, ED25519_Q - 2, ED25519_Q) % ED25519_Q
+ED25519_I = pow(2, (ED25519_Q - 1) // 4, ED25519_Q)
+
+
+def validate_canonical_json_value(value: object) -> None:
+    if value is None or type(value) in {bool, int, str}:
+        return
+    if isinstance(value, list):
+        for item in value:
+            validate_canonical_json_value(item)
+        return
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise ValueError("canonical JSON object keys must be strings")
+        for item in value.values():
+            validate_canonical_json_value(item)
+        return
+    raise ValueError(
+        "canonical governance JSON permits only null, boolean, integer, "
+        "string, array, and object values"
+    )
+
+
+def canonical_json_bytes(value: object) -> bytes:
+    validate_canonical_json_value(value)
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def parse_utc_timestamp(value: object, label: str) -> tuple[datetime | None, str | None]:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        return None, f"{label} must be an RFC 3339 UTC timestamp ending in Z"
+    try:
+        parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    except ValueError:
+        return None, f"{label} is not a valid RFC 3339 timestamp"
+    if parsed.tzinfo is None:
+        return None, f"{label} must carry a UTC offset"
+    return parsed.astimezone(timezone.utc), None
+
+
+def ed25519_xrecover(y: int) -> int:
+    xx = (y * y - 1) * pow(ED25519_D * y * y + 1, ED25519_Q - 2, ED25519_Q)
+    x = pow(xx, (ED25519_Q + 3) // 8, ED25519_Q)
+    if (x * x - xx) % ED25519_Q != 0:
+        x = x * ED25519_I % ED25519_Q
+    if (x * x - xx) % ED25519_Q != 0:
+        raise ValueError("invalid Ed25519 point")
+    if x & 1:
+        x = ED25519_Q - x
+    return x
+
+
+ED25519_B_Y = 4 * pow(5, ED25519_Q - 2, ED25519_Q) % ED25519_Q
+ED25519_B = (ed25519_xrecover(ED25519_B_Y), ED25519_B_Y)
+
+
+def ed25519_add(
+    left: tuple[int, int],
+    right: tuple[int, int],
+) -> tuple[int, int]:
+    x1, y1 = left
+    x2, y2 = right
+    x_denominator = pow(
+        1 + ED25519_D * x1 * x2 * y1 * y2,
+        ED25519_Q - 2,
+        ED25519_Q,
+    )
+    y_denominator = pow(
+        1 - ED25519_D * x1 * x2 * y1 * y2,
+        ED25519_Q - 2,
+        ED25519_Q,
+    )
+    return (
+        (x1 * y2 + x2 * y1) * x_denominator % ED25519_Q,
+        (y1 * y2 + x1 * x2) * y_denominator % ED25519_Q,
+    )
+
+
+def ed25519_multiply(
+    point: tuple[int, int],
+    scalar: int,
+) -> tuple[int, int]:
+    result = (0, 1)
+    addend = point
+    while scalar:
+        if scalar & 1:
+            result = ed25519_add(result, addend)
+        addend = ed25519_add(addend, addend)
+        scalar >>= 1
+    return result
+
+
+def ed25519_decode_point(encoded: bytes) -> tuple[int, int]:
+    if len(encoded) != 32:
+        raise ValueError("Ed25519 point must be 32 bytes")
+    encoded_integer = int.from_bytes(encoded, "little")
+    y = encoded_integer & ((1 << 255) - 1)
+    sign = encoded_integer >> 255
+    if y >= ED25519_Q:
+        raise ValueError("non-canonical Ed25519 point")
+    x = ed25519_xrecover(y)
+    if (x & 1) != sign:
+        x = ED25519_Q - x
+    if x == 0 and sign:
+        raise ValueError("non-canonical Ed25519 sign bit")
+    point = (x, y)
+    if ed25519_multiply(point, ED25519_L) != (0, 1):
+        raise ValueError("Ed25519 point is not in the prime-order subgroup")
+    return point
+
+
+def verify_ed25519_signature(
+    public_key: bytes,
+    message: bytes,
+    signature: bytes,
+) -> bool:
+    if len(public_key) != 32 or len(signature) != 64:
+        return False
+    scalar = int.from_bytes(signature[32:], "little")
+    if scalar >= ED25519_L:
+        return False
+    try:
+        public_point = ed25519_decode_point(public_key)
+        r_point = ed25519_decode_point(signature[:32])
+    except ValueError:
+        return False
+    challenge = int.from_bytes(
+        hashlib.sha512(signature[:32] + public_key + message).digest(),
+        "little",
+    )
+    challenge %= ED25519_L
+    return ed25519_multiply(ED25519_B, scalar) == ed25519_add(
+        r_point,
+        ed25519_multiply(public_point, challenge),
+    )
+
+
+def validate_trust_root(document: dict) -> list[str]:
+    errors: list[str] = []
+    if set(document) != TRUST_ROOT_FIELDS:
+        errors.append(
+            "trust root fields mismatch: "
+            f"missing={sorted(TRUST_ROOT_FIELDS - set(document))!r}, "
+            f"extra={sorted(set(document) - TRUST_ROOT_FIELDS)!r}"
+        )
+    if document.get("schema") != "QinaoAdmissionTrustRootV1":
+        errors.append("trust root schema must be QinaoAdmissionTrustRootV1")
+    if not is_nonempty_string(document.get("repositoryIdentity")):
+        errors.append("trust root repositoryIdentity must be non-empty")
+    issued, issued_error = parse_utc_timestamp(
+        document.get("issuedAt"),
+        "trust root issuedAt",
+    )
+    expires, expires_error = parse_utc_timestamp(
+        document.get("expiresAt"),
+        "trust root expiresAt",
+    )
+    if issued_error is not None:
+        errors.append(issued_error)
+    if expires_error is not None:
+        errors.append(expires_error)
+    if issued is not None and expires is not None and expires <= issued:
+        errors.append("trust root expiresAt must be later than issuedAt")
+    if expires is not None and expires <= datetime.now(timezone.utc):
+        errors.append("trust root is expired")
+
+    keys_value = document.get("keys")
+    if not isinstance(keys_value, list) or not keys_value:
+        errors.append("trust root keys must be a non-empty list")
+        keys: list[object] = []
+    else:
+        keys = keys_value
+    identities: list[tuple[str, str]] = []
+    for index, key in enumerate(keys):
+        if not isinstance(key, dict):
+            errors.append(f"trust root keys[{index}] must be an object")
+            continue
+        if set(key) != TRUST_KEY_FIELDS:
+            errors.append(f"trust root keys[{index}] fields mismatch")
+        key_id = key.get("keyID")
+        role = key.get("role")
+        if not is_nonempty_string(key_id) or not is_nonempty_string(role):
+            errors.append(f"trust root keys[{index}] keyID/role must be non-empty")
+        else:
+            identities.append((key_id, role))
+        encoded_key = key.get("publicKey")
+        try:
+            decoded_key = base64.b64decode(encoded_key, validate=True)
+        except (TypeError, ValueError):
+            decoded_key = b""
+        if len(decoded_key) != 32:
+            errors.append(
+                f"trust root keys[{index}] publicKey must be canonical Base64 "
+                "for exactly 32 Ed25519 bytes"
+            )
+    if len(identities) != len(set(identities)):
+        errors.append("trust root keyID/role pairs must be unique")
+    revoked = document.get("revokedNonces")
+    if not isinstance(revoked, list) or any(
+        not is_nonempty_string(nonce) for nonce in revoked
+    ):
+        errors.append("trust root revokedNonces must be a string list")
+    elif len(revoked) != len(set(revoked)):
+        errors.append("trust root revokedNonces must be unique")
+    return errors
+
+
+def trusted_public_key(
+    trust_root: dict,
+    *,
+    signer: object,
+    role: object,
+) -> bytes | None:
+    keys = trust_root.get("keys")
+    if not isinstance(keys, list):
+        return None
+    matches = [
+        key
+        for key in keys
+        if isinstance(key, dict)
+        and key.get("keyID") == signer
+        and key.get("role") == role
+    ]
+    if len(matches) != 1:
+        return None
+    encoded_key = matches[0].get("publicKey")
+    try:
+        public_key = base64.b64decode(encoded_key, validate=True)
+    except (TypeError, ValueError):
+        return None
+    return public_key if len(public_key) == 32 else None
+
+
+def validate_signed_document(
+    document: dict,
+    trust_root: dict,
+    *,
+    expected_role: str,
+    label: str,
+) -> list[str]:
+    errors: list[str] = []
+    signer = document.get("signer")
+    role = document.get("role")
+    if role != expected_role:
+        errors.append(f"{label} role must be exactly {expected_role!r}")
+    if document.get("signatureAlgorithm") != "Ed25519":
+        errors.append(f"{label} signatureAlgorithm must be Ed25519")
+    nonce = document.get("nonce")
+    if not is_nonempty_string(nonce):
+        errors.append(f"{label} nonce must be non-empty")
+    revoked = trust_root.get("revokedNonces")
+    if isinstance(revoked, list) and nonce in revoked:
+        errors.append(f"{label} nonce is revoked/replayed")
+    issued, issued_error = parse_utc_timestamp(document.get("issuedAt"), f"{label} issuedAt")
+    expires, expires_error = parse_utc_timestamp(
+        document.get("expiresAt"),
+        f"{label} expiresAt",
+    )
+    if issued_error is not None:
+        errors.append(issued_error)
+    if expires_error is not None:
+        errors.append(expires_error)
+    if issued is not None and expires is not None and expires <= issued:
+        errors.append(f"{label} expiresAt must be later than issuedAt")
+    if expires is not None and expires <= datetime.now(timezone.utc):
+        errors.append(f"{label} is expired")
+    public_key = trusted_public_key(
+        trust_root,
+        signer=signer,
+        role=role,
+    )
+    if public_key is None:
+        errors.append(f"{label} signer/role is not trusted")
+        return errors
+    encoded_signature = document.get("signature")
+    try:
+        signature = base64.b64decode(encoded_signature, validate=True)
+    except (TypeError, ValueError):
+        signature = b""
+    unsigned = dict(document)
+    unsigned.pop("signature", None)
+    try:
+        message = canonical_json_bytes(unsigned)
+    except ValueError as error:
+        errors.append(f"{label} cannot be canonicalized: {error}")
+        return errors
+    if not verify_ed25519_signature(public_key, message, signature):
+        errors.append(f"{label} signature is invalid")
+    return errors
+
+
+def git_tree_exists(root: Path, object_id: str) -> bool:
+    if GIT_OBJECT_PATTERN.fullmatch(object_id) is None:
+        return False
+    completed = subprocess.run(
+        ["git", "cat-file", "-t", object_id],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    return completed.returncode == 0 and completed.stdout.strip() == "tree"
+
+
+def git_commit_tree(root: Path, commit: str) -> str | None:
+    if GIT_OBJECT_PATTERN.fullmatch(commit) is None:
+        return None
+    completed = subprocess.run(
+        ["git", "rev-parse", f"{commit}^{{tree}}"],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return None
+    tree = completed.stdout.strip()
+    return tree if GIT_OBJECT_PATTERN.fullmatch(tree) is not None else None
+
+
+def validate_source_selection(
+    document: dict,
+    trust_root: dict,
+    *,
+    root: Path,
+) -> list[str]:
+    errors: list[str] = []
+    if set(document) != SOURCE_SELECTION_FIELDS:
+        errors.append(
+            "source selection fields mismatch: "
+            f"missing={sorted(SOURCE_SELECTION_FIELDS - set(document))!r}, "
+            f"extra={sorted(set(document) - SOURCE_SELECTION_FIELDS)!r}"
+        )
+    if document.get("schema") != "QinaoSourceSelectionV1":
+        errors.append("source selection schema must be QinaoSourceSelectionV1")
+    if document.get("repositoryIdentity") != trust_root.get("repositoryIdentity"):
+        errors.append("source selection repositoryIdentity does not match trust root")
+    selected_commit = document.get("selectedCommit")
+    selected_tree = document.get("selectedTree")
+    if not isinstance(selected_commit, str) or not isinstance(selected_tree, str):
+        errors.append("source selection selectedCommit/selectedTree must be Git IDs")
+    elif git_commit_tree(root, selected_commit) != selected_tree:
+        errors.append(
+            "source selection/root admission is not bound to the selected commit/tree"
+        )
+    for field in ("approvedDesignBlob", "externalVerifierSHA256"):
+        if (
+            not isinstance(document.get(field), str)
+            or HEX_DIGEST_PATTERN.fullmatch(document[field]) is None
+        ):
+            errors.append(f"source selection {field} must be 64 lowercase hex")
+    errors.extend(
+        validate_signed_document(
+            document,
+            trust_root,
+            expected_role="source-selector",
+            label="source selection",
+        )
+    )
+    return errors
+
+
+def load_governance_document(path: Path, label: str) -> tuple[dict | None, list[str]]:
+    errors: list[str] = []
+    try:
+        if path.stat().st_size == 0:
+            return None, [f"{label} category document is empty"]
+        document = load_bounded_json_object(path.resolve())
+    except (
+        OSError,
+        json.JSONDecodeError,
+        DuplicateJSONKeyError,
+        ValueError,
+    ) as error:
+        return None, [f"{label} document is invalid: {error}"]
+    return document, errors
+
+
+def resolve_anchor_paths(
+    root: Path,
+    anchors: list[str],
+) -> tuple[list[str], list[str]]:
+    resolved: list[str] = []
+    errors: list[str] = []
+    for anchor in anchors:
+        if not isinstance(anchor, str) or not anchor:
+            errors.append("anchor must be a non-empty string")
+            continue
+        path = PurePosixPath(anchor)
+        if path.is_absolute() or ".." in path.parts or "\\" in anchor:
+            errors.append(f"anchor is not normalized/workspace-relative: {anchor!r}")
+            continue
+        wildcard = any(token in anchor for token in ("*", "?", "["))
+        try:
+            matches = sorted(
+                candidate
+                for candidate in root.glob(anchor)
+                if candidate.is_file()
+            )
+        except OSError as error:
+            errors.append(f"anchor scanner tool error for {anchor!r}: {error}")
+            continue
+        if not matches:
+            kind = "empty glob" if wildcard else "missing anchored file"
+            errors.append(f"{kind}: {anchor}")
+            continue
+        resolved.extend(
+            match.relative_to(root).as_posix()
+            for match in matches
+        )
+    return resolved, errors
+
+
+def validate_swift_authority_source(path: str, contents: str) -> list[str]:
+    errors: list[str] = []
+    stripped = strip_c_style_comments(contents)
+    for authority in sorted(FORBIDDEN_AUTOMATION_AUTHORITIES):
+        declaration = re.compile(
+            rf"\b(?:actor|class|enum|protocol|struct)\s+{re.escape(authority)}\b"
+        )
+        if declaration.search(stripped):
+            errors.append(
+                f"{path}: forbidden second automation store/scheduler/event log/"
+                f"compiler authority {authority}"
+            )
+    if "ZoneCAppleEffectExecutor" not in path:
+        imports_apple_mutation_framework = re.search(
+            r"(?m)^\s*import\s+(?:CloudKit|EventKit|HomeKit|UserNotifications)\s*$",
+            stripped,
+        )
+        mutation_call = re.search(
+            r"\.\s*(?:add|delete|modifySubscriptions|remove|save)\s*\(",
+            stripped,
+        )
+        if imports_apple_mutation_framework and mutation_call:
+            errors.append(
+                f"{path}: direct Apple mutation must be routed only through "
+                "ZoneCAppleEffectExecutor"
+            )
+    return errors
+
+
+def is_authority_diff_path(path: str) -> bool:
+    if "/Tests/" in path or "/Fixtures/" in path:
+        return path.endswith((".json", ".plist", ".sql", ".swift"))
+    if path in {
+        "BehavioralAISubstrate/Package.swift",
+        "QinaoRuntimeSDK/Package.swift",
+        "SampleHost/Package.swift",
+        "BehavioralAISubstrate/DeviceTestApp/project.yml",
+        (
+            "BehavioralAISubstrate/DeviceTestApp/"
+            "BASDeviceTest.xcodeproj/project.pbxproj"
+        ),
+    }:
+        return True
+    return (
+        path.startswith("BehavioralAISubstrate/Sources/")
+        or path.startswith("QinaoRuntimeSDK/Sources/")
+        or path.startswith("SampleHost/Sources/")
+    ) and path.endswith((".sql", ".swift"))
+
+
+def git_tree_diff(
+    root: Path,
+    base_tree: str,
+    candidate_tree: str,
+) -> tuple[list[dict], list[str]]:
+    completed = subprocess.run(
+        [
+            "git",
+            "diff-tree",
+            "--no-commit-id",
+            "--no-renames",
+            "--raw",
+            "-r",
+            "-z",
+            base_tree,
+            candidate_tree,
+        ],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return [], ["git diff-tree tool error while deriving production diff"]
+    records = completed.stdout.split(b"\0")
+    rows: list[dict] = []
+    index = 0
+    while index < len(records):
+        metadata = records[index]
+        index += 1
+        if not metadata:
+            continue
+        if not metadata.startswith(b":") or index >= len(records):
+            return [], ["git diff-tree returned a malformed raw record"]
+        path_bytes = records[index]
+        index += 1
+        try:
+            metadata_fields = metadata[1:].decode("ascii").split()
+            path = path_bytes.decode("utf-8")
+        except UnicodeError:
+            return [], ["git diff-tree returned a non-UTF-8 record"]
+        if len(metadata_fields) != 5:
+            return [], ["git diff-tree returned a malformed metadata record"]
+        old_mode, new_mode, old_blob, new_blob, status = metadata_fields
+        if status not in {"A", "D", "M", "T"}:
+            return [], [f"git diff-tree returned unsupported status {status!r}"]
+        rows.append(
+            {
+                "path": path,
+                "oldMode": old_mode,
+                "newMode": new_mode,
+                "oldBlob": old_blob,
+                "newBlob": new_blob,
+                "change": {
+                    "A": "add",
+                    "D": "delete",
+                    "M": "modify",
+                    "T": "modify",
+                }[status],
+            }
+        )
+    return rows, []
+
+
+def owner_maps(ledger: dict) -> tuple[dict[str, list[dict]], dict[str, dict]]:
+    owners_by_path: dict[str, list[dict]] = {}
+    owners = ledger.get("owners")
+    if isinstance(owners, list):
+        for owner in owners:
+            if not isinstance(owner, dict):
+                continue
+            evidence_paths = owner.get("evidence_paths")
+            if not isinstance(evidence_paths, list):
+                continue
+            for path in evidence_paths:
+                if isinstance(path, str):
+                    owners_by_path.setdefault(path, []).append(owner)
+    create_by_path: dict[str, dict] = {}
+    permissions = ledger.get("create_permissions")
+    if isinstance(permissions, list):
+        for permission in permissions:
+            if not isinstance(permission, dict):
+                continue
+            allowed_paths = permission.get("allowed_paths")
+            if not isinstance(allowed_paths, list):
+                continue
+            for path in allowed_paths:
+                if isinstance(path, str):
+                    create_by_path[path] = permission
+    return owners_by_path, create_by_path
+
+
+def derive_authority_rows(
+    diff_rows: list[dict],
+    ledger: dict,
+) -> tuple[dict[str, list[dict]], list[str]]:
+    categorized = {category: [] for category in WAVE_CATEGORIES}
+    errors: list[str] = []
+    owners_by_path, create_by_path = owner_maps(ledger)
+    owners_value = ledger.get("owners")
+    owners = owners_value if isinstance(owners_value, list) else []
+    owners_by_id = {
+        owner.get("owner_id"): owner
+        for owner in owners
+        if isinstance(owner, dict)
+        and is_nonempty_string(owner.get("owner_id"))
+    }
+    for diff_row in diff_rows:
+        path = diff_row["path"]
+        if not is_authority_diff_path(path):
+            continue
+        if "/Tests/" in path or "/Fixtures/" in path:
+            category = "fixture"
+            owner_id = "fixture"
+            classification = "fixture"
+            symbol = PurePosixPath(path).stem
+        else:
+            permission = create_by_path.get(path)
+            if diff_row["change"] == "add" and permission is not None:
+                owner_id = permission.get("owner_id")
+                category = "create"
+                classification = "M"
+                symbol = permission.get("authority_symbol")
+            else:
+                path_owners = owners_by_path.get(path, [])
+                if len(path_owners) != 1:
+                    errors.append(
+                        f"production diff path {path!r} has unknown or ambiguous owner"
+                    )
+                    owner_id = "unknown"
+                    classification = "unknown"
+                    symbol = ""
+                    category = "extension"
+                else:
+                    owner = path_owners[0]
+                    owner_id = owner.get("owner_id")
+                    classification = owner.get("classification")
+                    symbol = owner.get("authority_owner")
+                    category = (
+                        "adapter" if classification == "A" else "extension"
+                    )
+        if owner_id != "fixture" and owner_id not in owners_by_id:
+            errors.append(f"production diff row references unknown owner {owner_id!r}")
+        categorized[category].append(
+            {
+                "path": path,
+                "blob": (
+                    diff_row["oldBlob"]
+                    if diff_row["change"] == "delete"
+                    else diff_row["newBlob"]
+                ),
+                "change": diff_row["change"],
+                "ownerID": owner_id,
+                "classification": classification,
+                "symbol": symbol,
+                "authorityClaims": [],
+            }
+        )
+    for rows in categorized.values():
+        rows.sort(key=lambda row: (row["path"], row["ownerID"], row["symbol"]))
+    return categorized, errors
+
+
+def validate_category_evidence(
+    document: dict,
+    *,
+    category: str,
+    wave: str,
+    base_tree: str,
+    production_diff_root: str,
+    derived_rows: list[dict],
+    ledger: dict,
+    root: Path,
+    trust_root: dict,
+) -> list[str]:
+    errors: list[str] = []
+    label = f"{category} category"
+    if set(document) != WAVE_CATEGORY_FIELDS:
+        errors.append(
+            f"{label} fields mismatch: "
+            f"missing={sorted(WAVE_CATEGORY_FIELDS - set(document))!r}, "
+            f"extra={sorted(set(document) - WAVE_CATEGORY_FIELDS)!r}"
+        )
+    if document.get("schema") != "QinaoWaveCategoryEvidenceV1":
+        errors.append(f"{label} schema must be QinaoWaveCategoryEvidenceV1")
+    if document.get("repositoryIdentity") != trust_root.get("repositoryIdentity"):
+        errors.append(f"{label} repositoryIdentity does not match trust root")
+    if document.get("wave") != wave:
+        errors.append(
+            f"{category} cross-wave reuse: expected {wave!r}, "
+            f"found={document.get('wave')!r}"
+        )
+    if document.get("category") != category:
+        errors.append(
+            f"{label} category discriminator must be exactly {category!r}"
+        )
+    if document.get("baseTree") != base_tree:
+        errors.append(f"{label} baseTree is stale or mismatched")
+    if document.get("productionDiffRoot") != production_diff_root:
+        errors.append(f"{label} productionDiffRoot is stale or mismatched")
+    rows_value = document.get("reviewedRows")
+    if not isinstance(rows_value, list):
+        errors.append(f"{label} reviewedRows must be a list")
+        rows: list[object] = []
+    else:
+        rows = rows_value
+    row_fingerprints: list[bytes] = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            errors.append(f"{label} reviewedRows[{index}] must be an object")
+            continue
+        if set(row) != WAVE_CATEGORY_ROW_FIELDS:
+            errors.append(f"{label} reviewedRows[{index}] fields mismatch")
+        try:
+            fingerprint = canonical_json_bytes(row)
+        except ValueError as error:
+            errors.append(f"{label} reviewedRows[{index}] is not canonical: {error}")
+            continue
+        row_fingerprints.append(fingerprint)
+        classification = row.get("classification")
+        if category == "create" and classification != "M":
+            errors.append(
+                f"{label} classification must be M; found={classification!r}"
+            )
+        if category == "extension" and classification not in {"E", "M"}:
+            errors.append(
+                f"{label} classification must be E or existing-M extension"
+            )
+        if category == "adapter" and classification != "A":
+            errors.append(f"{label} classification must be A")
+        claims = row.get("authorityClaims")
+        if category == "adapter" and claims:
+            errors.append(
+                f"{label} may not claim writer or external effect authority: "
+                f"{claims!r}"
+            )
+        owner_id = row.get("ownerID")
+        owners = ledger.get("owners")
+        known_owner_ids = {
+            owner.get("owner_id")
+            for owner in owners
+            if isinstance(owners, list) and isinstance(owner, dict)
+        } if isinstance(owners, list) else set()
+        if category != "fixture" and owner_id not in known_owner_ids:
+            errors.append(
+                f"{label} reviewed path {row.get('path')!r} references unknown "
+                f"owner {owner_id!r}"
+            )
+        if category in {"extension", "adapter"}:
+            owner = next(
+                (
+                    item
+                    for item in owners
+                    if isinstance(owners, list)
+                    and isinstance(item, dict)
+                    and item.get("owner_id") == owner_id
+                ),
+                None,
+            ) if isinstance(owners, list) else None
+            evidence_paths = owner.get("evidence_paths", []) if owner else []
+            if row.get("path") not in evidence_paths:
+                errors.append(
+                    f"{label} path {row.get('path')!r} is unknown for owner "
+                    f"{owner_id!r}"
+                )
+    if len(row_fingerprints) != len(set(row_fingerprints)):
+        errors.append(f"{label} reviewedRows contains duplicate candidate rows")
+    if row_fingerprints != sorted(row_fingerprints):
+        errors.append(f"{label} reviewedRows must be canonically sorted")
+
+    status = document.get("status")
+    if derived_rows:
+        if status != "present":
+            errors.append(
+                f"{label} derived production diff is non-empty but manifest is "
+                "not present"
+            )
+            if category == "create":
+                owner_ids = sorted(
+                    {
+                        row.get("ownerID")
+                        for row in derived_rows
+                        if isinstance(row, dict)
+                    }
+                )
+                errors.append(
+                    f"create first-wire for {owner_ids!r} has zero reviewedRows"
+                )
+        if not rows:
+            errors.append(f"{label} present manifest must be non-empty")
+    else:
+        if status != "notApplicable":
+            errors.append(
+                f"{label} must be typed notApplicable when derived set is empty"
+            )
+        if rows:
+            errors.append(
+                f"{label} has extra manifest row absent from the production diff"
+            )
+        if not is_nonempty_string(document.get("reason")):
+            errors.append(f"{label} notApplicable reason must be non-empty")
+    expected_fingerprints = {
+        canonical_json_bytes(row) for row in derived_rows
+    }
+    actual_fingerprints = set(row_fingerprints)
+    missing = expected_fingerprints - actual_fingerprints
+    extra = actual_fingerprints - expected_fingerprints
+    if missing:
+        errors.append(
+            f"{label} production diff rows omitted from manifest: {len(missing)}"
+        )
+    if extra:
+        errors.append(
+            f"{label} extra manifest rows absent from production diff: {len(extra)}"
+        )
+    anchors = document.get("anchors")
+    if not isinstance(anchors, list):
+        errors.append(f"{label} anchors must be a list")
+    else:
+        _resolved, anchor_errors = resolve_anchor_paths(root, anchors)
+        errors.extend(f"{label} {error}" for error in anchor_errors)
+    errors.extend(
+        validate_signed_document(
+            document,
+            trust_root,
+            expected_role="wave-category-reviewer",
+            label=label,
+        )
+    )
+    return errors
+
+
+def validate_changed_swift_sources(
+    root: Path,
+    diff_rows: list[dict],
+) -> list[str]:
+    errors: list[str] = []
+    for row in diff_rows:
+        path = row["path"]
+        if row["change"] == "delete" or not path.endswith(".swift"):
+            continue
+        completed = subprocess.run(
+            ["git", "cat-file", "blob", row["newBlob"]],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if completed.returncode != 0:
+            errors.append(f"{path}: git cat-file tool error")
+            continue
+        try:
+            contents = completed.stdout.decode("utf-8")
+        except UnicodeDecodeError:
+            errors.append(f"{path}: Swift source is not UTF-8")
+            continue
+        errors.extend(validate_swift_authority_source(path, contents))
+    return errors
+
+
 def validate_candidate(candidate: dict, ledger: dict) -> list[str]:
     errors: list[str] = []
     required_fields = {
@@ -2946,13 +3910,125 @@ def main() -> int:
     args = parse_args()
     root = args.root.resolve()
     ledger_path = args.ledger.resolve()
+    errors: list[str] = []
     try:
         data = load_bounded_json_object(ledger_path)
     except (OSError, json.JSONDecodeError, DuplicateJSONKeyError, ValueError) as error:
         print(f"owner-ledger: ERROR: {error}", file=sys.stderr)
         return 1
     ledger_errors = validate_ledger(data, root)
-    errors = list(ledger_errors)
+    errors.extend(ledger_errors)
+
+    trust_root, trust_errors = load_governance_document(
+        args.trust_root,
+        "trust root",
+    )
+    errors.extend(trust_errors)
+    if trust_root is not None:
+        errors.extend(validate_trust_root(trust_root))
+
+    source_selection, source_errors = load_governance_document(
+        args.source_selection,
+        "source selection",
+    )
+    errors.extend(source_errors)
+    if source_selection is not None and trust_root is not None:
+        errors.extend(
+            validate_source_selection(
+                source_selection,
+                trust_root,
+                root=root,
+            )
+        )
+        if source_selection.get("selectedTree") != args.base_tree:
+            errors.append(
+                "source selection selectedTree does not bind --base-tree"
+            )
+
+    if not git_tree_exists(root, args.base_tree):
+        errors.append("--base-tree must name an existing canonical Git tree")
+    if not git_tree_exists(root, args.candidate_tree):
+        errors.append("--candidate-tree must name an existing canonical Git tree")
+
+    diff_rows: list[dict] = []
+    categorized = {category: [] for category in WAVE_CATEGORIES}
+    if git_tree_exists(root, args.base_tree) and git_tree_exists(
+        root,
+        args.candidate_tree,
+    ):
+        diff_rows, diff_errors = git_tree_diff(
+            root,
+            args.base_tree,
+            args.candidate_tree,
+        )
+        errors.extend(diff_errors)
+        categorized, category_derivation_errors = derive_authority_rows(
+            diff_rows,
+            data,
+        )
+        errors.extend(category_derivation_errors)
+        errors.extend(validate_changed_swift_sources(root, diff_rows))
+    flat_rows = [
+        row
+        for category in WAVE_CATEGORIES
+        for row in categorized[category]
+    ]
+    flat_rows.sort(key=lambda row: (row["path"], row["ownerID"], row["symbol"]))
+    production_diff_root = canonical_json_digest(flat_rows)
+
+    category_paths = {
+        "create": args.create_manifest_or_disposition,
+        "extension": args.extension_manifest_or_disposition,
+        "adapter": args.adapter_manifest_or_disposition,
+        "fixture": args.fixture_set_or_disposition,
+    }
+    category_documents: dict[str, dict] = {}
+    for category in WAVE_CATEGORIES:
+        document, document_errors = load_governance_document(
+            category_paths[category],
+            category,
+        )
+        errors.extend(document_errors)
+        if document is None:
+            continue
+        category_documents[category] = document
+        if trust_root is not None:
+            errors.extend(
+                validate_category_evidence(
+                    document,
+                    category=category,
+                    wave=args.wave,
+                    base_tree=args.base_tree,
+                    production_diff_root=production_diff_root,
+                    derived_rows=categorized[category],
+                    ledger=data,
+                    root=root,
+                    trust_root=trust_root,
+                )
+            )
+        if (
+            source_selection is not None
+            and document.get("approvedDesignBlob")
+            != source_selection.get("approvedDesignBlob")
+        ):
+            errors.append(
+                f"{category} category approvedDesignBlob does not match "
+                "source selection"
+            )
+
+    signed_documents = [
+        document
+        for document in [source_selection, *category_documents.values()]
+        if isinstance(document, dict)
+    ]
+    nonces = [
+        document.get("nonce")
+        for document in signed_documents
+        if is_nonempty_string(document.get("nonce"))
+    ]
+    if len(nonces) != len(set(nonces)):
+        errors.append("signed governance document nonce was replayed")
+
     seen_candidate_paths: set[str] = set()
     for candidate_path in args.candidate_manifest:
         try:
@@ -2989,6 +4065,11 @@ def main() -> int:
         return 1
     print(
         f"owner-ledger: PASS ({ledger_path}; candidates={len(args.candidate_manifest)})"
+        f"; create={len(categorized['create'])}"
+        f"; extension={len(categorized['extension'])}"
+        f"; adapter={len(categorized['adapter'])}"
+        f"; fixture={len(categorized['fixture'])}"
+        f"; productionDiffRoot={production_diff_root}"
     )
     return 0
 

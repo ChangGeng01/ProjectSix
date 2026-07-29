@@ -1,5 +1,8 @@
 import copy
+import base64
+import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -30,6 +33,17 @@ CREATE_PROOF = {
 
 
 class QinaoOwnerLedgerCLITests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._wave_fixture_directory = tempfile.TemporaryDirectory()
+        cls.WAVE_ARGUMENTS = _make_default_wave_arguments(
+            Path(cls._wave_fixture_directory.name)
+        )
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._wave_fixture_directory.cleanup()
+
     @staticmethod
     def make_audit_boundary_root(
         directory: str,
@@ -56,8 +70,8 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
         checker_path.write_text(checker_source, encoding="utf-8")
         return root
 
-    @staticmethod
-    def run_ledger(ledger: Path) -> subprocess.CompletedProcess[str]:
+    @classmethod
+    def run_ledger(cls, ledger: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
                 sys.executable,
@@ -66,6 +80,7 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
                 str(ROOT),
                 "--ledger",
                 str(ledger),
+                *cls.WAVE_ARGUMENTS,
             ],
             cwd=ROOT,
             capture_output=True,
@@ -128,6 +143,7 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
                     str(ROOT),
                     "--ledger",
                     str(LEDGER),
+                    *self.WAVE_ARGUMENTS,
                     "--candidate-manifest",
                     str(path),
                 ],
@@ -161,6 +177,7 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
                     str(ROOT),
                     "--ledger",
                     str(ledger_path),
+                    *self.WAVE_ARGUMENTS,
                     "--candidate-manifest",
                     str(candidate_path),
                 ],
@@ -189,6 +206,7 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
                 str(ROOT),
                 "--ledger",
                 str(LEDGER),
+                *self.WAVE_ARGUMENTS,
             ]
             for path in paths:
                 command.extend(["--candidate-manifest", str(path)])
@@ -1874,6 +1892,748 @@ publicationSinkReceiptArtifactID = nil
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("controlled document set", completed.stderr)
         self.assertIn("seven", completed.stderr)
+
+
+_ED25519_Q = 2**255 - 19
+_ED25519_L = 2**252 + 27742317777372353535851937790883648493
+_ED25519_D = -121665 * pow(121666, _ED25519_Q - 2, _ED25519_Q) % _ED25519_Q
+_ED25519_I = pow(2, (_ED25519_Q - 1) // 4, _ED25519_Q)
+
+
+def _ed25519_xrecover(y: int) -> int:
+    xx = (y * y - 1) * pow(_ED25519_D * y * y + 1, _ED25519_Q - 2, _ED25519_Q)
+    x = pow(xx, (_ED25519_Q + 3) // 8, _ED25519_Q)
+    if (x * x - xx) % _ED25519_Q != 0:
+        x = x * _ED25519_I % _ED25519_Q
+    if x & 1:
+        x = _ED25519_Q - x
+    return x
+
+
+_ED25519_B_Y = 4 * pow(5, _ED25519_Q - 2, _ED25519_Q) % _ED25519_Q
+_ED25519_B = (_ed25519_xrecover(_ED25519_B_Y), _ED25519_B_Y)
+
+
+def _ed25519_add(left: tuple[int, int], right: tuple[int, int]) -> tuple[int, int]:
+    x1, y1 = left
+    x2, y2 = right
+    denominator_x = pow(
+        1 + _ED25519_D * x1 * x2 * y1 * y2,
+        _ED25519_Q - 2,
+        _ED25519_Q,
+    )
+    denominator_y = pow(
+        1 - _ED25519_D * x1 * x2 * y1 * y2,
+        _ED25519_Q - 2,
+        _ED25519_Q,
+    )
+    return (
+        (x1 * y2 + x2 * y1) * denominator_x % _ED25519_Q,
+        (y1 * y2 + x1 * x2) * denominator_y % _ED25519_Q,
+    )
+
+
+def _ed25519_multiply(point: tuple[int, int], scalar: int) -> tuple[int, int]:
+    result = (0, 1)
+    addend = point
+    while scalar:
+        if scalar & 1:
+            result = _ed25519_add(result, addend)
+        addend = _ed25519_add(addend, addend)
+        scalar >>= 1
+    return result
+
+
+def _ed25519_encode(point: tuple[int, int]) -> bytes:
+    x, y = point
+    encoded = y | ((x & 1) << 255)
+    return encoded.to_bytes(32, "little")
+
+
+def _test_ed25519_key(seed: bytes) -> tuple[bytes, bytes, int]:
+    digest = hashlib.sha512(seed).digest()
+    scalar_bytes = bytearray(digest[:32])
+    scalar_bytes[0] &= 248
+    scalar_bytes[31] &= 63
+    scalar_bytes[31] |= 64
+    scalar = int.from_bytes(scalar_bytes, "little")
+    public_key = _ed25519_encode(_ed25519_multiply(_ED25519_B, scalar))
+    return public_key, digest[32:], scalar
+
+
+def _test_ed25519_sign(seed: bytes, message: bytes) -> bytes:
+    public_key, prefix, scalar = _test_ed25519_key(seed)
+    nonce = int.from_bytes(hashlib.sha512(prefix + message).digest(), "little")
+    nonce %= _ED25519_L
+    encoded_r = _ed25519_encode(_ed25519_multiply(_ED25519_B, nonce))
+    challenge = int.from_bytes(
+        hashlib.sha512(encoded_r + public_key + message).digest(),
+        "little",
+    )
+    challenge %= _ED25519_L
+    encoded_s = ((nonce + challenge * scalar) % _ED25519_L).to_bytes(
+        32,
+        "little",
+    )
+    return encoded_r + encoded_s
+
+
+def _canonical_test_json(value: object) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _make_default_wave_arguments(directory: Path) -> list[str]:
+    def git(*arguments: str) -> str:
+        return subprocess.run(
+            ["git", *arguments],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    def signed(value: dict) -> dict:
+        result = copy.deepcopy(value)
+        result["signature"] = base64.b64encode(
+            _test_ed25519_sign(
+                QinaoWaveAuthorityGateTests.TEST_SEED,
+                _canonical_test_json(value),
+            )
+        ).decode("ascii")
+        return result
+
+    def write(name: str, value: object) -> Path:
+        path = directory / name
+        path.write_bytes(_canonical_test_json(value) + b"\n")
+        return path
+
+    base_tree = git("rev-parse", "HEAD^{tree}")
+    public_key, _prefix, _scalar = _test_ed25519_key(
+        QinaoWaveAuthorityGateTests.TEST_SEED
+    )
+    trust_root = {
+        "schema": "QinaoAdmissionTrustRootV1",
+        "repositoryIdentity": QinaoWaveAuthorityGateTests.REPOSITORY_IDENTITY,
+        "issuedAt": QinaoWaveAuthorityGateTests.ISSUED_AT,
+        "expiresAt": QinaoWaveAuthorityGateTests.EXPIRES_AT,
+        "keys": [
+            {
+                "keyID": QinaoWaveAuthorityGateTests.TEST_KEY_ID,
+                "role": role,
+                "publicKey": base64.b64encode(public_key).decode("ascii"),
+            }
+            for role in ("source-selector", "wave-category-reviewer")
+        ],
+        "revokedNonces": [],
+    }
+    design_digest = hashlib.sha256(
+        QinaoWaveAuthorityGateTests.DESIGN_PATH.read_bytes()
+    ).hexdigest()
+    source_selection = signed(
+        {
+            "schema": "QinaoSourceSelectionV1",
+            "repositoryIdentity": QinaoWaveAuthorityGateTests.REPOSITORY_IDENTITY,
+            "selectedCommit": git("rev-parse", "HEAD"),
+            "selectedTree": base_tree,
+            "approvedDesignBlob": design_digest,
+            "externalVerifierSHA256": "a" * 64,
+            "issuedAt": QinaoWaveAuthorityGateTests.ISSUED_AT,
+            "expiresAt": QinaoWaveAuthorityGateTests.EXPIRES_AT,
+            "nonce": "legacy-source-selection-test-nonce",
+            "signer": QinaoWaveAuthorityGateTests.TEST_KEY_ID,
+            "role": "source-selector",
+            "signatureAlgorithm": "Ed25519",
+        }
+    )
+    empty_diff_root = hashlib.sha256(_canonical_test_json([])).hexdigest()
+    categories: dict[str, Path] = {}
+    for category in ("create", "extension", "adapter", "fixture"):
+        categories[category] = write(
+            f"legacy-{category}.json",
+            signed(
+                {
+                    "schema": "QinaoWaveCategoryEvidenceV1",
+                    "repositoryIdentity": (
+                        QinaoWaveAuthorityGateTests.REPOSITORY_IDENTITY
+                    ),
+                    "wave": "W0",
+                    "category": category,
+                    "status": "notApplicable",
+                    "baseTree": base_tree,
+                    "approvedDesignBlob": design_digest,
+                    "productionDiffRoot": empty_diff_root,
+                    "reviewedRows": [],
+                    "anchors": [],
+                    "reason": "legacy checker tests carry no production tree diff",
+                    "issuedAt": QinaoWaveAuthorityGateTests.ISSUED_AT,
+                    "expiresAt": QinaoWaveAuthorityGateTests.EXPIRES_AT,
+                    "nonce": f"legacy-{category}-test-nonce",
+                    "signer": QinaoWaveAuthorityGateTests.TEST_KEY_ID,
+                    "role": "wave-category-reviewer",
+                    "signatureAlgorithm": "Ed25519",
+                }
+            ),
+        )
+    trust_path = write("legacy-trust-root.json", trust_root)
+    selection_path = write("legacy-source-selection.json", source_selection)
+    return [
+        "--source-selection",
+        str(selection_path),
+        "--trust-root",
+        str(trust_path),
+        "--base-tree",
+        base_tree,
+        "--candidate-tree",
+        base_tree,
+        "--wave",
+        "W0",
+        "--create-manifest-or-disposition",
+        str(categories["create"]),
+        "--extension-manifest-or-disposition",
+        str(categories["extension"]),
+        "--adapter-manifest-or-disposition",
+        str(categories["adapter"]),
+        "--fixture-set-or-disposition",
+        str(categories["fixture"]),
+    ]
+
+
+class QinaoWaveAuthorityGateTests(unittest.TestCase):
+    """Task 1 RED/GREEN coverage for the candidate-tree authority gate."""
+
+    REPOSITORY_IDENTITY = "qinao/project06"
+    DESIGN_PATH = (
+        ROOT
+        / "docs"
+        / "superpowers"
+        / "specs"
+        / "2026-07-29-qinao-dual-space-automation-apple-ecosystem-design.md"
+    )
+    TEST_SEED = bytes(range(32))
+    TEST_KEY_ID = "test-wave-review-key"
+    ISSUED_AT = "2026-07-29T00:00:00Z"
+    EXPIRES_AT = "2030-01-01T00:00:00Z"
+
+    def setUp(self) -> None:
+        self.temp_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_directory.cleanup)
+        self.directory = Path(self.temp_directory.name)
+        self.base_tree = self.git("rev-parse", "HEAD^{tree}")
+        self.candidate_tree = self.base_tree
+        self.design_digest = hashlib.sha256(self.DESIGN_PATH.read_bytes()).hexdigest()
+        self.empty_diff_root = hashlib.sha256(_canonical_test_json([])).hexdigest()
+        public_key, _prefix, _scalar = _test_ed25519_key(self.TEST_SEED)
+        self.trust_root = {
+            "schema": "QinaoAdmissionTrustRootV1",
+            "repositoryIdentity": self.REPOSITORY_IDENTITY,
+            "issuedAt": self.ISSUED_AT,
+            "expiresAt": self.EXPIRES_AT,
+            "keys": [
+                {
+                    "keyID": self.TEST_KEY_ID,
+                    "role": "wave-category-reviewer",
+                    "publicKey": base64.b64encode(public_key).decode("ascii"),
+                },
+                {
+                    "keyID": self.TEST_KEY_ID,
+                    "role": "source-selector",
+                    "publicKey": base64.b64encode(public_key).decode("ascii"),
+                },
+            ],
+            "revokedNonces": [],
+        }
+        self.source_selection = self.signed(
+            {
+                "schema": "QinaoSourceSelectionV1",
+                "repositoryIdentity": self.REPOSITORY_IDENTITY,
+                "selectedCommit": self.git("rev-parse", "HEAD"),
+                "selectedTree": self.base_tree,
+                "approvedDesignBlob": self.design_digest,
+                "externalVerifierSHA256": "a" * 64,
+                "issuedAt": self.ISSUED_AT,
+                "expiresAt": self.EXPIRES_AT,
+                "nonce": "source-selection-test-nonce",
+                "signer": self.TEST_KEY_ID,
+                "role": "source-selector",
+                "signatureAlgorithm": "Ed25519",
+            }
+        )
+        self.documents: dict[str, dict] = {
+            category: self.category_document(category)
+            for category in ("create", "extension", "adapter", "fixture")
+        }
+
+    @staticmethod
+    def git(*arguments: str) -> str:
+        return subprocess.run(
+            ["git", *arguments],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    def signed(self, value: dict) -> dict:
+        signed = copy.deepcopy(value)
+        signed["signature"] = base64.b64encode(
+            _test_ed25519_sign(self.TEST_SEED, _canonical_test_json(value))
+        ).decode("ascii")
+        return signed
+
+    def category_document(
+        self,
+        category: str,
+        *,
+        status: str = "notApplicable",
+        rows: list[dict] | None = None,
+        anchors: list[str] | None = None,
+    ) -> dict:
+        rows = [] if rows is None else rows
+        return self.signed(
+            {
+                "schema": "QinaoWaveCategoryEvidenceV1",
+                "repositoryIdentity": self.REPOSITORY_IDENTITY,
+                "wave": "W0",
+                "category": category,
+                "status": status,
+                "baseTree": self.base_tree,
+                "approvedDesignBlob": self.design_digest,
+                "productionDiffRoot": self.empty_diff_root,
+                "reviewedRows": rows,
+                "anchors": [] if anchors is None else anchors,
+                "reason": (
+                    "W0 changes governance and floor tooling only"
+                    if status == "notApplicable"
+                    else None
+                ),
+                "issuedAt": self.ISSUED_AT,
+                "expiresAt": self.EXPIRES_AT,
+                "nonce": f"{category}-test-nonce",
+                "signer": self.TEST_KEY_ID,
+                "role": "wave-category-reviewer",
+                "signatureAlgorithm": "Ed25519",
+            }
+        )
+
+    def write_json(self, name: str, value: object) -> Path:
+        path = self.directory / name
+        path.write_bytes(_canonical_test_json(value) + b"\n")
+        return path
+
+    def command(self) -> list[str]:
+        paths = {
+            "trust-root": self.write_json("trust-root.json", self.trust_root),
+            "source-selection": self.write_json(
+                "source-selection.json",
+                self.source_selection,
+            ),
+        }
+        for category, value in self.documents.items():
+            paths[category] = self.write_json(f"{category}.json", value)
+        return [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(ROOT),
+            "--ledger",
+            str(LEDGER),
+            "--source-selection",
+            str(paths["source-selection"]),
+            "--trust-root",
+            str(paths["trust-root"]),
+            "--base-tree",
+            self.base_tree,
+            "--candidate-tree",
+            self.candidate_tree,
+            "--wave",
+            "W0",
+            "--create-manifest-or-disposition",
+            str(paths["create"]),
+            "--extension-manifest-or-disposition",
+            str(paths["extension"]),
+            "--adapter-manifest-or-disposition",
+            str(paths["adapter"]),
+            "--fixture-set-or-disposition",
+            str(paths["fixture"]),
+        ]
+
+    def run_gate(self, command: list[str] | None = None) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            self.command() if command is None else command,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    def mutate_document(self, category: str, mutation: Callable[[dict], None]) -> None:
+        document = copy.deepcopy(self.documents[category])
+        document.pop("signature")
+        mutation(document)
+        self.documents[category] = self.signed(document)
+
+    def candidate_tree_with_blob(self, path: str, contents: bytes) -> str:
+        object_id = subprocess.run(
+            ["git", "hash-object", "-w", "--stdin"],
+            cwd=ROOT,
+            input=contents,
+            check=True,
+            capture_output=True,
+        ).stdout.decode("ascii").strip()
+        index = self.directory / "index"
+        environment = dict(os.environ)
+        environment["GIT_INDEX_FILE"] = str(index)
+        subprocess.run(
+            ["git", "read-tree", self.base_tree],
+            cwd=ROOT,
+            env=environment,
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                f"100644,{object_id},{path}",
+            ],
+            cwd=ROOT,
+            env=environment,
+            check=True,
+        )
+        return subprocess.run(
+            ["git", "write-tree"],
+            cwd=ROOT,
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    def test_all_required_wave_arguments_are_accepted_and_valid_w0_passes(self) -> None:
+        result = self.run_gate()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("create=0", result.stdout)
+        self.assertIn("extension=0", result.stdout)
+        self.assertIn("adapter=0", result.stdout)
+        self.assertIn("fixture=0", result.stdout)
+
+    def test_missing_extension_category_argument_is_rejected(self) -> None:
+        command = self.command()
+        option_index = command.index("--extension-manifest-or-disposition")
+        del command[option_index : option_index + 2]
+
+        result = self.run_gate(command)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--extension-manifest-or-disposition", result.stderr)
+        self.assertIn("required", result.stderr)
+
+    def test_empty_adapter_category_document_is_rejected(self) -> None:
+        command = self.command()
+        option_index = command.index("--adapter-manifest-or-disposition")
+        empty_path = self.directory / "empty-adapter.json"
+        empty_path.write_bytes(b"")
+        command[option_index + 1] = str(empty_path)
+
+        result = self.run_gate(command)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("adapter category document is empty", result.stderr)
+
+    def test_duplicate_candidate_rows_are_rejected(self) -> None:
+        row = {
+            "path": "BehavioralAISubstrate/Sources/BASRuntimeCore/Existing.swift",
+            "blob": "b" * 40,
+            "change": "modify",
+            "ownerID": "identity.semantic-layers",
+            "classification": "E",
+            "symbol": "BASCognitiveLayer",
+            "authorityClaims": [],
+        }
+        self.documents["extension"] = self.category_document(
+            "extension",
+            status="present",
+            rows=[row, copy.deepcopy(row)],
+        )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duplicate", result.stderr)
+        self.assertIn("reviewedRows", result.stderr)
+
+    def test_extra_manifest_row_absent_from_production_diff_is_rejected(self) -> None:
+        self.documents["extension"] = self.category_document(
+            "extension",
+            status="present",
+            rows=[
+                {
+                    "path": (
+                        "BehavioralAISubstrate/Sources/BASRuntimeCore/"
+                        "BASObservationReconciliationCore.swift"
+                    ),
+                    "blob": "b" * 40,
+                    "change": "modify",
+                    "ownerID": "identity.semantic-layers",
+                    "classification": "E",
+                    "symbol": "BASCognitiveLayer",
+                    "authorityClaims": [],
+                }
+            ],
+        )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("extra", result.stderr)
+        self.assertIn("production diff", result.stderr)
+
+    def test_cross_wave_category_reuse_is_rejected(self) -> None:
+        self.mutate_document(
+            "fixture",
+            lambda document: document.__setitem__("wave", "W1"),
+        )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("fixture cross-wave reuse", result.stderr)
+
+    def test_stale_base_and_diff_roots_are_rejected(self) -> None:
+        self.mutate_document(
+            "create",
+            lambda document: (
+                document.__setitem__("baseTree", "0" * 40),
+                document.__setitem__("productionDiffRoot", "f" * 64),
+            ),
+        )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("baseTree", result.stderr)
+        self.assertIn("productionDiffRoot", result.stderr)
+
+    def test_invalid_category_signature_is_rejected(self) -> None:
+        self.documents["adapter"]["signature"] = base64.b64encode(b"\0" * 64).decode(
+            "ascii"
+        )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("signature", result.stderr)
+        self.assertIn("adapter", result.stderr)
+
+    def test_unknown_extension_owner_and_path_are_rejected(self) -> None:
+        path = "BehavioralAISubstrate/Sources/BASRuntimeCore/UnknownExtension.swift"
+        row = {
+            "path": path,
+            "blob": "e" * 40,
+            "change": "add",
+            "ownerID": "unknown.owner",
+            "classification": "E",
+            "symbol": "UnknownExtension",
+            "authorityClaims": [],
+        }
+        diff_root = hashlib.sha256(_canonical_test_json([row])).hexdigest()
+        self.empty_diff_root = diff_root
+        self.documents["extension"] = self.category_document(
+            "extension",
+            status="present",
+            rows=[row],
+        )
+
+        self.assertTrue(
+            hasattr(checker, "validate_category_evidence"),
+            "the authority gate needs per-category semantic validation",
+        )
+        with LEDGER.open("r", encoding="utf-8") as handle:
+            ledger = json.load(handle)
+        errors = checker.validate_category_evidence(
+            self.documents["extension"],
+            category="extension",
+            wave="W0",
+            base_tree=self.base_tree,
+            production_diff_root=diff_root,
+            derived_rows=[row],
+            ledger=ledger,
+            root=ROOT,
+            trust_root=self.trust_root,
+        )
+
+        self.assertTrue(any("unknown.owner" in error for error in errors), errors)
+        self.assertTrue(any("unknown" in error.lower() for error in errors), errors)
+        self.assertTrue(any(path in error for error in errors), errors)
+
+    def test_adapter_cannot_claim_writer_or_effect_authority(self) -> None:
+        self.documents["adapter"] = self.category_document(
+            "adapter",
+            status="present",
+            rows=[
+                {
+                    "path": (
+                        "QinaoRuntimeSDK/Sources/QinaoLoop/"
+                        "QinaoOrganEndpoint.swift"
+                    ),
+                    "blob": "c" * 40,
+                    "change": "modify",
+                    "ownerID": "provider.package-boundary",
+                    "classification": "A",
+                    "symbol": "QinaoOrganEndpoint",
+                    "authorityClaims": ["writer", "externalEffect"],
+                }
+            ],
+        )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("adapter", result.stderr)
+        self.assertIn("writer", result.stderr)
+        self.assertIn("effect", result.stderr.lower())
+
+    def test_e_candidate_cannot_be_passed_through_create_gate(self) -> None:
+        self.documents["create"] = self.category_document(
+            "create",
+            status="present",
+            rows=[
+                {
+                    "path": (
+                        "BehavioralAISubstrate/Sources/BASRuntimeCore/"
+                        "BASObservationReconciliationCore.swift"
+                    ),
+                    "blob": "d" * 40,
+                    "change": "modify",
+                    "ownerID": "identity.semantic-layers",
+                    "classification": "E",
+                    "symbol": "BASCognitiveLayer",
+                    "authorityClaims": [],
+                }
+            ],
+        )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("create", result.stderr)
+        self.assertIn("classification", result.stderr)
+        self.assertIn("M", result.stderr)
+
+    def test_first_wire_for_missing_m_owner_cannot_have_zero_create_rows(self) -> None:
+        with LEDGER.open("r", encoding="utf-8") as handle:
+            ledger = json.load(handle)
+        permission = next(
+            row
+            for row in ledger["create_permissions"]
+            if not (ROOT / row["allowed_paths"][0]).is_file()
+        )
+        path = permission["allowed_paths"][0]
+        row = {
+            "path": path,
+            "blob": "e" * 40,
+            "change": "add",
+            "ownerID": permission["owner_id"],
+            "classification": "M",
+            "symbol": permission["authority_symbol"],
+            "authorityClaims": [],
+        }
+        diff_root = hashlib.sha256(_canonical_test_json([row])).hexdigest()
+
+        self.assertTrue(
+            hasattr(checker, "validate_category_evidence"),
+            "the authority gate needs per-category semantic validation",
+        )
+        errors = checker.validate_category_evidence(
+            self.documents["create"],
+            category="create",
+            wave="W0",
+            base_tree=self.base_tree,
+            production_diff_root=diff_root,
+            derived_rows=[row],
+            ledger=ledger,
+            root=ROOT,
+            trust_root=self.trust_root,
+        )
+
+        self.assertTrue(
+            any(permission["owner_id"] in error for error in errors),
+            errors,
+        )
+        self.assertTrue(any("create" in error for error in errors), errors)
+        self.assertTrue(any("zero" in error for error in errors), errors)
+
+    def test_missing_anchor_and_empty_glob_are_rejected(self) -> None:
+        self.documents["fixture"] = self.category_document(
+            "fixture",
+            anchors=[
+                "BehavioralAISubstrate/Tests/DefinitelyMissing.swift",
+                "BehavioralAISubstrate/Tests/NoSuchSuite*.swift",
+            ],
+        )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("DefinitelyMissing.swift", result.stderr)
+        self.assertIn("NoSuchSuite*.swift", result.stderr)
+        self.assertIn("anchor", result.stderr)
+
+    def test_anchor_tool_errors_cannot_be_reported_as_no_match(self) -> None:
+        self.assertTrue(
+            hasattr(checker, "resolve_anchor_paths"),
+            "the authority gate needs a fail-closed anchor resolver",
+        )
+        with mock.patch.object(Path, "glob", side_effect=OSError("scanner failed")):
+            _paths, errors = checker.resolve_anchor_paths(
+                ROOT,
+                ["BehavioralAISubstrate/Tests/*.swift"],
+            )
+        self.assertTrue(any("tool error" in error for error in errors), errors)
+
+    def test_forbidden_second_automation_authority_is_rejected(self) -> None:
+        path = "BehavioralAISubstrate/Sources/BASRuntimeCore/AutomationStore.swift"
+        self.assertTrue(
+            hasattr(checker, "validate_swift_authority_source"),
+            "the authority gate needs a candidate-tree Swift authority scanner",
+        )
+        errors = checker.validate_swift_authority_source(
+            path,
+            "public actor AutomationStore {}\n",
+        )
+
+        self.assertTrue(any("AutomationStore" in error for error in errors), errors)
+        self.assertTrue(any("second" in error for error in errors), errors)
+
+    def test_direct_apple_mutation_outside_zone_c_is_rejected(self) -> None:
+        path = "BehavioralAISubstrate/Sources/BASRuntimeCore/UnsafeCalendar.swift"
+        self.assertTrue(
+            hasattr(checker, "validate_swift_authority_source"),
+            "the authority gate needs a candidate-tree Swift authority scanner",
+        )
+        errors = checker.validate_swift_authority_source(
+            path,
+            (
+                "import EventKit\n"
+                "func mutate(_ store: EKEventStore, _ event: EKEvent) throws {\n"
+                "  try store.save(event, span: .thisEvent)\n"
+                "}\n"
+            ),
+        )
+
+        self.assertTrue(any("UnsafeCalendar.swift" in error for error in errors), errors)
+        self.assertTrue(
+            any("ZoneCAppleEffectExecutor" in error for error in errors),
+            errors,
+        )
 
 
 if __name__ == "__main__":

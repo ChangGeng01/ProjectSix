@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftParser
 import SwiftSyntax
 
@@ -160,3 +161,4 @@ enum BASEventLogHeadSyntaxAudit {
         }
     }
 }
+#endif
