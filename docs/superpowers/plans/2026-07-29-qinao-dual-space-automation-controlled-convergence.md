@@ -142,8 +142,12 @@ external verifier/trust-root/provider/receipt design; it defers its execution
 only.
 
 Under this overlay Tasks 0A-0B and the pinned development-worktree setup may
-proceed. Production edits remain subject to the original owner, gate, and
-wave rules, and Tasks 3-10 cannot be executed from this file under any status.
+proceed. After that setup, **only** the Task 1/2 local checks explicitly
+enumerated in “Required development checks” may execute; every Task 1/2
+external command remains deferred as stated above. No other Task 1/2 operation
+is authorized by this overlay. Production edits remain subject to the original
+owner, gate, and wave rules, and Tasks 3-10 cannot be executed from this file
+under any status.
 
 The following capabilities remain disabled until their named stop condition clears:
 
