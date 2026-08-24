@@ -62,53 +62,81 @@ def load_verified_weights_checkpoint(
     expected_hex = _validated_digest(expected_digest)
     byte_limit = _validated_max_bytes(max_bytes)
 
-    if not hasattr(os, "O_NOFOLLOW"):
-        raise CheckpointVerificationError("platform cannot refuse checkpoint symlinks")
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_NONBLOCK"):
+        raise CheckpointVerificationError("platform cannot safely open checkpoints")
 
-    flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    flags = (
+        os.O_RDONLY
+        | os.O_NOFOLLOW
+        | os.O_NONBLOCK
+        | getattr(os, "O_CLOEXEC", 0)
+    )
     try:
         source_fd = os.open(path, flags)
     except (OSError, TypeError, ValueError) as error:
         raise CheckpointVerificationError("checkpoint is not an accessible regular file") from error
 
     try:
-        before = os.fstat(source_fd)
+        try:
+            before = os.fstat(source_fd)
+        except OSError as error:
+            raise CheckpointVerificationError("checkpoint source I/O failed") from error
         if not stat.S_ISREG(before.st_mode):
             raise CheckpointVerificationError("checkpoint is not a regular file")
         if before.st_size > byte_limit:
             raise CheckpointVerificationError("checkpoint exceeds configured size limit")
 
-        with os.fdopen(source_fd, "rb", closefd=True) as source:
-            source_fd = -1
-            with tempfile.TemporaryFile(mode="w+b") as snapshot:
+        try:
+            source = os.fdopen(source_fd, "rb", closefd=True)
+        except OSError as error:
+            raise CheckpointVerificationError("checkpoint source I/O failed") from error
+        source_fd = -1
+        with source:
+            try:
+                snapshot_file = tempfile.TemporaryFile(mode="w+b")
+            except OSError as error:
+                raise CheckpointVerificationError(
+                    "checkpoint snapshot I/O failed"
+                ) from error
+            with snapshot_file as snapshot:
                 digest = hashlib.sha256()
                 copied = 0
-                while True:
-                    chunk = source.read(min(_COPY_CHUNK_BYTES, byte_limit - copied + 1))
-                    if not chunk:
-                        break
-                    copied += len(chunk)
-                    if copied > byte_limit:
-                        raise CheckpointVerificationError(
-                            "checkpoint exceeds configured size limit"
+                try:
+                    while True:
+                        chunk = source.read(
+                            min(_COPY_CHUNK_BYTES, byte_limit - copied + 1)
                         )
-                    digest.update(chunk)
-                    if snapshot.write(chunk) != len(chunk):
+                        if not chunk:
+                            break
+                        copied += len(chunk)
+                        if copied > byte_limit:
+                            raise CheckpointVerificationError(
+                                "checkpoint exceeds configured size limit"
+                            )
+                        digest.update(chunk)
+                        if snapshot.write(chunk) != len(chunk):
+                            raise CheckpointVerificationError(
+                                "failed to snapshot checkpoint exactly"
+                            )
+
+                    after = os.fstat(source.fileno())
+                    if (
+                        _source_version(before) != _source_version(after)
+                        or copied != after.st_size
+                    ):
                         raise CheckpointVerificationError(
-                            "failed to snapshot checkpoint exactly"
+                            "checkpoint changed while being copied"
                         )
 
-                after = os.fstat(source.fileno())
-                if _source_version(before) != _source_version(after) or copied != after.st_size:
+                    if not hmac.compare_digest(digest.hexdigest(), expected_hex):
+                        raise CheckpointVerificationError("checkpoint digest mismatch")
+
+                    snapshot.flush()
+                    snapshot.seek(0)
+                except OSError as error:
                     raise CheckpointVerificationError(
-                        "checkpoint changed while being copied"
-                    )
-
-                if not hmac.compare_digest(digest.hexdigest(), expected_hex):
-                    raise CheckpointVerificationError("checkpoint digest mismatch")
-
-                snapshot.flush()
-                snapshot.seek(0)
+                        "checkpoint snapshot I/O failed"
+                    ) from error
 
                 try:
                     import torch

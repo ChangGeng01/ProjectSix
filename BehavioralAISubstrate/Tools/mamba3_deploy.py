@@ -50,9 +50,18 @@ def _checkpoint_max_bytes() -> int:
     configured = os.environ.get("CKPT_MAX_BYTES")
     if configured is None:
         return DEFAULT_MAX_BYTES
-    if not configured.isascii() or not configured.isdecimal():
+    if (
+        len(configured) > 20
+        or not configured.isascii()
+        or not configured.isdecimal()
+    ):
         raise CheckpointVerificationError("CKPT_MAX_BYTES must be a positive integer")
-    value = int(configured)
+    try:
+        value = int(configured)
+    except (ValueError, OverflowError) as error:
+        raise CheckpointVerificationError(
+            "CKPT_MAX_BYTES must be a positive integer"
+        ) from error
     if value <= 0:
         raise CheckpointVerificationError("CKPT_MAX_BYTES must be a positive integer")
     return value

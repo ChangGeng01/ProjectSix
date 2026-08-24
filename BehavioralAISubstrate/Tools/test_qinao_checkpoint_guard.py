@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import ast
+import errno
 import hashlib
+import importlib.util
 import os
+import subprocess
 import sys
 import tempfile
 import types
@@ -18,6 +21,69 @@ from BehavioralAISubstrate.Tools.qinao_checkpoint_guard import (
 
 def _identity(payload: bytes) -> str:
     return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+
+def _load_deploy_module_for_config_test():
+    fake_torch = types.ModuleType("torch")
+    fake_nn = types.ModuleType("torch.nn")
+    fake_functional = types.ModuleType("torch.nn.functional")
+
+    class FakeModule:
+        pass
+
+    fake_nn.Module = FakeModule
+    fake_torch.nn = fake_nn
+
+    fake_coreai = types.ModuleType("coreai_torch")
+    fake_compression = types.ModuleType("coreai_torch._compression")
+    fake_custom_layers = types.ModuleType(
+        "coreai_torch._compression.custom_layers"
+    )
+    fake_custom_layers.constexpr_blockwise_shift_scale = object()
+    fake_compression_utils = types.ModuleType("coreai_torch._compression.utils")
+    fake_compression_utils.inject_subbyte_tensors = lambda value: value
+
+    fake_quant = types.ModuleType("llama_to_coreai_int8")
+    fake_quant.QuantEmbed = object
+    fake_quant.QuantLinear = object
+
+    fake_trainable = types.ModuleType("mamba3_trainable")
+    fake_trainable.H = 1
+    fake_trainable.P = 64
+    fake_trainable.N = 64
+    fake_trainable.R = 1
+    fake_trainable.D_MODEL = 1
+
+    guard_module = sys.modules[
+        "BehavioralAISubstrate.Tools.qinao_checkpoint_guard"
+    ]
+    fake_modules = {
+        "torch": fake_torch,
+        "torch.nn": fake_nn,
+        "torch.nn.functional": fake_functional,
+        "coreai_torch": fake_coreai,
+        "coreai_torch._compression": fake_compression,
+        "coreai_torch._compression.custom_layers": fake_custom_layers,
+        "coreai_torch._compression.utils": fake_compression_utils,
+        "llama_to_coreai_int8": fake_quant,
+        "mamba3_trainable": fake_trainable,
+        "qinao_checkpoint_guard": guard_module,
+    }
+
+    deploy_path = Path(__file__).with_name("mamba3_deploy.py")
+    spec = importlib.util.spec_from_file_location(
+        "_qinao_checkpoint_deploy_config_test", deploy_path
+    )
+    if spec is None or spec.loader is None:
+        raise AssertionError("could not load deploy module spec")
+    deploy_module = importlib.util.module_from_spec(spec)
+    with (
+        mock.patch.dict(sys.modules, fake_modules),
+        mock.patch.object(sys, "argv", [str(deploy_path)]),
+        mock.patch.object(sys, "path", sys.path.copy()),
+    ):
+        spec.loader.exec_module(deploy_module)
+    return deploy_module
 
 
 class _RecordingTorch(types.ModuleType):
@@ -124,6 +190,60 @@ class CheckpointGuardTests(unittest.TestCase):
                 ):
                     load_verified_weights_checkpoint(checkpoint, _identity(payload))
 
+        self.assertEqual(fake_torch.calls, [])
+
+    def test_fifo_without_writer_is_refused_promptly(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fifo = Path(directory) / "checkpoint.fifo"
+            os.mkfifo(fifo)
+            child = """
+import sys
+from BehavioralAISubstrate.Tools.qinao_checkpoint_guard import (
+    CheckpointVerificationError,
+    load_verified_weights_checkpoint,
+)
+
+try:
+    load_verified_weights_checkpoint(sys.argv[1], f"sha256:{'0' * 64}")
+except CheckpointVerificationError:
+    raise SystemExit(0)
+raise SystemExit(2)
+"""
+            environment = os.environ.copy()
+            environment["PYTHONDONTWRITEBYTECODE"] = "1"
+
+            completed = subprocess.run(
+                [sys.executable, "-c", child, str(fifo)],
+                cwd=Path(__file__).parents[2],
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
+
+        self.assertEqual(
+            completed.returncode,
+            0,
+            msg=f"stdout={completed.stdout!r} stderr={completed.stderr!r}",
+        )
+
+    def test_temporary_storage_failure_uses_public_verification_error(self) -> None:
+        payload = b"checkpoint"
+        fake_torch = _RecordingTorch({"model": {}})
+        disk_full = OSError(errno.ENOSPC, "simulated disk full")
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint = Path(directory) / "weights.pt"
+            checkpoint.write_bytes(payload)
+
+            with mock.patch.dict(sys.modules, {"torch": fake_torch}), mock.patch(
+                "BehavioralAISubstrate.Tools.qinao_checkpoint_guard.tempfile.TemporaryFile",
+                side_effect=disk_full,
+            ):
+                with self.assertRaises(CheckpointVerificationError) as caught:
+                    load_verified_weights_checkpoint(checkpoint, _identity(payload))
+
+        self.assertIs(caught.exception.__cause__, disk_full)
         self.assertEqual(fake_torch.calls, [])
 
     def test_mismatched_identity_rejects_before_loader(self) -> None:
@@ -299,6 +419,16 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
         self.assertIn("load_verified_weights_checkpoint", imported_names)
         self.assertIn("load_verified_weights_checkpoint", called_names)
         self.assertEqual(torch_load_calls, [])
+
+    def test_deploy_max_bytes_parser_rejects_arbitrarily_long_decimal(self) -> None:
+        deploy = _load_deploy_module_for_config_test()
+
+        with mock.patch.dict(os.environ, {"CKPT_MAX_BYTES": "17"}):
+            self.assertEqual(deploy._checkpoint_max_bytes(), 17)
+
+        with mock.patch.dict(os.environ, {"CKPT_MAX_BYTES": "9" * 5000}):
+            with self.assertRaises(deploy.CheckpointVerificationError):
+                deploy._checkpoint_max_bytes()
 
     def test_real_torch_rejects_execution_gadget_without_executing_it(self) -> None:
         try:
