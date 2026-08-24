@@ -66,7 +66,12 @@ bf16 on CUDA, grad-accum, warmup, grad-clip, atomic checkpoint/resume.
 ## Deploy back to the A19 (the loop closes)
 
 ```bash
-# copy /workspace/ckpt/ckpt_latest.pt → /tmp/draft_coreai/mamba3_poc_student.pt (24-layer)
+# After every quality gate passes, select the immutable metric-gated artifact on the trusted producer:
+#   /workspace/ckpt/ckpt_best.pt
+# Record its SHA-256 in the trusted release receipt, then carry that digest to the deploy operator over
+# an authenticated channel. A digest computed from the same untrusted destination copy is NOT provenance.
+export CKPT=/tmp/draft_coreai/ckpt_best.pt
+export CKPT_SHA256=sha256:<trusted-release-digest>
 uv run --with coreai-torch python Tools/mamba3_deploy.py 24 8   # int8, 24 layers → .aimodel
 # then run on the A19 (CoreAI GPU backend) ≈ 70 tok/s, ~80-120 MB resident. NOT pure-ANE at 24L (addendum 15).
 # (For the 8-layer pure-ANE variant: mamba3_deploy.py 8 8 — 0 fresh compile errors, ~112 tok/s.)
@@ -162,9 +167,12 @@ change `data_fp` so they need a FRESH `CKPT_DIR`):
   backwards E3-graceful), fidelity_argmax (answer-span), generation EM/F1, stability (incl. id-aligned subset), **fp16_seq_parity**
   (HOST run_twin≡run_ref in fp16 — NOT on-device parity), no_contamination (REAL disjoint split). Plus the opt-in **E4 counterfactual**
   reads-vs-memorizes diagnostic (`COUNTERFACTUAL=1`). Offline re-eval entry: `EVAL_CKPT=/path/ckpt.pt python Tools/mamba3_eval.py`.
-- GATE 3 — ckpt → device WITH `CKPT` set: the converters now **fail-closed** on a missing CKPT (no silent random-weight asset;
-  `FORCE_RANDOM=1` only for op-graph probes) AND on a mismatched arch/layers/vocab/mla_positions/config or an MLA_ROPE ckpt
-  (the deploy converter is still NoPE). `resolve_ckpt` is authoritative on vocab.
+- GATE 3 — trusted `ckpt_best.pt` → device WITH both `CKPT` and
+  `CKPT_SHA256=sha256:<trusted-release-digest>` set. The digest is recorded by the trusted producer/release receipt and carried
+  over an authenticated operator channel; recomputing it from the same untrusted deploy copy proves consistency, not provenance.
+  The converters **fail-closed** on a missing CKPT or digest (no silent random-weight asset; `FORCE_RANDOM=1` only for op-graph
+  probes) AND on a mismatched arch/layers/vocab/mla_positions/config or an MLA_ROPE ckpt (the deploy converter is still NoPE).
+  `resolve_ckpt` is authoritative on vocab.
 - GATE 4 — device argmax-consistency: the A19 `BAS_COREAI_STATELAKE_PROBE` reproduces `HOSTREF_STATELAKE_ARGMAX` (cross-launch int8).
 - GATE 5 — quant-fidelity (device phase): `quant_fidelity_stub` is HONESTLY a stub and is NOT a gate; `fp16_seq_parity` is a HOST
   PyTorch-fp16 check, not real int8/CoreAI. Real int8-vs-fp32 + A19 argmax parity is measured at the device phase.

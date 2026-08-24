@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import textwrap
 import types
 import unittest
 from pathlib import Path
@@ -84,6 +85,190 @@ def _load_deploy_module_for_config_test():
     ):
         spec.loader.exec_module(deploy_module)
     return deploy_module
+
+
+_OPTIMIZED_DEPLOY_DRIVER = r"""
+import importlib.util
+import os
+import sys
+import types
+from pathlib import Path
+
+if __debug__:
+    raise SystemExit(90)
+
+case, deploy_path, checkpoint_path, out_path, quant_marker, convert_marker, save_marker = sys.argv[1:]
+
+fake_torch = types.ModuleType("torch")
+fake_nn = types.ModuleType("torch.nn")
+fake_functional = types.ModuleType("torch.nn.functional")
+
+class FakeModule:
+    def __init__(self, *args, **kwargs):
+        pass
+    def eval(self):
+        return self
+    def half(self):
+        return self
+    def register_buffer(self, name, value):
+        setattr(self, name, value)
+    def load_state_dict(self, _state, strict=False):
+        if strict is not False:
+            raise AssertionError("deploy must retain strict=False compatibility loading")
+        if case == "unexpected":
+            return [], ["attacker.extra_weight"]
+        return ["layers.0.in_proj.weight"], []
+    def __call__(self, *args, **kwargs):
+        return object()
+
+fake_nn.Module = FakeModule
+fake_nn.Embedding = lambda *args, **kwargs: types.SimpleNamespace(weight=object())
+fake_nn.ModuleList = lambda values: list(values)
+fake_nn.Parameter = lambda value: value
+fake_torch.nn = fake_nn
+fake_torch.ones = lambda *args, **kwargs: object()
+fake_torch.zeros = lambda *args, **kwargs: object()
+fake_torch.manual_seed = lambda *_args, **_kwargs: None
+fake_torch.float16 = object()
+fake_torch.long = object()
+
+class FakeExportedProgram:
+    graph_signature = types.SimpleNamespace(buffers_to_mutate={})
+    def run_decompositions(self, _table):
+        return self
+
+fake_torch.export = types.SimpleNamespace(
+    export=lambda *_args, **_kwargs: FakeExportedProgram()
+)
+
+fake_coreai = types.ModuleType("coreai_torch")
+class FakeAsset:
+    def optimize(self):
+        return None
+    def save_asset(self, path):
+        Path(save_marker).write_text("save-called", encoding="utf-8")
+        Path(path).mkdir(parents=True, exist_ok=True)
+class FakeConverter:
+    def add_exported_program(self, *_args, **_kwargs):
+        Path(convert_marker).write_text("convert-called", encoding="utf-8")
+        return self
+    def to_coreai(self):
+        return FakeAsset()
+fake_coreai.TorchConverter = FakeConverter
+fake_coreai.get_decomp_table = lambda: {}
+
+fake_compression = types.ModuleType("coreai_torch._compression")
+fake_custom_layers = types.ModuleType("coreai_torch._compression.custom_layers")
+fake_custom_layers.constexpr_blockwise_shift_scale = object()
+fake_compression_utils = types.ModuleType("coreai_torch._compression.utils")
+fake_compression_utils.inject_subbyte_tensors = lambda value: value
+
+fake_quant = types.ModuleType("llama_to_coreai_int8")
+fake_quant.QuantEmbed = object
+fake_quant.QuantLinear = object
+
+fake_trainable = types.ModuleType("mamba3_trainable")
+fake_trainable.H = 1
+fake_trainable.P = 64
+fake_trainable.N = 64
+fake_trainable.R = 1
+fake_trainable.D_MODEL = 1
+fake_trainable.Lyr = lambda: object()
+
+fake_guard = types.ModuleType("qinao_checkpoint_guard")
+class FakeCheckpointVerificationError(Exception):
+    pass
+fake_guard.DEFAULT_MAX_BYTES = 1024
+fake_guard.CheckpointVerificationError = FakeCheckpointVerificationError
+fake_guard.load_verified_weights_checkpoint = lambda *_args, **_kwargs: {
+    "layers": 1,
+    "model": {},
+}
+
+sys.modules.update({
+    "torch": fake_torch,
+    "torch.nn": fake_nn,
+    "torch.nn.functional": fake_functional,
+    "coreai_torch": fake_coreai,
+    "coreai_torch._compression": fake_compression,
+    "coreai_torch._compression.custom_layers": fake_custom_layers,
+    "coreai_torch._compression.utils": fake_compression_utils,
+    "llama_to_coreai_int8": fake_quant,
+    "mamba3_trainable": fake_trainable,
+    "qinao_checkpoint_guard": fake_guard,
+})
+
+os.environ.pop("FORCE_RANDOM", None)
+os.environ.pop("FP16", None)
+os.environ["CKPT"] = checkpoint_path
+os.environ["CKPT_SHA256"] = "sha256:" + "0" * 64
+sys.argv = [deploy_path, "1", "8"]
+
+spec = importlib.util.spec_from_file_location("_qinao_optimized_deploy_test", deploy_path)
+if spec is None or spec.loader is None:
+    raise SystemExit(91)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+module.CKPT = checkpoint_path
+module.OUT = out_path
+
+def record_quantize(self):
+    Path(quant_marker).write_text("quantize-called", encoding="utf-8")
+    return self
+
+module.DeployM.quantize = record_quantize
+module.main()
+"""
+
+
+def _assert_optimized_deploy_refuses_incomplete_state(case: str) -> None:
+    deploy_path = Path(__file__).with_name("mamba3_deploy.py")
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        checkpoint = root / "checkpoint.pt"
+        checkpoint.write_bytes(b"authenticated-by-test-double")
+        output = root / "existing-output.aimodel"
+        output.mkdir()
+        sentinel = output / "keep-me"
+        sentinel.write_text("pre-existing-output", encoding="utf-8")
+        quant_marker = root / "quantize-called"
+        convert_marker = root / "convert-called"
+        save_marker = root / "save-called"
+
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-O",
+                "-c",
+                textwrap.dedent(_OPTIMIZED_DEPLOY_DRIVER),
+                case,
+                str(deploy_path),
+                str(checkpoint),
+                str(output),
+                str(quant_marker),
+                str(convert_marker),
+                str(save_marker),
+            ],
+            cwd=Path(__file__).parents[2],
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+
+        diagnostic = completed.stdout + completed.stderr
+        expected = (
+            "checkpoint has tensors DeployM lacks"
+            if case == "unexpected"
+            else "DeployM missing trained params"
+        )
+        assert completed.returncode != 0, diagnostic
+        assert expected in diagnostic, diagnostic
+        assert sentinel.read_text(encoding="utf-8") == "pre-existing-output"
+        assert not quant_marker.exists(), "state refusal happened after quantization"
+        assert not convert_marker.exists(), "state refusal happened after conversion"
+        assert not save_marker.exists(), "state refusal happened after save_asset"
 
 
 class _RecordingTorch(types.ModuleType):
@@ -573,6 +758,12 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"CKPT_MAX_BYTES": "9" * 5000}):
             with self.assertRaises(deploy.CheckpointVerificationError):
                 deploy._checkpoint_max_bytes()
+
+    def test_optimized_deploy_refuses_unexpected_trained_keys_before_output(self) -> None:
+        _assert_optimized_deploy_refuses_incomplete_state("unexpected")
+
+    def test_optimized_deploy_refuses_missing_trained_keys_before_output(self) -> None:
+        _assert_optimized_deploy_refuses_incomplete_state("missing")
 
     def test_real_torch_rejects_execution_gadget_without_executing_it(self) -> None:
         try:

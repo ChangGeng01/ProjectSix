@@ -5,7 +5,8 @@ inference step), loads the trained weights, quantizes (int8/int4), and emits the
 (angle/ssm/kprev/vprev — the flat-state SIGSEGV fix). Because Lyr is the exact training module, the deployed
 graph is identical to what trained, no re-derivation. Loads /tmp/draft_coreai/mamba3_poc_student.pt if present.
 
-Run: uv run --with coreai-torch python Tools/mamba3_deploy.py <L> <bits>   (e.g. 8 8)
+Run: CKPT=/path/ckpt_best.pt CKPT_SHA256=sha256:<trusted-release-digest> \
+     uv run --with coreai-torch python Tools/mamba3_deploy.py <L> <bits>   (e.g. 8 8)
 """
 from __future__ import annotations
 
@@ -35,7 +36,7 @@ import mamba3_trainable as MT
 L = int(sys.argv[1]) if len(sys.argv) > 1 else 8
 BITS = int(sys.argv[2]) if len(sys.argv) > 2 else 8
 VOCAB = 100352                                                    # Granite tokenizer
-CKPT = os.environ.get("CKPT", "/tmp/draft_coreai/mamba3_poc_student.pt")   # cloud output → set CKPT=/workspace/ckpt/ckpt_latest.pt
+CKPT = os.environ.get("CKPT", "/tmp/draft_coreai/mamba3_poc_student.pt")   # cloud output → set CKPT=/workspace/ckpt/ckpt_best.pt
 _TAG = (f"_{os.environ['SPLIT']}" if os.environ.get("SPLIT") else "") + \
        ("_fp16" if os.environ.get("FP16") == "1" else "") + \
        (f"_n{MT.N}p{MT.P}" if (MT.N, MT.P) != (64, 64) else "") + \
@@ -161,9 +162,16 @@ def main() -> None:
             raise SystemExit(f"checkpoint has {ck_L} layers but deploy L={L} — would be incoherent; run: "
                              f"mamba3_deploy.py {ck_L} {BITS}")
         missing, unexpected = m.load_state_dict(ck["model"], strict=False)
-        assert not unexpected, f"checkpoint has tensors DeployM lacks: {unexpected[:3]}"
+        if unexpected:
+            raise SystemExit(
+                f"checkpoint has tensors DeployM lacks: {unexpected[:3]}"
+            )
         bad = [k for k in missing if not k.endswith("_all")]          # only the decode-state buffers may be missing
-        assert not bad, f"DeployM missing trained params (would deploy uninitialized): {bad[:3]}"
+        if bad:
+            raise SystemExit(
+                "DeployM missing trained params (would deploy uninitialized): "
+                f"{bad[:3]}"
+            )
         print(f"loaded the FULL {ck_L}-layer trained student ({len(ck['model'])} tensors); decode state zero-init")
     else:
         raise SystemExit(f"no checkpoint at {CKPT} — refusing a silent random-weight production asset; "
