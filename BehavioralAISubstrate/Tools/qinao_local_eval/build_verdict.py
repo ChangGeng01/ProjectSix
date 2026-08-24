@@ -119,6 +119,28 @@ def _humaneval_evidence_provenance(values):
         or not 0 < evidence["sample_count"] <= MAX_HUMANEVAL_SAMPLES
     ):
         return None
+    if (
+        type(evidence.get("passed")) is not int
+        or not 0 <= evidence["passed"] <= evidence["sample_count"]
+    ):
+        return None
+    raw_score = evidence.get("score")
+    raw_value = values.get("30")
+    if (
+        isinstance(raw_score, bool)
+        or not isinstance(raw_score, (int, float))
+        or isinstance(raw_value, bool)
+        or not isinstance(raw_value, (int, float))
+    ):
+        return None
+    score = float(raw_score)
+    value = float(raw_value)
+    if not math.isfinite(score) or not math.isfinite(value):
+        return None
+    if not 0 <= score <= 100 or value != score:
+        return None
+    if score != round(evidence["passed"] / evidence["sample_count"] * 100, 1):
+        return None
     if evidence.get("dataset_id") != DATASET_ID:
         return None
     if evidence.get("dataset_split") != DATASET_SPLIT:
@@ -138,6 +160,10 @@ def _humaneval_comparison(base, tuned):
     tuned_evidence = _humaneval_evidence_provenance(tuned)
     if base_evidence is None or tuned_evidence is None:
         return False, "HumanEval current-run evidence unavailable"
+    if base_evidence["tag"] == tuned_evidence["tag"]:
+        return False, "HumanEval base and tuned tags must be distinct"
+    if base_evidence["subject_sha256"] == tuned_evidence["subject_sha256"]:
+        return False, "HumanEval base and tuned subject identities must be distinct"
     for field in _HUMANEVAL_COMPARABLE_FIELDS:
         if base_evidence[field] != tuned_evidence[field]:
             label = {
@@ -317,14 +343,23 @@ def build(base, tuned):
 
 
 def main():
+    if len(sys.argv) != 3:
+        sys.stderr.write("usage: build_verdict.py <base_tag> <tuned_tag>\n")
+        sys.exit(2)
     base_tag, tuned_tag = sys.argv[1], sys.argv[2]
+    if base_tag == tuned_tag:
+        sys.stderr.write("build_verdict: base and tuned tags must be distinct\n")
+        sys.exit(2)
     # H23 wire-1/2 (2026-07-09): fold in the orphan harness side-files
     # (qinao_read/bench/humaneval/bench_zh/cmmlu/gsm8k_fair/forget/…) that
     # build_verdict never read, so their CRITICAL gates flow into the verdict
     # instead of staying silently PENDING. The merge stamps computed provenance
     # for MODEL_CRITICAL metrics so they count as genuine passes, not ATTEST.
     from qinao_merge import merge_known_sidefiles
-    from qinao_humaneval_evidence import optional_humaneval_run_context_from_env
+    from qinao_humaneval_evidence import (
+        observe_humaneval_output_set,
+        optional_humaneval_run_context_from_env,
+    )
 
     try:
         humaneval_context = optional_humaneval_run_context_from_env(
@@ -335,13 +370,29 @@ def main():
             f"build_verdict: invalid HumanEval current-run context: {error}\n"
         )
         sys.exit(2)
-    base = merge_known_sidefiles(
-        _load_values(base_tag), base_tag, humaneval_context=humaneval_context
-    )
-    tuned = merge_known_sidefiles(
-        _load_values(tuned_tag), tuned_tag, humaneval_context=humaneval_context
-    )
-    verdict = build(base, tuned)
+    if humaneval_context is None:
+        base = merge_known_sidefiles(_load_values(base_tag), base_tag)
+        tuned = merge_known_sidefiles(_load_values(tuned_tag), tuned_tag)
+        verdict = build(base, tuned)
+    else:
+        # One ordered shared-lock observation prevents a verdict from combining
+        # base generation A with tuned generation B during a writer transition.
+        with observe_humaneval_output_set(
+            humaneval_context, (base_tag, tuned_tag)
+        ) as humaneval_observation:
+            base = merge_known_sidefiles(
+                _load_values(base_tag),
+                base_tag,
+                humaneval_context=humaneval_context,
+                humaneval_observation=humaneval_observation,
+            )
+            tuned = merge_known_sidefiles(
+                _load_values(tuned_tag),
+                tuned_tag,
+                humaneval_context=humaneval_context,
+                humaneval_observation=humaneval_observation,
+            )
+            verdict = build(base, tuned)
     verdict["model"] = tuned_tag
     verdict["base"] = base_tag
     _out = os.environ.get(

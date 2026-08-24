@@ -18,10 +18,12 @@ Run: python -m pytest Tools/qinao_local_eval/test_gate_integrity.py -q
 
 import json
 import os
+import select
 import subprocess
 import shutil
 import sys
 import tempfile
+import threading
 import uuid
 from pathlib import Path
 
@@ -372,6 +374,178 @@ def test_build_verdict_cli_accepts_only_receipt_bound_current_run_humaneval():
             path.unlink(missing_ok=True)
 
 
+def test_build_verdict_cli_observes_one_atomic_base_tuned_generation():
+    """The CLI must not combine base A with tuned B across a writer transition."""
+
+    from qinao_humaneval_evidence import (
+        HumanEvalProducer,
+        HumanEvalRunContext,
+        SubjectReceipt,
+        atomic_write_humaneval_evidence,
+        build_humaneval_evidence,
+        prepare_humaneval_output,
+    )
+
+    token = f"fractured-{os.getpid()}-{uuid.uuid4().hex}"
+    tags = (f"{token}-base", f"{token}-tuned")
+    value_paths = [Path("/tmp") / f"qinao_values_{tag}.json" for tag in tags]
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        run_id = "fractured-pair-run"
+        evidence_dir = root / run_id
+        evidence_dir.mkdir()
+        subjects = {
+            tags[0]: SubjectReceipt("a" * 64, "base-model", None),
+            tags[1]: SubjectReceipt("b" * 64, "tuned-model", "adapter"),
+        }
+        context = HumanEvalRunContext(
+            run_id=run_id,
+            evidence_dir=evidence_dir,
+            dataset_fingerprint="fractured-pair-dataset",
+            subjects=subjects,
+        )
+        receipt_manifest = root / "subjects.json"
+        receipt_manifest.write_text(
+            json.dumps(
+                {
+                    "schema": "qinao/humaneval-subject-receipts/v1",
+                    "subjects": {
+                        tag: {
+                            "sha256": receipt.sha256,
+                            "model": receipt.model,
+                            "adapter": receipt.adapter,
+                        }
+                        for tag, receipt in subjects.items()
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        task_ids = [f"HumanEval/{index}" for index in range(100)]
+
+        def evidence(tag, passed):
+            outcomes = {
+                task_id: int(index < passed)
+                for index, task_id in enumerate(task_ids)
+            }
+            return build_humaneval_evidence(
+                passed=passed,
+                total=len(task_ids),
+                infra_errors=0,
+                per_problem=outcomes,
+                sample_ids=task_ids,
+                producer=HumanEvalProducer.PAIRED,
+                context=context,
+                tag=tag,
+            )
+
+        try:
+            for tag, value_path, passed in zip(tags, value_paths, (50, 0)):
+                value_path.write_text(
+                    json.dumps(_fully_passing_critical_values()), encoding="utf-8"
+                )
+                (evidence_dir / f"qinao_humaneval_paired_{tag}.json").write_text(
+                    json.dumps(evidence(tag, passed)), encoding="utf-8"
+                )
+
+            verdict_path = root / "verdict.json"
+            first_merge_read, first_merge_write = os.pipe()
+            continue_read, continue_write = os.pipe()
+            child = os.fork()
+            if child == 0:
+                os.close(first_merge_read)
+                os.close(continue_write)
+                try:
+                    real_merge = qm.merge_known_sidefiles
+                    merge_count = 0
+
+                    def pause_after_first_merge(*args, **kwargs):
+                        nonlocal merge_count
+                        merged = real_merge(*args, **kwargs)
+                        merge_count += 1
+                        if merge_count == 1:
+                            os.write(first_merge_write, b"1")
+                            if os.read(continue_read, 1) != b"1":
+                                raise RuntimeError("parent did not release verdict build")
+                        return merged
+
+                    qm.merge_known_sidefiles = pause_after_first_merge
+                    os.environ.update(
+                        {
+                            "QINAO_VERDICT_OUT": str(verdict_path),
+                            "QINAO_EVAL_RUN_ID": run_id,
+                            "QINAO_EVAL_EVIDENCE_DIR": str(evidence_dir),
+                            "QINAO_SUBJECT_RECEIPTS": str(receipt_manifest),
+                            "QINAO_HUMANEVAL_DATASET_FINGERPRINT": (
+                                context.dataset_fingerprint
+                            ),
+                        }
+                    )
+                    sys.argv = [str(Path(HERE) / "build_verdict.py"), *tags]
+                    bv.main()
+                except BaseException:
+                    os._exit(70)
+                os._exit(0)
+
+            os.close(first_merge_write)
+            os.close(continue_read)
+            writer_started = threading.Event()
+            writer_done = threading.Event()
+            writer_errors = []
+
+            def publish_next_pair():
+                writer_started.set()
+                try:
+                    for tag, passed in zip(tags, (100, 99)):
+                        with prepare_humaneval_output(
+                            context, HumanEvalProducer.PAIRED, tag
+                        ) as attempt:
+                            atomic_write_humaneval_evidence(
+                                attempt, evidence(tag, passed)
+                            )
+                except BaseException as error:
+                    writer_errors.append(error)
+                finally:
+                    writer_done.set()
+
+            readable, _, _ = select.select([first_merge_read], [], [], 5)
+            assert readable and os.read(first_merge_read, 1) == b"1"
+            writer = threading.Thread(target=publish_next_pair, daemon=True)
+            writer.start()
+            assert writer_started.wait(2)
+            writer_was_blocked = not writer_done.wait(1)
+            os.write(continue_write, b"1")
+            _, child_status = os.waitpid(child, 0)
+            writer.join(5)
+
+            assert os.waitstatus_to_exitcode(child_status) == 0
+            assert not writer.is_alive()
+            assert not writer_errors
+            assert writer_was_blocked, (
+                "base/tuned writers must block while one verdict snapshot is observed"
+            )
+            verdict = json.loads(verdict_path.read_text(encoding="utf-8"))
+            row = next(row for row in verdict["rows"] if row["num"] == 30)
+            assert row["status"] == "FAIL", (
+                "base A=50 and tuned B=99 form a false PASS that never coexisted"
+            )
+        finally:
+            for descriptor_name in (
+                "first_merge_read",
+                "first_merge_write",
+                "continue_read",
+                "continue_write",
+            ):
+                descriptor = locals().get(descriptor_name)
+                if descriptor is not None:
+                    try:
+                        os.close(descriptor)
+                    except OSError:
+                        pass
+            for path in value_paths:
+                path.unlink(missing_ok=True)
+
+
 def test_missing_or_invalid_baseline_for_relative_critical_gate_is_pending():
     tuned = _fully_passing_critical_values()
     for bad_baseline in (None, "not-a-number", True, float("nan"), float("inf")):
@@ -502,6 +676,133 @@ def test_copied_ladder_executes_tools_from_its_own_resolved_directory():
     observed_real = {os.path.realpath(path) for path in observed}
     assert observed_real <= {expected_tools, expected_home}
     assert expected_tools in observed_real
+
+
+def _ladder_receipts(root, *, correct_selectors):
+    model = "mlx-community/Qwen3.5-4B-4bit"
+    tags = ("base", "v6-900", "v7-900", "v8-900", "v9-900", "v10-900", "v11-900")
+    subjects = {}
+    for index, tag in enumerate(tags):
+        adapter = (
+            None
+            if tag == "base"
+            else str(root / "home/qwen_honesty_finetune" / f"4b_{tag[:-4]}_adapter_900")
+        )
+        subjects[tag] = {
+            "sha256": f"{index + 1:064x}",
+            "model": model if correct_selectors else "wrong-model-selector",
+            "adapter": adapter if correct_selectors else None,
+        }
+    manifest = root / "subjects.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "qinao/humaneval-subject-receipts/v1",
+                "subjects": subjects,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return manifest
+
+
+def _run_real_ladder_preflight(root, manifest, *, run_id="ladder-fresh"):
+    fake_home = root / "home"
+    fake_python = fake_home / "qwen_honesty_finetune/.venv/bin/python"
+    fake_python.parent.mkdir(parents=True, exist_ok=True)
+    if not fake_python.exists():
+        fake_python.symlink_to(sys.executable)
+    evidence_dir = root / run_id
+    result = subprocess.run(
+        ["/bin/bash", str(Path(HERE) / "run_ladder.sh")],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "HOME": str(fake_home),
+            "QINAO_EVAL_RUN_ID": run_id,
+            "QINAO_EVAL_EVIDENCE_DIR": str(evidence_dir),
+            "QINAO_SUBJECT_RECEIPTS": str(manifest),
+            "QINAO_HUMANEVAL_DATASET_FINGERPRINT": "dataset-fingerprint",
+            "QINAO_LADDER_PREFLIGHT_ONLY": "1",
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
+    )
+    return result, evidence_dir
+
+
+def test_ladder_requires_a_fresh_exclusive_run_directory():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        manifest = _ladder_receipts(root, correct_selectors=True)
+        existing = root / "already-exists"
+        existing.mkdir()
+        marker = existing / "stale.json"
+        marker.write_text("stale", encoding="utf-8")
+
+        result, _ = _run_real_ladder_preflight(
+            root, manifest, run_id="already-exists"
+        )
+
+        assert result.returncode != 0
+        assert marker.read_text(encoding="utf-8") == "stale"
+
+
+def test_ladder_preflight_checks_exact_selectors_and_cleans_failed_dry_run():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        wrong_manifest = _ladder_receipts(root, correct_selectors=False)
+        rejected, evidence_dir = _run_real_ladder_preflight(root, wrong_manifest)
+
+        assert rejected.returncode != 0
+        assert not evidence_dir.exists(), "failed preflight poisoned the fresh run id"
+
+        adapter_manifest = _ladder_receipts(root, correct_selectors=True)
+        adapter_payload = json.loads(adapter_manifest.read_text(encoding="utf-8"))
+        adapter_payload["subjects"]["v9-900"]["adapter"] = None
+        adapter_manifest.write_text(json.dumps(adapter_payload), encoding="utf-8")
+        rejected_adapter, adapter_dir = _run_real_ladder_preflight(
+            root, adapter_manifest, run_id="ladder-wrong-adapter"
+        )
+        assert rejected_adapter.returncode != 0
+        assert not adapter_dir.exists()
+
+        correct_manifest = _ladder_receipts(root, correct_selectors=True)
+        accepted, evidence_dir = _run_real_ladder_preflight(root, correct_manifest)
+        assert accepted.returncode == 0, accepted.stderr
+        assert not evidence_dir.exists(), "preflight-only must not reserve the run id"
+
+
+def test_build_verdict_cli_rejects_identical_base_and_tuned_tags():
+    token = f"same-tag-{os.getpid()}-{uuid.uuid4().hex}"
+    value_path = Path("/tmp") / f"qinao_values_{token}.json"
+    try:
+        value_path.write_text(
+            json.dumps(_fully_passing_critical_values()), encoding="utf-8"
+        )
+        environment = os.environ.copy()
+        for name in (
+            "QINAO_EVAL_RUN_ID",
+            "QINAO_EVAL_EVIDENCE_DIR",
+            "QINAO_SUBJECT_RECEIPTS",
+            "QINAO_HUMANEVAL_DATASET_FINGERPRINT",
+        ):
+            environment.pop(name, None)
+        result = subprocess.run(
+            [sys.executable, str(Path(HERE) / "build_verdict.py"), token, token],
+            capture_output=True,
+            text=True,
+            env={
+                **environment,
+                "QINAO_VERDICT_OUT": str(Path(tempfile.gettempdir()) / f"{token}.json"),
+            },
+        )
+        assert result.returncode != 0
+        assert "distinct" in result.stderr
+    finally:
+        value_path.unlink(missing_ok=True)
+        (Path(tempfile.gettempdir()) / f"{token}.json").unlink(missing_ok=True)
 
 
 def test_truncated_json_fails_closed():

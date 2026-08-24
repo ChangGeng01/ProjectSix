@@ -38,12 +38,17 @@ export QINAO_EVAL_RUN_ID=eval-20260824-001
 export QINAO_EVAL_EVIDENCE_DIR=/absolute/eval-runs/$QINAO_EVAL_RUN_ID
 export QINAO_SUBJECT_RECEIPTS=/absolute/receipts/subjects.json
 export QINAO_HUMANEVAL_DATASET_FINGERPRINT=<expected-HF-dataset-fingerprint>
-mkdir -p "$QINAO_EVAL_EVIDENCE_DIR"
+# Direct writer invocation only (run_ladder creates this leaf exclusively):
+mkdir -m 700 "$QINAO_EVAL_EVIDENCE_DIR"
 ```
 
 The evidence directory must be absolute, non-symlinked, and named exactly by
-the run ID. The external subject workflow—not this harness—creates the receipt
-manifest:
+the run ID. `run_ladder.sh` requires that leaf not to exist and creates it
+exclusively; its preflight checks every exact hard-coded model/adapter selector
+against the manifest before any existence-cached harness can run. A
+preflight-only or failed preflight removes its still-empty leaf, so a corrected
+retry cannot reuse a partially accepted directory. The external subject
+workflow—not this harness—creates the receipt manifest:
 
 ```json
 {
@@ -69,16 +74,42 @@ receipt. It then loads HumanEval, reads the materialized dataset object's real
 loading the model. Evidence binds schema, producer, run/tag, subject SHA-256,
 the current producer+evidence+sandbox source digest, dataset ID/split/
 fingerprint, strict passed/total counts, and the canonical task-ID set digest.
-Base and tuned must have the same run, producer, harness, dataset, task set,
-and sample count; each subject SHA-256 is checked against its own tag receipt.
-Any missing or mismatched field makes #30 PENDING and blocks `model_eval_ok`.
+Base and tuned must have distinct tags and distinct subject SHA-256 identities,
+plus the same run, producer, harness, dataset, task set, and sample count; each
+subject SHA-256 is checked against its own tag receipt. Provenance also binds
+the score and strict passed count. Any missing or mismatched field makes #30
+PENDING and blocks `model_eval_ok`.
 
-Each writer removes every HumanEval producer output for its current run/tag
-before heavy imports or model load, then publishes the selected producer's
-complete JSON with a same-directory atomic rename. The ladder therefore always
-reruns HumanEval; it never skips because a file exists.
-After an interrupted run, resume with the persisted run context and rerun the
-writer—an old success cannot stand in for a crashed/no-output attempt.
+Each writer holds one run/tag-scoped coordination lock from invalidation through
+publication. Before lock admission it durably creates a unique incomplete-
+attempt tombstone; filesystem and typed aggregation take the matching shared
+lock and reject while any tombstone remains. The writer removes every
+HumanEval producer output before heavy imports or model load, and durably
+orders invalidation and same-directory atomic publish before clearing its
+tombstone only at a normal exit from the complete producer scope. Verdict
+construction takes the base and tuned shared locks in deterministic order and
+holds their one anchored directory/tombstone snapshot through both reads and
+the comparison, so it cannot assemble generations that never coexisted. The
+writer retains the exact published file descriptor until scope exit and checks
+that the no-follow path still names that inode before commit. If marker repair
+and path removal fail after a commit error, it truncates and fsyncs that exact
+inode so the residual producer file cannot parse as evidence. Aggregation
+accepts only the two exact internal observation runtime types—not duck-typed
+objects or subclass overrides—and validates their live anchored directory and
+complete lock set before reading. Cleanup attempts to unlock every flock fd,
+closes every detached descriptor exactly once, preserves an existing primary
+exception, and reports cleanup-only failures. These
+lock/tombstone files contain only opaque run-scoped
+coordination tokens—no score, subject fact, ownership, or authority—and keep
+no completed-attempt history. A failed attempt's tombstone intentionally
+persists fail-closed until a later exclusive writer safely prunes it.
+A newer failed, killed, or cancelled standard/paired attempt therefore leaves
+no older publication to replay. The typed API additionally requires its
+in-memory payload to match the exact anchored, no-follow producer output; a
+pure in-memory build cannot certify #30. The ladder always reruns HumanEval;
+it never skips because a file exists. A direct writer may be rerun inside an
+explicitly persisted context; the ladder itself deliberately requires a new
+exclusive run directory.
 
 The other Phase-1 harnesses in `run_ladder.sh` still retain their historical
 existence cache. This slice makes no claim that the entire 100-metric ladder is

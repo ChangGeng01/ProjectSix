@@ -16,23 +16,51 @@ adapter() {
 : "${QINAO_EVAL_EVIDENCE_DIR:?set the absolute run-scoped evidence directory}"
 : "${QINAO_SUBJECT_RECEIPTS:?set the external tag-to-subject receipt manifest}"
 : "${QINAO_HUMANEVAL_DATASET_FINGERPRINT:?set the expected materialized dataset fingerprint receipt}"
-mkdir -p -- "$QINAO_EVAL_EVIDENCE_DIR"
-chmod 700 "$QINAO_EVAL_EVIDENCE_DIR"
+if ! mkdir -m 700 -- "$QINAO_EVAL_EVIDENCE_DIR"; then
+  echo "run_ladder: evidence directory must be fresh and must not already exist" >&2
+  exit 2
+fi
+
+cleanup_preflight_directory() {
+  status=$?
+  trap - EXIT
+  rmdir -- "$QINAO_EVAL_EVIDENCE_DIR" 2>/dev/null || true
+  exit "$status"
+}
+trap cleanup_preflight_directory EXIT
 
 # Validate the complete external context before starting the ladder. This is a
 # run receipt, not a new authority/store; Qinao's upstream model workflow owns it.
 cd "$TOOLS"
-"$P" - <<'PY'
+"$P" - "$M" \
+  "$(adapter base)" \
+  "$(adapter v6-900)" \
+  "$(adapter v7-900)" \
+  "$(adapter v8-900)" \
+  "$(adapter v9-900)" \
+  "$(adapter v10-900)" \
+  "$(adapter v11-900)" <<'PY'
+import sys
+
 from qinao_humaneval_evidence import load_humaneval_run_context_from_env
 
-load_humaneval_run_context_from_env(
-    required_tags=("base", "v6-900", "v7-900", "v8-900", "v9-900", "v10-900", "v11-900")
-)
+tags = ("base", "v6-900", "v7-900", "v8-900", "v9-900", "v10-900", "v11-900")
+context = load_humaneval_run_context_from_env(required_tags=tags)
+model, *raw_adapters = sys.argv[1:]
+if len(raw_adapters) != len(tags):
+    raise SystemExit("run_ladder: internal selector plan is incomplete")
+for tag, raw_adapter in zip(tags, raw_adapters):
+    context.require_invocation(
+        tag,
+        model=model,
+        adapter=None if raw_adapter == "none" else raw_adapter,
+    )
 PY
 
 if [ "${QINAO_LADDER_PREFLIGHT_ONLY:-0}" = "1" ]; then
   exit 0
 fi
+trap - EXIT
 
 for tag in base v6-900 v7-900 v8-900 v9-900 v10-900 v11-900; do
   AD=$(adapter "$tag")

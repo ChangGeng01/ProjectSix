@@ -59,7 +59,21 @@ def main() -> None:
 
     producer = HumanEvalProducer.PAIRED
     context = load_humaneval_run_context_from_env(required_tags=(tag,))
-    output = prepare_humaneval_output(context, producer, tag)
+    with prepare_humaneval_output(context, producer, tag) as attempt:
+        _run_humaneval_attempt(
+            context=context,
+            producer=producer,
+            tag=tag,
+            mp=mp,
+            ad=ad,
+            raw_sample_limit=raw_sample_limit,
+            attempt=attempt,
+        )
+
+
+def _run_humaneval_attempt(
+    *, context, producer, tag, mp, ad, raw_sample_limit, attempt
+) -> None:
     context.require_invocation(tag, model=mp, adapter=ad)
     n = validated_sample_limit(raw_sample_limit, default=164)
 
@@ -168,7 +182,7 @@ def main() -> None:
         context=context,
         tag=tag,
     )
-    atomic_write_humaneval_evidence(output, out)
+    atomic_write_humaneval_evidence(attempt, out)
     score = f"{out['30']}%" if "30" in out else "UNAVAILABLE"
     print(
         f"{tag} HumanEval(paired,fixed) pass@1 = {ok}/{tot} = {score}"

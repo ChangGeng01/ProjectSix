@@ -56,7 +56,28 @@ def main() -> None:
 
     producer = HumanEvalProducer.STANDARD
     context = load_humaneval_run_context_from_env(required_tags=(tag,))
-    output = prepare_humaneval_output(context, producer, tag)
+    with prepare_humaneval_output(context, producer, tag) as attempt:
+        _run_humaneval_attempt(
+            context=context,
+            producer=producer,
+            tag=tag,
+            model_selector=model_selector,
+            adapter_selector=adapter_selector,
+            raw_sample_limit=raw_sample_limit,
+            attempt=attempt,
+        )
+
+
+def _run_humaneval_attempt(
+    *,
+    context,
+    producer,
+    tag,
+    model_selector,
+    adapter_selector,
+    raw_sample_limit,
+    attempt,
+) -> None:
     context.require_invocation(tag, model=model_selector, adapter=adapter_selector)
     sample_limit = validated_sample_limit(raw_sample_limit, default=60)
 
@@ -147,7 +168,7 @@ def main() -> None:
         context=context,
         tag=tag,
     )
-    atomic_write_humaneval_evidence(output, evidence)
+    atomic_write_humaneval_evidence(attempt, evidence)
     score = f"{evidence['30']}%" if "30" in evidence else "UNAVAILABLE"
     suffix = (
         f"  ({infrastructure_errors} task(s) EXCLUDED — harness/infra error, "

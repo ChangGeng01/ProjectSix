@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,8 +20,11 @@ from typing import Any, Iterable
 sys.path.insert(0, os.path.dirname(__file__))
 from qinao_humaneval_evidence import (  # noqa: E402
     HumanEvalEvidenceSummary,
+    HumanEvalObservation,
+    HumanEvalObservationSet,
     HumanEvalProducer,
     HumanEvalRunContext,
+    observe_humaneval_outputs,
     optional_humaneval_run_context_from_env,
     validate_humaneval_evidence,
 )
@@ -183,6 +187,39 @@ def merge_sidefile_into_values(
     return _merge_sidefile_set(values, [(sidefile, _ProducerSpec(runner))])
 
 
+def _read_published_humaneval_sidefile(
+    observation, producer: HumanEvalProducer, tag: str
+) -> object | None:
+    """Read one exact producer output through the observation's anchored fd."""
+
+    if observation.admission_pending or observation.directory_descriptor is None:
+        return None
+    filename = f"qinao_{producer.sidefile_prefix}_{tag}.json"
+    flags = os.O_RDONLY
+    for name in ("O_CLOEXEC", "O_NOFOLLOW", "O_NONBLOCK"):
+        flags |= getattr(os, name)
+    try:
+        descriptor = os.open(
+            filename,
+            flags,
+            dir_fd=observation.directory_descriptor,
+        )
+    except OSError:
+        return None
+    try:
+        file_info = os.fstat(descriptor)
+        if not stat.S_ISREG(file_info.st_mode):
+            return None
+        with os.fdopen(descriptor, encoding="utf-8") as handle:
+            descriptor = -1
+            return json.load(handle)
+    except (json.JSONDecodeError, OSError, UnicodeError):
+        return None
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
 def merge_humaneval_sidefile_into_values(
     values: dict[str, Any],
     sidefile: object,
@@ -195,12 +232,21 @@ def merge_humaneval_sidefile_into_values(
 
     if not isinstance(producer, HumanEvalProducer):
         raise TypeError("producer must be a HumanEvalProducer")
-    return _merge_sidefile_set(
-        values,
-        [(sidefile, _ProducerSpec(producer.runner, producer))],
-        humaneval_context=context,
-        tag=tag,
-    )
+    with observe_humaneval_outputs(context, tag) as observation:
+        published_sidefile = _read_published_humaneval_sidefile(
+            observation, producer, tag
+        )
+        observed_sidefile = (
+            published_sidefile
+            if isinstance(sidefile, dict) and sidefile == published_sidefile
+            else None
+        )
+        return _merge_sidefile_set(
+            values,
+            [(observed_sidefile, _ProducerSpec(producer.runner, producer))],
+            humaneval_context=context,
+            tag=tag,
+        )
 
 
 def merge_explicit_sidefiles(
@@ -223,6 +269,7 @@ def merge_known_sidefiles(
     tmpdir: str = "/tmp",
     *,
     humaneval_context: HumanEvalRunContext | None = None,
+    humaneval_observation: HumanEvalObservation | HumanEvalObservationSet | None = None,
 ) -> dict[str, Any]:
     """Fold known producers, binding HumanEval to the explicit current run.
 
@@ -232,28 +279,116 @@ def merge_known_sidefiles(
     """
 
     observations: list[tuple[object, _ProducerSpec]] = []
-    for prefix, producer in sorted(KNOWN_SIDEFILES.items()):
-        if producer.humaneval is not None:
-            if humaneval_context is None:
-                continue
-            path = humaneval_context.evidence_dir / f"qinao_{prefix}_{tag}.json"
-        else:
-            path = Path(tmpdir) / f"qinao_{prefix}_{tag}.json"
-        if not path.exists():
-            continue
+    owned_humaneval_observation: HumanEvalObservation | None = None
+    evidence_directory_descriptor: int | None = None
+    evidence_directory_error: Exception | None = None
+    admission_pending = False
+    if humaneval_observation is not None:
+        if humaneval_context is None:
+            evidence_directory_error = ValueError(
+                "HumanEval observation requires its current-run context"
+            )
+        elif type(humaneval_observation) not in (
+            HumanEvalObservation,
+            HumanEvalObservationSet,
+        ):
+            # Producer authority is a closed runtime type, not a duck-typed
+            # snapshot_for method or subclass override.
+            evidence_directory_error = ValueError(
+                "HumanEval observation has an untrusted runtime type"
+            )
+    if humaneval_context is not None:
         try:
-            with path.open(encoding="utf-8") as handle:
-                sidefile = json.load(handle)
-        except (json.JSONDecodeError, OSError) as error:
-            if producer.humaneval is not None:
-                sys.stderr.write(
-                    f"qinao_merge: HumanEval evidence unavailable at {path}: {error}\n"
+            if evidence_directory_error is not None:
+                pass
+            elif humaneval_observation is None:
+                owned_humaneval_observation = observe_humaneval_outputs(
+                    humaneval_context, tag
                 )
-                observations.append((None, producer))
-            else:
+                owned_humaneval_observation.__enter__()
+                humaneval_observation = owned_humaneval_observation
+            if evidence_directory_error is None:
+                (
+                    evidence_directory_descriptor,
+                    admission_pending,
+                ) = humaneval_observation.snapshot_for(
+                    humaneval_context,
+                    tag,
+                )
+        except (OSError, TypeError, ValueError) as error:
+            evidence_directory_error = error
+    try:
+        for prefix, producer in sorted(KNOWN_SIDEFILES.items()):
+            if producer.humaneval is not None:
+                if humaneval_context is None:
+                    continue
+                filename = f"qinao_{prefix}_{tag}.json"
+                path = humaneval_context.evidence_dir / filename
+                if evidence_directory_error is not None:
+                    sys.stderr.write(
+                        "qinao_merge: HumanEval evidence directory unavailable: "
+                        f"{evidence_directory_error}\n"
+                    )
+                    observations.append((None, producer))
+                    continue
+                if admission_pending:
+                    sys.stderr.write(
+                        "qinao_merge: HumanEval attempt is incomplete for "
+                        f"run/tag {humaneval_context.run_id}/{tag}; evidence revoked\n"
+                    )
+                    observations.append((None, producer))
+                    continue
+                try:
+                    flags = os.O_RDONLY
+                    for name in ("O_CLOEXEC", "O_NOFOLLOW", "O_NONBLOCK"):
+                        flags |= getattr(os, name)
+                    descriptor = os.open(
+                        filename,
+                        flags,
+                        dir_fd=evidence_directory_descriptor,
+                    )
+                except FileNotFoundError:
+                    continue
+                except OSError as error:
+                    sys.stderr.write(
+                        f"qinao_merge: HumanEval evidence unavailable at {path}: "
+                        f"{error}\n"
+                    )
+                    observations.append((None, producer))
+                    continue
+                try:
+                    file_info = os.fstat(descriptor)
+                    if not stat.S_ISREG(file_info.st_mode):
+                        raise OSError("evidence is not a regular file")
+                    with os.fdopen(descriptor, encoding="utf-8") as handle:
+                        descriptor = -1
+                        sidefile = json.load(handle)
+                except (json.JSONDecodeError, OSError) as error:
+                    sys.stderr.write(
+                        f"qinao_merge: HumanEval evidence unavailable at {path}: "
+                        f"{error}\n"
+                    )
+                    observations.append((None, producer))
+                    continue
+                finally:
+                    if descriptor >= 0:
+                        os.close(descriptor)
+                observations.append((sidefile, producer))
+                continue
+
+            path = Path(tmpdir) / f"qinao_{prefix}_{tag}.json"
+            if not path.exists():
+                continue
+            try:
+                with path.open(encoding="utf-8") as handle:
+                    sidefile = json.load(handle)
+            except (json.JSONDecodeError, OSError) as error:
                 sys.stderr.write(f"qinao_merge: skipping unreadable {path}: {error}\n")
-            continue
-        observations.append((sidefile, producer))
+                continue
+            observations.append((sidefile, producer))
+    finally:
+        if owned_humaneval_observation is not None:
+            owned_humaneval_observation.__exit__(None, None, None)
     return _merge_sidefile_set(
         values,
         observations,
