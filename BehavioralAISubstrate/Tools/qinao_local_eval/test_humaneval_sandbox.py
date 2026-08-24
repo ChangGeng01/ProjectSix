@@ -4,6 +4,7 @@ import os
 import re
 import signal
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -17,11 +18,13 @@ import qinao_sandbox as qs
 PYBIN = sys.executable
 MODEL_TIMEOUT_PROBE_SECONDS = 1.0
 
-def _run(code: str, timeout: float = 15):
+def _run(code: str, timeout: float = 15, *, cpu_seconds=None):
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
         f.write(code); path = f.name
     try:
-        return qs.run_sandboxed(PYBIN, path, timeout=timeout)
+        return qs.run_sandboxed(
+            PYBIN, path, timeout=timeout, cpu_seconds=cpu_seconds
+        )
     finally:
         os.unlink(path)
 
@@ -70,14 +73,39 @@ def _expect_typed_infrastructure(call):
     raise AssertionError("expected SandboxInfrastructureError")
 
 
+def _assert_bounded_policy_failure(result, reason):
+    assert isinstance(result, subprocess.CompletedProcess), result
+    assert result.returncode == qs.RESOURCE_LIMIT_RETURN_CODE, result
+    assert f"resource-limit/{reason}".encode() in result.stderr, result.stderr[-400:]
+    assert len(result.stdout) <= qs.MAX_CAPTURE_BYTES
+    assert len(result.stderr) <= qs.MAX_CAPTURE_BYTES
+
+
+def _run_recording_private_root(code, timeout=5, *, cpu_seconds=None):
+    roots = []
+    real_mkdtemp = tempfile.mkdtemp
+
+    def recording_mkdtemp(*args, **kwargs):
+        root = real_mkdtemp(*args, **kwargs)
+        roots.append(root)
+        return root
+
+    with mock.patch.object(qs.tempfile, "mkdtemp", side_effect=recording_mkdtemp):
+        result = _run(code, timeout=timeout, cpu_seconds=cpu_seconds)
+    assert roots, "sandbox never allocated its private root"
+    assert all(not os.path.lexists(root) for root in roots), roots
+    return result
+
+
 class _FakeProcess:
     def __init__(self):
         self.pid = 987654321
-        self.returncode = 0
+        self.returncode = None
         self.communicate_calls = 0
 
     def communicate(self, timeout=None):
         self.communicate_calls += 1
+        self.returncode = 0
         return b"model-stdout", b"model-stderr"
 
     def poll(self):
@@ -192,9 +220,14 @@ def _assert_total_teardown_after_close_failure(failing_end):
     assert isinstance(caught, qs.SandboxInfrastructureError), caught
     read_fd, write_fd = probe["pipes"][0]
     failing_fd = write_fd if failing_end == "write" else read_fd
-    other_fd = read_fd if failing_end == "write" else write_fd
     assert probe["close_counts"][failing_fd] == 1, "ambiguous close was retried"
-    assert probe["close_counts"][other_fd] == 1, "remaining descriptor was not closed"
+    for descriptors in probe["pipes"]:
+        for descriptor in descriptors:
+            assert probe["close_counts"][descriptor] == 1, (
+                "a remaining control descriptor was not closed",
+                descriptors,
+                probe["close_counts"],
+            )
     assert probe["kill_calls"] == [probe["process"]]
     assert probe["process"].communicate_calls == 1, "launched process was not reaped"
     assert probe["remove_calls"], "private root removal was not attempted"
@@ -247,17 +280,12 @@ def _assert_permission_sabotaged_root_removed(*, exit_code=None, hangs=False):
             code = _permission_sabotage_code(
                 os.path.realpath(outside), exit_code=exit_code, hangs=hangs
             )
-            if hangs:
-                try:
-                    _run(code, timeout=MODEL_TIMEOUT_PROBE_SECONDS)
-                except subprocess.TimeoutExpired as error:
-                    output = _as_bytes(error.output)
-                else:
-                    raise AssertionError("permission-sabotage probe must time out")
-            else:
-                result = _run(code)
-                assert result.returncode == (exit_code or 0), result.stderr.decode()[:400]
-                output = result.stdout
+            result = _run(
+                code,
+                timeout=MODEL_TIMEOUT_PROBE_SECONDS if hangs else 15,
+            )
+            _assert_bounded_policy_failure(result, "directory-observability")
+            output = result.stdout
             match = re.search(rb"RUN_ROOT=([^\r\n]+)", output)
             assert match, output
             run_root = match.group(1).decode()
@@ -299,6 +327,117 @@ def test_benign_check_scores():
     r = _run("def add(a,b):\n    return a+b\nassert add(2,2)==4\n")
     assert r.returncode == 0, r.stderr.decode()[:400]
 
+
+def test_normal_runpy_return_has_authenticated_completion_witness():
+    r = _run("print('normal-return')\n")
+    assert r.returncode == 0, r.stderr.decode()[:400]
+    assert r.stdout == b"normal-return\n"
+
+
+def test_system_exit_zero_cannot_masquerade_as_normal_completion():
+    r = _run("raise SystemExit(0)\n")
+    assert r.returncode != 0, "activation is not a normal-completion witness"
+
+
+def test_os_exit_zero_cannot_masquerade_as_normal_completion():
+    r = _run("import os\nos._exit(0)\n")
+    assert r.returncode != 0, "a zero process status is not a normal-completion witness"
+
+
+def test_stdout_flood_is_a_bounded_model_policy_failure_with_total_teardown():
+    result = _run_recording_private_root(
+        "import os\n"
+        "chunk = b'x' * 16384\n"
+        "while True:\n"
+        "    os.write(1, chunk)\n"
+    )
+    _assert_bounded_policy_failure(result, "stdout-capture")
+
+
+def test_stderr_flood_is_a_bounded_model_policy_failure_with_total_teardown():
+    result = _run_recording_private_root(
+        "import os\n"
+        "chunk = b'e' * 16384\n"
+        "while True:\n"
+        "    os.write(2, chunk)\n"
+    )
+    _assert_bounded_policy_failure(result, "stderr-capture")
+
+
+def test_cpu_flood_hits_kernel_limit_before_wall_timeout():
+    started = time.monotonic()
+    result = _run_recording_private_root(
+        "while True:\n    pass\n", timeout=5, cpu_seconds=1
+    )
+    elapsed = time.monotonic() - started
+    _assert_bounded_policy_failure(result, "cpu")
+    assert elapsed < 4, f"CPU quota was not independently enforced: {elapsed:.2f}s"
+
+
+def test_resident_memory_flood_is_terminated_before_host_damage():
+    result = _run_recording_private_root(
+        "blocks = []\n"
+        "while True:\n"
+        "    blocks.append(bytearray(8 * 1024 * 1024))\n"
+    )
+    _assert_bounded_policy_failure(result, "resident-memory")
+
+
+def test_thread_flood_is_terminated_by_observed_thread_quota():
+    result = _run_recording_private_root(
+        "import threading\n"
+        "gate = threading.Event()\n"
+        "threads = []\n"
+        f"for _ in range({qs.MAX_THREADS + 16}):\n"
+        "    thread = threading.Thread(target=gate.wait, daemon=True)\n"
+        "    thread.start()\n"
+        "    threads.append(thread)\n"
+        "gate.wait()\n"
+    )
+    _assert_bounded_policy_failure(result, "thread-count")
+
+
+def test_single_file_limit_is_a_bounded_model_policy_failure():
+    result = _run_recording_private_root(
+        "import os\n"
+        "path = os.path.join(os.environ['TMPDIR'], 'oversized')\n"
+        "with open(path, 'wb') as stream:\n"
+        f"    stream.write(b'x' * ({qs.MAX_SINGLE_FILE_BYTES} + 4096))\n"
+    )
+    _assert_bounded_policy_failure(result, "single-file")
+
+
+def test_directory_total_limit_is_a_bounded_model_policy_failure():
+    each = qs.MAX_SINGLE_FILE_BYTES - 32768
+    count = (qs.MAX_DIRECTORY_BYTES // each) + 1
+    result = _run_recording_private_root(
+        "import os\n"
+        f"payload = b'x' * {each}\n"
+        f"for index in range({count}):\n"
+        "    with open(os.path.join(os.environ['TMPDIR'], f'part-{index}'), 'wb') as stream:\n"
+        "        stream.write(payload)\n"
+    )
+    _assert_bounded_policy_failure(result, "directory-total")
+
+
+def test_directory_entry_limit_is_a_bounded_model_policy_failure():
+    result = _run_recording_private_root(
+        "import os\n"
+        f"for index in range({qs.MAX_DIRECTORY_ENTRIES + 8}):\n"
+        "    open(os.path.join(os.environ['TMPDIR'], f'entry-{index}'), 'wb').close()\n"
+    )
+    _assert_bounded_policy_failure(result, "directory-entry-count")
+
+
+def test_open_file_limit_is_kernel_enforced_and_reported():
+    result = _run_recording_private_root(
+        "import os\n"
+        "handles = []\n"
+        f"for index in range({qs.MAX_OPEN_FILES + 16}):\n"
+        "    handles.append(open(os.path.join(os.environ['TMPDIR'], f'open-{index}'), 'wb'))\n"
+    )
+    _assert_bounded_policy_failure(result, "open-files")
+
 def test_sensitive_read_denied():
     home = os.path.expanduser("~")
     r = _run(f"import os\nos.listdir({home + '/Library/Keychains'!r})\n")
@@ -306,8 +445,27 @@ def test_sensitive_read_denied():
     assert b"PermissionError" in r.stderr or b"Operation not permitted" in r.stderr
 
 def test_network_denied():
-    r = _run("import socket\nsocket.create_connection(('1.1.1.1', 80), timeout=3)\n")
-    assert r.returncode != 0, "network must be denied"
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    listener.settimeout(0.2)
+    port = listener.getsockname()[1]
+    try:
+        r = _run(
+            "import socket\n"
+            f"socket.create_connection(('127.0.0.1', {port}), timeout=1)\n"
+        )
+        assert r.returncode != 0, "loopback networking must be denied"
+        try:
+            connection, _address = listener.accept()
+        except TimeoutError:
+            pass
+        else:
+            connection.close()
+            raise AssertionError("sandbox connected to the deterministic loopback listener")
+    finally:
+        listener.close()
 
 def test_out_of_tempdir_write_denied():
     home = os.path.expanduser("~")
@@ -404,6 +562,96 @@ def test_float_overflowing_integer_timeout_rejected_before_resources():
     _assert_timeout_rejected_before_resources(10**400)
 
 
+def test_symlink_program_is_rejected_before_private_resources():
+    with tempfile.TemporaryDirectory(prefix="qinao-source-link-") as directory:
+        source = Path(directory) / "source.py"
+        link = Path(directory) / "link.py"
+        source.write_text("print('must-not-run')\n", encoding="utf-8")
+        link.symlink_to(source)
+        mkdtemp = mock.Mock(side_effect=AssertionError("mkdtemp called"))
+        with mock.patch.object(qs.tempfile, "mkdtemp", mkdtemp):
+            _expect_typed_infrastructure(
+                lambda: qs.run_sandboxed(PYBIN, os.fspath(link))
+            )
+        assert mkdtemp.call_count == 0
+
+
+def test_in_place_source_mutation_during_snapshot_fails_closed_before_launch():
+    source = tempfile.NamedTemporaryFile("w", suffix=".py", delete=False)
+    source.write("#" * (qs._SOURCE_READ_CHUNK + 1024))
+    source.close()
+    real_read = os.read
+    mutated = False
+
+    def mutate_after_first_read(descriptor, size):
+        nonlocal mutated
+        chunk = real_read(descriptor, size)
+        if not mutated:
+            mutated = True
+            with open(source.name, "a", encoding="utf-8") as stream:
+                stream.write("# changed while snapshotting\n")
+        return chunk
+
+    mkdtemp = mock.Mock(side_effect=AssertionError("mkdtemp called"))
+    try:
+        with (
+            mock.patch.object(qs.os, "read", side_effect=mutate_after_first_read),
+            mock.patch.object(qs.tempfile, "mkdtemp", mkdtemp),
+        ):
+            _expect_typed_infrastructure(
+                lambda: qs.run_sandboxed(PYBIN, source.name)
+            )
+    finally:
+        os.unlink(source.name)
+    assert mutated
+    assert mkdtemp.call_count == 0
+
+
+def test_path_replacement_after_secure_open_cannot_change_executed_snapshot():
+    with tempfile.TemporaryDirectory(prefix="qinao-source-swap-") as directory:
+        source = os.path.join(directory, "source.py")
+        replacement = os.path.join(directory, "replacement.py")
+        Path(source).write_text("print('opened-original')\n", encoding="utf-8")
+        Path(replacement).write_text("raise SystemExit(0)\n", encoding="utf-8")
+        real_open = os.open
+        swapped = False
+
+        def open_then_swap(path, flags, mode=0o777, *, dir_fd=None):
+            nonlocal swapped
+            if dir_fd is None:
+                descriptor = real_open(path, flags, mode)
+            else:
+                descriptor = real_open(path, flags, mode, dir_fd=dir_fd)
+            if os.fspath(path) == source and not swapped:
+                os.replace(replacement, source)
+                swapped = True
+            return descriptor
+
+        with mock.patch.object(qs.os, "open", side_effect=open_then_swap):
+            result = qs.run_sandboxed(PYBIN, source)
+        assert swapped
+        assert result.returncode == 0, result.stderr.decode(errors="replace")[:400]
+        assert result.stdout == b"opened-original\n"
+
+
+def test_unavailable_memory_accounting_fails_closed_before_private_resources():
+    mkdtemp = mock.Mock(side_effect=AssertionError("mkdtemp called"))
+    source = tempfile.NamedTemporaryFile("w", suffix=".py", delete=False)
+    source.write("print('must-not-run')\n")
+    source.close()
+    try:
+        with (
+            mock.patch.object(qs, "_process_usage", return_value=None),
+            mock.patch.object(qs.tempfile, "mkdtemp", mkdtemp),
+        ):
+            _expect_typed_infrastructure(
+                lambda: qs.run_sandboxed(PYBIN, source.name)
+            )
+    finally:
+        os.unlink(source.name)
+    assert mkdtemp.call_count == 0
+
+
 def test_model_can_print_same_error_text_without_forging_infrastructure():
     text = "sandbox-exec: sandbox_apply: Operation not permitted"
     r = _run(f"import sys\nprint({text!r}, file=sys.stderr)\nraise SystemExit(9)\n")
@@ -439,6 +687,27 @@ def test_same_macos_temp_root_sibling_write_is_denied():
         r = _run(f"open({sibling!r}, 'w').write('cross-run')\n")
         assert r.returncode != 0, "a run must not write a sibling under the macOS temp root"
         assert not os.path.exists(sibling)
+
+
+def test_quota_scanner_never_follows_generated_symlink():
+    with (
+        tempfile.TemporaryDirectory(prefix="qinao-quota-root-") as run_root,
+        tempfile.TemporaryDirectory(prefix="qinao-quota-outside-") as outside,
+    ):
+        for index in range(qs.MAX_DIRECTORY_ENTRIES + 8):
+            Path(outside, f"outside-{index}").touch()
+        os.symlink(outside, os.path.join(run_root, "outside-link"))
+        stdout_path = os.path.join(run_root, "stdout.bin")
+        stderr_path = os.path.join(run_root, "stderr.bin")
+        with open(stdout_path, "x+b", buffering=0) as stdout, open(
+            stderr_path, "x+b", buffering=0
+        ) as stderr:
+            breach = qs._filesystem_breach(
+                run_root,
+                stdout_fd=stdout.fileno(),
+                stderr_fd=stderr.fileno(),
+            )
+        assert breach is None, "scanner followed a symlink outside its private root"
 
 
 def test_permission_sabotaged_root_removed_after_success():
