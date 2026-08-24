@@ -166,11 +166,12 @@ rg -n 'subprocess\.run|run_sandboxed' \
 rg -n 'torch\.load|weights_only|CKPT_SHA256|/Users/changgeng' \
   BehavioralAISubstrate/Tools/qinao_checkpoint_guard.py \
   BehavioralAISubstrate/Tools/mamba3_deploy.py
-git diff --check HEAD~2..HEAD
+git diff --check 4f0b9846c..HEAD
+git diff --name-only 4f0b9846c..HEAD
 git status --short
 ```
 
-Expected: paired evaluation has only mandatory sandbox delegation; the only checkpoint deserialization is post-verification and explicitly restricted; no hard-coded checkout remains; no whitespace errors; pre-existing dirty paths remain present but unchanged by these commits.
+Expected: paired evaluation has only mandatory sandbox delegation; the only checkpoint deserialization is post-verification and explicitly restricted; no hard-coded checkout remains; no whitespace errors; the complete implementation range is audited rather than a `HEAD~N` guess; pre-existing dirty paths remain present but unchanged by these commits.
 
 - [ ] **Step 3: Independent review**
 
