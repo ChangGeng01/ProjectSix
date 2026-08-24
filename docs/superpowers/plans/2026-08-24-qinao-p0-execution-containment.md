@@ -39,11 +39,14 @@ Add a test that replaces `run_sandboxed` with a recording fake, calls `execute_g
 - [ ] **Step 2: Run RED**
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  BehavioralAISubstrate.Tools.test_qinao_humaneval_paired
+PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/qinao-uv-cache \
+  uv run --with pytest pytest -q \
+  BehavioralAISubstrate/Tools/test_qinao_humaneval_paired.py
 ```
 
-Expected: the new test fails because `execute_generated_program` does not exist.
+Expected: two tests are discovered; the new test fails because
+`execute_generated_program`/`run_sandboxed` does not exist. Zero discovered
+tests is a harness failure, never a pass.
 
 - [ ] **Step 3: Implement the smallest production change**
 
@@ -52,8 +55,9 @@ Import `run_sandboxed`, add the helper, and replace the raw `subprocess.run([PYB
 - [ ] **Step 4: Run GREEN and sandbox behavior tests**
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  BehavioralAISubstrate.Tools.test_qinao_humaneval_paired
+PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/qinao-uv-cache \
+  uv run --with pytest pytest -q \
+  BehavioralAISubstrate/Tools/test_qinao_humaneval_paired.py
 
 PYTHONDONTWRITEBYTECODE=1 python3 \
   BehavioralAISubstrate/Tools/qinao_local_eval/test_humaneval_sandbox.py
@@ -143,8 +147,11 @@ git commit -m "fix: authenticate deploy checkpoints"
 - [ ] **Step 1: Run the complete focused suite**
 
 ```bash
+PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/qinao-uv-cache \
+  uv run --with pytest pytest -q \
+  BehavioralAISubstrate/Tools/test_qinao_humaneval_paired.py
+
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  BehavioralAISubstrate.Tools.test_qinao_humaneval_paired \
   BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard
 
 PYTHONDONTWRITEBYTECODE=1 python3 \
