@@ -66,8 +66,15 @@ bf16 on CUDA, grad-accum, warmup, grad-clip, atomic checkpoint/resume.
 ## Deploy back to the A19 (the loop closes)
 
 The legacy `ssd-track-g-distill-optimized` checkout above is only a training recipe source. Never run the deploy converter from
-that mutable training checkout. The trusted release receipt binds the checkpoint identity (`CKPT_SHA256`) and immutable full deploy-source commit (`QINAO_REVIEWED_DEPLOY_COMMIT`) in one record. Carry both values to the deploy operator over the same
+that mutable training checkout. The trusted release receipt binds the checkpoint identity (`CKPT_SHA256`) and immutable full
+deploy-source commit (`QINAO_REVIEWED_DEPLOY_COMMIT`) in one record. Carry both values to the deploy operator over the same
 authenticated channel. A digest computed from the destination's same untrusted checkpoint proves copy consistency, not provenance.
+
+The procedure below authenticates repository source only: it copies the reviewed commit into an object-only clone, materializes one
+private execution snapshot from that commit object, and runs both source guards and conversion there. The same release receipt must
+also bind the approved Python, Git, `uv`, `coreai-torch`, PyTorch, and CoreAI runtime/dependency identities; these commands do not
+locally authenticate that external stack. Mode bits are privacy/hygiene, not immutability—if hostile same-user/root processes are in
+scope, run this inside the separately attested release container/account.
 
 ```bash
 set -euo pipefail
@@ -77,35 +84,135 @@ export CKPT='/tmp/draft_coreai/ckpt_best.pt'
 export CKPT_SHA256='sha256:<trusted-release-digest>'
 export QINAO_REVIEWED_DEPLOY_COMMIT='<full-reviewed-deploy-source-commit>'
 
-# Build a separate clean deploy checkout. Refuse a pre-existing destination instead of reusing mutable state.
+# Build a separate object-only source clone and one commit-derived execution snapshot. Refuse all reused state.
 export QINAO_DEPLOY_REPO_URL='<this-repo>'
-export QINAO_DEPLOY_CHECKOUT='/workspace/Project06-deploy'
+export QINAO_DEPLOY_OBJECTS='/workspace/Project06-deploy-objects'
+export QINAO_DEPLOY_EXEC_ROOT="/workspace/Project06-deploy-${QINAO_REVIEWED_DEPLOY_COMMIT}"
+export QINAO_DEPLOY_ARCHIVE="/workspace/Project06-deploy-${QINAO_REVIEWED_DEPLOY_COMMIT}.tar"
 export QINAO_DEPLOY_SECURITY_FLOOR='3f5f49b85822aa7272a3c5d173eacd7906896b21'
-test ! -e "$QINAO_DEPLOY_CHECKOUT"
-git clone --no-checkout "$QINAO_DEPLOY_REPO_URL" "$QINAO_DEPLOY_CHECKOUT"
-git -C "$QINAO_DEPLOY_CHECKOUT" checkout --detach "$QINAO_REVIEWED_DEPLOY_COMMIT"
-cd "$QINAO_DEPLOY_CHECKOUT"
+test ! -e "$QINAO_DEPLOY_OBJECTS"
+test ! -e "$QINAO_DEPLOY_EXEC_ROOT"
+test ! -e "$QINAO_DEPLOY_ARCHIVE"
+umask 077
 
-qinao_require_clean_deploy_source() {
-  QINAO_DEPLOY_STATUS="$(git status --porcelain=v1 --untracked-files=all --ignored=matching)"
-  test -z "$QINAO_DEPLOY_STATUS"
+# Git receives a whitelist, not ambient GIT_DIR/GIT_WORK_TREE/index/config override variables.
+# Repository authentication must therefore use the URL, HOME credential helper, or SSH agent.
+qinao_clean_exec() {
+  if test -n "${SSH_AUTH_SOCK:-}"; then
+    env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" \
+      SSH_AUTH_SOCK="$SSH_AUTH_SOCK" "$@"
+  else
+    env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" "$@"
+  fi
 }
-qinao_require_clean_deploy_source
+qinao_git() {
+  if test -n "${SSH_AUTH_SOCK:-}"; then
+    env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" \
+      SSH_AUTH_SOCK="$SSH_AUTH_SOCK" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git "$@"
+  else
+    env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" \
+      GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git "$@"
+  fi
+}
+qinao_git_with_index() {
+  QINAO_INDEX_PATH="$1"
+  shift
+  if test -n "${SSH_AUTH_SOCK:-}"; then
+    env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" \
+      SSH_AUTH_SOCK="$SSH_AUTH_SOCK" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+      GIT_INDEX_FILE="$QINAO_INDEX_PATH" git "$@"
+  else
+    env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" \
+      GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_INDEX_FILE="$QINAO_INDEX_PATH" git "$@"
+  fi
+}
+qinao_conversion_exec() {
+  : "${CKPT:?missing checkpoint path}"
+  : "${CKPT_SHA256:?missing trusted checkpoint identity}"
+  env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" \
+    CKPT="$CKPT" CKPT_SHA256="$CKPT_SHA256" "$@"
+}
 
-# DEPLOY-SOURCE-PREFLIGHT-BEGIN — run from the candidate checkout before every conversion.
+# The clone alone may use HOME credentials; every post-clone Git read disables global/system config hooks.
+qinao_clean_exec git clone --no-checkout --no-local "$QINAO_DEPLOY_REPO_URL" "$QINAO_DEPLOY_OBJECTS"
+# DEPLOY-SOURCE-OBJECTS-READY
 : "${QINAO_REVIEWED_DEPLOY_COMMIT:?missing trusted deploy-source commit}"
-test "$(git rev-parse HEAD)" = "$QINAO_REVIEWED_DEPLOY_COMMIT"
-git merge-base --is-ancestor "$QINAO_DEPLOY_SECURITY_FLOOR" "$QINAO_REVIEWED_DEPLOY_COMMIT"
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
-  BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_deploy_uses_candidate_local_verified_checkpoint_loader \
-  BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_optimized_deploy_refuses_unexpected_trained_keys_before_output \
-  BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_optimized_deploy_refuses_missing_trained_keys_before_output \
-  BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_optimized_deploy_accepts_only_registered_decode_state_buffers
-qinao_require_clean_deploy_source
+QINAO_RESOLVED_DEPLOY_COMMIT="$(qinao_git -C "$QINAO_DEPLOY_OBJECTS" rev-parse --verify \
+  "${QINAO_REVIEWED_DEPLOY_COMMIT}^{commit}")"
+test "$QINAO_RESOLVED_DEPLOY_COMMIT" = "$QINAO_REVIEWED_DEPLOY_COMMIT"
+qinao_git -C "$QINAO_DEPLOY_OBJECTS" merge-base --is-ancestor \
+  "$QINAO_DEPLOY_SECURITY_FLOOR" "$QINAO_REVIEWED_DEPLOY_COMMIT"
+qinao_git -C "$QINAO_DEPLOY_OBJECTS" ls-tree -r -z "$QINAO_REVIEWED_DEPLOY_COMMIT" | \
+  qinao_clean_exec python3 -I -B -c '
+import sys
+
+entries = sys.stdin.buffer.read().split(b"\0")
+for entry in entries:
+    if not entry:
+        continue
+    mode = entry.split(b" ", 1)[0]
+    if mode not in {b"100644", b"100755"}:
+        print("reviewed tree contains symlink or gitlink; refusing external source", file=sys.stderr)
+        raise SystemExit(65)
+'
+qinao_git -C "$QINAO_DEPLOY_OBJECTS" archive --format=tar \
+  --output="$QINAO_DEPLOY_ARCHIVE" "$QINAO_REVIEWED_DEPLOY_COMMIT"
+test -f "$QINAO_DEPLOY_ARCHIVE"
+test ! -L "$QINAO_DEPLOY_ARCHIVE"
+mkdir -m 700 "$QINAO_DEPLOY_EXEC_ROOT"
+qinao_clean_exec tar -xf "$QINAO_DEPLOY_ARCHIVE" -C "$QINAO_DEPLOY_EXEC_ROOT"
+
+# Each check uses a newly created index loaded directly from the reviewed tree. It never trusts checkout index flags.
+qinao_require_exact_execution_snapshot() {
+  QINAO_FRESH_INDEX="$1"
+  test ! -e "$QINAO_FRESH_INDEX"
+  qinao_git_with_index "$QINAO_FRESH_INDEX" \
+    --git-dir="$QINAO_DEPLOY_OBJECTS/.git" --work-tree="$QINAO_DEPLOY_EXEC_ROOT" \
+    read-tree "$QINAO_REVIEWED_DEPLOY_COMMIT"
+  qinao_git_with_index "$QINAO_FRESH_INDEX" \
+    --git-dir="$QINAO_DEPLOY_OBJECTS/.git" --work-tree="$QINAO_DEPLOY_EXEC_ROOT" \
+    update-index --refresh
+  qinao_git_with_index "$QINAO_FRESH_INDEX" \
+    --git-dir="$QINAO_DEPLOY_OBJECTS/.git" --work-tree="$QINAO_DEPLOY_EXEC_ROOT" \
+    diff-files --quiet --no-ext-diff --
+  QINAO_UNTRACKED="$(qinao_git_with_index "$QINAO_FRESH_INDEX" \
+    --git-dir="$QINAO_DEPLOY_OBJECTS/.git" --work-tree="$QINAO_DEPLOY_EXEC_ROOT" \
+    ls-files --others --exclude-standard)"
+  test -z "$QINAO_UNTRACKED"
+  QINAO_IGNORED="$(qinao_git_with_index "$QINAO_FRESH_INDEX" \
+    --git-dir="$QINAO_DEPLOY_OBJECTS/.git" --work-tree="$QINAO_DEPLOY_EXEC_ROOT" \
+    ls-files --others --ignored --exclude-standard)"
+  test -z "$QINAO_IGNORED"
+}
+qinao_require_exact_execution_snapshot "$QINAO_DEPLOY_OBJECTS/.git/qinao-source-pre.index"
+
+# DEPLOY-SOURCE-PREFLIGHT-BEGIN — run isolated guards from the reviewed execution snapshot before every conversion.
+cd "$QINAO_DEPLOY_EXEC_ROOT"
+qinao_clean_exec python3 -I -B -c '
+import sys
+import unittest
+
+root = sys.argv[1]
+sys.path.insert(0, root)
+case = "BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests."
+names = [case + name for name in (
+    "test_deploy_uses_candidate_local_verified_checkpoint_loader",
+    "test_optimized_deploy_refuses_unexpected_trained_keys_before_output",
+    "test_optimized_deploy_refuses_missing_trained_keys_before_output",
+    "test_optimized_deploy_accepts_only_registered_decode_state_buffers",
+    "test_optimized_deploy_refuses_present_nonzero_decode_state_before_output",
+    "test_optimized_deploy_accepts_present_zero_decode_state",
+)]
+suite = unittest.defaultTestLoader.loadTestsFromNames(names)
+result = unittest.TextTestRunner(verbosity=2).run(suite)
+raise SystemExit(0 if result.wasSuccessful() else 1)
+' "$QINAO_DEPLOY_EXEC_ROOT"
+qinao_require_exact_execution_snapshot "$QINAO_DEPLOY_OBJECTS/.git/qinao-source-post.index"
 # DEPLOY-SOURCE-PREFLIGHT-END
 
-cd BehavioralAISubstrate
-uv run --with coreai-torch python Tools/mamba3_deploy.py 24 8   # int8, 24 layers → .aimodel
+cd "$QINAO_DEPLOY_EXEC_ROOT/BehavioralAISubstrate"
+qinao_conversion_exec uv --no-config run --with coreai-torch python -I -B \
+  Tools/mamba3_deploy.py 24 8   # int8, 24 layers → .aimodel
 # then run on the A19 (CoreAI GPU backend) ≈ 70 tok/s, ~80-120 MB resident. NOT pure-ANE at 24L (addendum 15).
 # (For the 8-layer pure-ANE variant: mamba3_deploy.py 8 8 — 0 fresh compile errors, ~112 tok/s.)
 ```
@@ -203,7 +310,9 @@ change `data_fp` so they need a FRESH `CKPT_DIR`):
 - GATE 3 — trusted `ckpt_best.pt` → device WITH `CKPT`, `CKPT_SHA256='sha256:<trusted-release-digest>'`, and the immutable
   `QINAO_REVIEWED_DEPLOY_COMMIT` from one trusted producer/release receipt. Both identities travel over an authenticated operator
   channel; recomputing a digest from the same untrusted deploy copy proves consistency, not provenance. Conversion runs only from
-  the separate detached checkout after exact-HEAD, ancestry-floor, candidate-local loader, and all optimized state-load guards pass.
+  the separate commit-derived execution snapshot after exact-object, ancestry-floor, candidate-local loader, snapshot-integrity,
+  and all optimized state-load guards pass. Repository-source verification does not replace the receipt-bound runtime/dependency
+  identities described above.
   The converters **fail-closed** on a missing CKPT or digest (no silent random-weight asset; `FORCE_RANDOM=1` only for op-graph
   probes) AND on a mismatched arch/layers/vocab/mla_positions/config or an MLA_ROPE ckpt (the deploy converter is still NoPE).
   `resolve_ckpt` is authoritative on vocab.

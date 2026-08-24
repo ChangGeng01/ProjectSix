@@ -69,6 +69,21 @@ def _checkpoint_max_bytes() -> int:
     return value
 
 
+def _present_nonzero_decode_state_names(model_state, registered_names):
+    nonzero_names = []
+    for name in sorted(registered_names.intersection(model_state)):
+        try:
+            nonzero_count = int(torch.count_nonzero(model_state[name]).item())
+        except Exception as error:
+            raise SystemExit(
+                f"checkpoint decode state {name!r} could not be validated as zero: "
+                f"{error}"
+            ) from None
+        if nonzero_count:
+            nonzero_names.append(name)
+    return nonzero_names
+
+
 class DeployM(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -174,6 +189,14 @@ def main() -> None:
         if ck_L != L:                                                  # REFUSE silent truncation (audit must-fix)
             raise SystemExit(f"checkpoint has {ck_L} layers but deploy L={L} — would be incoherent; run: "
                              f"mamba3_deploy.py {ck_L} {BITS}")
+        nonzero_decode_state = _present_nonzero_decode_state_names(
+            ck["model"], m.decode_state_buffer_names
+        )
+        if nonzero_decode_state:
+            raise SystemExit(
+                "checkpoint carries non-zero decode state; refusing to bake "
+                f"request/runtime state into the asset: {nonzero_decode_state[:3]}"
+            )
         missing, unexpected = m.load_state_dict(ck["model"], strict=False)
         if unexpected:
             raise SystemExit(
