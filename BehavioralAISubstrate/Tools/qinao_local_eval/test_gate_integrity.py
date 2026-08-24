@@ -20,6 +20,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -150,11 +151,72 @@ def test_model_eval_ok_separates_from_deployment_attestations():
     # A run where every VERIFIABLE critical gate genuinely passes but the architectural
     # attestations are (correctly) ATTEST: model_eval_ok True, release_ok_model False,
     # attestations_pending lists exactly the architectural gates.
-    tuned = _fully_passing_critical_values()
-    v = _run_build_verdict(tuned, tuned)
+    standard = {"30": 100.0, "_N": 2, "_infra_errs": 0}
+    paired = {
+        **standard,
+        "per_problem": {"HumanEval/0": 1, "HumanEval/1": 1},
+    }
+    with tempfile.TemporaryDirectory() as directory:
+        for tag in ("base", "tuned"):
+            Path(directory, f"qinao_humaneval_{tag}.json").write_text(
+                json.dumps(standard), encoding="utf-8"
+            )
+            Path(directory, f"qinao_humaneval_paired_{tag}.json").write_text(
+                json.dumps(paired), encoding="utf-8"
+            )
+        base = qm.merge_known_sidefiles(
+            _fully_passing_critical_values(), "base", tmpdir=directory
+        )
+        tuned = qm.merge_known_sidefiles(
+            _fully_passing_critical_values(), "tuned", tmpdir=directory
+        )
+    v = bv.build(base, tuned)
     assert v["model_eval_ok"] is True, "all verifiable critical gates pass → model_eval_ok"
     assert set(v["attestations_pending"]) == ATTEST_ONLY_CRITICAL
     assert v["release_ok_model"] is False, "release still blocked on deployment attestations"
+
+
+def test_build_verdict_cli_revokes_prior_run_humaneval_when_current_files_absent():
+    token = f"pytest-{os.getpid()}-{uuid.uuid4().hex}"
+    tags = (f"{token}-base", f"{token}-tuned")
+    value_paths = [Path("/tmp") / f"qinao_values_{tag}.json" for tag in tags]
+    humaneval_paths = [
+        Path("/tmp") / f"qinao_{prefix}_{tag}.json"
+        for tag in tags
+        for prefix in ("humaneval", "humaneval_paired")
+    ]
+
+    try:
+        assert all(not path.exists() for path in value_paths + humaneval_paths)
+        for path in value_paths:
+            values = _fully_passing_critical_values()
+            values["_prov"]["30"] = {
+                "kind": "computed",
+                "runner": "qinao_humaneval_paired",
+            }
+            path.write_text(json.dumps(values), encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as directory:
+            verdict_path = Path(directory) / "verdict.json"
+            out = subprocess.run(
+                [
+                    sys.executable,
+                    os.path.join(HERE, "build_verdict.py"),
+                    tags[0],
+                    tags[1],
+                ],
+                capture_output=True,
+                text=True,
+                env={**os.environ, "QINAO_VERDICT_OUT": str(verdict_path)},
+            )
+            assert out.returncode == 0, out.stderr
+            verdict = json.loads(verdict_path.read_text(encoding="utf-8"))
+
+        row = next(row for row in verdict["rows"] if row["num"] == 30)
+        assert (row["status"], verdict["model_eval_ok"]) == ("PENDING", False)
+    finally:
+        for path in value_paths + humaneval_paths:
+            path.unlink(missing_ok=True)
 
 
 def test_missing_or_invalid_baseline_for_relative_critical_gate_is_pending():

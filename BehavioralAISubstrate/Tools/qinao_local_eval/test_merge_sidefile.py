@@ -113,6 +113,93 @@ def _assert_only_humaneval_was_revoked(values):
     assert values["_prov"]["7"] == {"kind": "computed", "runner": "keep"}
 
 
+def test_complete_known_observation_set_without_humaneval_revokes_prior_run():
+    with tempfile.TemporaryDirectory() as directory:
+        base = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "base", tmpdir=directory
+        )
+        tuned = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "tuned", tmpdir=directory
+        )
+
+    _assert_only_humaneval_was_revoked(base)
+    _assert_only_humaneval_was_revoked(tuned)
+    _assert_humaneval_pending(base, tuned)
+
+
+def test_one_sided_missing_humaneval_is_pending_in_both_orientations():
+    for missing_tag in ("base", "tuned"):
+        with tempfile.TemporaryDirectory() as directory:
+            present_tag = "tuned" if missing_tag == "base" else "base"
+            _write_sidefile(
+                directory, "humaneval_paired", present_tag, _valid_paired()
+            )
+            merged = {
+                tag: qm.merge_known_sidefiles(
+                    _seeded_humaneval_values(), tag, tmpdir=directory
+                )
+                for tag in ("base", "tuned")
+            }
+
+        _assert_only_humaneval_was_revoked(merged[missing_tag])
+        assert merged[present_tag]["30"] == 50.0
+        assert merged[present_tag]["_prov"]["30"] == {
+            "kind": "computed",
+            "runner": "qinao_humaneval_paired",
+        }
+        _assert_humaneval_pending(merged["base"], merged["tuned"])
+
+
+def test_explicit_empty_observation_set_revokes_only_prior_run_humaneval():
+    merged = qm.merge_explicit_sidefiles(_seeded_humaneval_values(), [])
+
+    _assert_only_humaneval_was_revoked(merged)
+
+
+def test_explicit_unrelated_sidefile_revokes_prior_run_and_keeps_new_metric():
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "unrelated.json"
+        path.write_text(json.dumps({"26": 80.0}), encoding="utf-8")
+        merged = qm.merge_explicit_sidefiles(
+            _seeded_humaneval_values(), [path]
+        )
+
+    _assert_only_humaneval_was_revoked(merged)
+    assert merged["26"] == 80.0
+    assert merged["_prov"]["26"] == {
+        "kind": "computed",
+        "runner": "unrelated.json",
+    }
+
+
+def test_direct_generic_merge_cannot_preserve_prior_run_humaneval():
+    merged = qm.merge_sidefile_into_values(
+        _seeded_humaneval_values(), {"26": 80.0}, "generic-runner"
+    )
+
+    _assert_only_humaneval_was_revoked(merged)
+    assert merged["26"] == 80.0
+    assert merged["_prov"]["26"] == {
+        "kind": "computed",
+        "runner": "generic-runner",
+    }
+
+
+def test_known_unrelated_sidefile_revokes_prior_run_and_keeps_new_metric():
+    with tempfile.TemporaryDirectory() as directory:
+        _write_sidefile(directory, "read", "current", {"26": 80.0})
+        merged = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "current", tmpdir=directory
+        )
+
+    _assert_only_humaneval_was_revoked(merged)
+    assert merged["26"] == 80.0
+    assert merged["_prov"]["26"] == {
+        "kind": "computed",
+        "runner": "qinao_reading",
+    }
+
+
 def test_invalid_humaneval_evidence_revokes_only_stale_metric_and_provenance():
     valid = _valid_paired()
     invalid_cases = [

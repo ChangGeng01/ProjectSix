@@ -128,7 +128,7 @@ def _merge_sidefile_set(
 
     merged["_prov"] = prov
     if not humaneval_observed:
-        return merged
+        return _without_humaneval(merged)
 
     summaries = {
         (candidate.score, candidate.sample_count)
@@ -164,8 +164,9 @@ def merge_sidefile_into_values(
 ) -> dict[str, Any]:
     """Return a NEW values dict with `sidefile`'s metric-number keys folded in
     and `_prov` stamped 'computed' for every MODEL_CRITICAL metric ingested.
-    Existing values / `_prov` are preserved; diagnostic (`_`-prefixed / `*_err`)
-    keys are ignored. Does not mutate the inputs."""
+    Existing values / `_prov` are preserved except that metric 30 requires
+    validated HumanEval evidence in this observation set; diagnostic
+    (`_`-prefixed / `*_err`) keys are ignored. Does not mutate the inputs."""
     return _merge_sidefile_set(values, [(sidefile, runner)])
 
 
@@ -199,7 +200,8 @@ def merge_known_sidefiles(
 
     Generic metric conflicts warn and retain last-wins compatibility. Metric 30
     is different: only validated HumanEval owners may certify it, and any
-    invalid owner/evidence/conflict observation revokes it for the whole set.
+    invalid owner/evidence/conflict or absent current evidence revokes it for
+    the whole set.
     """
     observations: list[tuple[object, str]] = []
     for prefix, runner in sorted(KNOWN_SIDEFILES.items()):
