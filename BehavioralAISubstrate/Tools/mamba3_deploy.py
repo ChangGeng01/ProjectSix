@@ -18,11 +18,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-sys.path.insert(0, "/Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate/Tools")
+_TOOLS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(_TOOLS_DIR))
 import coreai_torch
 from coreai_torch._compression.custom_layers import constexpr_blockwise_shift_scale  # noqa: F401
 from coreai_torch._compression.utils import inject_subbyte_tensors
 from llama_to_coreai_int8 import QuantEmbed, QuantLinear
+from qinao_checkpoint_guard import (  # noqa: E402
+    DEFAULT_MAX_BYTES,
+    CheckpointVerificationError,
+    load_verified_weights_checkpoint,
+)
 
 import mamba3_trainable as MT
 
@@ -38,6 +44,18 @@ _TAG = (f"_{os.environ['SPLIT']}" if os.environ.get("SPLIT") else "") + \
        (f"_s{os.environ['SEED']}" if os.environ.get("SEED") else "")
 OUT = f"/tmp/draft_coreai/Mamba3Deploy_L{L}_int{BITS}{_TAG}.aimodel"
 H, P, N, R, D = MT.H, MT.P, MT.N, MT.R, MT.D_MODEL
+
+
+def _checkpoint_max_bytes() -> int:
+    configured = os.environ.get("CKPT_MAX_BYTES")
+    if configured is None:
+        return DEFAULT_MAX_BYTES
+    if not configured.isascii() or not configured.isdecimal():
+        raise CheckpointVerificationError("CKPT_MAX_BYTES must be a positive integer")
+    value = int(configured)
+    if value <= 0:
+        raise CheckpointVerificationError("CKPT_MAX_BYTES must be a positive integer")
+    return value
 
 
 class DeployM(nn.Module):
@@ -121,7 +139,14 @@ def main() -> None:
     if os.environ.get("FORCE_RANDOM") == "1":
         print(f"FORCE_RANDOM: L={L} random-weight compile probe (no checkpoint)")
     elif Path(CKPT).exists():
-        ck = torch.load(CKPT, map_location="cpu")
+        try:
+            ck = load_verified_weights_checkpoint(
+                CKPT,
+                os.environ.get("CKPT_SHA256"),
+                max_bytes=_checkpoint_max_bytes(),
+            )
+        except CheckpointVerificationError as error:
+            raise SystemExit(f"checkpoint refused: {error}") from None
         ck_L = int(ck.get("layers", L))
         if ck_L != L:                                                  # REFUSE silent truncation (audit must-fix)
             raise SystemExit(f"checkpoint has {ck_L} layers but deploy L={L} — would be incoherent; run: "
