@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import os
 import sys
 import warnings
 from pathlib import Path
@@ -49,9 +50,8 @@ from coreai_torch._compression.custom_layers import constexpr_blockwise_shift_sc
 from coreai_torch._compression.utils import inject_subbyte_tensors
 
 # Reuse the verified module + weight-copy + sample-inputs from the repo converter.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-REPO = "/Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate"
-sys.path.insert(0, f"{REPO}/Tools")
+_TOOLS_DIR = Path(os.path.abspath(__file__)).parent
+sys.path.insert(0, str(_TOOLS_DIR))
 from llama_to_coreai import (  # type: ignore  # noqa: E402
     StatefulLlamaDraft,
     copy_weights,

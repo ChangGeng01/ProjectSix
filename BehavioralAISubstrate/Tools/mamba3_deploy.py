@@ -20,7 +20,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-_TOOLS_DIR = Path(__file__).resolve().parent
+_TOOLS_DIR = Path(os.path.abspath(__file__)).parent
 sys.path.insert(0, str(_TOOLS_DIR))
 import coreai_torch
 from coreai_torch._compression.custom_layers import constexpr_blockwise_shift_scale  # noqa: F401

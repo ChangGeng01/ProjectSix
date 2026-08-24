@@ -71,8 +71,8 @@ deploy-source commit (`QINAO_REVIEWED_DEPLOY_COMMIT`) in one record. Carry both 
 authenticated channel. A digest computed from the destination's same untrusted checkpoint proves copy consistency, not provenance.
 
 The procedure below authenticates repository source only: it copies the reviewed commit into an object-only clone, materializes one
-private execution snapshot from that commit object, and runs both source guards and conversion there. The same release receipt must
-also bind the approved Python, Git, `uv`, `coreai-torch`, PyTorch, and CoreAI runtime/dependency identities; these commands do not
+private guard snapshot, then streams the same commit directly into an anonymous conversion descriptor with no reusable archive path.
+The same release receipt must also bind the approved Python, Git, `uv`, `coreai-torch`, PyTorch, and CoreAI runtime/dependency identities; these commands do not
 locally authenticate that external stack. Mode bits are privacy/hygiene, not immutability—if hostile same-user/root processes are in
 scope, run this inside the separately attested release container/account.
 
@@ -96,7 +96,7 @@ test ! -e "$QINAO_DEPLOY_ARCHIVE"
 umask 077
 
 # Git receives a whitelist, not ambient GIT_DIR/GIT_WORK_TREE/index/config override variables.
-# Repository authentication must therefore use the URL, HOME credential helper, or SSH agent.
+# Repository authentication must therefore use the URL or SSH agent.
 qinao_clean_exec() {
   if test -n "${SSH_AUTH_SOCK:-}"; then
     env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" \
@@ -108,10 +108,14 @@ qinao_clean_exec() {
 qinao_git() {
   if test -n "${SSH_AUTH_SOCK:-}"; then
     env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" \
-      SSH_AUTH_SOCK="$SSH_AUTH_SOCK" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git "$@"
+      SSH_AUTH_SOCK="$SSH_AUTH_SOCK" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+      GIT_NO_REPLACE_OBJECTS=1 GIT_ATTR_NOSYSTEM=1 \
+      git -c core.attributesFile=/dev/null "$@"
   else
     env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" \
-      GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git "$@"
+      GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+      GIT_NO_REPLACE_OBJECTS=1 GIT_ATTR_NOSYSTEM=1 \
+      git -c core.attributesFile=/dev/null "$@"
   fi
 }
 qinao_git_with_index() {
@@ -120,10 +124,15 @@ qinao_git_with_index() {
   if test -n "${SSH_AUTH_SOCK:-}"; then
     env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" \
       SSH_AUTH_SOCK="$SSH_AUTH_SOCK" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
-      GIT_INDEX_FILE="$QINAO_INDEX_PATH" git "$@"
+      GIT_NO_REPLACE_OBJECTS=1 GIT_ATTR_NOSYSTEM=1 \
+      GIT_INDEX_FILE="$QINAO_INDEX_PATH" \
+      git -c core.attributesFile=/dev/null "$@"
   else
     env -i HOME="$HOME" PATH="$PATH" LC_ALL=C TMPDIR="${TMPDIR:-/tmp}" \
-      GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_INDEX_FILE="$QINAO_INDEX_PATH" git "$@"
+      GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+      GIT_NO_REPLACE_OBJECTS=1 GIT_ATTR_NOSYSTEM=1 \
+      GIT_INDEX_FILE="$QINAO_INDEX_PATH" \
+      git -c core.attributesFile=/dev/null "$@"
   fi
 }
 qinao_conversion_exec() {
@@ -133,8 +142,8 @@ qinao_conversion_exec() {
     CKPT="$CKPT" CKPT_SHA256="$CKPT_SHA256" "$@"
 }
 
-# The clone alone may use HOME credentials; every post-clone Git read disables global/system config hooks.
-qinao_clean_exec git clone --no-checkout --no-local "$QINAO_DEPLOY_REPO_URL" "$QINAO_DEPLOY_OBJECTS"
+# Every Git operation, including clone, ignores ambient system/global config. Authenticate via the URL or SSH agent.
+qinao_git clone --no-checkout --no-local "$QINAO_DEPLOY_REPO_URL" "$QINAO_DEPLOY_OBJECTS"
 # DEPLOY-SOURCE-OBJECTS-READY
 : "${QINAO_REVIEWED_DEPLOY_COMMIT:?missing trusted deploy-source commit}"
 QINAO_RESOLVED_DEPLOY_COMMIT="$(qinao_git -C "$QINAO_DEPLOY_OBJECTS" rev-parse --verify \
@@ -142,6 +151,7 @@ QINAO_RESOLVED_DEPLOY_COMMIT="$(qinao_git -C "$QINAO_DEPLOY_OBJECTS" rev-parse -
 test "$QINAO_RESOLVED_DEPLOY_COMMIT" = "$QINAO_REVIEWED_DEPLOY_COMMIT"
 qinao_git -C "$QINAO_DEPLOY_OBJECTS" merge-base --is-ancestor \
   "$QINAO_DEPLOY_SECURITY_FLOOR" "$QINAO_REVIEWED_DEPLOY_COMMIT"
+readonly QINAO_REVIEWED_DEPLOY_COMMIT QINAO_RESOLVED_DEPLOY_COMMIT QINAO_DEPLOY_OBJECTS
 qinao_git -C "$QINAO_DEPLOY_OBJECTS" ls-tree -r -z "$QINAO_REVIEWED_DEPLOY_COMMIT" | \
   qinao_clean_exec python3 -I -B -c '
 import sys
@@ -210,9 +220,110 @@ raise SystemExit(0 if result.wasSuccessful() else 1)
 qinao_require_exact_execution_snapshot "$QINAO_DEPLOY_OBJECTS/.git/qinao-source-post.index"
 # DEPLOY-SOURCE-PREFLIGHT-END
 
-cd "$QINAO_DEPLOY_EXEC_ROOT/BehavioralAISubstrate"
-qinao_conversion_exec uv --no-config run --with coreai-torch python -I -B \
-  Tools/mamba3_deploy.py 24 8   # int8, 24 layers → .aimodel
+# Build the child command first; the isolated opener then binds, validates, and unlinks the code archive before running it.
+QINAO_DEPLOY_CONVERSION_COMMAND="$(
+  qinao_clean_exec python3 -I -B -c 'import sys; sys.stdout.write(sys.stdin.read())' <<'QINAO_CONVERSION_EOF'
+set -eu
+# DEPLOY-CONVERSION-BEGIN
+unset QINAO_DEPLOY_EXEC_ROOT
+cd /tmp
+exec uv --no-config run --no-project --with coreai-torch python -I -B -c '
+import runpy
+import sys
+
+archive = sys.argv.pop(1)
+sys.path.insert(0, archive)
+runpy.run_module(
+    "BehavioralAISubstrate.Tools.mamba3_deploy",
+    run_name="__main__",
+    alter_sys=True,
+)
+' "/dev/fd/${QINAO_DEPLOY_CODE_FD}" 24 8
+QINAO_CONVERSION_EOF
+)"
+# DEPLOY-SOURCE-BIND-BEGIN — Git writes the reviewed object directly into an
+# unlinked temporary file. No persistent ZIP path can become execution authority.
+qinao_conversion_exec python3 -I -B -c '
+import os
+import stat
+import subprocess
+import sys
+import tempfile
+
+object_store, reviewed_commit, execution_root, command = sys.argv[1:5]
+git_environment = {
+    "HOME": os.environ["HOME"],
+    "PATH": os.environ["PATH"],
+    "LC_ALL": "C",
+    "TMPDIR": os.environ.get("TMPDIR", "/tmp"),
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_NO_REPLACE_OBJECTS": "1",
+    "GIT_ATTR_NOSYSTEM": "1",
+}
+archive = tempfile.TemporaryFile(mode="w+b", dir=git_environment["TMPDIR"])
+try:
+    object_directory = os.path.join(object_store, ".git", "objects")
+    object_info = os.stat(object_directory, follow_symlinks=False)
+    if not stat.S_ISDIR(object_info.st_mode):
+        raise SystemExit("reviewed deploy object directory is unavailable")
+    if os.path.lexists(os.path.join(object_directory, "info", "alternates")):
+        raise SystemExit("reviewed deploy object store must be self-contained")
+    # The final archive uses a fresh Git namespace. It borrows only the verified
+    # object database, never the clone repository local config, refs/replace, or
+    # .git/info/attributes that could transform bytes after the guards passed.
+    with tempfile.TemporaryDirectory(dir=git_environment["TMPDIR"]) as namespace:
+        isolated_git_dir = os.path.join(namespace, "repository.git")
+        initialized = subprocess.run(
+            ["git", "init", "--bare", "--quiet", "--template=", isolated_git_dir],
+            env=git_environment,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if initialized.returncode != 0:
+            sys.stderr.buffer.write(initialized.stderr[-65536:])
+            raise SystemExit("isolated deploy source namespace failed")
+        archive_environment = dict(git_environment)
+        archive_environment["GIT_DIR"] = isolated_git_dir
+        archive_environment["GIT_OBJECT_DIRECTORY"] = object_directory
+        result = subprocess.run(
+            [
+                "git",
+                "-c",
+                "core.attributesFile=/dev/null",
+                "archive",
+                "--format=zip",
+                reviewed_commit,
+            ],
+            env=archive_environment,
+            cwd="/",
+            stdout=archive,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    if result.returncode != 0:
+        sys.stderr.buffer.write(result.stderr[-65536:])
+        raise SystemExit("reviewed deploy source stream failed")
+    archive.flush()
+    os.fsync(archive.fileno())
+    archive_info = os.fstat(archive.fileno())
+    if (
+        not stat.S_ISREG(archive_info.st_mode)
+        or archive_info.st_nlink != 0
+        or archive_info.st_size <= 0
+    ):
+        raise SystemExit("reviewed deploy source is not an anonymous regular file")
+    archive.seek(0)
+    archive_fd = archive.fileno()
+    os.set_inheritable(archive_fd, True)
+    os.environ["QINAO_DEPLOY_CODE_FD"] = str(archive_fd)
+    os.environ["QINAO_DEPLOY_EXEC_ROOT"] = execution_root
+    os.execve("/bin/sh", ["/bin/sh", "-c", command], os.environ)
+finally:
+    archive.close()
+' "$QINAO_DEPLOY_OBJECTS" "$QINAO_RESOLVED_DEPLOY_COMMIT" "$QINAO_DEPLOY_EXEC_ROOT" \
+  "$QINAO_DEPLOY_CONVERSION_COMMAND"   # int8, 24 layers → .aimodel
 # then run on the A19 (CoreAI GPU backend) ≈ 70 tok/s, ~80-120 MB resident. NOT pure-ANE at 24L (addendum 15).
 # (For the 8-layer pure-ANE variant: mamba3_deploy.py 8 8 — 0 fresh compile errors, ~112 tok/s.)
 ```

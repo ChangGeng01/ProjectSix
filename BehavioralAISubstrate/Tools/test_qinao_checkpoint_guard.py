@@ -14,6 +14,7 @@ import tempfile
 import textwrap
 import types
 import unittest
+import zipfile
 from pathlib import Path
 from unittest import mock
 
@@ -293,6 +294,8 @@ class _DocumentedDeployFixture:
             "shift\n"
             'test "${1:-}" = run\n'
             "shift\n"
+            'test "${1:-}" = --no-project\n'
+            "shift\n"
             'while test "$#" -gt 0 && test "$1" != python; do shift; done\n'
             'test "$#" -gt 0\n'
             "shift\n"
@@ -307,6 +310,7 @@ class _DocumentedDeployFixture:
         reviewed_commit: str | None = None,
         floor_commit: str | None = None,
         after_source_clone: str = "",
+        before_source_binding: str = "",
         before_conversion: str = "",
         extra_env: dict[str, str] | None = None,
         fail_git_verification: bool = False,
@@ -346,12 +350,24 @@ class _DocumentedDeployFixture:
 
         if before_conversion:
             conversion_handoffs = re.findall(
-                r"(?m)^cd [^\n]*BehavioralAISubstrate[^\n]*\n", script
+                r"(?m)^# DEPLOY-CONVERSION-BEGIN\n", script
             )
+            if not conversion_handoffs:
+                conversion_handoffs = re.findall(
+                    r"(?m)^cd [^\n]*BehavioralAISubstrate[^\n]*\n", script
+                )
             if len(conversion_handoffs) != 1:
                 raise AssertionError("documented conversion handoff must be unique")
             anchor = conversion_handoffs[0]
             script = script.replace(anchor, before_conversion + "\n" + anchor, 1)
+
+        if before_source_binding:
+            anchor = "qinao_conversion_exec python3 -I -B -c '\n"
+            if script.count(anchor) != 1:
+                raise AssertionError("documented source binding must be unique")
+            script = script.replace(
+                anchor, before_source_binding + "\n" + anchor, 1
+            )
 
         env = {
             **os.environ,
@@ -1185,7 +1201,8 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
         ]
 
         self.assertNotIn("/Users/changgeng/", source)
-        self.assertIn("Path(__file__).resolve().parent", source)
+        self.assertIn("Path(os.path.abspath(__file__)).parent", source)
+        self.assertNotIn("Path(__file__).resolve()", source)
         self.assertIn("load_verified_weights_checkpoint", imported_names)
         self.assertIn("load_verified_weights_checkpoint", called_names)
         self.assertEqual(torch_load_calls, [])
@@ -1261,6 +1278,116 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
             ["ssm_all"],
         )
 
+    def test_descriptor_zip_imports_full_deploy_sibling_chain_without_resolving_fd(
+        self,
+    ) -> None:
+        source_root = _DEPLOY_PATH.parents[2]
+        archive_members = (
+            "BehavioralAISubstrate/Tools/mamba3_deploy.py",
+            "BehavioralAISubstrate/Tools/llama_to_coreai_int8.py",
+            "BehavioralAISubstrate/Tools/llama_to_coreai.py",
+            "BehavioralAISubstrate/Tools/qinao_checkpoint_guard.py",
+            "BehavioralAISubstrate/Tools/mamba3_trainable.py",
+        )
+        launcher = r'''
+import importlib
+import os
+import pathlib
+import sys
+import types
+
+archive_path = sys.argv[1]
+archive_fd = os.open(
+    archive_path,
+    os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+)
+os.set_inheritable(archive_fd, True)
+os.unlink(archive_path)
+archive_root = f"/dev/fd/{archive_fd}"
+
+real_resolve = pathlib.Path.resolve
+linux_deleted_root = pathlib.Path("/tmp/reviewed-source.zip (deleted)")
+def linux_descriptor_resolve(path, *args, **kwargs):
+    raw = os.fspath(path)
+    prefix = archive_root + os.sep
+    if raw.startswith(prefix):
+        return linux_deleted_root / raw.removeprefix(prefix)
+    return real_resolve(path, *args, **kwargs)
+pathlib.Path.resolve = linux_descriptor_resolve
+
+class FakeModule:
+    pass
+
+fake_torch = types.ModuleType("torch")
+fake_nn = types.ModuleType("torch.nn")
+fake_functional = types.ModuleType("torch.nn.functional")
+fake_nn.Module = FakeModule
+fake_torch.nn = fake_nn
+fake_torch.float32 = object()
+
+fake_numpy = types.ModuleType("numpy")
+fake_coreai = types.ModuleType("coreai")
+fake_coreai_runtime = types.ModuleType("coreai.runtime")
+fake_coreai_runtime.AIModel = object
+fake_coreai_runtime.NDArray = object
+fake_coreai_torch = types.ModuleType("coreai_torch")
+fake_compression = types.ModuleType("coreai_torch._compression")
+fake_custom_layers = types.ModuleType(
+    "coreai_torch._compression.custom_layers"
+)
+fake_custom_layers.constexpr_blockwise_shift_scale = object()
+fake_compression_utils = types.ModuleType(
+    "coreai_torch._compression.utils"
+)
+fake_compression_utils.inject_subbyte_tensors = lambda value: value
+sys.modules.update({
+    "numpy": fake_numpy,
+    "torch": fake_torch,
+    "torch.nn": fake_nn,
+    "torch.nn.functional": fake_functional,
+    "coreai": fake_coreai,
+    "coreai.runtime": fake_coreai_runtime,
+    "coreai_torch": fake_coreai_torch,
+    "coreai_torch._compression": fake_compression,
+    "coreai_torch._compression.custom_layers": fake_custom_layers,
+    "coreai_torch._compression.utils": fake_compression_utils,
+})
+
+sys.argv[1:] = ["1", "8"]
+sys.path.insert(0, archive_root)
+deploy = importlib.import_module("BehavioralAISubstrate.Tools.mamba3_deploy")
+loaded = {
+    "mamba3_deploy": deploy,
+    "llama_to_coreai_int8": sys.modules["llama_to_coreai_int8"],
+    "llama_to_coreai": sys.modules["llama_to_coreai"],
+    "qinao_checkpoint_guard": sys.modules["qinao_checkpoint_guard"],
+    "mamba3_trainable": sys.modules["mamba3_trainable"],
+}
+expected_prefix = archive_root + "/BehavioralAISubstrate/Tools/"
+for name, module in loaded.items():
+    origin = module.__file__
+    if not origin.startswith(expected_prefix):
+        raise AssertionError(f"{name} escaped reviewed archive: {origin}")
+print("descriptor ZIP import chain OK")
+'''
+
+        with tempfile.TemporaryDirectory() as directory:
+            archive_path = Path(directory) / "reviewed-source.zip"
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                archive.writestr("BehavioralAISubstrate/", "")
+                archive.writestr("BehavioralAISubstrate/Tools/", "")
+                for member in archive_members:
+                    archive.write(source_root / member, member)
+            completed = subprocess.run(
+                [sys.executable, "-I", "-B", "-c", launcher, str(archive_path)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            diagnostic = completed.stdout + completed.stderr
+            self.assertEqual(completed.returncode, 0, diagnostic)
+            self.assertIn("descriptor ZIP import chain OK", completed.stdout)
+
     def test_documented_shell_and_module_usage_are_shell_valid(self) -> None:
         runbook = _RUNBOOK_PATH.read_text(encoding="utf-8")
         scripts = _fenced_bash_scripts(runbook)
@@ -1309,7 +1436,12 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
             "diff-files --quiet --no-ext-diff",
             "python3 -I -B",
             "python -I -B",
-            "qinao_conversion_exec uv --no-config run",
+            "qinao_conversion_exec python3 -I -B -c",
+            "exec uv --no-config run",
+            "tempfile.TemporaryFile",
+            "stdout=archive",
+            "archive_info.st_nlink != 0",
+            "/dev/fd/${QINAO_DEPLOY_CODE_FD}",
             "3f5f49b85822aa7272a3c5d173eacd7906896b21",
             "test_deploy_uses_candidate_local_verified_checkpoint_loader",
             "test_optimized_deploy_refuses_unexpected_trained_keys_before_output",
@@ -1321,6 +1453,7 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
         for fragment in required_fragments:
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, deploy_section)
+        self.assertNotIn("QINAO_DEPLOY_CODE_ARCHIVE", deploy_section)
         self.assertIn("only a training recipe source", deploy_section)
         deploy_scripts = _fenced_bash_scripts(deploy_section)
         self.assertTrue(
@@ -1476,6 +1609,118 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
             )
             self.assertFalse(hook_marker.exists(), diagnostic)
 
+    def test_documented_deploy_ignores_git_template_config_hooks_during_clone(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = _DocumentedDeployFixture(root)
+            attacker_home = root / "attacker-home"
+            attacker_home.mkdir()
+            attacker_template = root / "attacker-template"
+            attacker_template.mkdir()
+            hook_marker = root / "template-fsmonitor-executed"
+            fsmonitor = root / "template-fsmonitor"
+            fsmonitor.write_text(
+                "#!/bin/sh\n"
+                f"printf executed > {shlex.quote(str(hook_marker))}\n",
+                encoding="utf-8",
+            )
+            fsmonitor.chmod(0o755)
+            (attacker_template / "config").write_text(
+                "[core]\n"
+                f"\tfsmonitor = {fsmonitor}\n",
+                encoding="utf-8",
+            )
+            (attacker_home / ".gitconfig").write_text(
+                "[init]\n"
+                f"\ttemplateDir = {attacker_template}\n",
+                encoding="utf-8",
+            )
+
+            completed, sentinel = fixture.run(
+                extra_env={"HOME": str(attacker_home)}
+            )
+            diagnostic = completed.stdout + completed.stderr
+            self.assertEqual(completed.returncode, 0, diagnostic)
+            self.assertEqual(
+                sentinel.read_text(encoding="utf-8"), "reviewed source\n"
+            )
+            self.assertFalse(hook_marker.exists(), diagnostic)
+
+    def test_documented_deploy_ignores_repository_replace_refs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = _DocumentedDeployFixture(root)
+            fixture._git("checkout", "--detach", fixture.floor_commit)
+            (fixture.source / _DEPLOY_RELATIVE_PATH).write_text(
+                "print('QINAO-CONVERSION-SOURCE:replacement ref')\n",
+                encoding="utf-8",
+            )
+            replacement_commit = fixture._commit("replacement-ref source")
+            fixture._git("branch", "replacement-ref-source", replacement_commit)
+            fixture._git("checkout", "main")
+            replacement = (
+                f"{shlex.quote(fixture._git_binary)} "
+                '-C "$QINAO_DEPLOY_OBJECTS" replace '
+                '"$QINAO_REVIEWED_DEPLOY_COMMIT" '
+                f"{shlex.quote(replacement_commit)}"
+            )
+
+            completed, sentinel = fixture.run(after_source_clone=replacement)
+            diagnostic = completed.stdout + completed.stderr
+            self.assertEqual(completed.returncode, 0, diagnostic)
+            self.assertEqual(
+                sentinel.read_text(encoding="utf-8"),
+                "reviewed source\n",
+                "Git replacement refs changed reviewed commit bytes",
+            )
+
+    def test_documented_deploy_final_stream_ignores_repository_local_attributes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = _DocumentedDeployFixture(root)
+            fixture._git("checkout", "--detach", fixture.current_commit)
+            (fixture.source / _DEPLOY_RELATIVE_PATH).write_text(
+                "print('QINAO-CONVERSION-SOURCE:$Format:%s$')\n",
+                encoding="utf-8",
+            )
+            reviewed_commit = fixture._commit("attribute-substitution-payload")
+            fixture._git("branch", "attribute-source", reviewed_commit)
+            fixture._git("checkout", "main")
+            attributes = root / "repository-local-attributes"
+            attributes.write_text(
+                f"{_DEPLOY_RELATIVE_PATH} export-subst\n", encoding="utf-8"
+            )
+            mutations = {
+                "core.attributesFile": (
+                    f"{shlex.quote(fixture._git_binary)} "
+                    '-C "$QINAO_DEPLOY_OBJECTS" config core.attributesFile '
+                    f"{shlex.quote(str(attributes))}"
+                ),
+                ".git/info/attributes": (
+                    "printf '%s\\n' "
+                    f"{shlex.quote(f'{_DEPLOY_RELATIVE_PATH} export-subst')} "
+                    '> "$QINAO_DEPLOY_OBJECTS/.git/info/attributes"'
+                ),
+            }
+
+            for source, mutation in mutations.items():
+                with self.subTest(source=source):
+                    completed, sentinel = fixture.run(
+                        reviewed_commit=reviewed_commit,
+                        before_source_binding=mutation,
+                    )
+                    diagnostic = completed.stdout + completed.stderr
+                    self.assertEqual(completed.returncode, 0, diagnostic)
+                    self.assertEqual(
+                        sentinel.read_text(encoding="utf-8"),
+                        "$Format:%s$\n",
+                        f"{source} transformed reviewed source bytes",
+                    )
+
     def test_documented_deploy_rejects_symlink_and_gitlink_tree_entries(
         self,
     ) -> None:
@@ -1558,18 +1803,14 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
             self.assertFalse(startup_marker.exists(), diagnostic)
             self.assertFalse(module_marker.exists(), diagnostic)
 
-    def test_documented_deploy_mutable_source_mutation_after_guards_cannot_change_snapshot(
+    def test_documented_deploy_execution_root_mutation_after_guards_cannot_change_source(
         self,
     ) -> None:
         post_guard_mutation = _rewrite_deploy_source(
-            "$QINAO_MUTATION_TARGET", "post-guard mutation"
+            "$QINAO_DEPLOY_EXEC_ROOT", "post-guard execution-root mutation"
         )
         mutation = (
-            'if test -n "${QINAO_DEPLOY_CHECKOUT:-}" '
-            f'&& test -f "$QINAO_DEPLOY_CHECKOUT/{_DEPLOY_RELATIVE_PATH}"; '
-            'then QINAO_MUTATION_TARGET="$QINAO_DEPLOY_CHECKOUT"; '
-            'else QINAO_MUTATION_TARGET="$QINAO_DEPLOY_REPO_URL"; fi; '
-            f'test -f "$QINAO_MUTATION_TARGET/{_DEPLOY_RELATIVE_PATH}"; '
+            f'test -f "$QINAO_DEPLOY_EXEC_ROOT/{_DEPLOY_RELATIVE_PATH}"; '
             f"{post_guard_mutation}; "
             'printf "mutation-completed\\n" > "$QINAO_MUTATION_PROOF"'
         )
@@ -1577,9 +1818,11 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
             root = Path(directory)
             fixture = _DocumentedDeployFixture(root)
             mutation_proof = root / "post-guard-mutation-completed"
+            mutation = mutation.replace(
+                '"$QINAO_MUTATION_PROOF"', shlex.quote(str(mutation_proof))
+            )
             completed, sentinel = fixture.run(
                 before_conversion=mutation,
-                extra_env={"QINAO_MUTATION_PROOF": str(mutation_proof)},
             )
             diagnostic = completed.stdout + completed.stderr
             self.assertEqual(completed.returncode, 0, diagnostic)
@@ -1590,8 +1833,92 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
             self.assertEqual(
                 sentinel.read_text(encoding="utf-8"),
                 "reviewed source\n",
-                "post-guard checkout bytes became the conversion source",
+                "post-guard execution-root bytes became the conversion source",
             )
+
+    def test_documented_deploy_post_binding_stray_archive_cannot_change_source(
+        self,
+    ) -> None:
+        for shell in _documentation_shells():
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                fixture = _DocumentedDeployFixture(root)
+                replacement_archive = root / "replacement-source.zip"
+                with zipfile.ZipFile(replacement_archive, "w") as archive:
+                    archive.writestr("BehavioralAISubstrate/", "")
+                    archive.writestr("BehavioralAISubstrate/Tools/", "")
+                    archive.writestr(
+                        _DEPLOY_RELATIVE_PATH,
+                        "print('QINAO-CONVERSION-SOURCE:replacement archive')\n",
+                    )
+                mutation_proof = root / "archive-replacement-completed"
+                stray_archive = root / "reviewed-code.zip"
+                mutation = (
+                    f"rm -f {shlex.quote(str(stray_archive))}; "
+                    f"cp {shlex.quote(str(replacement_archive))} "
+                    f"{shlex.quote(str(stray_archive))}; "
+                    'printf "mutation-completed\\n" > '
+                    f"{shlex.quote(str(mutation_proof))}"
+                )
+
+                with self.subTest(shell=shell):
+                    completed, sentinel = fixture.run(
+                        before_conversion=mutation,
+                        shell=shell,
+                    )
+                    diagnostic = completed.stdout + completed.stderr
+                    self.assertEqual(completed.returncode, 0, diagnostic)
+                    self.assertEqual(
+                        mutation_proof.read_text(encoding="utf-8"),
+                        "mutation-completed\n",
+                    )
+                    self.assertEqual(
+                        sentinel.read_text(encoding="utf-8"),
+                        "reviewed source\n",
+                        f"{shell} opened replacement code-archive bytes",
+                    )
+
+    def test_documented_deploy_pre_binding_stray_archive_cannot_change_source(
+        self,
+    ) -> None:
+        for shell in _documentation_shells():
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                fixture = _DocumentedDeployFixture(root)
+                replacement_archive = root / "pre-open-replacement.zip"
+                with zipfile.ZipFile(replacement_archive, "w") as archive:
+                    archive.writestr("BehavioralAISubstrate/", "")
+                    archive.writestr("BehavioralAISubstrate/Tools/", "")
+                    archive.writestr(
+                        _DEPLOY_RELATIVE_PATH,
+                        "print('QINAO-CONVERSION-SOURCE:pre-open replacement')\n",
+                    )
+                mutation_proof = root / "pre-open-replacement-completed"
+                stray_archive = root / "reviewed-code.zip"
+                mutation = (
+                    f"rm -f {shlex.quote(str(stray_archive))}; "
+                    f"cp {shlex.quote(str(replacement_archive))} "
+                    f"{shlex.quote(str(stray_archive))}; "
+                    'printf "mutation-completed\\n" > '
+                    f"{shlex.quote(str(mutation_proof))}"
+                )
+
+                with self.subTest(shell=shell):
+                    completed, sentinel = fixture.run(
+                        before_source_binding=mutation,
+                        shell=shell,
+                    )
+                    diagnostic = completed.stdout + completed.stderr
+                    self.assertEqual(completed.returncode, 0, diagnostic)
+                    self.assertEqual(
+                        mutation_proof.read_text(encoding="utf-8"),
+                        "mutation-completed\n",
+                    )
+                    self.assertEqual(
+                        sentinel.read_text(encoding="utf-8"),
+                        "reviewed source\n",
+                        f"{shell} accepted pre-open replacement source",
+                    )
 
     def test_documented_deploy_propagates_snapshot_verification_failure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
