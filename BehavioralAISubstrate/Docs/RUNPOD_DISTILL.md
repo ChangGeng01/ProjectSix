@@ -99,7 +99,8 @@ git merge-base --is-ancestor "$QINAO_DEPLOY_SECURITY_FLOOR" "$QINAO_REVIEWED_DEP
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_deploy_uses_candidate_local_verified_checkpoint_loader \
   BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_optimized_deploy_refuses_unexpected_trained_keys_before_output \
-  BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_optimized_deploy_refuses_missing_trained_keys_before_output
+  BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_optimized_deploy_refuses_missing_trained_keys_before_output \
+  BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_optimized_deploy_accepts_only_registered_decode_state_buffers
 qinao_require_clean_deploy_source
 # DEPLOY-SOURCE-PREFLIGHT-END
 
@@ -202,7 +203,7 @@ change `data_fp` so they need a FRESH `CKPT_DIR`):
 - GATE 3 — trusted `ckpt_best.pt` → device WITH `CKPT`, `CKPT_SHA256='sha256:<trusted-release-digest>'`, and the immutable
   `QINAO_REVIEWED_DEPLOY_COMMIT` from one trusted producer/release receipt. Both identities travel over an authenticated operator
   channel; recomputing a digest from the same untrusted deploy copy proves consistency, not provenance. Conversion runs only from
-  the separate detached checkout after exact-HEAD, ancestry-floor, candidate-local loader, and both optimized no-save guards pass.
+  the separate detached checkout after exact-HEAD, ancestry-floor, candidate-local loader, and all optimized state-load guards pass.
   The converters **fail-closed** on a missing CKPT or digest (no silent random-weight asset; `FORCE_RANDOM=1` only for op-graph
   probes) AND on a mismatched arch/layers/vocab/mla_positions/config or an MLA_ROPE ckpt (the deploy converter is still NoPE).
   `resolve_ckpt` is authoritative on vocab.

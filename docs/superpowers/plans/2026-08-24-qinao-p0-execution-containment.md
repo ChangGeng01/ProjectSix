@@ -299,7 +299,7 @@ suite, and the real-PyTorch exploit suite. Commit only the three listed files.
 - Verify only, except ignored SDD evidence under `.superpowers/sdd/...`.
 
 - [ ] Re-run every Task 4 and Task 5 suite with positive discovery assertions.
-- [ ] Re-run the checkpoint suite with an asserted positive discovery count (currently 23 tests) under real PyTorch, and the complete expanded external seatbelt suite.
+- [ ] Re-run the checkpoint suite with an asserted positive discovery count under real PyTorch, and the complete expanded external seatbelt suite.
 - [ ] Run `git diff --check 4f0b9846c..HEAD` and audit every changed path in the full range.
 - [ ] Regenerate the protected 33-path manifest and require an exact match with `protected-33-pre.tsv`.
 - [ ] Obtain fresh specification and code-quality/security approval over the entire range. Any P1/P0 returns to RED; do not begin the next containment slice.

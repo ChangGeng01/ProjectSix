@@ -75,19 +75,31 @@ class DeployM(nn.Module):
         self.embedding = nn.Embedding(VOCAB, D)
         self.layers = nn.ModuleList([MT.Lyr() for _ in range(L)])          # the TRAINING module — same math
         self.fw = nn.Parameter(torch.ones(D))
+        decode_state_buffer_names = []
         if os.environ.get("STATE_WRITE") == "separate":
             # 4*L SEPARATE per-layer state buffers — NO [L,...] stacked tensor, so NO integer-index/gather of a
             # too-big buffer (the suspected source of "ANE cannot handle intermediate tensor type" at L=16).
             for i in range(L):
-                self.register_buffer(f"angle_{i}", torch.zeros(H, N // 2))
-                self.register_buffer(f"ssm_{i}", torch.zeros(H, P, N))
-                self.register_buffer(f"kprev_{i}", torch.zeros(H, R, N))
-                self.register_buffer(f"vprev_{i}", torch.zeros(H, P, R))
+                buffers = (
+                    (f"angle_{i}", torch.zeros(H, N // 2)),
+                    (f"ssm_{i}", torch.zeros(H, P, N)),
+                    (f"kprev_{i}", torch.zeros(H, R, N)),
+                    (f"vprev_{i}", torch.zeros(H, P, R)),
+                )
+                for name, value in buffers:
+                    self.register_buffer(name, value)
+                    decode_state_buffer_names.append(name)
         else:
-            self.register_buffer("angle_all", torch.zeros(L, H, N // 2))    # state 1 (FIRST)
-            self.register_buffer("ssm_all", torch.zeros(L, H, P, N))        # state 2
-            self.register_buffer("kprev_all", torch.zeros(L, H, R, N))      # state 3
-            self.register_buffer("vprev_all", torch.zeros(L, H, P, R))      # state 4
+            buffers = (
+                ("angle_all", torch.zeros(L, H, N // 2)),    # state 1 (FIRST)
+                ("ssm_all", torch.zeros(L, H, P, N)),        # state 2
+                ("kprev_all", torch.zeros(L, H, R, N)),      # state 3
+                ("vprev_all", torch.zeros(L, H, P, R)),      # state 4
+            )
+            for name, value in buffers:
+                self.register_buffer(name, value)
+                decode_state_buffer_names.append(name)
+        self.decode_state_buffer_names = frozenset(decode_state_buffer_names)
 
     def quantize(self) -> "DeployM":
         for l in self.layers:
@@ -167,7 +179,7 @@ def main() -> None:
             raise SystemExit(
                 f"checkpoint has tensors DeployM lacks: {unexpected[:3]}"
             )
-        bad = [k for k in missing if not k.endswith("_all")]          # only the decode-state buffers may be missing
+        bad = [k for k in missing if k not in m.decode_state_buffer_names]
         if bad:
             raise SystemExit(
                 "DeployM missing trained params (would deploy uninitialized): "

@@ -87,6 +87,7 @@ _DOCUMENTED_SOURCE_GUARDS = (
     "test_deploy_uses_candidate_local_verified_checkpoint_loader",
     "test_optimized_deploy_refuses_unexpected_trained_keys_before_output",
     "test_optimized_deploy_refuses_missing_trained_keys_before_output",
+    "test_optimized_deploy_accepts_only_registered_decode_state_buffers",
 )
 
 
@@ -387,7 +388,18 @@ class FakeModule:
             raise AssertionError("deploy must retain strict=False compatibility loading")
         if case == "unexpected":
             return [], ["attacker.extra_weight"]
-        return ["layers.0.in_proj.weight"], []
+        missing_by_case = {
+            "missing": ["layers.0.in_proj.weight"],
+            "stack-decode-state": [
+                "angle_all", "ssm_all", "kprev_all", "vprev_all"
+            ],
+            "separate-decode-state": [
+                "angle_0", "ssm_0", "kprev_0", "vprev_0",
+                "angle_1", "ssm_1", "kprev_1", "vprev_1",
+            ],
+            "spoofed-decode-state": ["layers.0.attacker_all"],
+        }
+        return missing_by_case[case], []
     def __call__(self, *args, **kwargs):
         return object()
 
@@ -451,7 +463,7 @@ class FakeCheckpointVerificationError(Exception):
 fake_guard.DEFAULT_MAX_BYTES = 1024
 fake_guard.CheckpointVerificationError = FakeCheckpointVerificationError
 fake_guard.load_verified_weights_checkpoint = lambda *_args, **_kwargs: {
-    "layers": 1,
+    "layers": 2 if case == "separate-decode-state" else 1,
     "model": {},
 }
 
@@ -470,9 +482,12 @@ sys.modules.update({
 
 os.environ.pop("FORCE_RANDOM", None)
 os.environ.pop("FP16", None)
+os.environ.pop("STATE_WRITE", None)
+if case == "separate-decode-state":
+    os.environ["STATE_WRITE"] = "separate"
 os.environ["CKPT"] = checkpoint_path
 os.environ["CKPT_SHA256"] = "sha256:" + "0" * 64
-sys.argv = [deploy_path, "1", "8"]
+sys.argv = [deploy_path, "2" if case == "separate-decode-state" else "1", "8"]
 
 spec = importlib.util.spec_from_file_location("_qinao_optimized_deploy_test", deploy_path)
 if spec is None or spec.loader is None:
@@ -491,16 +506,19 @@ module.main()
 """
 
 
-def _assert_optimized_deploy_refuses_incomplete_state(case: str) -> None:
+def _run_optimized_deploy_case(
+    case: str, *, existing_output: bool
+) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
     deploy_path = Path(__file__).with_name("mamba3_deploy.py")
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         checkpoint = root / "checkpoint.pt"
         checkpoint.write_bytes(b"authenticated-by-test-double")
         output = root / "existing-output.aimodel"
-        output.mkdir()
         sentinel = output / "keep-me"
-        sentinel.write_text("pre-existing-output", encoding="utf-8")
+        if existing_output:
+            output.mkdir()
+            sentinel.write_text("pre-existing-output", encoding="utf-8")
         quant_marker = root / "quantize-called"
         convert_marker = root / "convert-called"
         save_marker = root / "save-called"
@@ -527,18 +545,48 @@ def _assert_optimized_deploy_refuses_incomplete_state(case: str) -> None:
             check=False,
         )
 
-        diagnostic = completed.stdout + completed.stderr
-        expected = (
-            "checkpoint has tensors DeployM lacks"
-            if case == "unexpected"
-            else "DeployM missing trained params"
-        )
-        assert completed.returncode != 0, diagnostic
-        assert expected in diagnostic, diagnostic
-        assert sentinel.read_text(encoding="utf-8") == "pre-existing-output"
-        assert not quant_marker.exists(), "state refusal happened after quantization"
-        assert not convert_marker.exists(), "state refusal happened after conversion"
-        assert not save_marker.exists(), "state refusal happened after save_asset"
+        observed = {
+            "output_exists": output.exists(),
+            "sentinel": (
+                sentinel.read_text(encoding="utf-8") if sentinel.exists() else None
+            ),
+            "quantized": quant_marker.exists(),
+            "converted": convert_marker.exists(),
+            "saved": save_marker.exists(),
+        }
+        return completed, observed
+
+
+def _assert_optimized_deploy_refuses_incomplete_state(case: str) -> None:
+    completed, observed = _run_optimized_deploy_case(case, existing_output=True)
+    diagnostic = completed.stdout + completed.stderr
+    expected = (
+        "checkpoint has tensors DeployM lacks"
+        if case == "unexpected"
+        else "DeployM missing trained params"
+    )
+    assert completed.returncode != 0, diagnostic
+    assert expected in diagnostic, diagnostic
+    assert observed == {
+        "output_exists": True,
+        "sentinel": "pre-existing-output",
+        "quantized": False,
+        "converted": False,
+        "saved": False,
+    }
+
+
+def _assert_optimized_deploy_accepts_decode_state(case: str) -> None:
+    completed, observed = _run_optimized_deploy_case(case, existing_output=False)
+    diagnostic = completed.stdout + completed.stderr
+    assert completed.returncode == 0, diagnostic
+    assert observed == {
+        "output_exists": True,
+        "sentinel": None,
+        "quantized": True,
+        "converted": True,
+        "saved": True,
+    }
 
 
 class _RecordingTorch(types.ModuleType):
@@ -1035,6 +1083,17 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
     def test_optimized_deploy_refuses_missing_trained_keys_before_output(self) -> None:
         _assert_optimized_deploy_refuses_incomplete_state("missing")
 
+    def test_optimized_deploy_accepts_only_registered_decode_state_buffers(
+        self,
+    ) -> None:
+        for case in ("stack-decode-state", "separate-decode-state"):
+            with self.subTest(case=case):
+                _assert_optimized_deploy_accepts_decode_state(case)
+        with self.subTest(case="spoofed-decode-state"):
+            _assert_optimized_deploy_refuses_incomplete_state(
+                "spoofed-decode-state"
+            )
+
     def test_documented_shell_and_module_usage_are_shell_valid(self) -> None:
         runbook = _RUNBOOK_PATH.read_text(encoding="utf-8")
         scripts = _fenced_bash_scripts(runbook)
@@ -1078,6 +1137,7 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
             "test_deploy_uses_candidate_local_verified_checkpoint_loader",
             "test_optimized_deploy_refuses_unexpected_trained_keys_before_output",
             "test_optimized_deploy_refuses_missing_trained_keys_before_output",
+            "test_optimized_deploy_accepts_only_registered_decode_state_buffers",
         )
         for fragment in required_fragments:
             with self.subTest(fragment=fragment):
