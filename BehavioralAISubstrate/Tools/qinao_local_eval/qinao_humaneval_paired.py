@@ -22,7 +22,13 @@ import textwrap
 import subprocess
 import tempfile
 
+from qinao_sandbox import run_sandboxed
+
 PYBIN = os.path.expanduser("~/qwen_honesty_finetune/.venv/bin/python")
+
+
+def execute_generated_program(pybin: str, script_path: str, timeout: int = 15):
+    return run_sandboxed(pybin, script_path, timeout=timeout)
 
 
 def counts_toward_denominator(outcome: str) -> bool:
@@ -99,9 +105,7 @@ def main() -> None:
             with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
                 f.write(program)
                 path = f.name
-            # audit tools-scripts LOW / decision 7: -I isolated mode (ignore env / user site-packages)
-            # hardens the exec of model-generated code a little (a real sandbox is the follow-up).
-            res = subprocess.run([PYBIN, "-I", path], capture_output=True, timeout=15)
+            res = execute_generated_program(PYBIN, path, timeout=15)
             passed = int(res.returncode == 0)
             outcome = "ran"
         except subprocess.TimeoutExpired:
