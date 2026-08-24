@@ -255,6 +255,14 @@ def test_build_verdict_cli_revokes_prior_run_humaneval_when_current_files_absent
 
         with tempfile.TemporaryDirectory() as directory:
             verdict_path = Path(directory) / "verdict.json"
+            environment = os.environ.copy()
+            for name in (
+                "QINAO_EVAL_RUN_ID",
+                "QINAO_EVAL_EVIDENCE_DIR",
+                "QINAO_SUBJECT_RECEIPTS",
+                "QINAO_HUMANEVAL_DATASET_FINGERPRINT",
+            ):
+                environment.pop(name, None)
             out = subprocess.run(
                 [
                     sys.executable,
@@ -264,7 +272,7 @@ def test_build_verdict_cli_revokes_prior_run_humaneval_when_current_files_absent
                 ],
                 capture_output=True,
                 text=True,
-                env={**os.environ, "QINAO_VERDICT_OUT": str(verdict_path)},
+                env={**environment, "QINAO_VERDICT_OUT": str(verdict_path)},
             )
             assert out.returncode == 0, out.stderr
             verdict = json.loads(verdict_path.read_text(encoding="utf-8"))

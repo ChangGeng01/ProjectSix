@@ -27,6 +27,13 @@ _RUNBOOK_PATH = Path(__file__).parents[1] / "Docs" / "RUNPOD_DISTILL.md"
 _DEPLOY_PATH = Path(__file__).with_name("mamba3_deploy.py")
 
 
+def _documentation_shells() -> tuple[str, ...]:
+    shells = ["bash"]
+    if shutil.which("zsh") is not None:
+        shells.append("zsh")
+    return tuple(shells)
+
+
 def _fenced_bash_scripts(markdown: str) -> list[str]:
     return re.findall(r"```bash\s*\n(.*?)```", markdown, flags=re.DOTALL)
 
@@ -1267,7 +1274,7 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
                     [],
                     msg=f"unquoted shell placeholder in:\n{script}",
                 )
-                for shell in ("bash", "zsh"):
+                for shell in _documentation_shells():
                     completed = subprocess.run(
                         [shell, "-n"],
                         input=script,
@@ -1589,7 +1596,7 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
     def test_documented_deploy_propagates_snapshot_verification_failure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = _DocumentedDeployFixture(Path(directory))
-            for shell in ("bash", "zsh"):
+            for shell in _documentation_shells():
                 with self.subTest(shell=shell):
                     completed, sentinel = fixture.run(
                         fail_git_verification=True, shell=shell
@@ -1642,7 +1649,7 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
     def test_documented_deploy_valid_reviewed_commit_reaches_conversion(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = _DocumentedDeployFixture(Path(directory))
-            for shell in ("bash", "zsh"):
+            for shell in _documentation_shells():
                 with self.subTest(shell=shell):
                     completed, sentinel = fixture.run(shell=shell)
                     diagnostic = completed.stdout + completed.stderr
