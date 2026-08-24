@@ -4,7 +4,7 @@
 
 **Goal:** Fail closed at the two currently reachable local-tool execution sinks identified by the replacement Deep Scan, without adding a new authority or persistence owner.
 
-**Architecture:** Reuse the existing deny-default HumanEval sandbox. Add a small standard-library checkpoint guard that stages authenticated bytes into an unlinked snapshot before a restricted PyTorch load. Keep Mamba imports candidate-local. This plan contains no gateway registry, K3 journal, sovereign ledger, provider inversion, or workflow mutation.
+**Architecture:** Harden the existing deny-default HumanEval sandbox and connect its typed infrastructure outcome through denominator, side-file merge, and verdict semantics. Add a small standard-library checkpoint guard that stages authenticated bytes into an unlinked snapshot before a restricted PyTorch load, and make post-load trained-state validation optimization-proof. Keep Mamba imports candidate-local. This plan contains no gateway registry, K3 journal, sovereign ledger, provider inversion, or workflow mutation.
 
 **Tech Stack:** Python 3 standard library, `unittest`, macOS seatbelt helper, SHA-256, unlinked temporary files, optional PyTorch integration test.
 
@@ -18,6 +18,8 @@
 - No unsandboxed fallback, optional digest, unsafe pickle compatibility mode, hard-coded checkout, “latest” selection, or same-artifact self-attestation.
 - Do not change `.github/workflows`, controlled-convergence plans, owner-ledger/admission scripts, Swift runtime code, provider manifests, or persistent stores.
 - Each implementation task ends with an exact-path commit and a task-review pass.
+- The adversarial-review repair is intentionally one closure bundle: sandbox execution, evidence aggregation, and verdict consumption may not be reviewed or declared complete independently.
+- `.superpowers/sdd/2026-08-24-qinao-p0-execution-containment/protected-33-pre.tsv` is the frozen pre-repair manifest. A post-repair manifest must match its 33 path statuses, modes, sizes, and SHA-256 values exactly.
 
 ---
 
@@ -180,3 +182,120 @@ Run one specification-compliance review and one code-quality/security review. An
 - [ ] **Step 4: Record the next governed boundary**
 
 Do not claim global recovery completion. The next implementation wave is W1 provider/operation convergence followed by K3/EventLog-backed transitions and sovereign-ledger halt epochs, using the incumbent owners named by the active controlled-convergence plan.
+
+---
+
+### Task 4: Close the Sandbox-to-Verdict Failure Chain
+
+**Review amendment:** This task was added after the whole-range adversarial review
+rejected Task 3. It supersedes Task 1's narrow delegation-only acceptance. The
+files below are the explicit expansion of scope; none of the 33 protected paths
+may be touched.
+
+**Files:**
+- Modify: `BehavioralAISubstrate/Tools/qinao_local_eval/qinao_sandbox.py`
+- Modify: `BehavioralAISubstrate/Tools/qinao_local_eval/test_humaneval_sandbox.py`
+- Modify: `BehavioralAISubstrate/Tools/qinao_local_eval/qinao_humaneval.py`
+- Modify: `BehavioralAISubstrate/Tools/qinao_local_eval/qinao_humaneval_paired.py`
+- Modify: `BehavioralAISubstrate/Tools/test_qinao_humaneval_paired.py`
+- Modify: `BehavioralAISubstrate/Tools/qinao_local_eval/qinao_merge.py`
+- Modify: `BehavioralAISubstrate/Tools/qinao_local_eval/test_merge_sidefile.py`
+- Modify: `BehavioralAISubstrate/Tools/qinao_local_eval/build_verdict.py`
+- Modify: `BehavioralAISubstrate/Tools/qinao_local_eval/test_gate_integrity.py`
+
+**Interfaces and invariants:**
+- Add `SandboxInfrastructureError`; only a private descriptor written by a trusted launcher after seatbelt activation distinguishes infrastructure from model execution.
+- Run in a private mode-0700 directory with a minimal environment. Do not grant all of `/private/var/folders`. Permit writes only within the private run root and `/dev/null`.
+- Deny generated process creation and own a new process session. Clean the process group after normal return, error, and timeout.
+- Emit metric `30` only for a positive integer denominator. Treat missing, boolean, zero, negative, or malformed HumanEval denominators as unavailable evidence.
+- When an invalid present HumanEval side-file is merged, remove stale `30` and `_prov["30"]`. Missing baseline evidence for a base-relative gate is `PENDING`; `NOTE` must also remain blocking for any verifiable critical gate.
+
+- [ ] **Step 1: Write RED tests for typed sandbox activation**
+
+Prove that launcher/profile failure raises `SandboxInfrastructureError`, while a
+generated program that prints identical error text and exits nonzero returns a
+model-attributable result. Do not inspect stderr to classify infrastructure.
+
+- [ ] **Step 2: Write RED external lifecycle/confinement tests**
+
+On macOS, prove: benign code runs; sensitive reads and network fail; the program
+can write inside its private run directory; a sibling file under the same macOS
+temporary root cannot be written; and delayed-marker/PID descendants using
+redirected pipes plus `start_new_session=True` are absent after both normal
+completion and timeout.
+
+- [ ] **Step 3: Implement the smallest authenticated sandbox lifecycle**
+
+Use a private run directory, trusted activation pipe, sanitized environment,
+isolated Python, fork denial, a parent-owned session/process group, and cleanup on
+every exit. Preserve `subprocess.TimeoutExpired` for genuine model timeouts. Never
+fall back to raw execution.
+
+- [ ] **Step 4: Write RED evidence-chain tests**
+
+Create real base/tuned HumanEval side-files for all-infrastructure,
+base-only-infrastructure, and tuned-only-infrastructure cases. Seed old metric
+`30` and old computed provenance in both values dictionaries. Pass them through
+`merge_known_sidefiles` and `build`; every affected gate must be `PENDING` or
+`FAIL`, never `PASS` or `NOTE`, and stale values/provenance must be absent.
+
+- [ ] **Step 5: Implement denominator, invalidation, and verdict semantics**
+
+Both HumanEval writers omit metric `30` when `_N == 0`. Both HumanEval side-file
+prefixes require a positive integer `_N` before metric `30` can be merged and
+stamped. An invalid present side-file explicitly revokes existing metric/provenance.
+Base-relative evaluation without a valid baseline is `PENDING`; verifiable
+critical `NOTE` states also block `model_eval_ok` as a defense in depth.
+
+- [ ] **Step 6: Run focused GREEN and commit exact paths**
+
+Run the paired tests, merge tests, gate-integrity tests, and all expanded external
+macOS sandbox tests with positive discovery counts. Commit only the nine listed
+files after the complete chain is green.
+
+---
+
+### Task 5: Make Trained-State Refusal Optimization-Proof
+
+**Files:**
+- Modify: `BehavioralAISubstrate/Tools/mamba3_deploy.py`
+- Modify: `BehavioralAISubstrate/Tools/test_qinao_checkpoint_guard.py`
+- Modify: `BehavioralAISubstrate/Docs/RUNPOD_DISTILL.md`
+
+- [ ] **Step 1: Write RED optimized-interpreter tests**
+
+Exercise the real deploy control flow under `python -O` with faked conversion
+dependencies. Missing trained keys and unexpected tensors must both terminate
+before quantization, conversion, output deletion, or `save_asset`. Assert that no
+output asset or save marker exists.
+
+- [ ] **Step 2: Replace optimization-sensitive assertions**
+
+Use explicit refusal branches for unexpected tensors and missing trained
+parameters. Only decode-state buffers ending in `_all` may be absent. Preserve
+the existing authenticated loader and `FORCE_RANDOM=1` behavior.
+
+- [ ] **Step 3: Repair trusted-digest documentation**
+
+Update the module usage and RunPod deploy runbook to require
+`CKPT_SHA256=sha256:<trusted-release-digest>`. State that the digest must come
+from an independently trusted training/release receipt; computing it from the
+same untrusted checkpoint at deploy time is integrity checking, not provenance.
+
+- [ ] **Step 4: Run GREEN and commit exact paths**
+
+Run the dedicated `python -O` regression, the full system-Python checkpoint
+suite, and the real-PyTorch exploit suite. Commit only the three listed files.
+
+---
+
+### Task 6: Repeat Whole-Range Adversarial Acceptance
+
+**Files:**
+- Verify only, except ignored SDD evidence under `.superpowers/sdd/...`.
+
+- [ ] Re-run every Task 4 and Task 5 suite with positive discovery assertions.
+- [ ] Re-run the real-PyTorch 19-test suite and the complete expanded external seatbelt suite.
+- [ ] Run `git diff --check 4f0b9846c..HEAD` and audit every changed path in the full range.
+- [ ] Regenerate the protected 33-path manifest and require an exact match with `protected-33-pre.tsv`.
+- [ ] Obtain fresh specification and code-quality/security approval over the entire range. Any P1/P0 returns to RED; do not begin the next containment slice.
