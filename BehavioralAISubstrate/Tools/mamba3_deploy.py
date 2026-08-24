@@ -5,8 +5,9 @@ inference step), loads the trained weights, quantizes (int8/int4), and emits the
 (angle/ssm/kprev/vprev — the flat-state SIGSEGV fix). Because Lyr is the exact training module, the deployed
 graph is identical to what trained, no re-derivation. Loads /tmp/draft_coreai/mamba3_poc_student.pt if present.
 
-Run: CKPT=/path/ckpt_best.pt CKPT_SHA256=sha256:<trusted-release-digest> \
-     uv run --with coreai-torch python Tools/mamba3_deploy.py <L> <bits>   (e.g. 8 8)
+Run:
+    CKPT=/path/ckpt_best.pt CKPT_SHA256='sha256:<trusted-release-digest>' \
+      uv run --with coreai-torch python Tools/mamba3_deploy.py '<L>' '<bits>'
 """
 from __future__ import annotations
 

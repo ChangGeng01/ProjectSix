@@ -24,9 +24,9 @@ THIS run establishes — every on-device number above is random-weight op-graph 
 ## Run
 
 ```bash
-# 1. get the repo onto the volume
-cd /workspace && git clone <this-repo> Project06 && cd Project06/BehavioralAISubstrate
-git checkout ssd-track-g-distill-optimized            # the branch carrying the audited+optimized distill recipe
+# 1. get the TRAINING-RECIPE checkout onto the volume
+cd /workspace && git clone '<this-repo>' Project06 && cd Project06/BehavioralAISubstrate
+git checkout ssd-track-g-distill-optimized   # training recipe source only; never the deploy converter source
 
 # 2. one-time deps (torch is preinstalled in the image; this adds transformers/datasets[/flash-attn])
 bash scripts/runpod_setup.sh
@@ -65,13 +65,39 @@ bf16 on CUDA, grad-accum, warmup, grad-clip, atomic checkpoint/resume.
 
 ## Deploy back to the A19 (the loop closes)
 
+The legacy `ssd-track-g-distill-optimized` checkout above is only a training recipe source. Never run the deploy converter from
+that mutable training checkout. The trusted release receipt binds the checkpoint identity (`CKPT_SHA256`) and immutable full deploy-source commit (`QINAO_REVIEWED_DEPLOY_COMMIT`) in one record. Carry both values to the deploy operator over the same
+authenticated channel. A digest computed from the destination's same untrusted checkpoint proves copy consistency, not provenance.
+
 ```bash
-# After every quality gate passes, select the immutable metric-gated artifact on the trusted producer:
-#   /workspace/ckpt/ckpt_best.pt
-# Record its SHA-256 in the trusted release receipt, then carry that digest to the deploy operator over
-# an authenticated channel. A digest computed from the same untrusted destination copy is NOT provenance.
-export CKPT=/tmp/draft_coreai/ckpt_best.pt
-export CKPT_SHA256=sha256:<trusted-release-digest>
+set -euo pipefail
+
+# Copy these two identities verbatim from the same authenticated trusted release receipt.
+export CKPT='/tmp/draft_coreai/ckpt_best.pt'
+export CKPT_SHA256='sha256:<trusted-release-digest>'
+export QINAO_REVIEWED_DEPLOY_COMMIT='<full-reviewed-deploy-source-commit>'
+
+# Build a separate clean deploy checkout. Refuse a pre-existing destination instead of reusing mutable state.
+export QINAO_DEPLOY_REPO_URL='<this-repo>'
+export QINAO_DEPLOY_CHECKOUT='/workspace/Project06-deploy'
+export QINAO_DEPLOY_SECURITY_FLOOR='3f5f49b85822aa7272a3c5d173eacd7906896b21'
+test ! -e "$QINAO_DEPLOY_CHECKOUT"
+git clone --no-checkout "$QINAO_DEPLOY_REPO_URL" "$QINAO_DEPLOY_CHECKOUT"
+git -C "$QINAO_DEPLOY_CHECKOUT" checkout --detach "$QINAO_REVIEWED_DEPLOY_COMMIT"
+cd "$QINAO_DEPLOY_CHECKOUT"
+test -z "$(git status --porcelain --untracked-files=no)"
+
+# DEPLOY-SOURCE-PREFLIGHT-BEGIN — run from the candidate checkout before every conversion.
+: "${QINAO_REVIEWED_DEPLOY_COMMIT:?missing trusted deploy-source commit}"
+test "$(git rev-parse HEAD)" = "$QINAO_REVIEWED_DEPLOY_COMMIT"
+git merge-base --is-ancestor "$QINAO_DEPLOY_SECURITY_FLOOR" "$QINAO_REVIEWED_DEPLOY_COMMIT"
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+  BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_deploy_uses_candidate_local_verified_checkpoint_loader \
+  BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_optimized_deploy_refuses_unexpected_trained_keys_before_output \
+  BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_optimized_deploy_refuses_missing_trained_keys_before_output
+# DEPLOY-SOURCE-PREFLIGHT-END
+
+cd BehavioralAISubstrate
 uv run --with coreai-torch python Tools/mamba3_deploy.py 24 8   # int8, 24 layers → .aimodel
 # then run on the A19 (CoreAI GPU backend) ≈ 70 tok/s, ~80-120 MB resident. NOT pure-ANE at 24L (addendum 15).
 # (For the 8-layer pure-ANE variant: mamba3_deploy.py 8 8 — 0 fresh compile errors, ~112 tok/s.)
@@ -167,9 +193,10 @@ change `data_fp` so they need a FRESH `CKPT_DIR`):
   backwards E3-graceful), fidelity_argmax (answer-span), generation EM/F1, stability (incl. id-aligned subset), **fp16_seq_parity**
   (HOST run_twin≡run_ref in fp16 — NOT on-device parity), no_contamination (REAL disjoint split). Plus the opt-in **E4 counterfactual**
   reads-vs-memorizes diagnostic (`COUNTERFACTUAL=1`). Offline re-eval entry: `EVAL_CKPT=/path/ckpt.pt python Tools/mamba3_eval.py`.
-- GATE 3 — trusted `ckpt_best.pt` → device WITH both `CKPT` and
-  `CKPT_SHA256=sha256:<trusted-release-digest>` set. The digest is recorded by the trusted producer/release receipt and carried
-  over an authenticated operator channel; recomputing it from the same untrusted deploy copy proves consistency, not provenance.
+- GATE 3 — trusted `ckpt_best.pt` → device WITH `CKPT`, `CKPT_SHA256='sha256:<trusted-release-digest>'`, and the immutable
+  `QINAO_REVIEWED_DEPLOY_COMMIT` from one trusted producer/release receipt. Both identities travel over an authenticated operator
+  channel; recomputing a digest from the same untrusted deploy copy proves consistency, not provenance. Conversion runs only from
+  the separate detached checkout after exact-HEAD, ancestry-floor, candidate-local loader, and both optimized no-save guards pass.
   The converters **fail-closed** on a missing CKPT or digest (no silent random-weight asset; `FORCE_RANDOM=1` only for op-graph
   probes) AND on a mismatched arch/layers/vocab/mla_positions/config or an MLA_ROPE ckpt (the deploy converter is still NoPE).
   `resolve_ckpt` is authoritative on vocab.

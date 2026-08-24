@@ -5,6 +5,7 @@ import errno
 import hashlib
 import importlib.util
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,50 @@ from BehavioralAISubstrate.Tools.qinao_checkpoint_guard import (
     CheckpointVerificationError,
     load_verified_weights_checkpoint,
 )
+
+
+_RUNBOOK_PATH = Path(__file__).parents[1] / "Docs" / "RUNPOD_DISTILL.md"
+_DEPLOY_PATH = Path(__file__).with_name("mamba3_deploy.py")
+
+
+def _fenced_bash_scripts(markdown: str) -> list[str]:
+    return re.findall(r"```bash\s*\n(.*?)```", markdown, flags=re.DOTALL)
+
+
+def _module_usage_script() -> str:
+    source = _DEPLOY_PATH.read_text(encoding="utf-8")
+    docstring = ast.get_docstring(ast.parse(source), clean=False)
+    if docstring is None or "Run:" not in docstring:
+        raise AssertionError("deploy module must carry a shell-checkable Run section")
+    return textwrap.dedent(docstring.split("Run:", 1)[1]).strip()
+
+
+def _unquoted_angle_placeholders(script: str) -> list[str]:
+    placeholders = []
+    quote = None
+    escaped = False
+    index = 0
+    while index < len(script):
+        character = script[index]
+        if escaped:
+            escaped = False
+        elif character == "\\" and quote != "'":
+            escaped = True
+        elif quote is not None:
+            if character == quote:
+                quote = None
+        elif character in ("'", '"'):
+            quote = character
+        elif character == "#":
+            newline = script.find("\n", index)
+            index = len(script) if newline < 0 else newline
+        elif character == "<":
+            end = script.find(">", index + 1)
+            if end >= 0:
+                placeholders.append(script[index : end + 1])
+                index = end
+        index += 1
+    return placeholders
 
 
 def _identity(payload: bytes) -> str:
@@ -764,6 +809,70 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
 
     def test_optimized_deploy_refuses_missing_trained_keys_before_output(self) -> None:
         _assert_optimized_deploy_refuses_incomplete_state("missing")
+
+    def test_documented_shell_and_module_usage_are_shell_valid(self) -> None:
+        runbook = _RUNBOOK_PATH.read_text(encoding="utf-8")
+        scripts = _fenced_bash_scripts(runbook)
+        scripts.append(_module_usage_script())
+        self.assertGreaterEqual(len(scripts), 3)
+
+        for index, script in enumerate(scripts):
+            with self.subTest(script=index):
+                self.assertEqual(
+                    _unquoted_angle_placeholders(script),
+                    [],
+                    msg=f"unquoted shell placeholder in:\n{script}",
+                )
+                for shell in ("bash", "zsh"):
+                    completed = subprocess.run(
+                        [shell, "-n"],
+                        input=script,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(
+                        completed.returncode,
+                        0,
+                        msg=(
+                            f"{shell} rejected documented script #{index}: "
+                            f"{completed.stderr}\n{script}"
+                        ),
+                    )
+
+    def test_runbook_binds_reviewed_deploy_source_and_runs_source_guards(self) -> None:
+        runbook = _RUNBOOK_PATH.read_text(encoding="utf-8")
+        deploy_section = runbook.split("## Deploy back to the A19", 1)[1]
+        required_fragments = (
+            "QINAO_REVIEWED_DEPLOY_COMMIT",
+            "QINAO_DEPLOY_CHECKOUT",
+            "checkout --detach",
+            "rev-parse HEAD",
+            "merge-base --is-ancestor",
+            "3f5f49b85822aa7272a3c5d173eacd7906896b21",
+            "test_deploy_uses_candidate_local_verified_checkpoint_loader",
+            "test_optimized_deploy_refuses_unexpected_trained_keys_before_output",
+            "test_optimized_deploy_refuses_missing_trained_keys_before_output",
+        )
+        for fragment in required_fragments:
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, deploy_section)
+        self.assertIn("only a training recipe source", deploy_section)
+        deploy_scripts = _fenced_bash_scripts(deploy_section)
+        self.assertTrue(
+            any(
+                re.search(r"(?m)^set -euo pipefail$", script)
+                for script in deploy_scripts
+            ),
+            "deploy checks must stop conversion on the first failed guard",
+        )
+        for script in deploy_scripts:
+            self.assertNotIn("ssd-track-g-distill-optimized", script)
+        self.assertRegex(
+            deploy_section,
+            r"trusted release receipt[^\n]*(?:checkpoint|CKPT)[^\n]*(?:commit|source)|"
+            r"trusted release receipt[^\n]*(?:commit|source)[^\n]*(?:checkpoint|CKPT)",
+        )
 
     def test_real_torch_rejects_execution_gadget_without_executing_it(self) -> None:
         try:
