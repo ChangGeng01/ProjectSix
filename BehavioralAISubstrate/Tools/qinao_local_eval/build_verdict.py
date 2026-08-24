@@ -18,7 +18,7 @@ need a signed / writer-owned channel. What IS structurally unforgeable from the 
 file is `release_ok_model`: attestations_pending derives from gate IDENTITY
 (ATTEST_ONLY_CRITICAL membership), so the FINAL release stays blocked regardless of forgery.
 """
-import json, re, sys, os
+import json, math, re, sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 from registry import METRICS, MODEL_CRITICAL, ATTEST_ONLY_CRITICAL, by_num
 
@@ -42,8 +42,10 @@ def _load_values(arg):
 
 
 def num(x):
-    try: return float(x)
+    if isinstance(x, bool): return None
+    try: value = float(x)
     except (TypeError, ValueError): return None
+    return value if math.isfinite(value) else None
 
 def evaluate(thr, direction, val, bval, num=None, prov=None):
     """Return PASS/FAIL/PENDING/NOTE/ATTEST + a note.
@@ -69,7 +71,7 @@ def evaluate(thr, direction, val, bval, num=None, prov=None):
     # base-relative (both directions)
     m = re.match(r"(<=|>=)base(-([\d.]+))?$", thr)
     if m:
-        if v is None or tonum(bval) is None: return "NOTE", f"{val} (base {bval})"
+        if tonum(bval) is None: return "PENDING", f"{val} (base unavailable: {bval})"
         tol = float(m.group(3) or 0)
         if m.group(1) == ">=": return ("PASS" if v >= tonum(bval) - tol else "FAIL"), f"{val} vs base {bval} (-{tol})"
         return ("PASS" if v <= tonum(bval) + tol else "FAIL"), f"{val} vs base {bval} (+{tol})"
@@ -128,7 +130,7 @@ def build(base, tuned):
     RECORDED_THRESHOLDS = ("frozen", "=target", "all")
     verifiable = [r for r in crit if r["num"] not in ATTEST_ONLY_CRITICAL]
     v_fail = [r for r in verifiable if r["status"] == "FAIL"]
-    v_pending = [r for r in verifiable if r["status"] == "PENDING"]
+    v_pending = [r for r in verifiable if r["status"] in ("PENDING", "NOTE")]
     v_attest_blocking = [r for r in verifiable
                          if r["status"] == "ATTEST" and r["threshold"] not in RECORDED_THRESHOLDS]
     attest_pending = sorted(r["num"] for r in crit if r["num"] in ATTEST_ONLY_CRITICAL)
@@ -168,7 +170,7 @@ def main():
     print(f"metrics {verdict['n_metrics']} | computed {verdict['n_computed']} | model-CRITICAL {crit_total}: "
           f"PASS {verdict['critical_pass']} FAIL {verdict['critical_fail']} "
           f"ATTEST {verdict['critical_attest']} PENDING {verdict['critical_pending']}")
-    print(f"model_eval_ok = {verdict['model_eval_ok']}  (no verifiable-CRITICAL FAIL/PENDING; recorded attestations don't block)")
+    print(f"model_eval_ok = {verdict['model_eval_ok']}  (no verifiable-CRITICAL FAIL/PENDING/NOTE; recorded attestations don't block)")
     print(f"attestations_pending = {verdict['attestations_pending']}  (architectural gates a model eval cannot verify — need a deployment attestation channel)")
     print(f"release_ok_model = {verdict['release_ok_model']}  (model_eval_ok AND all architectural attestations verified)")
     if crit_attest:

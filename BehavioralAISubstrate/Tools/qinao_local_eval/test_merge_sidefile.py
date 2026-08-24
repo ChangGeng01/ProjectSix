@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import tempfile
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 import qinao_merge as qm  # noqa: E402
@@ -60,3 +61,167 @@ def test_merge_known_sidefiles_ingests_present_files_from_dir():
         assert merged["26"] == 80.0 and merged["28"] == 55.0 and merged["29"] == 40.0
         assert merged["_prov"]["26"]["kind"] == "computed"
         assert merged["_prov"]["28"]["kind"] == "computed"
+
+
+def _seeded_humaneval_values():
+    return {
+        "7": 12.5,
+        "30": 99.9,
+        "_prov": {
+            "7": {"kind": "computed", "runner": "keep"},
+            "30": {"kind": "computed", "runner": "stale"},
+        },
+    }
+
+
+def _valid_standard(score=50.0, sample_count=2):
+    return {"30": score, "_N": sample_count, "_infra_errs": 0}
+
+
+def _valid_paired(score=50.0, sample_count=2):
+    if (score, sample_count) == (50.0, 2):
+        vector = {"HumanEval/0": 1, "HumanEval/1": 0}
+    elif (score, sample_count) == (100.0, 2):
+        vector = {"HumanEval/0": 1, "HumanEval/1": 1}
+    else:
+        raise AssertionError("test fixture requires a hand-checked paired vector")
+    return {
+        "30": score,
+        "_N": sample_count,
+        "_infra_errs": 0,
+        "per_problem": vector,
+    }
+
+
+def _write_sidefile(directory, prefix, tag, payload):
+    path = Path(directory) / f"qinao_{prefix}_{tag}.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def test_invalid_humaneval_evidence_revokes_only_stale_metric_and_provenance():
+    valid = _valid_paired()
+    invalid_cases = [
+        {"_N": 0, "_infra_errs": 164, "per_problem": {}},
+        {**valid, "_infra_errs": 1},
+        {**valid, "_N": True},
+        {**valid, "_N": "2"},
+        {**valid, "_infra_errs": False},
+        {k: v for k, v in valid.items() if k != "_infra_errs"},
+        {**valid, "30": float("nan")},
+        {**valid, "30": float("inf")},
+        {**valid, "30": -0.1},
+        {**valid, "30": 100.1},
+        {**valid, "per_problem": {"HumanEval/0": 1}},
+    ]
+
+    for sidefile in invalid_cases:
+        merged = qm.merge_sidefile_into_values(
+            _seeded_humaneval_values(), sidefile, "qinao_humaneval_paired"
+        )
+        assert "30" not in merged, sidefile
+        assert "30" not in merged["_prov"], sidefile
+        assert merged["7"] == 12.5
+        assert merged["_prov"]["7"] == {"kind": "computed", "runner": "keep"}
+
+
+def test_all_infrastructure_sidefiles_clear_stale_evidence_and_block_gate():
+    unavailable = {"_N": 0, "_infra_errs": 164, "per_problem": {}}
+    with tempfile.TemporaryDirectory() as directory:
+        _write_sidefile(directory, "humaneval_paired", "base", unavailable)
+        _write_sidefile(directory, "humaneval_paired", "tuned", unavailable)
+        base = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "base", tmpdir=directory
+        )
+        tuned = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "tuned", tmpdir=directory
+        )
+
+    assert "30" not in base and "30" not in tuned
+    assert "30" not in base["_prov"] and "30" not in tuned["_prov"]
+    assert _row(base, tuned, 30)["status"] == "PENDING"
+
+
+def test_baseline_only_infrastructure_is_pending_not_note_or_pass():
+    unavailable = {"_N": 0, "_infra_errs": 164, "per_problem": {}}
+    with tempfile.TemporaryDirectory() as directory:
+        _write_sidefile(directory, "humaneval_paired", "base", unavailable)
+        _write_sidefile(directory, "humaneval_paired", "tuned", _valid_paired())
+        base = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "base", tmpdir=directory
+        )
+        tuned = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "tuned", tmpdir=directory
+        )
+
+    assert _row(base, tuned, 30)["status"] == "PENDING"
+
+
+def test_tuned_only_infrastructure_is_pending_not_pass():
+    unavailable = {"_N": 0, "_infra_errs": 164, "per_problem": {}}
+    with tempfile.TemporaryDirectory() as directory:
+        _write_sidefile(directory, "humaneval_paired", "base", _valid_paired())
+        _write_sidefile(directory, "humaneval_paired", "tuned", unavailable)
+        base = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "base", tmpdir=directory
+        )
+        tuned = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "tuned", tmpdir=directory
+        )
+
+    assert _row(base, tuned, 30)["status"] == "PENDING"
+
+
+def test_agreeing_standard_and_paired_evidence_prefers_paired_and_passes():
+    with tempfile.TemporaryDirectory() as directory:
+        for tag in ("base", "tuned"):
+            _write_sidefile(directory, "humaneval", tag, _valid_standard())
+            _write_sidefile(directory, "humaneval_paired", tag, _valid_paired())
+        base = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "base", tmpdir=directory
+        )
+        tuned = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "tuned", tmpdir=directory
+        )
+
+    assert base["30"] == 50.0 and tuned["30"] == 50.0
+    assert tuned["_prov"]["30"] == {
+        "kind": "computed",
+        "runner": "qinao_humaneval_paired",
+    }
+    assert tuned["7"] == 12.5 and tuned["_prov"]["7"]["runner"] == "keep"
+    assert _row(base, tuned, 30)["status"] == "PASS"
+
+
+def test_malformed_non_object_and_unreadable_humaneval_files_revoke_stale_data():
+    with tempfile.TemporaryDirectory() as directory:
+        Path(directory, "qinao_humaneval_badjson.json").write_text(
+            '{"30": 50.0,', encoding="utf-8"
+        )
+        _write_sidefile(directory, "humaneval", "nonobject", [1, 2, 3])
+        Path(directory, "qinao_humaneval_unreadable.json").mkdir()
+
+        for tag in ("badjson", "nonobject", "unreadable"):
+            merged = qm.merge_known_sidefiles(
+                _seeded_humaneval_values(), tag, tmpdir=directory
+            )
+            assert "30" not in merged, tag
+            assert "30" not in merged["_prov"], tag
+            assert merged["7"] == 12.5
+
+
+def test_conflicting_dual_humaneval_files_fail_closed_for_score_or_sample_count():
+    with tempfile.TemporaryDirectory() as directory:
+        _write_sidefile(directory, "humaneval", "score", _valid_standard())
+        _write_sidefile(
+            directory, "humaneval_paired", "score", _valid_paired(100.0, 2)
+        )
+        _write_sidefile(directory, "humaneval", "count", _valid_standard(50.0, 4))
+        _write_sidefile(directory, "humaneval_paired", "count", _valid_paired())
+
+        for tag in ("score", "count"):
+            merged = qm.merge_known_sidefiles(
+                _seeded_humaneval_values(), tag, tmpdir=directory
+            )
+            assert "30" not in merged, tag
+            assert "30" not in merged["_prov"], tag

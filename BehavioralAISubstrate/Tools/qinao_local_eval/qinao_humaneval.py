@@ -4,6 +4,7 @@ subprocess with a timeout. Usage: python qinao_humaneval.py <model> <adapter|non
 import json, re, sys, random, subprocess, tempfile, os
 
 from qinao_sandbox import run_sandboxed
+from qinao_humaneval_evidence import build_humaneval_evidence
 
 from mlx_lm import load, generate
 try:
@@ -54,9 +55,8 @@ for i in idx:
         if path:
             try: os.unlink(path)
             except Exception: pass
-sc=round(ok/max(1,tot)*100,1)
-out={"30":sc,"_N":tot}
-if infra_errs: out["_infra_errs"]=infra_errs
+out=build_humaneval_evidence(passed=ok,total=tot,infra_errors=infra_errs)
 json.dump(out, open(f"/tmp/qinao_humaneval_{tag}.json","w"))
-print(f"{tag} HumanEval pass@1 = {ok}/{tot} = {sc}%"
+score=f"{out['30']}%" if "30" in out else "UNAVAILABLE"
+print(f"{tag} HumanEval pass@1 = {ok}/{tot} = {score}"
       + (f"  ({infra_errs} task(s) EXCLUDED — harness/infra error, not model failures)" if infra_errs else ""))

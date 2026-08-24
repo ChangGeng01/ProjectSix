@@ -22,6 +22,7 @@ import sys
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(__file__))
+from qinao_humaneval_evidence import validate_humaneval_evidence  # noqa: E402
 from registry import MODEL_CRITICAL  # noqa: E402
 
 # A pure metric-number key ("26"); skips diagnostic keys (_leak / _N / 28_err).
@@ -45,6 +46,31 @@ KNOWN_SIDEFILES: dict[str, str] = {
     "safety": "qinao_safety",  # #86 prompt_injection, #87 PII_leak (deterministic)
 }
 
+_HUMANEVAL_PREFIXES = {
+    "humaneval": False,
+    "humaneval_paired": True,
+}
+
+
+def _humaneval_pairing_for_runner(runner: str) -> bool | None:
+    basename = os.path.basename(runner)
+    if runner == "qinao_humaneval_paired" or basename.startswith(
+        "qinao_humaneval_paired_"
+    ):
+        return True
+    if runner == "qinao_humaneval" or basename.startswith("qinao_humaneval_"):
+        return False
+    return None
+
+
+def _without_humaneval(values: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(values)
+    merged.pop("30", None)
+    prov = dict(values["_prov"]) if isinstance(values.get("_prov"), dict) else {}
+    prov.pop("30", None)
+    merged["_prov"] = prov
+    return merged
+
 
 def merge_sidefile_into_values(
     values: dict[str, Any], sidefile: dict[str, Any], runner: str
@@ -53,9 +79,18 @@ def merge_sidefile_into_values(
     and `_prov` stamped 'computed' for every MODEL_CRITICAL metric ingested.
     Existing values / `_prov` are preserved; diagnostic (`_`-prefixed / `*_err`)
     keys are ignored. Does not mutate the inputs."""
+    pairing = _humaneval_pairing_for_runner(runner)
+    if pairing is not None:
+        summary = validate_humaneval_evidence(sidefile, paired=pairing)
+        if summary is None:
+            return _without_humaneval(values)
+        metric_values: dict[str, Any] = {"30": summary.score}
+    else:
+        metric_values = sidefile
+
     merged = dict(values)
     prov = dict(values["_prov"]) if isinstance(values.get("_prov"), dict) else {}
-    for k, v in sidefile.items():
+    for k, v in metric_values.items():
         if not (isinstance(k, str) and _METRIC_KEY.match(k)):
             continue
         merged[k] = v
@@ -73,15 +108,34 @@ def merge_known_sidefiles(
     (last wins) so a silent conflict never masquerades as a clean number."""
     merged = dict(values)
     seen: dict[str, tuple[Any, str]] = {}
+    humaneval_present = False
+    humaneval_invalid = False
+    humaneval_candidates: list[tuple[dict[str, Any], str, Any]] = []
     for prefix, runner in sorted(KNOWN_SIDEFILES.items()):
         path = os.path.join(tmpdir, f"qinao_{prefix}_{tag}.json")
         if not os.path.exists(path):
             continue
+        pairing = _HUMANEVAL_PREFIXES.get(prefix)
+        if pairing is not None:
+            humaneval_present = True
         try:
             with open(path) as fh:
                 side = json.load(fh)
         except (json.JSONDecodeError, OSError) as e:
-            sys.stderr.write(f"qinao_merge: skipping unreadable {path}: {e}\n")
+            if pairing is not None:
+                humaneval_invalid = True
+                sys.stderr.write(
+                    f"qinao_merge: HumanEval evidence unavailable at {path}: {e}\n"
+                )
+            else:
+                sys.stderr.write(f"qinao_merge: skipping unreadable {path}: {e}\n")
+            continue
+        if pairing is not None:
+            summary = validate_humaneval_evidence(side, paired=pairing)
+            if summary is None:
+                humaneval_invalid = True
+            else:
+                humaneval_candidates.append((side, runner, summary))
             continue
         for k, v in side.items():
             if isinstance(k, str) and _METRIC_KEY.match(k) and k in seen and seen[k][0] != v:
@@ -93,6 +147,33 @@ def merge_known_sidefiles(
         for k, v in side.items():
             if isinstance(k, str) and _METRIC_KEY.match(k):
                 seen[k] = (v, runner)
+
+    if humaneval_present:
+        accepted: tuple[dict[str, Any], str, Any] | None = None
+        summaries = {
+            (candidate[2].score, candidate[2].sample_count)
+            for candidate in humaneval_candidates
+        }
+        if len(summaries) > 1:
+            humaneval_invalid = True
+            sys.stderr.write(
+                "qinao_merge: WARNING conflicting validated HumanEval evidence; "
+                "metric #30 revoked\n"
+            )
+        if not humaneval_invalid and humaneval_candidates:
+            accepted = next(
+                (
+                    candidate
+                    for candidate in humaneval_candidates
+                    if candidate[1] == "qinao_humaneval_paired"
+                ),
+                humaneval_candidates[0],
+            )
+        if accepted is None:
+            merged = _without_humaneval(merged)
+        else:
+            side, runner, _summary = accepted
+            merged = merge_sidefile_into_values(merged, side, runner)
     return merged
 
 

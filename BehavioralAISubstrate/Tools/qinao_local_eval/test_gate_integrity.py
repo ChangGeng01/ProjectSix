@@ -116,11 +116,9 @@ def test_forged_computed_provenance_still_blocks_release():
     assert set(v["attestations_pending"]) == ATTEST_ONLY_CRITICAL
 
 
-def test_model_eval_ok_separates_from_deployment_attestations():
-    # A run where every VERIFIABLE critical gate genuinely passes but the architectural
-    # attestations are (correctly) ATTEST: model_eval_ok True, release_ok_model False,
-    # attestations_pending lists exactly the architectural gates.
+def _fully_passing_critical_values():
     from registry import by_num
+
     tuned = {}
     prov = {}
     import re as _re
@@ -143,10 +141,41 @@ def test_model_eval_ok_separates_from_deployment_attestations():
         tuned[str(n)] = val
         prov[str(n)] = {"kind": "computed"}
     tuned["_prov"] = prov
+    return tuned
+
+
+def test_model_eval_ok_separates_from_deployment_attestations():
+    # A run where every VERIFIABLE critical gate genuinely passes but the architectural
+    # attestations are (correctly) ATTEST: model_eval_ok True, release_ok_model False,
+    # attestations_pending lists exactly the architectural gates.
+    tuned = _fully_passing_critical_values()
     v = _run_build_verdict(tuned, tuned)
     assert v["model_eval_ok"] is True, "all verifiable critical gates pass → model_eval_ok"
     assert set(v["attestations_pending"]) == ATTEST_ONLY_CRITICAL
     assert v["release_ok_model"] is False, "release still blocked on deployment attestations"
+
+
+def test_missing_or_invalid_baseline_for_relative_critical_gate_is_pending():
+    tuned = _fully_passing_critical_values()
+    for bad_baseline in (None, "not-a-number", True, float("nan"), float("inf")):
+        base = dict(tuned)
+        if bad_baseline is None:
+            base.pop("30")
+        else:
+            base["30"] = bad_baseline
+        verdict = bv.build(base, tuned)
+        row = next(row for row in verdict["rows"] if row["num"] == 30)
+        assert row["status"] == "PENDING", bad_baseline
+        assert verdict["model_eval_ok"] is False, bad_baseline
+
+
+def test_verifiable_critical_note_blocks_model_eval_ok():
+    base = _fully_passing_critical_values()
+    tuned = {**base, "83": "not-a-number"}
+    verdict = bv.build(base, tuned)
+    row = next(row for row in verdict["rows"] if row["num"] == 83)
+    assert row["status"] == "NOTE"
+    assert verdict["model_eval_ok"] is False
 
 
 def test_truncated_json_fails_closed():

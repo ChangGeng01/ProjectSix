@@ -23,6 +23,7 @@ import subprocess
 import tempfile
 
 from qinao_sandbox import run_sandboxed
+from qinao_humaneval_evidence import build_humaneval_evidence
 
 PYBIN = os.path.expanduser("~/qwen_honesty_finetune/.venv/bin/python")
 
@@ -131,12 +132,15 @@ def main() -> None:
         else:
             infra_errs += 1
 
-    sc = round(ok / max(1, tot) * 100, 1)
-    out = {"30": sc, "_N": tot, "per_problem": per}
-    if infra_errs:
-        out["_infra_errs"] = infra_errs
+    out = build_humaneval_evidence(
+        passed=ok,
+        total=tot,
+        infra_errors=infra_errs,
+        per_problem=per,
+    )
     json.dump(out, open(f"/tmp/qinao_humaneval_paired_{tag}.json", "w"))
-    print(f"{tag} HumanEval(paired,fixed) pass@1 = {ok}/{tot} = {sc}%"
+    score = f"{out['30']}%" if "30" in out else "UNAVAILABLE"
+    print(f"{tag} HumanEval(paired,fixed) pass@1 = {ok}/{tot} = {score}"
           + (f"  ({infra_errs} task(s) EXCLUDED — harness/infra error, not model failures)" if infra_errs else ""))
 
 
