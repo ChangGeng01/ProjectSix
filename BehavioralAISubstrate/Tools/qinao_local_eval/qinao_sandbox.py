@@ -62,6 +62,7 @@ RESOURCE_LIMIT_RETURN_CODE = 120
 INCOMPLETE_RETURN_CODE = 121
 _MONITOR_INTERVAL_SECONDS = 0.005
 _SOURCE_READ_CHUNK = 64 * 1024
+_NANOSECONDS_PER_SECOND = 1_000_000_000
 
 _TRUSTED_LAUNCHER = """\
 import errno
@@ -291,6 +292,13 @@ class _ProcTaskInfo(ctypes.Structure):
     ]
 
 
+class _MachTimebaseInfo(ctypes.Structure):
+    _fields_ = [
+        ("numer", ctypes.c_uint32),
+        ("denom", ctypes.c_uint32),
+    ]
+
+
 def _load_proc_pidinfo():
     try:
         library = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
@@ -312,9 +320,32 @@ def _load_proc_pidinfo():
 
 _PROC_PIDTASKINFO = 4
 _PROC_PIDINFO = None
+_MACH_TIMEBASE = None
 
 
-def _process_usage(pid: int) -> tuple[int, int] | None:
+def _mach_timebase() -> tuple[int, int]:
+    global _MACH_TIMEBASE
+    if _MACH_TIMEBASE is None:
+        try:
+            library = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+            function = library.mach_timebase_info
+            function.argtypes = [ctypes.POINTER(_MachTimebaseInfo)]
+            function.restype = ctypes.c_int
+            information = _MachTimebaseInfo()
+            result = function(ctypes.byref(information))
+        except (AttributeError, OSError) as error:
+            raise SandboxInfrastructureError(
+                "Darwin CPU accounting timebase is unavailable"
+            ) from error
+        if result != 0 or information.numer <= 0 or information.denom <= 0:
+            raise SandboxInfrastructureError(
+                "Darwin CPU accounting returned an unusable timebase"
+            )
+        _MACH_TIMEBASE = int(information.numer), int(information.denom)
+    return _MACH_TIMEBASE
+
+
+def _process_usage(pid: int) -> tuple[int, int, int] | None:
     global _PROC_PIDINFO
     if _PROC_PIDINFO is None:
         _PROC_PIDINFO = _load_proc_pidinfo()
@@ -332,7 +363,14 @@ def _process_usage(pid: int) -> tuple[int, int] | None:
         raise SandboxInfrastructureError(
             "Darwin resident-memory accounting returned a partial record"
         )
-    return int(information.resident_size), int(information.thread_count)
+    numerator, denominator = _mach_timebase()
+    cpu_ticks = int(information.total_user) + int(information.total_system)
+    cpu_nanoseconds = cpu_ticks * numerator // denominator
+    return (
+        int(information.resident_size),
+        int(information.thread_count),
+        cpu_nanoseconds,
+    )
 
 
 def _resident_bytes(pid: int) -> int | None:
@@ -351,6 +389,34 @@ def _verify_memory_accounting() -> None:
         raise SandboxInfrastructureError(
             "Darwin resident-memory accounting could not observe the host process"
         )
+
+
+def _poll_process_with_cpu(
+    process: subprocess.Popen[bytes],
+) -> tuple[int | None, int | None]:
+    """Poll and retain exit CPU usage before ``Popen.poll`` discards wait4 data."""
+
+    if process.returncode is not None:
+        return process.returncode, None
+    while True:
+        try:
+            waited_pid, status, usage = os.wait4(process.pid, os.WNOHANG)
+            break
+        except InterruptedError:
+            continue
+        except ChildProcessError:
+            return process.poll(), None
+        except OSError as error:
+            raise SandboxInfrastructureError(
+                "could not observe sandbox exit CPU usage"
+            ) from error
+    if waited_pid == 0:
+        return None, None
+    process.returncode = os.waitstatus_to_exitcode(status)
+    cpu_nanoseconds = round(
+        (float(usage.ru_utime) + float(usage.ru_stime)) * _NANOSECONDS_PER_SECOND
+    )
+    return process.returncode, cpu_nanoseconds
 
 
 def _validated_cpu_seconds(
@@ -557,6 +623,7 @@ def _monitor_process(
     process: subprocess.Popen[bytes],
     *,
     deadline: float,
+    cpu_limit_seconds: int,
     run_root: str,
     stdout_fd: int,
     stderr_fd: int,
@@ -569,7 +636,16 @@ def _monitor_process(
         )
         if breach is not None:
             return "resource", breach
-        returncode = process.poll()
+        try:
+            returncode, exit_cpu_nanoseconds = _poll_process_with_cpu(process)
+        except SandboxInfrastructureError:
+            return "infra", "cpu-observability"
+        if (
+            exit_cpu_nanoseconds is not None
+            and exit_cpu_nanoseconds
+            >= cpu_limit_seconds * _NANOSECONDS_PER_SECOND
+        ):
+            return "resource", "cpu"
         if returncode is None:
             try:
                 usage = _process_usage(process.pid)
@@ -582,18 +658,31 @@ def _monitor_process(
                 # unobservability while alive remains an infrastructure fault.
                 transition_deadline = min(deadline, time.monotonic() + 0.02)
                 while time.monotonic() < transition_deadline:
-                    returncode = process.poll()
+                    try:
+                        returncode, exit_cpu_nanoseconds = _poll_process_with_cpu(
+                            process
+                        )
+                    except SandboxInfrastructureError:
+                        return "infra", "cpu-observability"
+                    if (
+                        exit_cpu_nanoseconds is not None
+                        and exit_cpu_nanoseconds
+                        >= cpu_limit_seconds * _NANOSECONDS_PER_SECOND
+                    ):
+                        return "resource", "cpu"
                     if returncode is not None:
                         break
                     time.sleep(0.001)
                 if returncode is None:
                     return "infra", "memory-observability"
             else:
-                resident, threads = usage
+                resident, threads, cpu_nanoseconds = usage
                 if resident > MAX_RESIDENT_BYTES:
                     return "resource", "resident-memory"
                 if threads > MAX_THREADS:
                     return "resource", "thread-count"
+                if cpu_nanoseconds >= cpu_limit_seconds * _NANOSECONDS_PER_SECOND:
+                    return "resource", "cpu"
         if returncode is not None:
             breach = _filesystem_breach(
                 run_root, stdout_fd=stdout_fd, stderr_fd=stderr_fd
@@ -890,6 +979,7 @@ def run_sandboxed(
         state, resource_reason = _monitor_process(
             process,
             deadline=deadline,
+            cpu_limit_seconds=cpu_limit,
             run_root=run_root,
             stdout_fd=stdout_stream.fileno(),
             stderr_fd=stderr_stream.fileno(),

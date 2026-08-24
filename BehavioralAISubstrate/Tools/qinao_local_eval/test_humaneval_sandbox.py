@@ -374,6 +374,42 @@ def test_cpu_flood_hits_kernel_limit_before_wall_timeout():
     assert elapsed < 4, f"CPU quota was not independently enforced: {elapsed:.2f}s"
 
 
+def test_handled_sigxcpu_is_cpu_policy_failure_not_success():
+    result = _run_recording_private_root(
+        "import signal\n"
+        "limit_reached = False\n"
+        "def handle_limit(*_):\n"
+        "    global limit_reached\n"
+        "    limit_reached = True\n"
+        "signal.signal(signal.SIGXCPU, handle_limit)\n"
+        "while not limit_reached:\n"
+        "    pass\n",
+        timeout=5,
+        cpu_seconds=1,
+    )
+    _assert_bounded_policy_failure(result, "cpu")
+
+
+def test_ignored_sigxcpu_is_cpu_policy_failure_not_wall_timeout():
+    started = time.monotonic()
+    try:
+        result = _run_recording_private_root(
+            "import signal\n"
+            "signal.signal(signal.SIGXCPU, signal.SIG_IGN)\n"
+            "while True:\n"
+            "    pass\n",
+            timeout=3,
+            cpu_seconds=1,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise AssertionError(
+            "the host CPU quota must win before the independent wall timeout"
+        ) from error
+    elapsed = time.monotonic() - started
+    _assert_bounded_policy_failure(result, "cpu")
+    assert elapsed < 2.5, f"CPU quota was not independently enforced: {elapsed:.2f}s"
+
+
 def test_resident_memory_flood_is_terminated_before_host_damage():
     result = _run_recording_private_root(
         "blocks = []\n"
