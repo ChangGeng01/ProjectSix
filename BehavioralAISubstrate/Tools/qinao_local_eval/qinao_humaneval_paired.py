@@ -11,19 +11,28 @@ Two fixes vs qinao_humaneval.py:
 Greedy/deterministic, N=164 full set (seed 2, order-invariant). Same subprocess sandbox + 15s timeout.
 Usage: python qinao_humaneval_paired.py <model> <adapter|none> <tag> [N]
 """
+
 from __future__ import annotations
 
-import json
 import os
 import re
 import sys
 import random
-import textwrap
 import subprocess
 import tempfile
 
 from qinao_sandbox import run_sandboxed
-from qinao_humaneval_evidence import build_humaneval_evidence
+from qinao_humaneval import assemble_generated_function
+from qinao_humaneval_evidence import (
+    DATASET_ID,
+    DATASET_SPLIT,
+    HumanEvalProducer,
+    atomic_write_humaneval_evidence,
+    build_humaneval_evidence,
+    load_humaneval_run_context_from_env,
+    prepare_humaneval_output,
+    validated_sample_limit,
+)
 
 PYBIN = os.path.expanduser("~/qwen_honesty_finetune/.venv/bin/python")
 
@@ -43,28 +52,47 @@ def counts_toward_denominator(outcome: str) -> bool:
 
 
 def main() -> None:
+    mp = sys.argv[1]
+    ad = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != "none" else None
+    tag = sys.argv[3]
+    raw_sample_limit = sys.argv[4] if len(sys.argv) > 4 else None
+
+    producer = HumanEvalProducer.PAIRED
+    context = load_humaneval_run_context_from_env(required_tags=(tag,))
+    output = prepare_humaneval_output(context, producer, tag)
+    context.require_invocation(tag, model=mp, adapter=ad)
+    n = validated_sample_limit(raw_sample_limit, default=164)
+
     # audit tools-scripts LOW: heavy deps imported LAZILY (inside main) so the module — and its pure
     # helper counts_toward_denominator — can be imported for unit tests without mlx_lm/datasets present.
+    # The current output was invalidated before these imports, so an import/model crash cannot replay it.
     from mlx_lm import load, generate
     from datasets import load_dataset
+
     try:
         from mlx_lm.sample_utils import make_sampler
+
         GREEDY = make_sampler(temp=0.0)
     except Exception:
         GREEDY = None
 
-    mp = sys.argv[1]
-    ad = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != "none" else None
-    tag = sys.argv[3]
-    n = int(sys.argv[4]) if len(sys.argv) > 4 else 164
-
+    ds = load_dataset(DATASET_ID, split=DATASET_SPLIT)
+    # Compare the materialized dataset's actual fingerprint with the external
+    # current-run receipt before loading the model.
+    context.require_dataset_fingerprint(getattr(ds, "_fingerprint", None))
     model, tok = load(mp, adapter_path=ad)
 
     def ask(u: str, mx: int = 512) -> str:
         try:
-            p = tok.apply_chat_template([{"role": "user", "content": u}], add_generation_prompt=True, enable_thinking=False)
+            p = tok.apply_chat_template(
+                [{"role": "user", "content": u}],
+                add_generation_prompt=True,
+                enable_thinking=False,
+            )
         except TypeError:
-            p = tok.apply_chat_template([{"role": "user", "content": u}], add_generation_prompt=True)
+            p = tok.apply_chat_template(
+                [{"role": "user", "content": u}], add_generation_prompt=True
+            )
         kw = {"max_tokens": mx, "verbose": False}
         if GREEDY is not None:
             kw["sampler"] = GREEDY
@@ -74,18 +102,6 @@ def main() -> None:
         m = re.search(r"```(?:python)?\s*(.*?)```", resp, re.S)
         return m.group(1) if m else resp
 
-    def assemble(prompt: str, code: str, entry: str) -> str:
-        """Robust assembly that fixes the line-31 indentation false-FAIL."""
-        if f"def {entry}" in code:
-            return code  # model returned a full function
-        body = code
-        # body-only: indent under the prompt signature if it isn't already indented
-        stripped = body.lstrip("\n")
-        if stripped and not stripped.startswith((" ", "\t")):
-            body = textwrap.indent(body, "    ")
-        return prompt + body
-
-    ds = load_dataset("openai/openai_humaneval", split="test")
     idx = list(range(len(ds)))
     random.seed(2)
     random.shuffle(idx)
@@ -96,9 +112,17 @@ def main() -> None:
     for i in idx:
         r = ds[i]
         entry = r["entry_point"]
-        resp = ask("Complete this Python function. Return ONLY the full function in a ```python code block```:\n\n" + r["prompt"])
+        resp = ask(
+            "Complete this Python function. Return ONLY the full function in a ```python code block```:\n\n"
+            + r["prompt"]
+        )
         code = extract_code(resp)
-        program = assemble(r["prompt"], code, entry) + "\n" + r["test"] + f"\ncheck({entry})\n"
+        program = (
+            assemble_generated_function(r["prompt"], code, entry)
+            + "\n"
+            + r["test"]
+            + f"\ncheck({entry})\n"
+        )
         passed = 0
         outcome = "infra"
         path = None
@@ -111,14 +135,16 @@ def main() -> None:
             outcome = "ran"
         except subprocess.TimeoutExpired:
             passed = 0
-            outcome = "timeout"   # a hung program is a legitimate wrong answer
+            outcome = "timeout"  # a hung program is a legitimate wrong answer
         except Exception as e:
             # audit tools-scripts LOW / decision 7: an INFRA failure (e.g. PYBIN missing) is NOT a
             # model wrong answer — it used to be `except: pass`-swallowed with an unconditional
             # `tot += 1`, scoring a broken harness as a false 0%. Surface it + EXCLUDE it.
             passed = 0
             outcome = "infra"
-            sys.stderr.write(f"qinao_humaneval_paired: harness error (not a model failure) on task {i}: {e}\n")
+            sys.stderr.write(
+                f"qinao_humaneval_paired: harness error (not a model failure) on task {i}: {e}\n"
+            )
         finally:
             if path:
                 try:
@@ -137,11 +163,21 @@ def main() -> None:
         total=tot,
         infra_errors=infra_errs,
         per_problem=per,
+        sample_ids=list(per),
+        producer=producer,
+        context=context,
+        tag=tag,
     )
-    json.dump(out, open(f"/tmp/qinao_humaneval_paired_{tag}.json", "w"))
+    atomic_write_humaneval_evidence(output, out)
     score = f"{out['30']}%" if "30" in out else "UNAVAILABLE"
-    print(f"{tag} HumanEval(paired,fixed) pass@1 = {ok}/{tot} = {score}"
-          + (f"  ({infra_errs} task(s) EXCLUDED — harness/infra error, not model failures)" if infra_errs else ""))
+    print(
+        f"{tag} HumanEval(paired,fixed) pass@1 = {ok}/{tot} = {score}"
+        + (
+            f"  ({infra_errs} task(s) EXCLUDED — harness/infra error, not model failures)"
+            if infra_errs
+            else ""
+        )
+    )
 
 
 if __name__ == "__main__":

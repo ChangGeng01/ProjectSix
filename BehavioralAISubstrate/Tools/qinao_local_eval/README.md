@@ -24,6 +24,73 @@ uv run python build_verdict.py base v6-900
 ```
 Data: `~/qwen_honesty_finetune/data_eval/` (frozen, sha256 in `qinao_data_manifest.json`).
 
+### HumanEval current-run receipt contract
+
+Metric #30 is accepted only from a run-scoped evidence directory and a typed
+known producer. An explicit arbitrary sidefile is always generic: naming it
+`qinao_humaneval_*.json` does not grant producer identity.
+
+Before `qinao_humaneval.py`, `qinao_humaneval_paired.py`, `run_ladder.sh`, or
+the final `build_verdict.py` merge, export all four current-run inputs:
+
+```bash
+export QINAO_EVAL_RUN_ID=eval-20260824-001
+export QINAO_EVAL_EVIDENCE_DIR=/absolute/eval-runs/$QINAO_EVAL_RUN_ID
+export QINAO_SUBJECT_RECEIPTS=/absolute/receipts/subjects.json
+export QINAO_HUMANEVAL_DATASET_FINGERPRINT=<expected-HF-dataset-fingerprint>
+mkdir -p "$QINAO_EVAL_EVIDENCE_DIR"
+```
+
+The evidence directory must be absolute, non-symlinked, and named exactly by
+the run ID. The external subject workflow—not this harness—creates the receipt
+manifest:
+
+```json
+{
+  "schema": "qinao/humaneval-subject-receipts/v1",
+  "subjects": {
+    "base": {
+      "sha256": "<64 lowercase hex>",
+      "model": "mlx-community/Qwen3.5-4B-4bit",
+      "adapter": null
+    },
+    "v6-900": {
+      "sha256": "<64 lowercase hex>",
+      "model": "mlx-community/Qwen3.5-4B-4bit",
+      "adapter": "/absolute/qwen_honesty_finetune/4b_v6_adapter_900"
+    }
+  }
+}
+```
+
+The writer compares its exact model/adapter selectors with the tag's external
+receipt. It then loads HumanEval, reads the materialized dataset object's real
+`_fingerprint`, and compares that value with the expected fingerprint before
+loading the model. Evidence binds schema, producer, run/tag, subject SHA-256,
+the current producer+evidence+sandbox source digest, dataset ID/split/
+fingerprint, strict passed/total counts, and the canonical task-ID set digest.
+Base and tuned must have the same run, producer, harness, dataset, task set,
+and sample count; each subject SHA-256 is checked against its own tag receipt.
+Any missing or mismatched field makes #30 PENDING and blocks `model_eval_ok`.
+
+Each writer removes every HumanEval producer output for its current run/tag
+before heavy imports or model load, then publishes the selected producer's
+complete JSON with a same-directory atomic rename. The ladder therefore always
+reruns HumanEval; it never skips because a file exists.
+After an interrupted run, resume with the persisted run context and rerun the
+writer—an old success cannot stand in for a crashed/no-output attempt.
+
+The other Phase-1 harnesses in `run_ladder.sh` still retain their historical
+existence cache. This slice makes no claim that the entire 100-metric ladder is
+current-run bound; expanding this receipt contract to those producers is a
+separate follow-up.
+
+This remains a plaintext accidental-integrity boundary, not an anti-malicious
+signature channel. A process able to rewrite the evidence, environment, and
+external receipt together can forge them. No new owner, ledger, registry, or
+authority is introduced here; durable authority remains with Qinao's upstream
+model/checkpoint workflow.
+
 ## Status (2026-06-24, v6-900 vs base)
 - **19 metrics computed**, 0 CRITICAL FAIL, **6/25 CRITICAL PASS** (capability_composite 60≥45.8, over_refusal 0≤1,
   contamination 0, offline 100, sovereignty 100, determinism 100). All honesty-core HIGH metrics PASS.
