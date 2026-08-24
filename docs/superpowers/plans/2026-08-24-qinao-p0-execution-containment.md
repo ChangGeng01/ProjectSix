@@ -46,7 +46,7 @@ PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/qinao-uv-cache \
   BehavioralAISubstrate/Tools/test_qinao_humaneval_paired.py
 ```
 
-Expected: two tests are discovered; the new test fails because
+Expected: at least two tests are discovered; the new test fails because
 `execute_generated_program`/`run_sandboxed` does not exist. Zero discovered
 tests is a harness failure, never a pass.
 

@@ -20,7 +20,7 @@ This is tactical P0 containment for the selected Option 2 execution-gateway arch
 
 ## Architectural Boundary
 
-This slice owns no durable truth. It only makes two local tool boundaries fail closed:
+This slice owns no durable truth. It only makes four local tool boundaries fail closed:
 
 1. **Generated-code execution boundary.** Every HumanEval program is copied into a private mode-0700 per-run directory and executed only after `sandbox-exec` has activated a deny-default profile. A trusted pre-exec launcher reports activation over an inherited private descriptor; stderr text is never used as the trust signal. Missing launch, failed profile application, and missing activation are typed `SandboxInfrastructureError` failures. The generated program receives a minimal environment, may write only inside its own run directory, cannot fork, and cannot retain descendants. The parent owns a fresh process session and performs process-group cleanup after success, failure, and timeout. There is no direct or unsandboxed fallback.
 2. **Evaluation-evidence boundary.** Both HumanEval writers and the merge consumer share one evidence-schema implementation. A HumanEval metric exists only when its denominator is a positive integer, the score is finite and bounded, its paired vector is internally consistent when present, and the run contains zero infrastructure failures. An invalid, partial-infrastructure, or all-infrastructure side-file actively removes metric `30` and its computed provenance from pre-existing values. Missing baseline evidence is `PENDING`, not a non-blocking `NOTE`. Base, tuned, merge, and verdict therefore fail closed as one chain.

@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import qinao_sandbox as qs
 
 PYBIN = sys.executable
+MODEL_TIMEOUT_PROBE_SECONDS = 1.0
 
 def _run(code: str, timeout: float = 15):
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
@@ -174,6 +175,8 @@ def _fake_runtime_probe(*, close_failure=None, activation_error=None, remove_err
         os.unlink(source.name)
         for descriptors in pipes:
             for descriptor in descriptors:
+                if descriptor in close_counts:
+                    continue
                 try:
                     real_close(descriptor)
                 except OSError:
@@ -246,7 +249,7 @@ def _assert_permission_sabotaged_root_removed(*, exit_code=None, hangs=False):
             )
             if hangs:
                 try:
-                    _run(code, timeout=0.2)
+                    _run(code, timeout=MODEL_TIMEOUT_PROBE_SECONDS)
                 except subprocess.TimeoutExpired as error:
                     output = _as_bytes(error.output)
                 else:
@@ -471,7 +474,10 @@ def test_detached_child_absent_after_timeout():
         pid = None
         try:
             try:
-                _run(_detached_probe_code(marker, parent_hangs=True), timeout=0.2)
+                _run(
+                    _detached_probe_code(marker, parent_hangs=True),
+                    timeout=MODEL_TIMEOUT_PROBE_SECONDS,
+                )
             except subprocess.TimeoutExpired as error:
                 pid = _child_pid(error.output)
             else:
@@ -515,7 +521,8 @@ def test_process_group_cleanup_after_timeout():
     try:
         try:
             _run_with_fork_temporarily_admitted(
-                _group_probe_code(parent_hangs=True), timeout=0.2
+                _group_probe_code(parent_hangs=True),
+                timeout=MODEL_TIMEOUT_PROBE_SECONDS,
             )
         except subprocess.TimeoutExpired as error:
             pid = _child_pid(error.output)
