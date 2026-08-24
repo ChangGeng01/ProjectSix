@@ -488,7 +488,9 @@ def test_build_verdict_cli_observes_one_atomic_base_tuned_generation():
                 os._exit(0)
 
             os.close(first_merge_write)
+            first_merge_write = None
             os.close(continue_read)
+            continue_read = None
             writer_started = threading.Event()
             writer_done = threading.Event()
             writer_errors = []
