@@ -85,7 +85,12 @@ test ! -e "$QINAO_DEPLOY_CHECKOUT"
 git clone --no-checkout "$QINAO_DEPLOY_REPO_URL" "$QINAO_DEPLOY_CHECKOUT"
 git -C "$QINAO_DEPLOY_CHECKOUT" checkout --detach "$QINAO_REVIEWED_DEPLOY_COMMIT"
 cd "$QINAO_DEPLOY_CHECKOUT"
-test -z "$(git status --porcelain --untracked-files=no)"
+
+qinao_require_clean_deploy_source() {
+  QINAO_DEPLOY_STATUS="$(git status --porcelain=v1 --untracked-files=all --ignored=matching)"
+  test -z "$QINAO_DEPLOY_STATUS"
+}
+qinao_require_clean_deploy_source
 
 # DEPLOY-SOURCE-PREFLIGHT-BEGIN — run from the candidate checkout before every conversion.
 : "${QINAO_REVIEWED_DEPLOY_COMMIT:?missing trusted deploy-source commit}"
@@ -95,6 +100,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
   BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_deploy_uses_candidate_local_verified_checkpoint_loader \
   BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_optimized_deploy_refuses_unexpected_trained_keys_before_output \
   BehavioralAISubstrate.Tools.test_qinao_checkpoint_guard.DeployCheckpointIntegrationTests.test_optimized_deploy_refuses_missing_trained_keys_before_output
+qinao_require_clean_deploy_source
 # DEPLOY-SOURCE-PREFLIGHT-END
 
 cd BehavioralAISubstrate

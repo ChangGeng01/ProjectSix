@@ -6,6 +6,8 @@ import hashlib
 import importlib.util
 import os
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -27,6 +29,18 @@ _DEPLOY_PATH = Path(__file__).with_name("mamba3_deploy.py")
 
 def _fenced_bash_scripts(markdown: str) -> list[str]:
     return re.findall(r"```bash\s*\n(.*?)```", markdown, flags=re.DOTALL)
+
+
+def _documented_deploy_script() -> str:
+    runbook = _RUNBOOK_PATH.read_text(encoding="utf-8")
+    deploy_section = runbook.split("## Deploy back to the A19", 1)[1]
+    deploy_section = deploy_section.split("## Cost", 1)[0]
+    scripts = _fenced_bash_scripts(deploy_section)
+    if len(scripts) != 1:
+        raise AssertionError(
+            f"expected one deploy shell block before Cost, found {len(scripts)}"
+        )
+    return scripts[0]
 
 
 def _module_usage_script() -> str:
@@ -67,6 +81,217 @@ def _unquoted_angle_placeholders(script: str) -> list[str]:
 
 def _identity(payload: bytes) -> str:
     return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+
+_DOCUMENTED_SOURCE_GUARDS = (
+    "test_deploy_uses_candidate_local_verified_checkpoint_loader",
+    "test_optimized_deploy_refuses_unexpected_trained_keys_before_output",
+    "test_optimized_deploy_refuses_missing_trained_keys_before_output",
+)
+
+
+def _candidate_guard_module(
+    *, failing_guard: str | None = None, dirty_after_preflight: bool = False
+) -> str:
+    methods = []
+    for guard in _DOCUMENTED_SOURCE_GUARDS:
+        if guard == failing_guard:
+            body = f'self.fail("{guard} rejected candidate")'
+        elif dirty_after_preflight and guard == _DOCUMENTED_SOURCE_GUARDS[-1]:
+            body = (
+                'Path("guard-created-untracked.py").write_text('
+                '"created by passing guard", encoding="utf-8")'
+            )
+        else:
+            body = "pass"
+        methods.append(
+            textwrap.indent(
+                textwrap.dedent(
+                    f"""
+                    def {guard}(self) -> None:
+                        {body}
+                    """
+                ).strip(),
+                "    ",
+            )
+        )
+
+    return (
+        "import unittest\n"
+        "from pathlib import Path\n\n\n"
+        "class DeployCheckpointIntegrationTests(unittest.TestCase):\n"
+        + "\n\n".join(methods)
+        + "\n"
+    )
+
+
+class _DocumentedDeployFixture:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.source = root / "source"
+        self.fake_bin = root / "fake-bin"
+        self.source.mkdir()
+        self.fake_bin.mkdir()
+        self._git_binary = shutil.which("git")
+        if self._git_binary is None:
+            raise AssertionError("git is required for documented deploy tests")
+
+        self._git("init")
+        self._git("config", "user.name", "Qinao deploy test")
+        self._git("config", "user.email", "qinao-deploy-test.invalid")
+        self._git("config", "commit.gpgsign", "false")
+        self._write_candidate_tree()
+        self.floor_commit = self._commit("security floor")
+        self._git("branch", "-M", "main")
+
+        (self.source / "README.md").write_text(
+            "valid current descendant\n", encoding="utf-8"
+        )
+        self.current_commit = self._commit("valid current descendant")
+
+        self.guard_failure_commits = {}
+        for index, guard in enumerate(_DOCUMENTED_SOURCE_GUARDS):
+            self._git("checkout", "--detach", self.current_commit)
+            self._guard_path.write_text(
+                _candidate_guard_module(failing_guard=guard), encoding="utf-8"
+            )
+            commit = self._commit(f"broken source guard {index}")
+            self._git("branch", f"broken-guard-{index}", commit)
+            self.guard_failure_commits[guard] = commit
+
+        self._git("checkout", "--detach", self.current_commit)
+        self._guard_path.write_text(
+            _candidate_guard_module(dirty_after_preflight=True), encoding="utf-8"
+        )
+        self.post_preflight_dirty_commit = self._commit(
+            "passing guard dirties candidate"
+        )
+        self._git("branch", "post-preflight-dirty", self.post_preflight_dirty_commit)
+
+        self._git("checkout", "main")
+        self._git("checkout", "--orphan", "nonancestor")
+        self.nonancestor_commit = self._commit("nonancestor candidate")
+        self._git("checkout", "main")
+        self._write_wrappers()
+        self._run_count = 0
+
+    @property
+    def _guard_path(self) -> Path:
+        return (
+            self.source
+            / "BehavioralAISubstrate"
+            / "Tools"
+            / "test_qinao_checkpoint_guard.py"
+        )
+
+    def _write_candidate_tree(self) -> None:
+        tools = self.source / "BehavioralAISubstrate" / "Tools"
+        tools.mkdir(parents=True)
+        (self.source / "BehavioralAISubstrate" / "__init__.py").write_text(
+            "", encoding="utf-8"
+        )
+        (tools / "__init__.py").write_text("", encoding="utf-8")
+        self._guard_path.write_text(_candidate_guard_module(), encoding="utf-8")
+        (tools / "mamba3_deploy.py").write_text(
+            "raise SystemExit('fake uv must intercept conversion')\n",
+            encoding="utf-8",
+        )
+
+    def _git(self, *args: str) -> str:
+        completed = subprocess.run(
+            [self._git_binary, *args],
+            cwd=self.source,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise AssertionError(
+                f"git {' '.join(args)} failed:\n{completed.stdout}{completed.stderr}"
+            )
+        return completed.stdout.strip()
+
+    def _commit(self, message: str) -> str:
+        self._git("add", "-A")
+        self._git("commit", "--allow-empty", "-m", message)
+        return self._git("rev-parse", "HEAD")
+
+    def _write_wrappers(self) -> None:
+        git_wrapper = self.fake_bin / "git"
+        git_wrapper.write_text(
+            "#!/bin/sh\n"
+            'if [ "${QINAO_FAIL_GIT_STATUS:-0}" = 1 ] '
+            '&& [ "${1:-}" = status ]; then\n'
+            "  exit 86\n"
+            "fi\n"
+            f"exec {shlex.quote(self._git_binary)} \"$@\"\n",
+            encoding="utf-8",
+        )
+        git_wrapper.chmod(0o755)
+
+        uv_wrapper = self.fake_bin / "uv"
+        uv_wrapper.write_text(
+            "#!/bin/sh\n"
+            "set -eu\n"
+            ': "${QINAO_CONVERSION_SENTINEL:?}"\n'
+            'printf "conversion reached\\n" > "$QINAO_CONVERSION_SENTINEL"\n',
+            encoding="utf-8",
+        )
+        uv_wrapper.chmod(0o755)
+
+    def run(
+        self,
+        *,
+        reviewed_commit: str | None = None,
+        floor_commit: str | None = None,
+        after_checkout: str = "",
+        fail_git_status: bool = False,
+        shell: str = "bash",
+    ) -> tuple[subprocess.CompletedProcess[str], Path]:
+        self._run_count += 1
+        checkout = self.root / f"checkout-{self._run_count}"
+        sentinel = self.root / f"conversion-{self._run_count}"
+        script = _documented_deploy_script()
+        replacements = {
+            "QINAO_REVIEWED_DEPLOY_COMMIT": reviewed_commit or self.current_commit,
+            "QINAO_DEPLOY_REPO_URL": str(self.source),
+            "QINAO_DEPLOY_CHECKOUT": str(checkout),
+            "QINAO_DEPLOY_SECURITY_FLOOR": floor_commit or self.floor_commit,
+        }
+        for name, value in replacements.items():
+            script, count = re.subn(
+                rf"(?m)^export {name}=.*$",
+                f"export {name}={shlex.quote(value)}",
+                script,
+                count=1,
+            )
+            if count != 1:
+                raise AssertionError(f"documented deploy script must export {name}")
+
+        if after_checkout:
+            anchor = 'cd "$QINAO_DEPLOY_CHECKOUT"\n'
+            if script.count(anchor) != 1:
+                raise AssertionError("documented checkout handoff must be unique")
+            script = script.replace(anchor, anchor + after_checkout + "\n", 1)
+
+        env = {
+            **os.environ,
+            "PATH": f"{self.fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "QINAO_CONVERSION_SENTINEL": str(sentinel),
+            "QINAO_FAIL_GIT_STATUS": "1" if fail_git_status else "0",
+        }
+        completed = subprocess.run(
+            [shell],
+            input=script,
+            cwd=self.root,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+        return completed, sentinel
 
 
 def _load_deploy_module_for_config_test():
@@ -873,6 +1098,104 @@ class DeployCheckpointIntegrationTests(unittest.TestCase):
             r"trusted release receipt[^\n]*(?:checkpoint|CKPT)[^\n]*(?:commit|source)|"
             r"trusted release receipt[^\n]*(?:commit|source)[^\n]*(?:checkpoint|CKPT)",
         )
+
+    def test_documented_deploy_refuses_dirty_checkout_before_conversion(self) -> None:
+        cases = {
+            "tracked": 'printf "mutated\\n" >> README.md',
+            "untracked-import-shadow": (
+                'printf "shadow\\n" > BehavioralAISubstrate/Tools/torch.py'
+            ),
+            "ignored-import-shadow": (
+                "printf 'BehavioralAISubstrate/Tools/torch.py\\n' "
+                ">> .git/info/exclude\n"
+                'printf "shadow\\n" > BehavioralAISubstrate/Tools/torch.py'
+            ),
+            "ignored-non-torch-import-shadow": (
+                "printf 'BehavioralAISubstrate/Tools/coreai_torch.py\\n' "
+                ">> .git/info/exclude\n"
+                'printf "shadow\\n" '
+                "> BehavioralAISubstrate/Tools/coreai_torch.py"
+            ),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _DocumentedDeployFixture(Path(directory))
+            for case, mutation in cases.items():
+                with self.subTest(case=case):
+                    completed, sentinel = fixture.run(after_checkout=mutation)
+                    diagnostic = completed.stdout + completed.stderr
+                    self.assertNotEqual(completed.returncode, 0, diagnostic)
+                    self.assertFalse(
+                        sentinel.exists(),
+                        f"{case} reached conversion despite dirty checkout:\n{diagnostic}",
+                    )
+
+    def test_documented_deploy_propagates_git_status_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _DocumentedDeployFixture(Path(directory))
+            for shell in ("bash", "zsh"):
+                with self.subTest(shell=shell):
+                    completed, sentinel = fixture.run(
+                        fail_git_status=True, shell=shell
+                    )
+                    diagnostic = completed.stdout + completed.stderr
+                    self.assertNotEqual(completed.returncode, 0, diagnostic)
+                    self.assertFalse(
+                        sentinel.exists(),
+                        f"{shell} masked git status failure and converted:\n{diagnostic}",
+                    )
+
+    def test_documented_deploy_runs_identity_and_source_guards_before_conversion(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _DocumentedDeployFixture(Path(directory))
+            cases = {
+                "wrong-exact-head": {
+                    "after_checkout": (
+                        'git checkout --detach "$QINAO_DEPLOY_SECURITY_FLOOR"'
+                    )
+                },
+                "nonancestor": {"reviewed_commit": fixture.nonancestor_commit},
+                **{
+                    f"source-guard:{guard}": {"reviewed_commit": commit}
+                    for guard, commit in fixture.guard_failure_commits.items()
+                },
+            }
+            for case, arguments in cases.items():
+                with self.subTest(case=case):
+                    completed, sentinel = fixture.run(**arguments)
+                    diagnostic = completed.stdout + completed.stderr
+                    self.assertNotEqual(completed.returncode, 0, diagnostic)
+                    self.assertFalse(
+                        sentinel.exists(),
+                        f"{case} reached conversion before its guard:\n{diagnostic}",
+                    )
+
+    def test_documented_deploy_rechecks_cleanliness_after_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _DocumentedDeployFixture(Path(directory))
+            completed, sentinel = fixture.run(
+                reviewed_commit=fixture.post_preflight_dirty_commit
+            )
+            diagnostic = completed.stdout + completed.stderr
+            self.assertNotEqual(completed.returncode, 0, diagnostic)
+            self.assertFalse(
+                sentinel.exists(),
+                f"guard-created dirt reached conversion:\n{diagnostic}",
+            )
+
+    def test_documented_deploy_valid_current_head_reaches_conversion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _DocumentedDeployFixture(Path(directory))
+            for shell in ("bash", "zsh"):
+                with self.subTest(shell=shell):
+                    completed, sentinel = fixture.run(shell=shell)
+                    diagnostic = completed.stdout + completed.stderr
+                    self.assertEqual(completed.returncode, 0, diagnostic)
+                    self.assertEqual(
+                        sentinel.read_text(encoding="utf-8"),
+                        "conversion reached\n",
+                    )
 
     def test_real_torch_rejects_execution_gadget_without_executing_it(self) -> None:
         try:
