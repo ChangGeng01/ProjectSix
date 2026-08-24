@@ -1,14 +1,14 @@
 # Qinao P0 Execution Containment Design
 
-**Status:** The tactical containment implementation is durably committed through
-`92519c935`. Fresh component reviewers accepted the sandbox, deploy, and
-HumanEval evidence boundaries after the earlier adversarial rejections. Latest
+**Status:** Accepted for this P0 tactical-containment slice. The implementation
+and prior status documentation are durably committed through `d3650dc5e`. Fresh
+component reviewers accepted the sandbox, deploy, and HumanEval evidence
+boundaries after the earlier adversarial rejections, and an independent
+whole-range reviewer accepted `4f0b9846c..d3650dc5e` with P0–P3 clear. Latest
 focused evidence is: checkpoint 45/45 under real PyTorch; system Python 45
 discovered with two honest dependency skips; non-sandbox HumanEval/local-eval
-136/136; and external macOS Seatbelt 43/43. The final independent whole-range
-decision over the final committed P0 containment range beginning at
-`4f0b9846c`, including this documentation status update, is still pending. No
-next governed slice is authorized by this component-level status.
+136/136; and external macOS Seatbelt 43/43. This status does not authorize a
+next governed slice or any global-recovery claim.
 
 ## Purpose
 
@@ -225,13 +225,14 @@ reviewed candidate-local tool closure
   zero/nonzero registered decode state.
 - A pre/post content manifest proves all 33 protected dirty paths remain byte-for-byte unchanged.
 
-Latest component evidence is checkpoint 45/45 with real PyTorch, system-Python
+Latest acceptance evidence is checkpoint 45/45 with real PyTorch, system-Python
 checkpoint 45 discovered with two honest dependency skips, non-sandbox
 HumanEval/local-eval 136/136, and external macOS Seatbelt 43/43. Fresh component
-reviewers returned `ACCEPT` for evidence, sandbox, and deploy. These results do
-not replace the pending independent whole-range decision.
+reviewers returned `ACCEPT` for evidence, sandbox, and deploy; an independent
+whole-range reviewer returned `ACCEPT` for `4f0b9846c..d3650dc5e` with P0–P3
+clear. None of these decisions expands the scope beyond this tactical slice.
 
-## Component-Accepted Residual Boundaries Pending Whole-Range Decision
+## Accepted Residual Boundaries
 
 - HumanEval receipts remain plaintext accidental-integrity evidence. A process
   able to rewrite environment, subject manifest and side-file together can forge

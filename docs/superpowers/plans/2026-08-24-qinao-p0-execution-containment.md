@@ -12,7 +12,7 @@
 
 ## Durable Execution State (2026-08-24)
 
-The implementation is persisted through `92519c935`; it is not relying on a
+The implementation is persisted through `d3650dc5e`; it is not relying on a
 live agent session. Exact correction commits after the rejected `dbc24fe5f`
 candidate are:
 
@@ -28,14 +28,18 @@ candidate are:
 - `212a253c3` — anonymous conversion source stream from an isolated temporary
   bare Git namespace;
 - `92519c935` — durable HumanEval attempt transactions, ordered multi-tag
-  observations, closed runtime types, and portable fd cleanup.
+  observations, closed runtime types, and portable fd cleanup;
+- `0fe13b285` — corrected design/plan state for the final component boundaries;
+- `d3650dc5e` — retired closed verdict-test pipe descriptors so cleanup cannot
+  close a subsequently reused fd number.
 
-Evidence, sandbox, and deploy now have fresh component `ACCEPT` decisions. The
-current gate is the single independent whole-range specification/quality/security
-decision over the final committed P0 containment range beginning at
-`4f0b9846c`, including this documentation status update. No next containment
-slice is authorized until Task 10 is complete. The original 33 dirty paths
-remain protected by the frozen manifest and must continue to match exactly.
+Evidence, sandbox, and deploy have fresh component `ACCEPT` decisions. An
+independent whole-range reviewer accepted `4f0b9846c..d3650dc5e` with P0–P3
+clear. Task 10 is complete for this tactical containment slice. This plan does
+not authorize a next containment slice; any W1, K3/EventLog, ledger, persistence,
+or global-recovery work requires its own governed authorization. The original 33
+dirty paths remain protected by the frozen manifest and must continue to match
+exactly.
 
 ## Global Constraints
 
@@ -425,16 +429,17 @@ claimed zero initialization.
 - [x] Re-run non-sandbox HumanEval/local-eval 136/136, system checkpoint 45
   discovered with two honest dependency skips, real-PyTorch checkpoint 45/45,
   and external macOS Seatbelt 43/43.
-- [x] Inspect the implementation range `4f0b9846c..92519c935` and require
-  `git diff --check`; the final whole-range reviewer must additionally include
-  this documentation status commit.
+- [x] Inspect the accepted range `4f0b9846c..d3650dc5e` and require
+  `git diff --check`, including the implementation, status documentation, and
+  final test-fixture fd-lifecycle correction.
 - [x] Require the protected manifest to remain exactly 33/33 and audit every
   changed path for forbidden owner/store/ledger/workflow/Swift scope expansion.
 - [x] Obtain fresh component `ACCEPT` decisions for evidence, sandbox, and deploy.
 - [x] Record accepted residual boundaries without upgrading them into guarantees.
-- [ ] Obtain one independent whole-range specification/quality/security
-  `ACCEPT`; only then may the design status be advanced. This plan does not by
-  itself authorize W1, K3/EventLog, ledger, or global recovery work.
+- [x] Obtain independent whole-range specification/quality/security `ACCEPT` for
+  `4f0b9846c..d3650dc5e`, P0–P3 clear. The accepted decision authorizes only this
+  P0 tactical-containment slice and does not authorize W1, K3/EventLog, ledger,
+  persistence, or global-recovery work.
 
 ### Task 11: Make HumanEval Publication and Observation Transactional
 
