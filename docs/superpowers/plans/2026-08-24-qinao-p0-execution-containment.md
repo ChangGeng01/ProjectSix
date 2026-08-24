@@ -193,6 +193,7 @@ files below are the explicit expansion of scope; none of the 33 protected paths
 may be touched.
 
 **Files:**
+- Create: `BehavioralAISubstrate/Tools/qinao_local_eval/qinao_humaneval_evidence.py`
 - Modify: `BehavioralAISubstrate/Tools/qinao_local_eval/qinao_sandbox.py`
 - Modify: `BehavioralAISubstrate/Tools/qinao_local_eval/test_humaneval_sandbox.py`
 - Modify: `BehavioralAISubstrate/Tools/qinao_local_eval/qinao_humaneval.py`
@@ -207,7 +208,8 @@ may be touched.
 - Add `SandboxInfrastructureError`; only a private descriptor written by a trusted launcher after seatbelt activation distinguishes infrastructure from model execution.
 - Run in a private mode-0700 directory with a minimal environment. Do not grant all of `/private/var/folders`. Permit writes only within the private run root and `/dev/null`.
 - Deny generated process creation and own a new process session. Clean the process group after normal return, error, and timeout.
-- Emit metric `30` only for a positive integer denominator. Treat missing, boolean, zero, negative, or malformed HumanEval denominators as unavailable evidence.
+- Put HumanEval evidence construction and validation in one shared pure module; neither writer nor merge may maintain a private schema interpretation.
+- Emit metric `30` only for a positive integer denominator, zero infrastructure errors, a finite score in `[0, 100]`, and (for paired evidence) a length/value/aggregate-consistent per-problem vector. Any partial-infrastructure run is unavailable evidence, not a score over a selectively reduced sample.
 - When an invalid present HumanEval side-file is merged, remove stale `30` and `_prov["30"]`. Missing baseline evidence for a base-relative gate is `PENDING`; `NOTE` must also remain blocking for any verifiable critical gate.
 
 - [ ] **Step 1: Write RED tests for typed sandbox activation**
@@ -241,16 +243,18 @@ base-only-infrastructure, and tuned-only-infrastructure cases. Seed old metric
 
 - [ ] **Step 5: Implement denominator, invalidation, and verdict semantics**
 
-Both HumanEval writers omit metric `30` when `_N == 0`. Both HumanEval side-file
-prefixes require a positive integer `_N` before metric `30` can be merged and
-stamped. An invalid present side-file explicitly revokes existing metric/provenance.
+Both HumanEval writers omit metric `30` when `_N == 0` or any infrastructure
+error occurred. Both HumanEval side-file prefixes use the shared validator before
+metric `30` can be merged and stamped. An invalid present side-file explicitly
+revokes existing metric/provenance; unreadable or non-object HumanEval JSON does
+the same rather than preserving stale evidence.
 Base-relative evaluation without a valid baseline is `PENDING`; verifiable
 critical `NOTE` states also block `model_eval_ok` as a defense in depth.
 
 - [ ] **Step 6: Run focused GREEN and commit exact paths**
 
 Run the paired tests, merge tests, gate-integrity tests, and all expanded external
-macOS sandbox tests with positive discovery counts. Commit only the nine listed
+macOS sandbox tests with positive discovery counts. Commit only the ten listed
 files after the complete chain is green.
 
 ---
