@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import select
 import shutil
 import signal
+import stat
 import subprocess
 import tempfile
 import time
@@ -103,18 +105,109 @@ def _kill_process_group(process: subprocess.Popen[bytes]) -> None:
         ) from error
 
 
-def _collect_after_kill(
-    process: subprocess.Popen[bytes],
-) -> tuple[bytes, bytes]:
-    _kill_process_group(process)
+def _validated_timeout(timeout: int | float) -> float:
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
+        raise SandboxInfrastructureError("sandbox timeout must be a finite positive number")
     try:
-        return process.communicate(timeout=2)
-    except subprocess.TimeoutExpired as error:
+        value = float(timeout)
+    except (OverflowError, TypeError, ValueError) as error:
         raise SandboxInfrastructureError(
-            "sandbox process group did not terminate",
-            returncode=process.poll(),
-            stderr=error.stderr or b"",
+            "sandbox timeout must be a finite positive number"
         ) from error
+    if not math.isfinite(value) or value <= 0:
+        raise SandboxInfrastructureError("sandbox timeout must be a finite positive number")
+    return value
+
+
+def _make_tree_removable(run_root: str) -> None:
+    """Restore directory traversal without following generated symlinks."""
+
+    pending = [run_root]
+    while pending:
+        path = pending.pop()
+        try:
+            metadata = os.lstat(path)
+        except FileNotFoundError:
+            continue
+        if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+            continue
+        os.chmod(path, 0o700, follow_symlinks=False)
+        with os.scandir(path) as entries:
+            for entry in entries:
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(entry.path)
+
+
+def _remove_run_root(run_root: str) -> None:
+    recovery_error: OSError | None = None
+    try:
+        _make_tree_removable(run_root)
+    except OSError as error:
+        recovery_error = error
+    try:
+        shutil.rmtree(run_root)
+    except OSError as error:
+        if recovery_error is not None:
+            raise error from recovery_error
+        raise
+    if os.path.lexists(run_root):
+        raise OSError(f"sandbox run root still exists after removal: {run_root}")
+
+
+def _teardown(
+    *,
+    process: subprocess.Popen[bytes] | None,
+    process_reaped: bool,
+    read_fd: int,
+    write_fd: int,
+    run_root: str | None,
+) -> tuple[list[tuple[str, BaseException]], bytes, bytes]:
+    """Attempt every independent teardown action and return all failures."""
+
+    failures: list[tuple[str, BaseException]] = []
+    reaped_stdout = b""
+    reaped_stderr = b""
+
+    for label, descriptor in (("activation write fd", write_fd), ("activation read fd", read_fd)):
+        if descriptor < 0:
+            continue
+        try:
+            os.close(descriptor)
+        except OSError as error:
+            failures.append((label, error))
+
+    if process is not None:
+        try:
+            _kill_process_group(process)
+        except BaseException as error:
+            failures.append(("process-group termination", error))
+        if not process_reaped:
+            try:
+                reaped_stdout, reaped_stderr = process.communicate(timeout=2)
+            except BaseException as error:
+                failures.append(("sandbox process reap", error))
+
+    if run_root is not None:
+        try:
+            _remove_run_root(run_root)
+        except BaseException as error:
+            failures.append(("private run-root removal", error))
+
+    return failures, reaped_stdout, reaped_stderr
+
+
+def _cleanup_failure(
+    failures: list[tuple[str, BaseException]],
+    *,
+    process: subprocess.Popen[bytes] | None,
+    stderr: bytes,
+) -> SandboxInfrastructureError:
+    actions = ", ".join(label for label, _error in failures)
+    return SandboxInfrastructureError(
+        f"sandbox teardown could not be proven: {actions}",
+        returncode=process.poll() if process is not None else None,
+        stderr=stderr,
+    )
 
 
 def run_sandboxed(
@@ -124,14 +217,18 @@ def run_sandboxed(
 ) -> subprocess.CompletedProcess[bytes]:
     """Run generated Python only after an out-of-band Seatbelt activation proof."""
 
-    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
-        raise SandboxInfrastructureError("sandbox timeout must be a positive number")
+    timeout_value = _validated_timeout(timeout)
 
     run_root: str | None = None
     process: subprocess.Popen[bytes] | None = None
     read_fd = write_fd = -1
     command: list[str] = []
-    deadline = time.monotonic() + float(timeout)
+    deadline = time.monotonic() + timeout_value
+    process_reaped = False
+    result: subprocess.CompletedProcess[bytes] | None = None
+    primary_error: SandboxInfrastructureError | None = None
+    primary_cause: BaseException | None = None
+    model_timed_out = False
     try:
         try:
             run_root = os.path.realpath(tempfile.mkdtemp(prefix="qinao-sandbox-"))
@@ -166,6 +263,7 @@ def run_sandboxed(
                 command,
                 cwd=run_root,
                 env=_minimal_environment(run_root),
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 pass_fds=(write_fd,),
@@ -173,62 +271,93 @@ def run_sandboxed(
             )
         except (OSError, TypeError, ValueError) as error:
             raise SandboxInfrastructureError("failed to launch sandbox runtime") from error
-        finally:
-            if write_fd >= 0:
-                os.close(write_fd)
-                write_fd = -1
+
+        descriptor = write_fd
+        write_fd = -1
+        try:
+            os.close(descriptor)
+        except OSError as error:
+            raise SandboxInfrastructureError(
+                "failed to close parent activation writer"
+            ) from error
 
         try:
             marker = _read_activation(read_fd, deadline)
         except OSError as error:
-            _stdout, stderr = _collect_after_kill(process)
             raise SandboxInfrastructureError(
                 "failed to authenticate sandbox activation",
-                returncode=process.returncode,
-                stderr=stderr,
+                returncode=process.poll(),
             ) from error
-        finally:
-            if read_fd >= 0:
-                os.close(read_fd)
-                read_fd = -1
+
+        descriptor = read_fd
+        read_fd = -1
+        try:
+            os.close(descriptor)
+        except OSError as error:
+            raise SandboxInfrastructureError(
+                "failed to close parent activation reader",
+                returncode=process.poll(),
+            ) from error
 
         if marker != _ACTIVATION_MAGIC:
-            _stdout, stderr = _collect_after_kill(process)
             raise SandboxInfrastructureError(
                 "sandbox activation was not authenticated",
-                returncode=process.returncode,
-                stderr=stderr,
+                returncode=process.poll(),
             )
 
         remaining = max(0.0, deadline - time.monotonic())
         try:
             stdout, stderr = process.communicate(timeout=remaining)
         except subprocess.TimeoutExpired:
-            stdout, stderr = _collect_after_kill(process)
-            raise subprocess.TimeoutExpired(
+            model_timed_out = True
+        else:
+            process_reaped = True
+            result = subprocess.CompletedProcess(
                 command,
-                timeout,
-                output=stdout,
-                stderr=stderr,
-            ) from None
-
-        _kill_process_group(process)
-        return subprocess.CompletedProcess(
-            command,
-            process.returncode,
-            stdout,
-            stderr,
+                process.returncode,
+                stdout,
+                stderr,
+            )
+    except SandboxInfrastructureError as error:
+        primary_error = error
+        primary_cause = error.__cause__
+    except Exception as error:
+        primary_error = SandboxInfrastructureError(
+            "unexpected failure inside sandbox runtime",
+            returncode=process.poll() if process is not None else None,
         )
+        primary_cause = error
     finally:
-        if write_fd >= 0:
-            os.close(write_fd)
-        if read_fd >= 0:
-            os.close(read_fd)
-        if process is not None:
-            try:
-                _kill_process_group(process)
-            except SandboxInfrastructureError:
-                if process.poll() is None:
-                    raise
-        if run_root is not None:
-            shutil.rmtree(run_root, ignore_errors=True)
+        failures, reaped_stdout, reaped_stderr = _teardown(
+            process=process,
+            process_reaped=process_reaped,
+            read_fd=read_fd,
+            write_fd=write_fd,
+            run_root=run_root,
+        )
+
+    if failures:
+        cleanup_error = _cleanup_failure(
+            failures,
+            process=process,
+            stderr=reaped_stderr,
+        )
+        raise cleanup_error from failures[0][1]
+    if primary_error is not None:
+        if primary_error.returncode is None and process is not None:
+            primary_error.returncode = process.poll()
+        if not primary_error.stderr:
+            primary_error.stderr = reaped_stderr
+        if primary_cause is not None:
+            raise primary_error from primary_cause
+        raise primary_error
+    if model_timed_out:
+        raise subprocess.TimeoutExpired(
+            command,
+            timeout,
+            output=reaped_stdout,
+            stderr=reaped_stderr,
+        ) from None
+    if result is None:
+        raise SandboxInfrastructureError("sandbox runtime produced no authenticated result")
+    return result

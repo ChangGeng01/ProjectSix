@@ -99,6 +99,20 @@ def _write_sidefile(directory, prefix, tag, payload):
     return path
 
 
+def _assert_humaneval_pending(base, tuned):
+    verdict = bv.build(base, tuned)
+    row = next(row for row in verdict["rows"] if row["num"] == 30)
+    assert row["status"] == "PENDING"
+    assert verdict["model_eval_ok"] is False
+
+
+def _assert_only_humaneval_was_revoked(values):
+    assert "30" not in values
+    assert "30" not in values["_prov"]
+    assert values["7"] == 12.5
+    assert values["_prov"]["7"] == {"kind": "computed", "runner": "keep"}
+
+
 def test_invalid_humaneval_evidence_revokes_only_stale_metric_and_provenance():
     valid = _valid_paired()
     invalid_cases = [
@@ -225,3 +239,139 @@ def test_conflicting_dual_humaneval_files_fail_closed_for_score_or_sample_count(
             )
             assert "30" not in merged, tag
             assert "30" not in merged["_prov"], tag
+
+
+def test_known_non_humaneval_metric_30_owner_is_revoked_before_verdict():
+    with tempfile.TemporaryDirectory() as directory:
+        for tag in ("base", "tuned"):
+            _write_sidefile(
+                directory,
+                "read",
+                tag,
+                {"26": 80.0, "30": 50.0, "_N": 2, "_infra_errs": 0},
+            )
+        base = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "base", tmpdir=directory
+        )
+        tuned = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "tuned", tmpdir=directory
+        )
+
+    for values in (base, tuned):
+        _assert_only_humaneval_was_revoked(values)
+        assert values["26"] == 80.0
+        assert values["_prov"]["26"] == {
+            "kind": "computed",
+            "runner": "qinao_reading",
+        }
+    _assert_humaneval_pending(base, tuned)
+
+
+def test_renamed_explicit_metric_30_owner_is_revoked_before_verdict():
+    with tempfile.TemporaryDirectory() as directory:
+        paths = {}
+        for tag in ("base", "tuned"):
+            path = Path(directory) / f"renamed-{tag}.json"
+            path.write_text(json.dumps(_valid_standard()), encoding="utf-8")
+            paths[tag] = path
+        base = qm.merge_explicit_sidefiles(
+            _seeded_humaneval_values(), [paths["base"]]
+        )
+        tuned = qm.merge_explicit_sidefiles(
+            _seeded_humaneval_values(), [paths["tuned"]]
+        )
+
+    _assert_only_humaneval_was_revoked(base)
+    _assert_only_humaneval_was_revoked(tuned)
+    _assert_humaneval_pending(base, tuned)
+
+
+def _assert_explicit_metric_30_poison_is_sticky(*, poison_first):
+    with tempfile.TemporaryDirectory() as directory:
+        merged = {}
+        for tag in ("base", "tuned"):
+            valid = _write_sidefile(
+                directory, "humaneval", tag, _valid_standard()
+            )
+            poison = Path(directory) / f"renamed-{tag}.json"
+            poison.write_text(json.dumps(_valid_standard()), encoding="utf-8")
+            ordered = [poison, valid] if poison_first else [valid, poison]
+            merged[tag] = qm.merge_explicit_sidefiles(
+                _seeded_humaneval_values(), ordered
+            )
+
+    _assert_only_humaneval_was_revoked(merged["base"])
+    _assert_only_humaneval_was_revoked(merged["tuned"])
+    _assert_humaneval_pending(merged["base"], merged["tuned"])
+
+
+def test_explicit_metric_30_poison_is_sticky_invalid_then_valid():
+    _assert_explicit_metric_30_poison_is_sticky(poison_first=True)
+
+
+def test_explicit_metric_30_poison_is_sticky_valid_then_invalid():
+    _assert_explicit_metric_30_poison_is_sticky(poison_first=False)
+
+
+def test_invalid_known_humaneval_matrix_reaches_pending_verdict():
+    valid = _valid_paired()
+    invalid_payloads = {
+        "partial-infra": {**valid, "_infra_errs": 1},
+        "invalid-n": {**valid, "_N": True},
+        "nan": {**valid, "30": float("nan")},
+        "positive-inf": {**valid, "30": float("inf")},
+        "negative-inf": {**valid, "30": float("-inf")},
+        "below-range": {**valid, "30": -0.1},
+        "above-range": {**valid, "30": 100.1},
+        "non-object": [1, 2, 3],
+    }
+    with tempfile.TemporaryDirectory() as directory:
+        for case, payload in invalid_payloads.items():
+            for tag in (f"{case}-base", f"{case}-tuned"):
+                _write_sidefile(directory, "humaneval_paired", tag, payload)
+            base = qm.merge_known_sidefiles(
+                _seeded_humaneval_values(), f"{case}-base", tmpdir=directory
+            )
+            tuned = qm.merge_known_sidefiles(
+                _seeded_humaneval_values(), f"{case}-tuned", tmpdir=directory
+            )
+            _assert_only_humaneval_was_revoked(base)
+            _assert_only_humaneval_was_revoked(tuned)
+            _assert_humaneval_pending(base, tuned)
+
+
+def test_malformed_known_humaneval_reaches_pending_verdict():
+    with tempfile.TemporaryDirectory() as directory:
+        for tag in ("base", "tuned"):
+            Path(directory, f"qinao_humaneval_{tag}.json").write_text(
+                '{"30": 50.0,', encoding="utf-8"
+            )
+        base = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "base", tmpdir=directory
+        )
+        tuned = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "tuned", tmpdir=directory
+        )
+
+    _assert_only_humaneval_was_revoked(base)
+    _assert_only_humaneval_was_revoked(tuned)
+    _assert_humaneval_pending(base, tuned)
+
+
+def test_dual_humaneval_conflict_reaches_pending_verdict():
+    with tempfile.TemporaryDirectory() as directory:
+        for tag in ("base", "tuned"):
+            _write_sidefile(directory, "humaneval", tag, _valid_standard())
+            _write_sidefile(
+                directory, "humaneval_paired", tag, _valid_paired(100.0, 2)
+            )
+        base = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "base", tmpdir=directory
+        )
+        tuned = qm.merge_known_sidefiles(
+            _seeded_humaneval_values(), "tuned", tmpdir=directory
+        )
+
+    _assert_only_humaneval_was_revoked(base)
+    _assert_only_humaneval_was_revoked(tuned)
+    _assert_humaneval_pending(base, tuned)

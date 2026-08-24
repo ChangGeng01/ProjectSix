@@ -20,12 +20,14 @@ import os
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from registry import MODEL_CRITICAL, ATTEST_ONLY_CRITICAL, by_num  # noqa: E402
 import build_verdict as bv  # noqa: E402
+import qinao_merge as qm  # noqa: E402
 
 
 def _classify(num, threshold, direction, val, bval=None, prov=None):
@@ -175,6 +177,45 @@ def test_verifiable_critical_note_blocks_model_eval_ok():
     verdict = bv.build(base, tuned)
     row = next(row for row in verdict["rows"] if row["num"] == 83)
     assert row["status"] == "NOTE"
+    assert verdict["model_eval_ok"] is False
+
+
+def test_known_foreign_metric_30_owner_blocks_otherwise_passing_model_eval():
+    base_seed = _fully_passing_critical_values()
+    tuned_seed = _fully_passing_critical_values()
+    with tempfile.TemporaryDirectory() as directory:
+        for tag in ("base", "tuned"):
+            Path(directory, f"qinao_read_{tag}.json").write_text(
+                json.dumps({"30": base_seed["30"], "_N": 2, "_infra_errs": 0}),
+                encoding="utf-8",
+            )
+        base = qm.merge_known_sidefiles(base_seed, "base", tmpdir=directory)
+        tuned = qm.merge_known_sidefiles(tuned_seed, "tuned", tmpdir=directory)
+
+    verdict = bv.build(base, tuned)
+    row = next(row for row in verdict["rows"] if row["num"] == 30)
+    assert row["status"] == "PENDING"
+    assert verdict["model_eval_ok"] is False
+
+
+def test_renamed_metric_30_owner_blocks_otherwise_passing_model_eval():
+    base_seed = _fully_passing_critical_values()
+    tuned_seed = _fully_passing_critical_values()
+    with tempfile.TemporaryDirectory() as directory:
+        paths = {}
+        for tag in ("base", "tuned"):
+            path = Path(directory, f"renamed-{tag}.json")
+            path.write_text(
+                json.dumps({"30": base_seed["30"], "_N": 2, "_infra_errs": 0}),
+                encoding="utf-8",
+            )
+            paths[tag] = path
+        base = qm.merge_explicit_sidefiles(base_seed, [paths["base"]])
+        tuned = qm.merge_explicit_sidefiles(tuned_seed, [paths["tuned"]])
+
+    verdict = bv.build(base, tuned)
+    row = next(row for row in verdict["rows"] if row["num"] == 30)
+    assert row["status"] == "PENDING"
     assert verdict["model_eval_ok"] is False
 
 
