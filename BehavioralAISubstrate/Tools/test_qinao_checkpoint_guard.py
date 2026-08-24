@@ -110,6 +110,36 @@ class _RecordingTorch(types.ModuleType):
         return self.result
 
 
+class _CloseFailingFile:
+    def __init__(self, wrapped, *, write_error: Exception | None = None) -> None:
+        self._wrapped = wrapped
+        self._write_error = write_error
+
+    def __enter__(self):
+        self._wrapped.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        try:
+            self._wrapped.__exit__(*args)
+        finally:
+            raise OSError(errno.EIO, "simulated close failure")
+
+    def close(self) -> None:
+        try:
+            self._wrapped.close()
+        finally:
+            raise OSError(errno.EIO, "simulated close failure")
+
+    def write(self, data: bytes) -> int:
+        if self._write_error is not None:
+            raise self._write_error
+        return self._wrapped.write(data)
+
+    def __getattr__(self, name: str):
+        return getattr(self._wrapped, name)
+
+
 class CheckpointGuardTests(unittest.TestCase):
     def test_missing_or_malformed_identity_rejects_before_open_or_loader(self) -> None:
         malformed = [
@@ -245,6 +275,120 @@ raise SystemExit(2)
 
         self.assertIs(caught.exception.__cause__, disk_full)
         self.assertEqual(fake_torch.calls, [])
+
+    def test_close_time_io_failure_uses_public_verification_error(self) -> None:
+        payload = b"checkpoint"
+        real_temporary_file = tempfile.TemporaryFile
+        real_fdopen = os.fdopen
+
+        for failing_resource in ("snapshot", "source"):
+            with self.subTest(failing_resource=failing_resource):
+                fake_torch = _RecordingTorch({"model": {}})
+                with tempfile.TemporaryDirectory() as directory:
+                    checkpoint = Path(directory) / "weights.pt"
+                    checkpoint.write_bytes(payload)
+
+                    patches = [mock.patch.dict(sys.modules, {"torch": fake_torch})]
+                    if failing_resource == "snapshot":
+                        patches.append(
+                            mock.patch(
+                                "BehavioralAISubstrate.Tools.qinao_checkpoint_guard.tempfile.TemporaryFile",
+                                side_effect=lambda *args, **kwargs: _CloseFailingFile(
+                                    real_temporary_file(*args, **kwargs)
+                                ),
+                            )
+                        )
+                    else:
+                        patches.append(
+                            mock.patch(
+                                "BehavioralAISubstrate.Tools.qinao_checkpoint_guard.os.fdopen",
+                                side_effect=lambda *args, **kwargs: _CloseFailingFile(
+                                    real_fdopen(*args, **kwargs)
+                                ),
+                            )
+                        )
+
+                    with patches[0], patches[1]:
+                        with self.assertRaises(
+                            CheckpointVerificationError
+                        ) as caught:
+                            load_verified_weights_checkpoint(
+                                checkpoint, _identity(payload)
+                            )
+
+                self.assertIsInstance(caught.exception.__cause__, OSError)
+                self.assertEqual(caught.exception.__cause__.errno, errno.EIO)
+                self.assertEqual(len(fake_torch.calls), 1)
+
+    def test_cleanup_failure_does_not_replace_active_error(self) -> None:
+        payload = b"checkpoint"
+        real_temporary_file = tempfile.TemporaryFile
+        fake_torch = _RecordingTorch({"model": {}})
+
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint = Path(directory) / "weights.pt"
+            checkpoint.write_bytes(payload)
+
+            with mock.patch.dict(sys.modules, {"torch": fake_torch}), mock.patch(
+                "BehavioralAISubstrate.Tools.qinao_checkpoint_guard.tempfile.TemporaryFile",
+                side_effect=lambda *args, **kwargs: _CloseFailingFile(
+                    real_temporary_file(*args, **kwargs)
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    CheckpointVerificationError, "digest mismatch"
+                ):
+                    load_verified_weights_checkpoint(
+                        checkpoint, f"sha256:{'0' * 64}"
+                    )
+
+        self.assertEqual(fake_torch.calls, [])
+
+    def test_cleanup_failure_does_not_replace_programmer_error(self) -> None:
+        payload = b"checkpoint"
+        real_temporary_file = tempfile.TemporaryFile
+        programmer_error = RuntimeError("programmer failure")
+        fake_torch = _RecordingTorch({"model": {}})
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint = Path(directory) / "weights.pt"
+            checkpoint.write_bytes(payload)
+
+            with mock.patch.dict(sys.modules, {"torch": fake_torch}), mock.patch(
+                "BehavioralAISubstrate.Tools.qinao_checkpoint_guard.tempfile.TemporaryFile",
+                side_effect=lambda *args, **kwargs: _CloseFailingFile(
+                    real_temporary_file(*args, **kwargs),
+                    write_error=programmer_error,
+                ),
+            ):
+                with self.assertRaises(RuntimeError) as caught:
+                    load_verified_weights_checkpoint(
+                        checkpoint, _identity(payload)
+                    )
+            self.assertIs(caught.exception, programmer_error)
+
+    def test_descriptor_cleanup_failure_does_not_replace_size_error(self) -> None:
+        payload = b"checkpoint"
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint = Path(directory) / "weights.pt"
+            checkpoint.write_bytes(payload)
+            real_close = os.close
+
+            def close_then_fail(file_descriptor: int) -> None:
+                try:
+                    real_close(file_descriptor)
+                finally:
+                    raise OSError(errno.EIO, "simulated descriptor close failure")
+
+            with mock.patch(
+                "BehavioralAISubstrate.Tools.qinao_checkpoint_guard.os.close",
+                side_effect=close_then_fail,
+            ):
+                with self.assertRaisesRegex(
+                    CheckpointVerificationError, "size limit"
+                ):
+                    load_verified_weights_checkpoint(
+                        checkpoint, _identity(payload), max_bytes=len(payload) - 1
+                    )
 
     def test_mismatched_identity_rejects_before_loader(self) -> None:
         fake_torch = _RecordingTorch({"model": {}})

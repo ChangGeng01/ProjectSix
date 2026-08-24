@@ -8,7 +8,7 @@ import os
 import re
 import stat
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 
@@ -51,6 +51,21 @@ def _source_version(file_stat: os.stat_result) -> tuple[int, ...]:
     )
 
 
+def _close_preserving_primary(
+    close: Callable[[], object],
+    failure_message: str,
+    active_error: BaseException | None,
+) -> None:
+    try:
+        close()
+    except BaseException as cleanup_error:
+        if active_error is not None:
+            return
+        if isinstance(cleanup_error, OSError):
+            raise CheckpointVerificationError(failure_message) from cleanup_error
+        raise
+
+
 def load_verified_weights_checkpoint(
     path: os.PathLike[str] | str,
     expected_digest: object,
@@ -76,6 +91,7 @@ def load_verified_weights_checkpoint(
     except (OSError, TypeError, ValueError) as error:
         raise CheckpointVerificationError("checkpoint is not an accessible regular file") from error
 
+    descriptor_error: BaseException | None = None
     try:
         try:
             before = os.fstat(source_fd)
@@ -91,14 +107,17 @@ def load_verified_weights_checkpoint(
         except OSError as error:
             raise CheckpointVerificationError("checkpoint source I/O failed") from error
         source_fd = -1
-        with source:
+        source_error: BaseException | None = None
+        try:
             try:
                 snapshot_file = tempfile.TemporaryFile(mode="w+b")
             except OSError as error:
                 raise CheckpointVerificationError(
                     "checkpoint snapshot I/O failed"
                 ) from error
-            with snapshot_file as snapshot:
+            snapshot = snapshot_file
+            snapshot_error: BaseException | None = None
+            try:
                 digest = hashlib.sha256()
                 copied = 0
                 try:
@@ -159,6 +178,31 @@ def load_verified_weights_checkpoint(
                         "restricted checkpoint payload must be a mapping"
                     )
                 return checkpoint
+            except BaseException as error:
+                snapshot_error = error
+                raise
+            finally:
+                _close_preserving_primary(
+                    lambda: snapshot_file.close(),
+                    "checkpoint snapshot I/O failed",
+                    snapshot_error,
+                )
+        except BaseException as error:
+            source_error = error
+            raise
+        finally:
+            _close_preserving_primary(
+                lambda: source.close(),
+                "checkpoint source I/O failed",
+                source_error,
+            )
+    except BaseException as error:
+        descriptor_error = error
+        raise
     finally:
         if source_fd >= 0:
-            os.close(source_fd)
+            _close_preserving_primary(
+                lambda: os.close(source_fd),
+                "checkpoint source I/O failed",
+                descriptor_error,
+            )
