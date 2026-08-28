@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import builtins
+import concurrent.futures
 import hashlib
 import importlib.util
 import inspect
@@ -10,6 +12,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from types import ModuleType
@@ -24,6 +27,13 @@ FROZEN = (
     / "superpowers"
     / "evidence"
     / "2026-08-29-qinao-a03-design-source-identity-freeze.json"
+)
+A02_FROZEN = (
+    ROOT
+    / "docs"
+    / "superpowers"
+    / "evidence"
+    / "2026-08-29-qinao-a02-provisional-review-projection.json"
 )
 PREDECESSOR_OBSERVATION = (
     ROOT
@@ -53,7 +63,7 @@ A02_FROZEN_SHA256 = (
     "cab70d307dd1e289850fe741b67ad64c9a252913ddccd9ba00c13d1b065f6f2b"
 )
 A03_FROZEN_SHA256 = (
-    "60de9cca81f6363941dc51062bc7335bfc55fc91b19e044e9f37a4c503ab63a7"
+    "1d0d81ef032b5babb9f954ce1f3a6d98bb56c120011ea4aaa136e16a41568f17"
 )
 BOOTSTRAP_COMMIT = "7e4aa2d626e2c94b1b1f3405fb8454e73448514f"
 BOOTSTRAP_TREE = "47304602b7d1c1eba8eed571dbc65ee36c3a5f21"
@@ -191,6 +201,28 @@ EXPECTED_CUSTODY = {
     "semanticAuthority": "none",
 }
 
+EXPECTED_EXECUTION_ISOLATION = {
+    "writeCapableGitInput": (
+        "ephemeralPrivateBareRepositoryFromHeldCustodyBundle"
+    ),
+    "bundleMaterialization": {
+        "inputMechanism": "gitBundleUnbundleFromHeldDescriptor",
+        "sourcePathReopenUsed": False,
+        "ordinaryCopyFallbackUsed": False,
+        "hardlinkFallbackUsed": False,
+        "liveSourceObjectDatabaseFallbackUsed": False,
+        "exactBundleHeadsMatched": True,
+    },
+    "sourceRepositoryObjectDatabaseObservation": (
+        "boundedSelectedMetadataEndpointInventoryEqualBeforeAfter"
+    ),
+    "privateEphemeralObjectMetadataMayChange": True,
+    "liveSourceObjectDatabaseUsedAsAlternate": False,
+    "runtimeOwnershipProtocol": "singlePinnedA02ScratchLeaseProtocol",
+    "nestedLeaseCount": 2,
+    "runtimeRootReboundAndRestored": True,
+}
+
 FORBIDDEN_PUBLIC_ARGUMENT_WORDS = {
     "receipt",
     "signer",
@@ -288,6 +320,70 @@ def repository_observation() -> dict[str, object]:
     }
 
 
+def repository_observation_for_path(repository: Path) -> dict[str, object]:
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith("GIT_")
+    }
+    environment.update(
+        {
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_OPTIONAL_LOCKS": "0",
+            "GIT_PAGER": "cat",
+            "GIT_TERMINAL_PROMPT": "0",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+        }
+    )
+
+    def observe(*arguments: str) -> bytes:
+        return subprocess.run(
+            ["/usr/bin/git", "-C", str(repository), *arguments],
+            cwd=repository,
+            env=environment,
+            capture_output=True,
+            check=True,
+        ).stdout
+
+    index = Path(
+        observe("rev-parse", "--path-format=absolute", "--git-path", "index")
+        .decode("utf-8", "strict")
+        .strip()
+    )
+    objects = Path(
+        observe("rev-parse", "--path-format=absolute", "--git-path", "objects")
+        .decode("utf-8", "strict")
+        .strip()
+    )
+    inventory: list[tuple[object, ...]] = []
+    for path in sorted(objects.rglob("*")):
+        metadata = path.lstat()
+        inventory.append(
+            (
+                str(path.relative_to(objects)),
+                metadata.st_mode,
+                metadata.st_ino,
+                metadata.st_nlink,
+                metadata.st_size,
+                metadata.st_mtime_ns,
+                metadata.st_ctime_ns,
+                getattr(metadata, "st_flags", 0),
+            )
+        )
+    return {
+        "head": observe("rev-parse", "HEAD"),
+        "refs": observe(
+            "for-each-ref",
+            "--format=%(refname)%00%(objectname)%00%(objecttype)",
+        ),
+        "indexSha256": hashlib.sha256(index.read_bytes()).hexdigest(),
+        "status": observe("status", "--porcelain=v2", "-z", "--untracked-files=all"),
+        "objectInventory": inventory,
+    }
+
+
 def load_subject() -> tuple[ModuleType | None, BaseException | None]:
     if not SCRIPT.is_file():
         return None, FileNotFoundError(SCRIPT)
@@ -339,10 +435,15 @@ class A03DesignSourceIdentityContractTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         assert SUBJECT is not None
         cls.subject = SUBJECT
+        cls.historical_a02 = json.loads(A02_FROZEN.read_text(encoding="utf-8"))
         with mock.patch.object(
             SUBJECT,
-            "_observe_bound_custody",
-            return_value=EXPECTED_CUSTODY,
+            "_prepare_projection_and_observe_custody",
+            return_value=(
+                cls.historical_a02,
+                EXPECTED_EXECUTION_ISOLATION,
+                EXPECTED_CUSTODY,
+            ),
         ):
             cls.result = SUBJECT.prepare_identity_freeze(ROOT, CUSTODY_DIRECTORY)
 
@@ -388,6 +489,201 @@ class A03DesignSourceIdentityContractTests(unittest.TestCase):
                 signer="forbidden",
             )
 
+    def test_private_repo_unbundle_consumes_held_descriptor_after_path_move(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="qinao-a03-held-unbundle-") as root:
+            base = Path(root)
+            repository = base / "repository"
+            environment = self.subject._git_environment()
+
+            def run_git(*arguments: str) -> bytes:
+                return subprocess.run(
+                    ["/usr/bin/git", *arguments],
+                    cwd=base,
+                    env=environment,
+                    capture_output=True,
+                    check=True,
+                ).stdout
+
+            run_git("init", str(repository))
+            (repository / "README.md").write_text("fixture\n", encoding="utf-8")
+            run_git("-C", str(repository), "add", "README.md")
+            run_git(
+                "-C",
+                str(repository),
+                "-c",
+                "user.name=Qinao Test",
+                "-c",
+                "user.email=qinao-test@example.invalid",
+                "commit",
+                "-m",
+                "fixture",
+            )
+            original = base / "original.bundle"
+            moved = base / "moved-after-open.bundle"
+            run_git("-C", str(repository), "bundle", "create", str(original), "--all")
+            descriptor = os.open(original, os.O_RDONLY)
+            original.rename(moved)
+            bundle_before = os.fstat(descriptor)
+            expected_heads = run_git("bundle", "list-heads", str(moved)).rstrip(b"\n")
+            session = base / "session"
+            session.mkdir(mode=0o700)
+            try:
+                private, observation = (
+                    self.subject._materialize_private_repository_from_held_bundle(
+                        session,
+                        descriptor,
+                        bundle_before,
+                        expected_heads=expected_heads,
+                    )
+                )
+                bundle_after = os.fstat(descriptor)
+            finally:
+                os.close(descriptor)
+            self.assertEqual(
+                self.subject._identity_tuple(bundle_after),
+                self.subject._identity_tuple(bundle_before),
+            )
+            self.assertFalse(original.exists())
+            run_git("-C", str(private), "fsck", "--full", "--strict")
+            self.assertEqual(
+                observation,
+                {
+                    "inputMechanism": "gitBundleUnbundleFromHeldDescriptor",
+                    "sourcePathReopenUsed": False,
+                    "ordinaryCopyFallbackUsed": False,
+                    "hardlinkFallbackUsed": False,
+                    "liveSourceObjectDatabaseFallbackUsed": False,
+                    "exactBundleHeadsMatched": True,
+                },
+            )
+
+    def test_invalid_held_bundle_fails_closed_without_source_fallback(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="qinao-a03-unbundle-fail-") as root:
+            base = Path(root)
+            source = base / "source.bundle"
+            source.write_bytes(b"not a Git bundle\n")
+            descriptor = os.open(source, os.O_RDONLY)
+            before = os.fstat(descriptor)
+            session = base / "session"
+            session.mkdir(mode=0o700)
+            try:
+                with self.assertRaises(self.subject.SourceIsolationError):
+                    self.subject._materialize_private_repository_from_held_bundle(
+                        session,
+                        descriptor,
+                        before,
+                        expected_heads=b"unreachable",
+                    )
+                after = os.fstat(descriptor)
+            finally:
+                os.close(descriptor)
+            self.assertEqual(
+                self.subject._identity_tuple(after),
+                self.subject._identity_tuple(before),
+            )
+            self.assertFalse(
+                (
+                    session
+                    / self.subject.PRIVATE_REPOSITORY_NAME
+                    / "objects"
+                    / "info"
+                    / "alternates"
+                ).exists()
+            )
+
+    def test_pinned_a02_executes_only_against_bundle_materialized_private_repo(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="qinao-a03-private-a02-") as root:
+            base = Path(root)
+            repository = base / "repository"
+            environment = self.subject._git_environment()
+
+            def run_git(*arguments: str) -> bytes:
+                return subprocess.run(
+                    ["/usr/bin/git", *arguments],
+                    cwd=base,
+                    env=environment,
+                    capture_output=True,
+                    check=True,
+                ).stdout
+
+            run_git("init", str(repository))
+            (repository / "README.md").write_text("fixture\n", encoding="utf-8")
+            run_git("-C", str(repository), "add", "README.md")
+            run_git(
+                "-C",
+                str(repository),
+                "-c",
+                "user.name=Qinao Test",
+                "-c",
+                "user.email=qinao-test@example.invalid",
+                "commit",
+                "-m",
+                "fixture",
+            )
+            bundle = base / "fixture.bundle"
+            run_git("-C", str(repository), "bundle", "create", str(bundle), "--all")
+            expected_heads = run_git(
+                "bundle",
+                "list-heads",
+                str(bundle),
+            ).rstrip(b"\n")
+            source_objects = repository / ".git" / "objects"
+            source_before = repository_observation_for_path(repository)
+
+            module = self.subject._load_pinned_a02_module()
+            original_runtime_root = module.RUNTIME_ROOT
+            observed: dict[str, object] = {}
+
+            def fake_prepare(private_repository: Path) -> dict[str, object]:
+                observed["repository"] = private_repository
+                observed["runtimeRoot"] = module.RUNTIME_ROOT
+                self.assertFalse(
+                    (private_repository / "objects" / "info" / "alternates").exists()
+                )
+                self.assertFalse(
+                    (private_repository / "objects" / "info" / "http-alternates").exists()
+                )
+                run_git("-C", str(private_repository), "fsck", "--full", "--strict")
+                private_packs = list((private_repository / "objects" / "pack").glob("*.pack"))
+                self.assertTrue(private_packs)
+                old_ns = 1_600_000_000_000_000_000
+                os.utime(private_packs[0], ns=(old_ns, old_ns))
+                return {"projection": "sentinel"}
+
+            module.prepare_provisional = fake_prepare
+            descriptor = os.open(bundle, os.O_RDONLY)
+            try:
+                result, isolation = self.subject._execute_pinned_a02_from_bundle(
+                    repository,
+                    source_objects.resolve(strict=True),
+                    descriptor,
+                    os.fstat(descriptor),
+                    module,
+                    expected_heads=expected_heads,
+                )
+            finally:
+                os.close(descriptor)
+
+            self.assertEqual(result, {"projection": "sentinel"})
+            self.assertEqual(module.RUNTIME_ROOT, original_runtime_root)
+            self.assertEqual(
+                isolation["writeCapableGitInput"],
+                "ephemeralPrivateBareRepositoryFromHeldCustodyBundle",
+            )
+            self.assertEqual(
+                source_before,
+                repository_observation_for_path(repository),
+            )
+            self.assertFalse(Path(observed["repository"]).exists())
+            self.assertEqual(
+                Path(observed["runtimeRoot"]).name,
+                "qinao-a02-provisional-runtime-v1",
+            )
+
     def test_a02_loader_ignores_top_level_module_cache_pollution(self) -> None:
         fake = ModuleType("qinao_a02_provisional_design_edge")
         fake.GIT = Path("/usr/bin/false")
@@ -407,6 +703,119 @@ class A03DesignSourceIdentityContractTests(unittest.TestCase):
             hashlib.sha256(Path(loaded.__file__).read_bytes()).hexdigest(),
             self.subject.A02_SOURCE_SHA256,
         )
+
+    def test_concurrent_a02_loads_restore_the_prior_private_module_mapping(
+        self,
+    ) -> None:
+        private_name = self.subject.A02_PRIVATE_MODULE_NAME
+        sentinel = ModuleType(private_name)
+        previous = sys.modules.get(private_name)
+        sys.modules[private_name] = sentinel
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+                loaded = list(
+                    executor.map(
+                        lambda _index: self.subject._load_pinned_a02_module(),
+                        range(32),
+                    )
+                )
+            self.assertIs(sys.modules.get(private_name), sentinel)
+        finally:
+            if previous is None:
+                sys.modules.pop(private_name, None)
+            else:
+                sys.modules[private_name] = previous
+        self.assertEqual(len({id(module) for module in loaded}), 32)
+        self.assertTrue(
+            all(module.RUNTIME_ROOT == self.subject.A02_RUNTIME_ROOT for module in loaded)
+        )
+
+    def test_aliased_a03_modules_share_the_process_loader_lock(self) -> None:
+        aliases = (
+            "scripts._qinao_a03_concurrency_alias_a",
+            "scripts._qinao_a03_concurrency_alias_b",
+        )
+        previous_aliases = {name: sys.modules.get(name) for name in aliases}
+
+        def load_alias(name: str) -> ModuleType:
+            spec = importlib.util.spec_from_file_location(name, SCRIPT)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"could not load alias {name}")
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
+            spec.loader.exec_module(module)
+            return module
+
+        release_first = threading.Event()
+        try:
+            first = load_alias(aliases[0])
+            second = load_alias(aliases[1])
+            self.assertIs(
+                first._PINNED_A02_PROCESS_LOCK,
+                second._PINNED_A02_PROCESS_LOCK,
+            )
+
+            private_name = first.A02_PRIVATE_MODULE_NAME
+            sentinel = ModuleType(private_name)
+            previous_private = sys.modules.get(private_name)
+            sys.modules[private_name] = sentinel
+            real_compile = builtins.compile
+            first_reached_compile = threading.Event()
+            second_reached_compile = threading.Event()
+
+            def slow_first_compile(*args: object, **kwargs: object) -> object:
+                first_reached_compile.set()
+                if not release_first.wait(5):
+                    raise TimeoutError("first alias compile release timed out")
+                return real_compile(*args, **kwargs)
+
+            def observed_second_compile(*args: object, **kwargs: object) -> object:
+                second_reached_compile.set()
+                return real_compile(*args, **kwargs)
+
+            first.compile = slow_first_compile
+            second.compile = observed_second_compile
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                    first_future = executor.submit(first._load_pinned_a02_module)
+                    self.assertTrue(first_reached_compile.wait(5))
+                    second_future = executor.submit(second._load_pinned_a02_module)
+                    overlapped = second_reached_compile.wait(0.25)
+                    release_first.set()
+                    loaded = (first_future.result(), second_future.result())
+                self.assertFalse(overlapped)
+                self.assertTrue(second_reached_compile.is_set())
+                self.assertIs(sys.modules.get(private_name), sentinel)
+                self.assertIsNot(loaded[0], loaded[1])
+            finally:
+                release_first.set()
+                if previous_private is None:
+                    sys.modules.pop(private_name, None)
+                else:
+                    sys.modules[private_name] = previous_private
+        finally:
+            for name, previous in previous_aliases.items():
+                if previous is None:
+                    sys.modules.pop(name, None)
+                else:
+                    sys.modules[name] = previous
+
+    def test_replaced_process_state_holder_fails_closed(self) -> None:
+        state_name = self.subject._PROCESS_STATE_MODULE_NAME
+        previous = sys.modules.get(state_name)
+        self.assertIs(previous, self.subject._PROCESS_STATE_HOLDER)
+        sys.modules[state_name] = ModuleType(state_name)
+        try:
+            with self.assertRaisesRegex(
+                self.subject.PinnedA02Error,
+                "process-state holder changed",
+            ):
+                self.subject._load_pinned_a02_module()
+        finally:
+            if previous is None:
+                sys.modules.pop(state_name, None)
+            else:
+                sys.modules[state_name] = previous
 
     def test_a02_loader_rejects_same_length_source_byte_drift(self) -> None:
         source = SCRIPT.with_name("qinao_a02_provisional_design_edge.py").read_bytes()
@@ -475,9 +884,39 @@ class A03DesignSourceIdentityContractTests(unittest.TestCase):
             self.result["derivation"],
             {
                 "derivationSource": "A0.2.prepare_provisional",
-                "verificationInheritance": "delegatedToA02",
+                "verificationInheritance": (
+                    "fixedIdentityFactsOnlyWithBoundErratum"
+                ),
                 "independentFailureDomains": False,
                 "sourceObjectEpochBinding": "notProven",
+                "executionIsolation": EXPECTED_EXECUTION_ISOLATION,
+                "historicalA02ClaimDisposition": {
+                    "jsonPointer": (
+                        "/deterministicProjection/sharedObjectDatabaseWrites"
+                    ),
+                    "historicalValue": 0,
+                    "status": "supersededAsOverbroad",
+                    "counterexample": (
+                        "alternatePackedObjectMtimeFreshenObserved"
+                    ),
+                    "acceptedSemanticScope": "none",
+                    "boundErratum": {
+                        "relativePath": (
+                            "docs/superpowers/evidence/"
+                            "2026-08-29-qinao-a02-shared-object-database-"
+                            "writes-erratum.json"
+                        ),
+                        "byteLength": 3446,
+                        "sha256": (
+                            "4e51270815584488bbd33054ff7b61f2c4f7ea9040f98ed5e"
+                            "86aa1bf3ae8b93a"
+                        ),
+                        "schema": (
+                            "qinao-a02-provisional-review-projection-v1-"
+                            "erratum-v1"
+                        ),
+                    },
+                },
                 "a02Implementation": {
                     "relativePath": "scripts/qinao_a02_provisional_design_edge.py",
                     "byteLength": 51142,
@@ -529,8 +968,12 @@ class A03DesignSourceIdentityContractTests(unittest.TestCase):
     ) -> None:
         with mock.patch.object(
             self.subject,
-            "_observe_bound_custody",
-            return_value=EXPECTED_CUSTODY,
+            "_prepare_projection_and_observe_custody",
+            return_value=(
+                self.historical_a02,
+                EXPECTED_EXECUTION_ISOLATION,
+                EXPECTED_CUSTODY,
+            ),
         ):
             second = self.subject.prepare_identity_freeze(ROOT, CUSTODY_DIRECTORY)
         self.assertEqual(self.result, second)
@@ -552,20 +995,19 @@ class A03DesignSourceIdentityContractTests(unittest.TestCase):
         self.assertNotEqual(digest, A02_PROJECTION_DIGEST)
 
     def test_a02_drift_fails_closed_instead_of_freezing_a_new_identity(self) -> None:
-        drifted = self.subject.prepare_provisional(ROOT)
+        drifted = json.loads(json.dumps(self.historical_a02))
         drifted["projectionDigest"] = "0" * 64
         with mock.patch.object(
             self.subject,
-            "prepare_provisional",
-            return_value=drifted,
+            "_prepare_projection_and_observe_custody",
+            return_value=(
+                drifted,
+                EXPECTED_EXECUTION_ISOLATION,
+                EXPECTED_CUSTODY,
+            ),
         ):
             with self.assertRaises(self.subject.SourceIdentityError):
-                with mock.patch.object(
-                    self.subject,
-                    "_observe_bound_custody",
-                    return_value=EXPECTED_CUSTODY,
-                ):
-                    self.subject.prepare_identity_freeze(ROOT, CUSTODY_DIRECTORY)
+                self.subject.prepare_identity_freeze(ROOT, CUSTODY_DIRECTORY)
 
     def test_full_a02_output_identity_rejects_effect_or_extra_field_drift(self) -> None:
         mutations = {
@@ -577,31 +1019,30 @@ class A03DesignSourceIdentityContractTests(unittest.TestCase):
                 0
             ].__setitem__("code", "BLOCKED_DIFFERENT"),
         }
-        original = self.subject.prepare_provisional(ROOT)
+        original = self.historical_a02
         for label, mutate in mutations.items():
             with self.subTest(label=label):
                 changed = json.loads(json.dumps(original))
                 mutate(changed)
                 with mock.patch.object(
                     self.subject,
-                    "prepare_provisional",
-                    return_value=changed,
+                    "_prepare_projection_and_observe_custody",
+                    return_value=(
+                        changed,
+                        EXPECTED_EXECUTION_ISOLATION,
+                        EXPECTED_CUSTODY,
+                    ),
                 ):
-                    with mock.patch.object(
-                        self.subject,
-                        "_observe_bound_custody",
-                        return_value=EXPECTED_CUSTODY,
-                    ):
-                        with self.assertRaises(self.subject.SourceIdentityError):
-                            self.subject.prepare_identity_freeze(
-                                ROOT,
-                                CUSTODY_DIRECTORY,
-                            )
+                    with self.assertRaises(self.subject.SourceIdentityError):
+                        self.subject.prepare_identity_freeze(
+                            ROOT,
+                            CUSTODY_DIRECTORY,
+                        )
 
     def test_custody_observation_failure_cannot_freeze_expected_constants(self) -> None:
         with mock.patch.object(
             self.subject,
-            "_observe_bound_custody",
+            "_prepare_projection_and_observe_custody",
             side_effect=self.subject.CustodyError("tampered custody"),
         ):
             with self.assertRaises(self.subject.CustodyError):
@@ -974,6 +1415,18 @@ class A03DesignSourceIdentityContractTests(unittest.TestCase):
         self.assertEqual(unavailable["semanticAuthority"], "none")
         self.assertTrue(unavailable["nonAuthoritative"])
         self.assertFalse(unavailable["installable"])
+        self.assertFalse(unavailable["a03Complete"])
+        self.assertEqual(
+            unavailable["phase"],
+            {
+                "completion": "evaluationUnavailable",
+                "opensA04": False,
+            },
+        )
+        self.assertEqual(
+            unavailable["deepScan3"],
+            "notStartedAndNotAuthorized",
+        )
         self.assertEqual(unavailable["authorityGate"]["state"], "blocked")
         self.assertEqual(
             unavailable["authorityGate"]["currentCodePathEffects"],

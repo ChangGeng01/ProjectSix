@@ -40,10 +40,22 @@ capsule into authority, or open A0.4.
   `674cb04da3d5ab80d3f22cb6a52494f4a6e8c36947a0755faff1ddf2b718fd70`
 - custody review SHA-256:
   `5b01e9705e54a46699f77efa9f0a5bfa064ed8358b15399dbcec9c50037a7371`
+- append-only A0.2 semantic erratum SHA-256:
+  `4e51270815584488bbd33054ff7b61f2c4f7ea9040f98ed5e86aa1bf3ae8b93a`
 
 The capsule is self-contained for the A0.2-required Git object closure. It is
 not a complete offline mirror of external Git LFS payloads and is never an
 authority receipt.
+
+The first postcommit clean-capsule reopen invalidated one overbroad historical
+A0.2 statement. A packed source object retained identical byte length but its
+`mtime_ns` changed while A0.2 used the live source object database through
+`GIT_ALTERNATE_OBJECT_DIRECTORIES`. Therefore
+`/deterministicProjection/sharedObjectDatabaseWrites: 0` is not accepted as a
+valid filesystem-wide claim. The historical A0.2 bytes, commit, tree, source
+tuples, projected tree identities, and zero authority effects remain exact;
+the false semantic scope is superseded by an append-only erratum rather than
+silently rewriting history.
 
 ## Existing authority boundary
 
@@ -80,13 +92,45 @@ must bind and resolve the exact predecessor terminal shape.
 Add `scripts/qinao_a03_design_source_identity.py`.
 
 The public callable and CLI accept only a repository containing the already
-pinned objects and a mode-restricted custody directory. They execute A0.2
+pinned implementation and a mode-restricted custody directory. They load A0.2
 only from its exact sibling source bytes after checking byte length, Git blob,
 and SHA-256, then require the entire canonical A0.2 output to match the frozen
 output SHA-256. Top-level imports, `PYTHONPATH`, and a preloaded same-name
 module cannot select the delegated implementation. The callable and CLI do
 not gain receipt, signer, trust-root, claim, operation, controller,
 output-ref, commit, or install inputs.
+
+No write-capable A0.2 Git operation may receive the live repository or its
+object database. After the custody bundle has been hashed, header/ref checked,
+and verified through the same held file descriptor, a fixed allowlisted Git
+process initializes an empty private SHA-1 bare repository and runs
+`git bundle unbundle /dev/fd/N` against a duplicate of that held descriptor.
+The custody pathname is never reopened. Any initialization, descriptor,
+unbundle, exact-heads, object-format, object-inventory, or identity mismatch
+fails closed; there is no ordinary-copy, hard-link, source-path reopen, or
+live-object-database fallback. The private repository must be non-empty,
+path-disjoint from the live object database, and free of `alternates` and
+`http-alternates`.
+
+The exact byte-pinned A0.2 module owns both the outer and inner scratch leases
+through its existing janitor/lease protocol. The private repository and inner
+runtime root are siblings. The module instance's `RUNTIME_ROOT` is temporarily
+rebound to the inner root with the same frozen basename, restored in `finally`,
+and the original `prepare_provisional(privateRepository)` executes unchanged.
+Loading and execution are serialized by one reentrant lock held in a
+versioned process-state module installed atomically with `sys.modules.setdefault`.
+Every A0.3 alias or reload validates and reuses that same holder and lock; a
+holder replacement or shape mismatch fails closed. The loader restores any
+pre-existing private A0.2 `sys.modules` entry in `finally` so concurrent
+embedded callers cannot leave or delete another caller's mapping.
+Private ephemeral pack metadata may change. The live source object database's
+complete bounded namespace and selected-metadata inventory (device, inode,
+mode, owner, link count, size, mtime, ctime, and flags) must be identical at
+the before/after sampling endpoints of both A0.2 execution and the whole A0.3
+observation. This is an endpoint-equality observation only: it does not hash
+all live object bytes, cover atime/birthtime/ACL/xattr, exclude a transient
+change restored between samples, or establish continuous immutability, a
+durable source epoch, or same-UID capability isolation.
 
 The custody directory is observed rather than trusted by declaration. The
 script opens the directory with `O_DIRECTORY | O_NOFOLLOW`, then proves that
@@ -119,9 +163,17 @@ length prefix. The document must contain:
 - `installable: false`;
 - `a03Complete: false`;
 - `derivationSource: A0.2.prepare_provisional`;
-- `verificationInheritance: delegatedToA02`;
+- `verificationInheritance: fixedIdentityFactsOnlyWithBoundErratum`;
 - `independentFailureDomains: false`;
 - `sourceObjectEpochBinding: notProven`;
+- a content-addressed A0.2 erratum that rejects inheritance of the historical
+  `sharedObjectDatabaseWrites` claim;
+- direct `git bundle unbundle` from the held descriptor, with no pathname
+  reopen or fallback;
+- `writeCapableGitInput` restricted to the ephemeral private bare repository;
+- unchanged live source-object metadata inventory before/after;
+- `privateEphemeralObjectMetadataMayChange: true`;
+- no live source ODB alternate and no copy/hard-link/live-ODB fallback;
 - exact source tuples and source observations;
 - exact base/candidate identities;
 - content-addressed custody evidence with
@@ -136,8 +188,11 @@ length prefix. The document must contain:
   - same-UID capability isolation not proven.
 
 Missing, changed, unreadable, or semantically inconsistent A0.2 evidence emits
-a typed `evaluationUnavailable` document. It never degrades to absent,
-admitted, or already-present.
+a typed `evaluationUnavailable` document. That failure document repeats
+`a03Complete: false`, `phase.opensA04: false`,
+`deepScan3: notStartedAndNotAuthorized`, the blocked authority gate, and zero
+authority effects so downstream machines never need to infer closure from an
+exceptional path. It never degrades to absent, admitted, or already-present.
 
 Freeze one byte-exact JSON output and one review receipt. Neither artifact
 contains its own containing commit/tree; the postcommit external receipt binds
@@ -153,14 +208,25 @@ those identities without a self-hash cycle.
    effects can appear.
 4. Add failing tests for deterministic canonical bytes and a domain-separated
    identity digest.
-5. Add failing tests for A0.2 projection drift, custody drift, and
-   missing-object
-   `evaluationUnavailable`.
-6. Implement the smallest projection wrapper over
-   `prepare_provisional(repository)`.
-7. Run the focused suite, A0.2 regression suite, compile checks, two independent
+5. Add failing tests for A0.2 projection drift, custody drift, and a
+   missing-object `evaluationUnavailable` response that explicitly keeps A0.3,
+   A0.4, and DS3 closed.
+6. Add a clean packed-object regression for the observed source-pack mtime
+   mutation, plus tests proving `unbundle` consumes the still-open file object
+   after its pathname moves, invalid bundles fail closed, exact heads match,
+   no source path/copy/hard-link/live-ODB fallback exists, execution is
+   private-only, the runtime root is restored, and live ODB sampling endpoints
+   remain equal. Add concurrent loader tests that prove every call receives a
+   distinct module object, the prior private `sys.modules` mapping is restored,
+   and separately loaded A0.3 aliases share the same process-state lock rather
+   than racing through module-instance-local locks. Prove that replacing the
+   versioned process-state holder fails closed before any A0.2 load.
+7. Execute the byte-pinned A0.2 implementation only against the private bare
+   repository materialized from the verified custody bundle; bind the
+   append-only erratum and reject inheritance of its superseded claim.
+8. Run the focused suite, A0.2 regression suite, compile checks, two independent
    CLI byte comparisons, and protected-worktree identity checks.
-8. Freeze JSON/receipt, independently review, commit, reopen from a clean
+9. Freeze JSON/receipt, independently review, commit, reopen from a clean
    capsule-backed clone, and publish a repository-external postcommit receipt.
 
 ## Hard stop before A0.3 authority closure

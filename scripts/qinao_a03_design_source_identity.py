@@ -23,6 +23,7 @@ import signal
 import stat
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from types import ModuleType
 from typing import Sequence
@@ -48,6 +49,14 @@ A02_SOURCE_SHA256 = (
     "9229f962f9581f7f942b5f08838f0f9199810dc366e62b03cc0206fe68f09f0d"
 )
 A02_PRIVATE_MODULE_NAME = "_qinao_a02_pinned_9229f962f958"
+A02_ERRATUM_RELATIVE_PATH = (
+    "docs/superpowers/evidence/"
+    "2026-08-29-qinao-a02-shared-object-database-writes-erratum.json"
+)
+A02_ERRATUM_BYTES = 3446
+A02_ERRATUM_SHA256 = (
+    "4e51270815584488bbd33054ff7b61f2c4f7ea9040f98ed5e86aa1bf3ae8b93a"
+)
 GIT = Path("/usr/bin/git")
 
 BOOTSTRAP_COMMIT = "7e4aa2d626e2c94b1b1f3405fb8454e73448514f"
@@ -170,6 +179,35 @@ MAX_BUNDLE_HEADER_BYTES = 16 * 1024
 BUNDLE_COMMAND_TIMEOUT_SECONDS = 60
 MAX_BUNDLE_COMMAND_OUTPUT_BYTES = 64 * 1024
 MAX_REGISTERED_WORKTREES = 256
+MAX_OBJECT_DATABASE_ENTRIES = 200_000
+MAX_OBJECT_DATABASE_DEPTH = 128
+MAX_OBJECT_DATABASE_BYTES = 64 * 1024 * 1024 * 1024
+A02_RUNTIME_ROOT = Path("/private/tmp/qinao-a02-provisional-runtime-v1")
+PRIVATE_REPOSITORY_NAME = "verified-a02-custody.git"
+_PROCESS_STATE_MODULE_NAME = "_qinao_a03_source_identity_process_state_v1"
+_PROCESS_STATE_MARKER = "qinao-a03-source-identity-process-state-v1"
+_PROCESS_STATE_LOCK_ATTRIBUTE = "pinned_a02_process_lock"
+_MISSING_MODULE = object()
+
+
+def _install_shared_process_state() -> tuple[ModuleType, object]:
+    candidate = ModuleType(_PROCESS_STATE_MODULE_NAME)
+    candidate.__qinao_process_state_marker__ = _PROCESS_STATE_MARKER
+    candidate.pinned_a02_process_lock = threading.RLock()
+    state = sys.modules.setdefault(_PROCESS_STATE_MODULE_NAME, candidate)
+    lock = getattr(state, _PROCESS_STATE_LOCK_ATTRIBUTE, None)
+    if (
+        type(state) is not ModuleType
+        or state.__name__ != _PROCESS_STATE_MODULE_NAME
+        or getattr(state, "__qinao_process_state_marker__", None)
+        != _PROCESS_STATE_MARKER
+        or type(lock) is not type(candidate.pinned_a02_process_lock)
+    ):
+        raise RuntimeError("A0.3 process-state holder collision")
+    return state, lock
+
+
+_PROCESS_STATE_HOLDER, _PINNED_A02_PROCESS_LOCK = _install_shared_process_state()
 
 class SourceIdentityError(RuntimeError):
     """A0.2 did not reproduce the one closed A0.3a expected identity."""
@@ -179,8 +217,25 @@ class PinnedA02Error(RuntimeError):
     """The byte-pinned A0.2 implementation could not be loaded or executed."""
 
 
+class SourceIsolationError(RuntimeError):
+    """The live source could not be kept outside write-capable Git execution."""
+
+
 class CustodyError(RuntimeError):
     """Repository-external custody did not match the closed reviewed bytes."""
+
+
+def _validated_pinned_a02_process_lock() -> object:
+    state = sys.modules.get(_PROCESS_STATE_MODULE_NAME)
+    if (
+        state is not _PROCESS_STATE_HOLDER
+        or getattr(state, "__qinao_process_state_marker__", None)
+        != _PROCESS_STATE_MARKER
+        or getattr(state, _PROCESS_STATE_LOCK_ATTRIBUTE, None)
+        is not _PINNED_A02_PROCESS_LOCK
+    ):
+        raise PinnedA02Error("A0.3 process-state holder changed")
+    return _PINNED_A02_PROCESS_LOCK
 
 
 def _verified_a02_source_bytes(path: Path) -> bytes:
@@ -230,7 +285,7 @@ def _verified_a02_source_bytes(path: Path) -> bytes:
     return raw
 
 
-def _load_pinned_a02_module() -> ModuleType:
+def _load_pinned_a02_module_unlocked() -> ModuleType:
     source_path = Path(__file__).resolve(strict=True).with_name(
         Path(A02_SOURCE_RELATIVE_PATH).name
     )
@@ -239,37 +294,39 @@ def _load_pinned_a02_module() -> ModuleType:
     module.__file__ = str(source_path)
     module.__package__ = ""
     module.__loader__ = None
+    previous = sys.modules.get(A02_PRIVATE_MODULE_NAME, _MISSING_MODULE)
     sys.modules[A02_PRIVATE_MODULE_NAME] = module
     try:
-        code = compile(source, str(source_path), "exec", dont_inherit=True)
-        exec(code, module.__dict__)
-    except Exception as error:
-        sys.modules.pop(A02_PRIVATE_MODULE_NAME, None)
-        raise PinnedA02Error("byte-pinned A0.2 implementation failed to load") from error
-    if (
-        getattr(module, "GIT", None) != GIT
-        or not callable(getattr(module, "prepare_provisional", None))
-    ):
-        sys.modules.pop(A02_PRIVATE_MODULE_NAME, None)
-        raise PinnedA02Error("byte-pinned A0.2 implementation surface mismatch")
-    return module
+        try:
+            code = compile(source, str(source_path), "exec", dont_inherit=True)
+            exec(code, module.__dict__)
+        except Exception as error:
+            raise PinnedA02Error(
+                "byte-pinned A0.2 implementation failed to load"
+            ) from error
+        if (
+            getattr(module, "GIT", None) != GIT
+            or getattr(module, "RUNTIME_ROOT", None) != A02_RUNTIME_ROOT
+            or not callable(getattr(module, "prepare_provisional", None))
+            or not callable(getattr(module, "_validated_runtime_root", None))
+            or not callable(getattr(module, "_scratch_session", None))
+        ):
+            raise PinnedA02Error("byte-pinned A0.2 implementation surface mismatch")
+        return module
+    finally:
+        if previous is _MISSING_MODULE:
+            sys.modules.pop(A02_PRIVATE_MODULE_NAME, None)
+        else:
+            sys.modules[A02_PRIVATE_MODULE_NAME] = previous
+
+
+def _load_pinned_a02_module() -> ModuleType:
+    with _validated_pinned_a02_process_lock():
+        return _load_pinned_a02_module_unlocked()
 
 
 def _pinned_a02_module() -> ModuleType:
     return _load_pinned_a02_module()
-
-
-def prepare_provisional(repository: Path) -> dict[str, object]:
-    """Execute only the exact byte-pinned A0.2 implementation."""
-
-    module = _pinned_a02_module()
-    try:
-        result = module.prepare_provisional(repository)
-    except Exception as error:
-        raise PinnedA02Error("byte-pinned A0.2 execution failed") from error
-    if not isinstance(result, dict):
-        raise PinnedA02Error("byte-pinned A0.2 returned a non-object")
-    return result
 
 
 def _git_environment() -> dict[str, str]:
@@ -296,7 +353,7 @@ def _git_environment() -> dict[str, str]:
     }
 
 
-def _run_readonly_git(
+def _run_git(
     arguments: Sequence[str],
     *,
     cwd: Path,
@@ -343,6 +400,72 @@ def _strict_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return result
 
 
+def _verified_a02_erratum() -> dict[str, object]:
+    path = Path(__file__).resolve(strict=True).parents[1] / A02_ERRATUM_RELATIVE_PATH
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_uid != os.getuid()
+            or stat.S_IMODE(before.st_mode) != 0o644
+            or before.st_nlink != 1
+            or before.st_size != A02_ERRATUM_BYTES
+        ):
+            raise SourceIdentityError("A0.2 erratum file shape mismatch")
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(descriptor, 64 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > A02_ERRATUM_BYTES:
+                raise SourceIdentityError("A0.2 erratum exceeds its byte length")
+        after = os.fstat(descriptor)
+        linked = os.lstat(path)
+        if (
+            _identity_tuple(after) != _identity_tuple(before)
+            or _identity_tuple(linked) != _identity_tuple(before)
+        ):
+            raise SourceIdentityError("A0.2 erratum changed while being read")
+    finally:
+        os.close(descriptor)
+    raw = b"".join(chunks)
+    if (
+        len(raw) != A02_ERRATUM_BYTES
+        or hashlib.sha256(raw).hexdigest() != A02_ERRATUM_SHA256
+    ):
+        raise SourceIdentityError("A0.2 erratum byte identity mismatch")
+    document = json.loads(
+        raw.decode("utf-8", "strict"),
+        object_pairs_hook=_strict_json_object,
+    )
+    if (
+        not isinstance(document, dict)
+        or document.get("schema")
+        != "qinao-a02-provisional-review-projection-v1-erratum-v1"
+        or document.get("classification")
+        != "appendOnlyHistoricalSemanticErratum"
+        or document.get("supersededClaim", {}).get("jsonPointer")
+        != "/deterministicProjection/sharedObjectDatabaseWrites"
+        or document.get("supersededClaim", {}).get("disposition")
+        != "invalidatedAsOverbroad"
+        or document.get("authority", {}).get("semanticAuthority") != "none"
+        or document.get("authority", {}).get("deepScan3")
+        != "notStartedAndNotAuthorized"
+    ):
+        raise SourceIdentityError("A0.2 erratum semantic boundary mismatch")
+    return {
+        "relativePath": A02_ERRATUM_RELATIVE_PATH,
+        "byteLength": A02_ERRATUM_BYTES,
+        "sha256": A02_ERRATUM_SHA256,
+        "schema": document["schema"],
+    }
+
+
 def _identity_tuple(value: os.stat_result) -> tuple[int, ...]:
     return (
         value.st_dev,
@@ -356,6 +479,253 @@ def _identity_tuple(value: os.stat_result) -> tuple[int, ...]:
         value.st_ctime_ns,
         getattr(value, "st_flags", 0),
     )
+
+
+def _object_database_metadata_inventory(
+    object_database: Path,
+) -> tuple[int, int, tuple[tuple[object, ...], ...]]:
+    root = object_database.resolve(strict=True)
+    root_metadata = os.lstat(root)
+    if not stat.S_ISDIR(root_metadata.st_mode) or stat.S_ISLNK(root_metadata.st_mode):
+        raise SourceIsolationError("source object database is not a real directory")
+    if root_metadata.st_uid != os.getuid():
+        raise SourceIsolationError("source object database has an unexpected owner")
+
+    root_device = root_metadata.st_dev
+    entries: list[tuple[object, ...]] = []
+    total_bytes = 0
+
+    def visit(path: Path, relative: str, depth: int) -> None:
+        nonlocal total_bytes
+        if depth > MAX_OBJECT_DATABASE_DEPTH:
+            raise SourceIsolationError("object database exceeds the depth budget")
+        try:
+            metadata = os.lstat(path)
+        except OSError as error:
+            raise SourceIsolationError("object database entry is unavailable") from error
+        if metadata.st_dev != root_device:
+            raise SourceIsolationError("object database crosses a device boundary")
+        if metadata.st_uid != os.getuid():
+            raise SourceIsolationError("object database entry has an unexpected owner")
+        if stat.S_ISDIR(metadata.st_mode):
+            kind = "directory"
+        elif stat.S_ISREG(metadata.st_mode):
+            kind = "regular"
+            if metadata.st_nlink != 1:
+                raise SourceIsolationError(
+                    "object database regular file has an unexpected link count"
+                )
+            total_bytes += metadata.st_size
+            if total_bytes > MAX_OBJECT_DATABASE_BYTES:
+                raise SourceIsolationError("object database exceeds the byte budget")
+        else:
+            raise SourceIsolationError("object database contains a special entry")
+        entries.append((relative, kind, *_identity_tuple(metadata)))
+        if len(entries) > MAX_OBJECT_DATABASE_ENTRIES:
+            raise SourceIsolationError("object database exceeds the entry budget")
+        if kind == "directory":
+            try:
+                children = sorted(path.iterdir(), key=lambda value: value.name)
+            except OSError as error:
+                raise SourceIsolationError(
+                    "object database directory cannot be enumerated"
+                ) from error
+            for child in children:
+                child_relative = child.name if relative == "." else f"{relative}/{child.name}"
+                if len(child_relative.encode("utf-8")) > 4096:
+                    raise SourceIsolationError("object database path exceeds the budget")
+                visit(child, child_relative, depth + 1)
+
+    visit(root, ".", 0)
+    return root_device, total_bytes, tuple(entries)
+
+
+def _materialize_private_repository_from_held_bundle(
+    session: Path,
+    bundle_descriptor: int,
+    bundle_before: os.stat_result,
+    *,
+    expected_heads: bytes,
+) -> tuple[Path, dict[str, object]]:
+    session_metadata = os.lstat(session)
+    if (
+        not stat.S_ISDIR(session_metadata.st_mode)
+        or stat.S_ISLNK(session_metadata.st_mode)
+        or session_metadata.st_uid != os.getuid()
+        or stat.S_IMODE(session_metadata.st_mode) != 0o700
+    ):
+        raise SourceIsolationError("private materialization session is not 0700")
+    if (
+        not stat.S_ISREG(bundle_before.st_mode)
+        or bundle_before.st_uid != os.getuid()
+        or bundle_before.st_nlink != 1
+        or _identity_tuple(os.fstat(bundle_descriptor))
+        != _identity_tuple(bundle_before)
+    ):
+        raise SourceIsolationError("held bundle identity is invalid")
+
+    private_repository = session / PRIVATE_REPOSITORY_NAME
+    empty_template = session / "empty-git-template"
+    empty_template.mkdir(mode=0o700)
+    _run_git(
+        [
+            "init",
+            "--bare",
+            "--object-format=sha1",
+            f"--template={empty_template}",
+            str(private_repository),
+        ],
+        cwd=session,
+    )
+
+    inherited = os.dup(bundle_descriptor)
+    try:
+        os.lseek(inherited, 0, os.SEEK_SET)
+        try:
+            unbundled_heads = _run_git(
+                [
+                    "-C",
+                    str(private_repository),
+                    "bundle",
+                    "unbundle",
+                    f"/dev/fd/{inherited}",
+                ],
+                cwd=session,
+                pass_fds=(inherited,),
+            ).rstrip(b"\n")
+        except CustodyError as error:
+            raise SourceIsolationError(
+                "held bundle could not materialize a private repository"
+            ) from error
+    finally:
+        os.close(inherited)
+    if unbundled_heads != expected_heads:
+        raise SourceIsolationError("private unbundle ref inventory mismatch")
+    if _identity_tuple(os.fstat(bundle_descriptor)) != _identity_tuple(bundle_before):
+        raise SourceIsolationError("held bundle changed across private unbundle")
+
+    return private_repository, {
+        "inputMechanism": "gitBundleUnbundleFromHeldDescriptor",
+        "sourcePathReopenUsed": False,
+        "ordinaryCopyFallbackUsed": False,
+        "hardlinkFallbackUsed": False,
+        "liveSourceObjectDatabaseFallbackUsed": False,
+        "exactBundleHeadsMatched": True,
+    }
+
+
+def _execute_pinned_a02_from_bundle_unlocked(
+    repository: Path,
+    source_object_database: Path,
+    bundle_descriptor: int,
+    bundle_before: os.stat_result,
+    module: ModuleType,
+    *,
+    expected_heads: bytes = _EXPECTED_LIST_HEADS,
+) -> tuple[dict[str, object], dict[str, object]]:
+    repository = repository.resolve(strict=True)
+    source_object_database = source_object_database.resolve(strict=True)
+    source_inventory_before = _object_database_metadata_inventory(
+        source_object_database
+    )
+    _bundle_sha_before, _prefix = _hash_open_descriptor(
+        bundle_descriptor,
+        bundle_before,
+        CUSTODY_BUNDLE_NAME,
+        bundle_before.st_size,
+    )
+
+    try:
+        runtime_root = module._validated_runtime_root(
+            repository,
+            source_object_database,
+        )
+        with module._scratch_session(runtime_root) as session:
+            private_repository, materialization = (
+                _materialize_private_repository_from_held_bundle(
+                    session,
+                    bundle_descriptor,
+                    bundle_before,
+                    expected_heads=expected_heads,
+                )
+            )
+            object_format = _run_git(
+                ["-C", str(private_repository), "rev-parse", "--show-object-format"],
+                cwd=session,
+            )
+            if object_format != b"sha1\n":
+                raise SourceIsolationError("private repository object format mismatch")
+            private_objects = (
+                private_repository / "objects"
+            ).resolve(strict=True)
+            if _paths_overlap(private_objects, source_object_database):
+                raise SourceIsolationError("private and source object databases overlap")
+            _require_absent_alternate_database_files(private_objects)
+            private_inventory = _object_database_metadata_inventory(private_objects)
+            if private_inventory[1] <= 0:
+                raise SourceIsolationError("private object database is empty")
+
+            original_runtime_root = module.RUNTIME_ROOT
+            inner_runtime_root = session / A02_RUNTIME_ROOT.name
+            module.RUNTIME_ROOT = inner_runtime_root
+            try:
+                result = module.prepare_provisional(private_repository)
+            finally:
+                module.RUNTIME_ROOT = original_runtime_root
+            if module.RUNTIME_ROOT != original_runtime_root:
+                raise SourceIsolationError("pinned A0.2 runtime root was not restored")
+            if not isinstance(result, dict):
+                raise PinnedA02Error("byte-pinned A0.2 returned a non-object")
+            _require_absent_alternate_database_files(private_objects)
+    except SourceIsolationError:
+        raise
+    except Exception as error:
+        raise PinnedA02Error("byte-pinned A0.2 private execution failed") from error
+    finally:
+        source_inventory_after = _object_database_metadata_inventory(
+            source_object_database
+        )
+        if source_inventory_after != source_inventory_before:
+            raise SourceIsolationError(
+                "source object database changed across private A0.2 execution"
+            )
+        if _identity_tuple(os.fstat(bundle_descriptor)) != _identity_tuple(bundle_before):
+            raise SourceIsolationError("held custody bundle changed during execution")
+
+    return result, {
+        "writeCapableGitInput": (
+            "ephemeralPrivateBareRepositoryFromHeldCustodyBundle"
+        ),
+        "bundleMaterialization": materialization,
+        "sourceRepositoryObjectDatabaseObservation": (
+            "boundedSelectedMetadataEndpointInventoryEqualBeforeAfter"
+        ),
+        "privateEphemeralObjectMetadataMayChange": True,
+        "liveSourceObjectDatabaseUsedAsAlternate": False,
+        "runtimeOwnershipProtocol": "singlePinnedA02ScratchLeaseProtocol",
+        "nestedLeaseCount": 2,
+        "runtimeRootReboundAndRestored": True,
+    }
+
+
+def _execute_pinned_a02_from_bundle(
+    repository: Path,
+    source_object_database: Path,
+    bundle_descriptor: int,
+    bundle_before: os.stat_result,
+    module: ModuleType,
+    *,
+    expected_heads: bytes = _EXPECTED_LIST_HEADS,
+) -> tuple[dict[str, object], dict[str, object]]:
+    with _validated_pinned_a02_process_lock():
+        return _execute_pinned_a02_from_bundle_unlocked(
+            repository,
+            source_object_database,
+            bundle_descriptor,
+            bundle_before,
+            module,
+            expected_heads=expected_heads,
+        )
 
 
 def _open_custody_directory(directory: Path) -> tuple[int, os.stat_result]:
@@ -651,7 +1021,7 @@ def _repository_storage_roots(
     }
     roots: dict[str, Path] = {}
     for label, command in commands.items():
-        raw = _run_readonly_git(command, cwd=resolved)
+        raw = _run_git(command, cwd=resolved)
         if not raw.endswith(b"\n") or b"\n" in raw[:-1]:
             raise CustodyError(f"{label} path observation is malformed")
         try:
@@ -661,7 +1031,7 @@ def _repository_storage_roots(
         if not text:
             raise CustodyError(f"{label} path observation is malformed")
         roots[label] = Path(text).resolve(strict=True)
-    worktree_raw = _run_readonly_git(
+    worktree_raw = _run_git(
         ["-C", str(resolved), "worktree", "list", "--porcelain", "-z"],
         cwd=resolved,
     )
@@ -713,7 +1083,7 @@ def _run_bound_bundle_command(
     inherited = os.dup(bundle_descriptor)
     try:
         os.lseek(inherited, 0, os.SEEK_SET)
-        return _run_readonly_git(
+        return _run_git(
             ["bundle", operation, f"/dev/fd/{inherited}"],
             cwd=repository,
             pass_fds=(inherited,),
@@ -725,7 +1095,9 @@ def _run_bound_bundle_command(
 def _observe_bound_custody(
     repository: Path,
     custody_directory: Path,
-) -> dict[str, object]:
+    *,
+    bundle_consumer: object | None = None,
+) -> dict[str, object] | tuple[dict[str, object], object]:
     repository = repository.resolve(strict=True)
     directory = custody_directory.resolve(strict=True)
     if directory != custody_directory.expanduser().absolute():
@@ -820,6 +1192,12 @@ def _observe_bound_custody(
         if list_heads != _EXPECTED_LIST_HEADS:
             raise CustodyError("custody bundle list-heads mismatch")
 
+        consumer_result: object | None = None
+        if bundle_consumer is not None:
+            if not callable(bundle_consumer):
+                raise CustodyError("bundle consumer is not callable")
+            consumer_result = bundle_consumer(bundle_descriptor, bundle_before)
+
         bundle_sha_after, bundle_prefix_after = _hash_open_descriptor(
             bundle_descriptor,
             bundle_before,
@@ -871,7 +1249,7 @@ def _observe_bound_custody(
         if directory_descriptor >= 0:
             os.close(directory_descriptor)
 
-    return {
+    observation: dict[str, object] = {
         "classification": (
             "canonicalPathRepositoryExternalModeRestrictedCustodyObservation"
         ),
@@ -920,6 +1298,71 @@ def _observe_bound_custody(
         "incumbentArtifactMeshReceiptBound": False,
         "semanticAuthority": "none",
     }
+    if bundle_consumer is None:
+        return observation
+    return observation, consumer_result
+
+
+def _prepare_projection_and_observe_custody(
+    repository: Path,
+    custody_directory: Path,
+) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+    repository = repository.resolve(strict=True)
+    module = _pinned_a02_module()
+    roots_before, boundary_before = _repository_storage_roots(repository)
+    source_object_database = roots_before["primaryObjectDatabase"]
+    source_inventory_before = _object_database_metadata_inventory(
+        source_object_database
+    )
+
+    def execute(
+        bundle_descriptor: int,
+        bundle_before: os.stat_result,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        return _execute_pinned_a02_from_bundle(
+            repository,
+            source_object_database,
+            bundle_descriptor,
+            bundle_before,
+            module,
+        )
+
+    try:
+        combined = _observe_bound_custody(
+            repository,
+            custody_directory,
+            bundle_consumer=execute,
+        )
+    finally:
+        roots_after, boundary_after = _repository_storage_roots(repository)
+        if (
+            boundary_after != boundary_before
+            or roots_after != roots_before
+            or roots_after["primaryObjectDatabase"] != source_object_database
+        ):
+            raise SourceIsolationError(
+                "repository storage boundary changed across A0.3 observation"
+            )
+        source_inventory_after = _object_database_metadata_inventory(
+            source_object_database
+        )
+        if source_inventory_after != source_inventory_before:
+            raise SourceIsolationError(
+                "source object database changed across A0.3 observation"
+            )
+
+    if not isinstance(combined, tuple) or len(combined) != 2:
+        raise CustodyError("custody bundle execution result is malformed")
+    custody, execution = combined
+    if (
+        not isinstance(custody, dict)
+        or not isinstance(execution, tuple)
+        or len(execution) != 2
+        or not isinstance(execution[1], dict)
+    ):
+        raise CustodyError("custody bundle execution result is malformed")
+    projection = _validate_a02_projection(execution[0])
+    return projection, execution[1], custody
 
 
 def _expected_source_observations() -> list[dict[str, object]]:
@@ -1019,8 +1462,11 @@ def prepare_identity_freeze(
 ) -> dict[str, object]:
     """Prepare one blocked A0.3a identity after exact A0.2/custody observation."""
 
-    projection = _validate_a02_projection(prepare_provisional(repository))
-    custody = _observe_bound_custody(repository, custody_directory)
+    raw_projection, execution_isolation, custody = (
+        _prepare_projection_and_observe_custody(repository, custody_directory)
+    )
+    projection = _validate_a02_projection(raw_projection)
+    a02_erratum = _verified_a02_erratum()
     result: dict[str, object] = {
         "schema": SCHEMA,
         "semanticAuthority": "none",
@@ -1034,9 +1480,20 @@ def prepare_identity_freeze(
         },
         "derivation": {
             "derivationSource": "A0.2.prepare_provisional",
-            "verificationInheritance": "delegatedToA02",
+            "verificationInheritance": "fixedIdentityFactsOnlyWithBoundErratum",
             "independentFailureDomains": False,
             "sourceObjectEpochBinding": "notProven",
+            "executionIsolation": execution_isolation,
+            "historicalA02ClaimDisposition": {
+                "jsonPointer": (
+                    "/deterministicProjection/sharedObjectDatabaseWrites"
+                ),
+                "historicalValue": 0,
+                "status": "supersededAsOverbroad",
+                "counterexample": "alternatePackedObjectMtimeFreshenObserved",
+                "acceptedSemanticScope": "none",
+                "boundErratum": a02_erratum,
+            },
             "a02Implementation": {
                 "relativePath": A02_SOURCE_RELATIVE_PATH,
                 "byteLength": A02_SOURCE_BYTES,
@@ -1095,6 +1552,10 @@ def _evaluation_unavailable_document() -> dict[str, object]:
         "nonAuthoritative": True,
         "installable": False,
         "a03Complete": False,
+        "phase": {
+            "completion": "evaluationUnavailable",
+            "opensA04": False,
+        },
         "authorityGate": {
             "state": "blocked",
             "blockers": [
@@ -1105,6 +1566,7 @@ def _evaluation_unavailable_document() -> dict[str, object]:
             ],
             "currentCodePathEffects": dict(ZERO_AUTHORITY_EFFECTS),
         },
+        "deepScan3": "notStartedAndNotAuthorized",
     }
 
 
