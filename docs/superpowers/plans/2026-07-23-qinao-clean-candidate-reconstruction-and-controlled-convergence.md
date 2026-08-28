@@ -1,6 +1,17 @@
 # Qinao Clean Candidate Reconstruction and Controlled Convergence Program Plan
 
-> **For agentic workers:** This file is the program-order authority, not a code task list. Execute the linked child implementation plans with `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans`. Never execute two child steps that write the same candidate tree at the same time.
+> **QINAO-PLAN-REGISTRY-V1: SUPERSEDED_HISTORICAL**
+
+> **SUPERSEDED; HISTORICAL; DO NOT EXECUTE; GRANTS NO AUTHORITY.** This file is
+> retained only as review provenance. Its former program-order and child-plan
+> instructions are void. The active order authority is
+> `docs/superpowers/plans/2026-07-15-iphone-air-architecture-convergence-master.md`;
+> its sole active Tasks-0-2 implementation annex is
+> `docs/superpowers/plans/2026-07-29-qinao-dual-space-automation-controlled-convergence.md`
+> and exposes only `resume-series`.
+
+> **Historical note:** the former worker/program-order directive is void and
+> grants no permission to execute this file or any linked child plan.
 
 **Goal:** Preserve every existing byte, reconstruct one non-circular clean candidate, admit preW0 through W6 through predecessor-derived gates, and hand off one verified model-independent Qinao SDK without creating duplicate authority.
 

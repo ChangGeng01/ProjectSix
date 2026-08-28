@@ -1,6 +1,13 @@
 # Qinao Bootstrap Verifier and Admission Lineage Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **QINAO-PLAN-REGISTRY-V1: SUPERSEDED_HISTORICAL**
+
+> **SUPERSEDED; HISTORICAL; DO NOT EXECUTE; GRANTS NO AUTHORITY.** Historical
+> child of the superseded 2026-07-23 program. Every worker directive, checkbox,
+> command, branch action, and authority claim below is inert. Its reviewed
+> requirements may enter only through
+> `2026-07-29-qinao-dual-space-automation-controlled-convergence.md` and the
+> controlled 2026-07-15 master/domain plans.
 
 **Goal:** Build the externally anchored bootstrap trust root that freezes every gate needed through W6, evaluates exact Git payload objects without candidate-code trust, hands authoritative side effects to an authenticated external admission service, and reparents the finalized preW0 payload under a minimal single-parent `B0` without losing the existing 22 preparation commits.
 

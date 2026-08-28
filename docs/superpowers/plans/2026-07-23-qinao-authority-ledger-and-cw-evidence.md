@@ -1,6 +1,13 @@
 # Qinao Authority Ledger and Cw Evidence Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **QINAO-PLAN-REGISTRY-V1: SUPERSEDED_HISTORICAL**
+
+> **SUPERSEDED; HISTORICAL; DO NOT EXECUTE; GRANTS NO AUTHORITY.** Historical
+> child of the superseded 2026-07-23 program. Every worker directive, checkbox,
+> command, branch action, and authority claim below is inert. Its reviewed
+> requirements may enter only through
+> `2026-07-29-qinao-dual-space-automation-controlled-convergence.md` and the
+> controlled 2026-07-15 master/domain plans.
 
 **Goal:** Atomically converge Qinao's exact 7 controlled documents plus 4 governing addenda, activate the sole Owner Ledger's schema-v2 authority/catalog/profile contracts, and form the evidence-only `Cw` plus one-receipt `Sw` without allowing candidate bytes or evidence to authorize themselves.
 

@@ -1,5 +1,7 @@
 # iPhone Air Apple Silicon Architecture Convergence Implementation Plan
 
+> **QINAO-PLAN-REGISTRY-V1: ORDER_MASTER**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Converge the substantial implementation already present in `BehavioralAISubstrate` onto the approved `14 Semantic LayerCores + 4 Physical Kernels + 4 bounded ControlRings + 7 orthogonal planes` architecture without duplicating mature components or overstating iPhone Air performance.

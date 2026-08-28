@@ -6,7 +6,7 @@
 // distinct `info` label per domain gives that separation deterministically.
 
 import XCTest
-import Crypto
+import CryptoKit
 @testable import QinaoSovereign
 
 final class QinaoKeyDomainSeparationTests: XCTestCase {

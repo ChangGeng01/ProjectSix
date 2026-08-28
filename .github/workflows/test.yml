@@ -12,16 +12,25 @@ on:
     branches: [ main, "m605-chapter-*", "decode-*" ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+
+permissions: {}
 
 jobs:
   bas-tests:
     name: BehavioralAISubstrate XCTest
     runs-on: macos-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: BAS test
@@ -31,10 +40,16 @@ jobs:
     name: QinaoRuntimeSDK XCTest
     runs-on: macos-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
       - name: Qinao test
         working-directory: QinaoRuntimeSDK
         run: swift test
@@ -43,6 +58,8 @@ jobs:
     name: SampleHost iOS XCTest
     runs-on: macos-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
     # 2026-05-21 — RE-ENABLED after SampleHost reconstitution。
     # SampleHost is now a standalone SPM iOS package at /SampleHost/Package.swift
     # (since 2026-05-20 SampleHost was a scheme inside the now-archived
@@ -51,9 +68,13 @@ jobs:
     # Tests live at /SampleHost/Tests/SampleHostTests/ (relocated from /SampleHostTests/
     # to satisfy SPM-canonical layout)。
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Build SampleHost for iOS Simulator
@@ -75,10 +96,16 @@ jobs:
     name: 4 boundary scripts + schema parity
     runs-on: macos-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
       - name: Qinao import boundaries
         run: bash scripts/check_qinao_import_boundaries.sh
       - name: Sovereign redaction
@@ -96,14 +123,20 @@ jobs:
     name: Python pytest fuzz tests
     runs-on: macos-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          python-version: "3.12"
+          python-version: "3.14.5"
       - name: Run pytest
         run: |
           pip install pytest
@@ -117,10 +150,16 @@ jobs:
     name: Rust cargo build + test (--locked)
     runs-on: macos-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
       - name: cargo build + test (locked, pinned toolchain)
         working-directory: BehavioralAISubstrate/Cargo
         run: |
@@ -147,15 +186,31 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          python-version: "3.12"
+          python-version: "3.14.5"
+      - name: Require protected Python 3.9.6 compatibility proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x /usr/bin/python3
+          test "$(/usr/bin/python3 --version 2>&1)" = "Python 3.9.6"
+          /usr/bin/python3 -m unittest \
+            scripts.test_check_qinao_owner_ledger.QinaoOwnerLedgerCLITests.test_repository_owner_ledger_runs_under_protected_python_39
       - name: Run Qinao gate units and real report-fixture smoke
         run: >-
           python3 -m unittest
           scripts.test_check_qinao_owner_ledger
           scripts.test_run_nonempty_swift_filter
+          scripts.test_run_nonempty_xcode_test
+          scripts.test_check_artifact_mesh_device_recovery
           scripts.test_run_qinao_wave_admission
+          scripts.test_prepare_qinao_v2_wave_candidate
+          scripts.test_run_qinao_managed_convergence
           scripts.test_run_qinao_k4_ios27_platform_spike
           scripts.test_qinao_admission_canonical_vectors
           scripts.test_qinao_plan_remediation
@@ -165,6 +220,49 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          qinao_read_head_object() {
+            test "$#" -eq 2
+            repository_root="$1"
+            case "$2" in
+              commit) object_expression='HEAD^{commit}' ;;
+              tree) object_expression='HEAD^{tree}' ;;
+              *) return 64 ;;
+            esac
+            /usr/bin/env -i \
+              HOME=/nonexistent \
+              LANG=C \
+              LC_ALL=C \
+              PATH=/usr/bin:/bin \
+              XDG_CONFIG_HOME=/nonexistent \
+              GIT_ATTR_NOSYSTEM=1 \
+              GIT_CONFIG_COUNT=5 \
+              GIT_CONFIG_GLOBAL=/dev/null \
+              GIT_CONFIG_KEY_0=core.fsmonitor \
+              GIT_CONFIG_KEY_1=core.hooksPath \
+              GIT_CONFIG_KEY_2=diff.external \
+              GIT_CONFIG_KEY_3=core.pager \
+              GIT_CONFIG_KEY_4=submodule.recurse \
+              GIT_CONFIG_NOSYSTEM=1 \
+              GIT_CONFIG_SYSTEM=/dev/null \
+              GIT_CONFIG_VALUE_0=false \
+              GIT_CONFIG_VALUE_1=/dev/null \
+              GIT_CONFIG_VALUE_2= \
+              GIT_CONFIG_VALUE_3=cat \
+              GIT_CONFIG_VALUE_4=false \
+              GIT_LITERAL_PATHSPECS=1 \
+              GIT_NO_LAZY_FETCH=1 \
+              GIT_NO_REPLACE_OBJECTS=1 \
+              GIT_OPTIONAL_LOCKS=0 \
+              GIT_PAGER=cat \
+              GIT_TERMINAL_PROMPT=0 \
+              PAGER=cat \
+              /usr/bin/git \
+                --no-pager \
+                --no-optional-locks \
+                --no-replace-objects \
+                -C "$repository_root" \
+                rev-parse --verify "$object_expression"
+          }
           for variable in \
             QINAO_CURRENT_WAVE_BUNDLE \
             QINAO_SOURCE_SELECTION \
@@ -268,8 +366,9 @@ jobs:
             done
             runtime_entry_args+=(--runtime-entry-predecessor "/dev/fd/$runtime_entry_fd")
           fi
-          QINAO_CANDIDATE_TREE="$(git rev-parse HEAD^{tree})"
+          QINAO_CANDIDATE_TREE="$(qinao_read_head_object "$GITHUB_WORKSPACE" tree)"
           python3 scripts/run_qinao_wave_admission.py report \
+            --git-executable /usr/bin/git \
             --root "$GITHUB_WORKSPACE" \
             --bundle "$QINAO_CURRENT_WAVE_BUNDLE" \
             --source-selection "$QINAO_SOURCE_SELECTION" \
@@ -286,32 +385,108 @@ jobs:
           exec 23<&-
           exec 24<&-
           exec 25<&-
+      - name: Require exclusive iOS 27 JIT runner readiness
+        if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
+        shell: bash
+        env:
+          QINAO_IOS27_JIT_EXCLUSIVE_READY: ${{ vars.QINAO_IOS27_JIT_EXCLUSIVE_READY }}
+        run: |
+          set -euo pipefail
+          if test "$QINAO_IOS27_JIT_EXCLUSIVE_READY" != "true"; then
+            printf '%s\n' \
+              "BLOCKED_PHASE_C_IOS27_JIT_EXCLUSIVE_WORKFLOW_REQUIRED"
+            exit 1
+          fi
+          printf '%s\n' \
+            "READY is an operator assertion, not runner-lifecycle proof"
 
   qinao-ios27-floor:
     name: Qinao Xcode 27 floor
     needs: qinao-gates
-    runs-on: xcode-27
+    # qinao-ios27-jit must permit only this exact workflow, provision a fresh
+    # one-job JIT/ephemeral runner, and destroy it after the job. The hosted
+    # readiness step blocks main when the operator assertion is absent.
+    # Group selection and READY still cannot attest the runner lifecycle.
+    if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
+    runs-on:
+      group: qinao-ios27-jit
+      labels: [self-hosted, macOS, xcode-27]
     timeout-minutes: 30
     permissions:
       contents: read
+    env:
+      QINAO_IOS27_FLOOR_RELATIVE: qinao-ios27-floor-${{ github.run_id }}-${{ github.run_attempt }}
+      GIT_ATTR_NOSYSTEM: "1"
+      GIT_CONFIG_COUNT: "9"
+      GIT_CONFIG_GLOBAL: "/dev/null"
+      GIT_CONFIG_NOSYSTEM: "1"
+      GIT_CONFIG_SYSTEM: "/dev/null"
+      GIT_CONFIG_KEY_0: core.fsmonitor
+      GIT_CONFIG_VALUE_0: "false"
+      GIT_CONFIG_KEY_1: core.hooksPath
+      GIT_CONFIG_VALUE_1: /dev/null
+      GIT_CONFIG_KEY_2: diff.external
+      GIT_CONFIG_VALUE_2: ""
+      GIT_CONFIG_KEY_3: core.pager
+      GIT_CONFIG_VALUE_3: cat
+      GIT_CONFIG_KEY_4: submodule.recurse
+      GIT_CONFIG_VALUE_4: "false"
+      GIT_CONFIG_KEY_5: filter.lfs.clean
+      GIT_CONFIG_VALUE_5: ""
+      GIT_CONFIG_KEY_6: filter.lfs.smudge
+      GIT_CONFIG_VALUE_6: ""
+      GIT_CONFIG_KEY_7: filter.lfs.process
+      GIT_CONFIG_VALUE_7: ""
+      GIT_CONFIG_KEY_8: filter.lfs.required
+      GIT_CONFIG_VALUE_8: "false"
+      GIT_LITERAL_PATHSPECS: "1"
+      GIT_NO_LAZY_FETCH: "1"
+      GIT_NO_REPLACE_OBJECTS: "1"
+      GIT_OPTIONAL_LOCKS: "0"
+      GIT_PAGER: cat
+      GIT_TERMINAL_PROMPT: "0"
+      PAGER: cat
+      XDG_CONFIG_HOME: /nonexistent
     steps:
+      - name: Assert isolated iOS 27 floor root is absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GITHUB_RUN_ID" in ""|*[!0-9]*) exit 64 ;; esac
+          case "$GITHUB_RUN_ATTEMPT" in ""|*[!0-9]*) exit 64 ;; esac
+          test "$QINAO_IOS27_FLOOR_RELATIVE" = \
+            "qinao-ios27-floor-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          floor_root="$GITHUB_WORKSPACE/$QINAO_IOS27_FLOOR_RELATIVE"
+          case "$floor_root" in
+            "$GITHUB_WORKSPACE"/*) ;;
+            *) exit 64 ;;
+          esac
+          test ! -e "$floor_root"
+          test ! -L "$floor_root"
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          path: ${{ env.QINAO_IOS27_FLOOR_RELATIVE }}
           fetch-depth: 0
           persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          python-version: "3.12"
+          python-version: "3.14.5"
       - name: Assert Xcode 27 toolchain
         shell: bash
+        working-directory: ${{ github.workspace }}/${{ env.QINAO_IOS27_FLOOR_RELATIVE }}
         run: |
           set -euo pipefail
           xcode_version="$(xcodebuild -version | sed -n '1s/^Xcode //p')"
           test "${xcode_version%%.*}" = "27"
           swift --version
       - name: Run iOS 27 floor unit tests
+        working-directory: ${{ github.workspace }}/${{ env.QINAO_IOS27_FLOOR_RELATIVE }}
         run: >-
           python3 -m unittest
           BehavioralAISubstrate.scripts.test_check_ios27_floor
       - name: Run local iOS 27 floor check
+        working-directory: ${{ github.workspace }}/${{ env.QINAO_IOS27_FLOOR_RELATIVE }}
         run: BehavioralAISubstrate/scripts/check-ios27-floor.sh

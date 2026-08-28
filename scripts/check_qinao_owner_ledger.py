@@ -9,11 +9,24 @@ import base64
 import hashlib
 import json
 import re
+import selectors
+import signal
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime, timezone
 from fnmatch import fnmatchcase
+from os import killpg, read, set_blocking
 from pathlib import Path, PurePosixPath
+from time import monotonic, sleep
+
+
+if sys.version_info >= (3, 10):
+    MATCH_NAME_BINDING_NODE_TYPES = (ast.MatchAs, ast.MatchStar)
+    MATCH_MAPPING_NODE_TYPES = (ast.MatchMapping,)
+else:
+    MATCH_NAME_BINDING_NODE_TYPES = ()
+    MATCH_MAPPING_NODE_TYPES = ()
 
 
 EXPECTED_ARCHITECTURE_SPEC = "docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md"
@@ -557,6 +570,18 @@ CREATE_PROOF_FIELDS = {
 MIN_CREATE_PROOF_CHARS = 24
 MAX_JSON_BYTES = 1_048_576
 MAX_AUDIT_BOUNDARY_SOURCE_BYTES = 4_194_304
+MAX_CANDIDATE_TREE_INDEX_BYTES = 64 * 1024 * 1024
+MAX_CANDIDATE_TREE_ENTRIES = 200_000
+MAX_CANDIDATE_UNIQUE_BLOB_READS = 4_096
+MAX_CANDIDATE_CACHED_BLOB_BYTES = 64 * 1024 * 1024
+MAX_CANDIDATE_BLOB_LOAD_ATTEMPTS = 4_096
+MAX_CANDIDATE_ATTEMPTED_BLOB_BYTES = (
+    MAX_CANDIDATE_CACHED_BLOB_BYTES + MAX_CANDIDATE_BLOB_LOAD_ATTEMPTS
+)
+MAX_CANDIDATE_BLOB_WALL_SECONDS = 120.0
+MAX_CANDIDATE_GLOB_MATCHES = 20_000
+MAX_CANDIDATE_TOTAL_GLOB_MATCHES = 50_000
+MAX_CANDIDATE_BUILD_SURFACES = 10_000
 
 AUDIT_ASSET_FILENAMES = (
     "qinao-owner-ledger-v1.json",
@@ -600,253 +625,650 @@ NON_QINAO_BUILD_COMPONENTS = {
     "Vendor",
 }
 OWNER_GATE_RELATIVE_PATH = "scripts/check_qinao_owner_ledger.py"
-FILESYSTEM_WRITE_METHODS = {
-    "chmod",
-    "copy",
-    "copy_into",
-    "hardlink_to",
-    "lchmod",
-    "link_to",
-    "mkdir",
-    "move",
-    "move_into",
-    "rename",
-    "replace",
-    "rmdir",
-    "symlink_to",
-    "touch",
-    "truncate",
-    "unlink",
-    "write",
-    "write_bytes",
-    "write_text",
-    "writelines",
-}
-FORBIDDEN_EMIT_CALLS = {
-    "json.dump",
-    "marshal.dump",
-    "os.link",
-    "os.makedirs",
-    "os.mkdir",
-    "os.remove",
-    "os.removedirs",
-    "os.rename",
-    "os.renames",
-    "os.replace",
-    "os.rmdir",
-    "os.symlink",
-    "os.truncate",
-    "os.unlink",
-    "pickle.dump",
-    "shutil.copy",
-    "shutil.copy2",
-    "shutil.copyfile",
-    "shutil.copytree",
-    "shutil.move",
-    "sqlite3.connect",
-    "yaml.dump",
-}
-SUBPROCESS_CALLS = {
-    "subprocess.call",
-    "subprocess.check_call",
-    "subprocess.check_output",
-    "subprocess.Popen",
-    "subprocess.run",
-}
-READ_ONLY_GIT_SUBCOMMANDS = {
-    "cat-file",
-    "diff-tree",
-    "ls-tree",
-    "rev-parse",
-}
-GIT_TIMEOUT_SECONDS = 30
-GIT_SUBPROCESS_ENVIRONMENT = {
-    "GIT_CONFIG_GLOBAL": "/dev/null",
-    "GIT_CONFIG_NOSYSTEM": "1",
-    "GIT_TERMINAL_PROMPT": "0",
-    "HOME": "/nonexistent",
-    "LANG": "C",
-    "LC_ALL": "C",
-    "PATH": "/usr/bin:/bin",
-}
-DANGEROUS_ALIAS_MODULES = {
-    "builtins",
-    "json",
-    "marshal",
-    "os",
-    "pickle",
-    "shutil",
-    "sqlite3",
-    "subprocess",
-    "yaml",
-}
-DANGEROUS_ALIAS_TARGETS = (
-    FORBIDDEN_EMIT_CALLS
-    | SUBPROCESS_CALLS
-    | {
-        "open",
-        "builtins.open",
-        "print",
-        "builtins.print",
-        "exec",
-        "eval",
-        "compile",
-        "__import__",
-        "getattr",
-        "setattr",
-        "delattr",
-        "os.system",
+APPLE_EFFECT_ADAPTER_PATH = (
+    "BehavioralAISubstrate/Sources/BASAppleEdgeWiring/BASToolEffectAdapter.swift"
+)
+APPLE_MUTATION_SELECTORS_BY_FRAMEWORK = (
+    (
+        "CloudKit",
+        (
+            "add",
+            "delete",
+            "fetchChanges",
+            "modifySubscriptions",
+            "save",
+            "sendChanges",
+        ),
+    ),
+    (
+        "CoreSpotlight",
+        (
+            "deleteAllSearchableItems",
+            "deleteSearchableItems",
+            "indexSearchableItems",
+        ),
+    ),
+    ("EventKit", ("remove", "save")),
+    ("HomeKit", ("add", "remove", "save")),
+    (
+        "UserNotifications",
+        (
+            "add",
+            "removeAllDeliveredNotifications",
+            "removeAllPendingNotificationRequests",
+            "removeDeliveredNotifications",
+            "removePendingNotificationRequests",
+        ),
+    ),
+)
+FILESYSTEM_WRITE_METHODS = frozenset(
+    {
+        "chmod",
+        "copy",
+        "copy_into",
+        "hardlink_to",
+        "lchmod",
+        "link_to",
+        "mkdir",
+        "move",
+        "move_into",
+        "rename",
+        "replace",
+        "rmdir",
+        "symlink_to",
+        "touch",
+        "truncate",
+        "unlink",
+        "write",
+        "write_bytes",
+        "write_text",
+        "writelines",
     }
 )
-ALLOWED_MODULE_IMPORTS = {
-    "argparse",
-    "ast",
-    "base64",
-    "hashlib",
-    "json",
-    "re",
-    "subprocess",
-    "sys",
-}
-ALLOWED_FROM_IMPORTS = {
-    "__future__": {("annotations", None)},
-    "datetime": {("datetime", None), ("timezone", None)},
-    "fnmatch": {("fnmatchcase", None)},
-    "pathlib": {("Path", None), ("PurePosixPath", None)},
-}
-ALLOWED_DIRECT_CALL_NAMES = {
-    "Path",
-    "PurePosixPath",
-    "SystemExit",
-    "ValueError",
-    "all",
-    "any",
-    "bool",
-    "bytes",
-    "dict",
-    "datetime",
-    "enumerate",
-    "fnmatchcase",
-    "int",
-    "isinstance",
-    "len",
-    "list",
-    "max",
-    "min",
-    "next",
-    "pow",
-    "print",
-    "range",
-    "set",
-    "sorted",
-    "tuple",
-    "type",
-    "zip",
-}
-ALLOWED_QUALIFIED_CALLS = {
-    "argparse.ArgumentParser",
-    "ast.iter_child_nodes",
-    "ast.parse",
-    "ast.walk",
-    "base64.b64decode",
-    "base64.b64encode",
-    "hashlib.sha256",
-    "hashlib.sha512",
-    "json.dumps",
-    "json.load",
-    "json.loads",
-    "re.compile",
-    "re.escape",
-    "re.findall",
-    "re.finditer",
-    "re.fullmatch",
-    "re.match",
-    "re.search",
-    "str.replace",
-    "subprocess.run",
-}
-PROTECTED_QUALIFIED_ROOTS = {
-    "argparse",
-    "ast",
-    "hashlib",
-    "json",
-    "re",
-    "str",
-    "subprocess",
-}
-PROTECTED_IMPORTED_NAMES = ALLOWED_MODULE_IMPORTS | {
-    "Path",
-    "PurePosixPath",
-    "datetime",
-    "fnmatchcase",
-    "timezone",
-}
-FORBIDDEN_REFLECTION_REGISTRIES = {
-    "sys.meta_path",
-    "sys.modules",
-    "sys.path_hooks",
-    "sys.path_importer_cache",
-}
-ALLOWED_METHOD_CALLS = {
-    "add",
-    "add_argument",
-    "append",
-    "as_posix",
-    "casefold",
-    "count",
-    "decode",
-    "digest",
-    "encode",
-    "end",
-    "endswith",
-    "exists",
-    "extend",
-    "find",
-    "findall",
-    "finditer",
-    "fullmatch",
-    "from_bytes",
-    "fromisoformat",
-    "get",
-    "glob",
-    "group",
-    "hexdigest",
-    "is_absolute",
-    "is_file",
-    "is_relative_to",
-    "isalnum",
-    "isspace",
-    "items",
-    "join",
-    "lower",
-    "match",
-    "now",
-    "isoformat",
-    "pop",
-    "parse_args",
-    "partition",
-    "read_text",
-    "read",
-    "relative_to",
-    "removesuffix",
-    "removeprefix",
-    "resolve",
-    "rfind",
-    "rstrip",
-    "split",
-    "splitlines",
-    "sort",
-    "start",
-    "startswith",
-    "stat",
-    "strip",
-    "setdefault",
-    "to_bytes",
-    "update",
-    "values",
-    "astimezone",
-    "search",
-}
+FORBIDDEN_EMIT_CALLS = frozenset(
+    {
+        "json.dump",
+        "marshal.dump",
+        "os.link",
+        "os.makedirs",
+        "os.mkdir",
+        "os.remove",
+        "os.removedirs",
+        "os.rename",
+        "os.renames",
+        "os.replace",
+        "os.rmdir",
+        "os.symlink",
+        "os.truncate",
+        "os.unlink",
+        "pickle.dump",
+        "shutil.copy",
+        "shutil.copy2",
+        "shutil.copyfile",
+        "shutil.copytree",
+        "shutil.move",
+        "sqlite3.connect",
+        "yaml.dump",
+    }
+)
+SUBPROCESS_CALLS = frozenset(
+    {
+        "subprocess.call",
+        "subprocess.check_call",
+        "subprocess.check_output",
+        "subprocess.Popen",
+        "subprocess.run",
+    }
+)
+READ_ONLY_GIT_SUBCOMMANDS = frozenset(
+    {
+        "cat-file",
+        "diff-tree",
+        "ls-tree",
+        "rev-parse",
+    }
+)
+GIT_TIMEOUT_SECONDS = 30
+PROCESS_TERMINATION_GRACE_SECONDS = 5.0
+PROCESS_READ_CHUNK_BYTES = 64 * 1024
+GIT_STDOUT_LIMIT_BYTES = 64 * 1024 * 1024
+GIT_STDERR_LIMIT_BYTES = 4 * 1024 * 1024
+GIT_SUBPROCESS_ENVIRONMENT = (
+    ("GIT_ATTR_NOSYSTEM", "1"),
+    ("GIT_CONFIG_COUNT", "5"),
+    ("GIT_CONFIG_GLOBAL", "/dev/null"),
+    ("GIT_CONFIG_KEY_0", "core.fsmonitor"),
+    ("GIT_CONFIG_KEY_1", "core.hooksPath"),
+    ("GIT_CONFIG_KEY_2", "diff.external"),
+    ("GIT_CONFIG_KEY_3", "core.pager"),
+    ("GIT_CONFIG_KEY_4", "submodule.recurse"),
+    ("GIT_CONFIG_NOSYSTEM", "1"),
+    ("GIT_CONFIG_SYSTEM", "/dev/null"),
+    ("GIT_CONFIG_VALUE_0", "false"),
+    ("GIT_CONFIG_VALUE_1", "/dev/null"),
+    ("GIT_CONFIG_VALUE_2", ""),
+    ("GIT_CONFIG_VALUE_3", "cat"),
+    ("GIT_CONFIG_VALUE_4", "false"),
+    ("GIT_LITERAL_PATHSPECS", "1"),
+    ("GIT_NO_LAZY_FETCH", "1"),
+    ("GIT_NO_REPLACE_OBJECTS", "1"),
+    ("GIT_OPTIONAL_LOCKS", "0"),
+    ("GIT_PAGER", "cat"),
+    ("GIT_TERMINAL_PROMPT", "0"),
+    ("HOME", "/nonexistent"),
+    ("LANG", "C"),
+    ("LC_ALL", "C"),
+    ("PAGER", "cat"),
+    ("PATH", "/usr/bin:/bin"),
+    ("XDG_CONFIG_HOME", "/nonexistent"),
+)
+
+
+class ProcessOutputLimitExceeded(OSError):
+    """A protected child emitted one byte beyond its declared stream cap."""
+
+
+def git_command_is_read_only(command: object) -> bool:
+    if type(command) is not list or not all(type(token) is str for token in command):
+        return False
+    object_pattern = r"[0-9a-f]{7,64}"
+    if (
+        len(command) == 4
+        and command[0] == "git"
+        and command[1] == "cat-file"
+        and command[2] in {"-t", "blob"}
+    ):
+        return re.fullmatch(object_pattern, command[3]) is not None
+    if (
+        len(command) == 3
+        and command[0] == "git"
+        and command[1] == "rev-parse"
+        and command[2].endswith("^{tree}")
+    ):
+        return (
+            re.fullmatch(
+                object_pattern,
+                command[2].removesuffix("^{tree}"),
+            )
+            is not None
+        )
+    if (
+        len(command) == 6
+        and command[:3] == ["git", "ls-tree", "-z"]
+        and command[4] == "--"
+    ):
+        return re.fullmatch(
+            object_pattern, command[3]
+        ) is not None and is_normalized_workspace_path(command[5])
+    if len(command) == 5 and command[:4] == ["git", "ls-tree", "-r", "-z"]:
+        return re.fullmatch(object_pattern, command[4]) is not None
+    if len(command) == 9 and command[:7] == [
+        "git",
+        "diff-tree",
+        "--no-commit-id",
+        "--no-renames",
+        "--raw",
+        "-r",
+        "-z",
+    ]:
+        return (
+            re.fullmatch(object_pattern, command[7]) is not None
+            and re.fullmatch(object_pattern, command[8]) is not None
+        )
+    return False
+
+
+def terminate_process_group(
+    process,
+    *,
+    grace_seconds: float,
+) -> None:
+    try:
+        killpg(process.pid, signal.SIGTERM)
+    except (PermissionError, ProcessLookupError):
+        pass
+    sleep(grace_seconds)
+    try:
+        killpg(process.pid, signal.SIGKILL)
+    except (PermissionError, ProcessLookupError):
+        pass
+    if process.stdout is not None:
+        process.stdout.close()
+    if process.stderr is not None:
+        process.stderr.close()
+    try:
+        process.wait(timeout=grace_seconds)
+    except ChildProcessError:
+        return
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=grace_seconds)
+
+
+def run_bounded_process(
+    command: list[str],
+    *,
+    cwd: Path,
+    timeout_seconds: float,
+    termination_grace_seconds: float = PROCESS_TERMINATION_GRACE_SECONDS,
+    stdout_limit_bytes: int,
+    stderr_limit_bytes: int,
+    text: bool,
+) -> subprocess.CompletedProcess:
+    _git_environment_items = (
+        ("GIT_ATTR_NOSYSTEM", "1"),
+        ("GIT_CONFIG_COUNT", "5"),
+        ("GIT_CONFIG_GLOBAL", "/dev/null"),
+        ("GIT_CONFIG_KEY_0", "core.fsmonitor"),
+        ("GIT_CONFIG_KEY_1", "core.hooksPath"),
+        ("GIT_CONFIG_KEY_2", "diff.external"),
+        ("GIT_CONFIG_KEY_3", "core.pager"),
+        ("GIT_CONFIG_KEY_4", "submodule.recurse"),
+        ("GIT_CONFIG_NOSYSTEM", "1"),
+        ("GIT_CONFIG_SYSTEM", "/dev/null"),
+        ("GIT_CONFIG_VALUE_0", "false"),
+        ("GIT_CONFIG_VALUE_1", "/dev/null"),
+        ("GIT_CONFIG_VALUE_2", ""),
+        ("GIT_CONFIG_VALUE_3", "cat"),
+        ("GIT_CONFIG_VALUE_4", "false"),
+        ("GIT_LITERAL_PATHSPECS", "1"),
+        ("GIT_NO_LAZY_FETCH", "1"),
+        ("GIT_NO_REPLACE_OBJECTS", "1"),
+        ("GIT_OPTIONAL_LOCKS", "0"),
+        ("GIT_PAGER", "cat"),
+        ("GIT_TERMINAL_PROMPT", "0"),
+        ("HOME", "/nonexistent"),
+        ("LANG", "C"),
+        ("LC_ALL", "C"),
+        ("PAGER", "cat"),
+        ("PATH", "/usr/bin:/bin"),
+        ("XDG_CONFIG_HOME", "/nonexistent"),
+    )
+    if not git_command_is_read_only(command):
+        raise OSError("owner gate subprocess is not an allowed read-only Git command")
+    if (
+        timeout_seconds <= 0
+        or termination_grace_seconds <= 0
+        or stdout_limit_bytes <= 0
+        or stderr_limit_bytes <= 0
+    ):
+        raise OSError("owner gate subprocess requires positive time and output bounds")
+    environment = dict(_git_environment_items)
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=False,
+        start_new_session=True,
+        pass_fds=(),
+    )
+    if process.stdout is None or process.stderr is None:
+        terminate_process_group(
+            process,
+            grace_seconds=termination_grace_seconds,
+        )
+        raise OSError("owner gate subprocess pipes are unavailable")
+    stdout_buffer = bytearray()
+    stderr_buffer = bytearray()
+    selector = selectors.DefaultSelector()
+    deadline = monotonic() + timeout_seconds
+    try:
+        set_blocking(process.stdout.fileno(), False)
+        set_blocking(process.stderr.fileno(), False)
+        selector.register(
+            process.stdout,
+            selectors.EVENT_READ,
+            ("stdout", stdout_buffer, stdout_limit_bytes),
+        )
+        selector.register(
+            process.stderr,
+            selectors.EVENT_READ,
+            ("stderr", stderr_buffer, stderr_limit_bytes),
+        )
+        open_streams = 2
+        while open_streams:
+            remaining_seconds = deadline - monotonic()
+            if remaining_seconds <= 0:
+                raise subprocess.TimeoutExpired(
+                    command,
+                    timeout_seconds,
+                    output=bytes(stdout_buffer),
+                    stderr=bytes(stderr_buffer),
+                )
+            events = selector.select(remaining_seconds)
+            if not events:
+                continue
+            for key, _mask in events:
+                stream_name, buffer, limit_bytes = key.data
+                read_size = min(
+                    PROCESS_READ_CHUNK_BYTES,
+                    limit_bytes + 1 - len(buffer),
+                )
+                chunk = read(key.fd, read_size)
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    key.fileobj.close()
+                    open_streams -= 1
+                    continue
+                buffer.extend(chunk)
+                if len(buffer) > limit_bytes:
+                    raise ProcessOutputLimitExceeded(
+                        f"owner gate subprocess {stream_name} limit exceeded "
+                        f"({limit_bytes} bytes)"
+                    )
+        remaining_seconds = deadline - monotonic()
+        if remaining_seconds <= 0:
+            raise subprocess.TimeoutExpired(
+                command,
+                timeout_seconds,
+                output=bytes(stdout_buffer),
+                stderr=bytes(stderr_buffer),
+            )
+        returncode = process.wait(timeout=remaining_seconds)
+    except (OSError, subprocess.TimeoutExpired):
+        terminate_process_group(
+            process,
+            grace_seconds=termination_grace_seconds,
+        )
+        raise
+    finally:
+        selector.close()
+    stdout: bytes | str = bytes(stdout_buffer)
+    stderr: bytes | str = bytes(stderr_buffer)
+    if text:
+        stdout = stdout.decode("utf-8", errors="strict")
+        stderr = stderr.decode("utf-8", errors="strict")
+    return subprocess.CompletedProcess(
+        command,
+        returncode,
+        stdout,
+        stderr,
+    )
+
+
+DANGEROUS_ALIAS_MODULES = frozenset(
+    {
+        "builtins",
+        "json",
+        "marshal",
+        "os",
+        "pickle",
+        "shutil",
+        "sqlite3",
+        "subprocess",
+        "yaml",
+    }
+)
+DANGEROUS_ALIAS_TARGETS = frozenset(
+    {
+        "__import__",
+        "builtins.open",
+        "builtins.print",
+        "compile",
+        "delattr",
+        "eval",
+        "exec",
+        "getattr",
+        "json.dump",
+        "marshal.dump",
+        "open",
+        "os.link",
+        "os.makedirs",
+        "os.mkdir",
+        "os.remove",
+        "os.removedirs",
+        "os.rename",
+        "os.renames",
+        "os.replace",
+        "os.rmdir",
+        "os.symlink",
+        "os.system",
+        "os.truncate",
+        "os.unlink",
+        "pickle.dump",
+        "print",
+        "setattr",
+        "shutil.copy",
+        "shutil.copy2",
+        "shutil.copyfile",
+        "shutil.copytree",
+        "shutil.move",
+        "sqlite3.connect",
+        "subprocess.Popen",
+        "subprocess.call",
+        "subprocess.check_call",
+        "subprocess.check_output",
+        "subprocess.run",
+        "yaml.dump",
+    }
+)
+ALLOWED_MODULE_IMPORTS = frozenset(
+    {
+        "argparse",
+        "ast",
+        "base64",
+        "hashlib",
+        "json",
+        "re",
+        "selectors",
+        "signal",
+        "subprocess",
+        "sys",
+        "unicodedata",
+    }
+)
+ALLOWED_FROM_IMPORTS = (
+    ("__future__", "annotations", None),
+    ("datetime", "datetime", None),
+    ("datetime", "timezone", None),
+    ("fnmatch", "fnmatchcase", None),
+    ("os", "killpg", None),
+    ("os", "read", None),
+    ("os", "set_blocking", None),
+    ("pathlib", "Path", None),
+    ("pathlib", "PurePosixPath", None),
+    ("time", "monotonic", None),
+    ("time", "sleep", None),
+)
+ALLOWED_DIRECT_CALL_NAMES = frozenset(
+    {
+        "Path",
+        "PurePosixPath",
+        "OSError",
+        "SystemExit",
+        "ValueError",
+        "all",
+        "any",
+        "bool",
+        "bytearray",
+        "bytes",
+        "dict",
+        "datetime",
+        "enumerate",
+        "fnmatchcase",
+        "frozenset",
+        "int",
+        "isinstance",
+        "killpg",
+        "len",
+        "list",
+        "max",
+        "min",
+        "monotonic",
+        "next",
+        "open",
+        "ord",
+        "pow",
+        "print",
+        "range",
+        "read",
+        "set",
+        "set_blocking",
+        "sleep",
+        "sorted",
+        "tuple",
+        "type",
+        "zip",
+    }
+)
+ALLOWED_QUALIFIED_CALLS = frozenset(
+    {
+        "argparse.ArgumentParser",
+        "ast.dump",
+        "ast.iter_child_nodes",
+        "ast.parse",
+        "ast.walk",
+        "base64.b64decode",
+        "base64.b64encode",
+        "hashlib.sha256",
+        "hashlib.sha512",
+        "json.dumps",
+        "json.load",
+        "json.loads",
+        "key.fileobj.close",
+        "process.communicate",
+        "process.kill",
+        "process.stderr.close",
+        "process.stdout.close",
+        "process.wait",
+        "re.compile",
+        "re.escape",
+        "re.findall",
+        "re.finditer",
+        "re.fullmatch",
+        "re.match",
+        "re.search",
+        "selectors.DefaultSelector",
+        "selector.close",
+        "str.replace",
+        "subprocess.CompletedProcess",
+        "subprocess.Popen",
+        "subprocess.TimeoutExpired",
+        "subprocess.run",
+        "unicodedata.category",
+        "unicodedata.normalize",
+    }
+)
+PROTECTED_QUALIFIED_ROOTS = frozenset(
+    {
+        "argparse",
+        "ast",
+        "hashlib",
+        "json",
+        "re",
+        "selectors",
+        "signal",
+        "str",
+        "subprocess",
+        "unicodedata",
+    }
+)
+PROTECTED_IMPORTED_NAMES = frozenset(
+    {
+        "Path",
+        "PurePosixPath",
+        "argparse",
+        "ast",
+        "base64",
+        "datetime",
+        "fnmatchcase",
+        "hashlib",
+        "json",
+        "killpg",
+        "monotonic",
+        "re",
+        "read",
+        "selectors",
+        "set_blocking",
+        "signal",
+        "sleep",
+        "subprocess",
+        "sys",
+        "timezone",
+        "unicodedata",
+    }
+)
+FORBIDDEN_REFLECTION_REGISTRIES = frozenset(
+    {
+        "sys.argv",
+        "sys.meta_path",
+        "sys.modules",
+        "sys.path",
+        "sys.path_hooks",
+        "sys.path_importer_cache",
+    }
+)
+ALLOWED_METHOD_CALLS = frozenset(
+    {
+        "add",
+        "add_argument",
+        "append",
+        "as_posix",
+        "casefold",
+        "count",
+        "decode",
+        "digest",
+        "encode",
+        "end",
+        "endswith",
+        "exists",
+        "extend",
+        "find",
+        "findall",
+        "finditer",
+        "fileno",
+        "fullmatch",
+        "from_bytes",
+        "fromisoformat",
+        "get",
+        "glob",
+        "group",
+        "hexdigest",
+        "is_absolute",
+        "is_file",
+        "is_relative_to",
+        "isalnum",
+        "isspace",
+        "items",
+        "join",
+        "lower",
+        "match",
+        "now",
+        "isoformat",
+        "pop",
+        "parse_args",
+        "partition",
+        "read_text",
+        "read",
+        "relative_to",
+        "removesuffix",
+        "removeprefix",
+        "resolve",
+        "register",
+        "rfind",
+        "rstrip",
+        "split",
+        "splitlines",
+        "sort",
+        "start",
+        "startswith",
+        "stat",
+        "strip",
+        "setdefault",
+        "to_bytes",
+        "update",
+        "values",
+        "astimezone",
+        "search",
+        "select",
+        "unregister",
+    }
+)
 
 
 class DuplicateJSONKeyError(ValueError):
@@ -908,15 +1330,24 @@ def parse_args() -> argparse.Namespace:
 
 
 def is_normalized_workspace_path(value: object) -> bool:
-    if not isinstance(value, str) or not value or "\\" in value:
+    if (
+        not isinstance(value, str)
+        or not value
+        or "\\" in value
+        or "\x00" in value
+        or any(unicodedata.category(character) == "Cc" for character in value)
+        or unicodedata.normalize("NFC", value) != value
+    ):
+        return False
+    try:
+        value.encode("utf-8", "strict")
+    except UnicodeEncodeError:
+        return False
+    components = value.split("/")
+    if any(component in {"", ".", ".."} for component in components):
         return False
     path = PurePosixPath(value)
-    return (
-        not path.is_absolute()
-        and ".." not in path.parts
-        and "." not in path.parts
-        and path.as_posix() == value
-    )
+    return not path.is_absolute() and path.as_posix() == value
 
 
 def is_nonempty_string(value: object) -> bool:
@@ -927,17 +1358,448 @@ def is_schema_version_one(value: object) -> bool:
     return type(value) is int and value == 1
 
 
+class ContentViewError(OSError):
+    """A repository-content view could not provide a bounded exact value."""
+
+
+class CandidateBlobSizeLimitError(ContentViewError):
+    """A larger explicit bound may make this immutable blob readable."""
+
+
+class CandidateBlobTerminalError(ContentViewError):
+    """Retrying the same immutable blob cannot change this failure."""
+
+
+def normalized_content_reference(
+    base_relative: str,
+    reference: str,
+) -> str | None:
+    if Path(reference).is_absolute():
+        return None
+    components: list[str] = []
+    for component in (
+        *PurePosixPath(base_relative).parts,
+        *PurePosixPath(reference).parts,
+    ):
+        if component in {"", "."}:
+            continue
+        if component == "..":
+            if not components:
+                return None
+            components.pop()
+            continue
+        components.append(component)
+    candidate = "/".join(components)
+    return candidate if is_normalized_workspace_path(candidate) else None
+
+
+def content_glob_matches(relative_path: str, pattern: str) -> bool:
+    patterns = [pattern]
+    if pattern.startswith("**/"):
+        patterns.append(pattern[3:])
+    return any(fnmatchcase(relative_path, candidate) for candidate in patterns)
+
+
+def resolve_live_content_path(root: Path, relative_path: str) -> Path:
+    if not is_normalized_workspace_path(relative_path):
+        raise ContentViewError(
+            f"live content path is not normalized: {relative_path!r}"
+        )
+    candidate = (root / relative_path).resolve(strict=False)
+    if not candidate.is_relative_to(root):
+        raise ContentViewError(
+            f"live content path escapes repository root: {relative_path}"
+        )
+    return candidate
+
+
+def load_candidate_tree_index(root: Path, tree: str) -> bytes:
+    try:
+        completed = run_bounded_process(
+            ["git", "ls-tree", "-r", "-z", tree],
+            cwd=root,
+            timeout_seconds=GIT_TIMEOUT_SECONDS,
+            stdout_limit_bytes=MAX_CANDIDATE_TREE_INDEX_BYTES,
+            stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
+            text=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ContentViewError(
+            f"candidate content tree index is unavailable: {error}"
+        ) from error
+    if completed.returncode != 0:
+        raise ContentViewError("candidate content tree index failed")
+    return completed.stdout
+
+
+def load_candidate_blob(
+    root: Path,
+    object_id: str,
+    max_bytes: int,
+    *,
+    timeout_seconds: float = GIT_TIMEOUT_SECONDS,
+) -> bytes:
+    if (
+        type(timeout_seconds) not in {int, float}
+        or timeout_seconds != timeout_seconds
+        or timeout_seconds <= 0
+        or timeout_seconds > GIT_TIMEOUT_SECONDS
+    ):
+        raise CandidateBlobTerminalError(
+            "candidate content blob timeout must be finite, positive, "
+            f"and at most {GIT_TIMEOUT_SECONDS} seconds"
+        )
+    try:
+        completed = run_bounded_process(
+            ["git", "cat-file", "blob", object_id],
+            cwd=root,
+            timeout_seconds=timeout_seconds,
+            stdout_limit_bytes=max_bytes,
+            stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
+            text=False,
+        )
+    except ProcessOutputLimitExceeded as error:
+        raise CandidateBlobSizeLimitError(
+            f"candidate content blob exceeds {max_bytes} bytes"
+        ) from error
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise CandidateBlobTerminalError(
+            f"candidate content blob is unavailable: {error}"
+        ) from error
+    if completed.returncode != 0:
+        raise CandidateBlobTerminalError("candidate content blob could not be read")
+    return completed.stdout
+
+
+class LiveContentView:
+    """Explicit opt-in view for direct unit APIs; CLI never selects it."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root.resolve(strict=True)
+
+    def exists(self, relative_path: str) -> bool:
+        return resolve_live_content_path(self.root, relative_path).exists()
+
+    def is_file(self, relative_path: str) -> bool:
+        return resolve_live_content_path(self.root, relative_path).is_file()
+
+    def read_text(
+        self,
+        relative_path: str,
+        *,
+        max_bytes: int,
+        label: str,
+    ) -> str:
+        path = resolve_live_content_path(self.root, relative_path)
+        if max_bytes <= 0 or path.stat().st_size > max_bytes:
+            raise ContentViewError(
+                f"{label} exceeds {max_bytes} bytes: {relative_path}"
+            )
+        try:
+            with open(path, "rb") as stream:
+                raw = stream.read(max_bytes + 1)
+            if len(raw) > max_bytes:
+                raise ContentViewError(
+                    f"{label} exceeds {max_bytes} bytes: {relative_path}"
+                )
+            return raw.decode("utf-8", errors="strict")
+        except (OSError, UnicodeError) as error:
+            raise ContentViewError(
+                f"{label} cannot be read as UTF-8: {relative_path}: {error}"
+            ) from error
+
+    def glob(self, base_relative: str, pattern: str) -> list[str]:
+        if base_relative and not is_normalized_workspace_path(base_relative):
+            raise ContentViewError(
+                f"live glob base is not normalized: {base_relative!r}"
+            )
+        base = self.root / base_relative if base_relative else self.root
+        matches: list[str] = []
+        try:
+            candidates = base.glob(pattern)
+            for candidate in candidates:
+                relative = candidate.relative_to(self.root).as_posix()
+                if is_normalized_workspace_path(relative) and candidate.is_file():
+                    matches.append(relative)
+        except (OSError, ValueError) as error:
+            raise ContentViewError(
+                f"live content glob cannot be evaluated: {error}"
+            ) from error
+        return sorted(set(matches))
+
+
+class CandidateTreeView:
+    """One bounded immutable Git-tree index with lazy bounded blob reads."""
+
+    def __init__(
+        self,
+        root: Path,
+        tree: str,
+        *,
+        max_unique_blob_reads: int = MAX_CANDIDATE_UNIQUE_BLOB_READS,
+        max_cached_blob_bytes: int = MAX_CANDIDATE_CACHED_BLOB_BYTES,
+        max_blob_load_attempts: int = MAX_CANDIDATE_BLOB_LOAD_ATTEMPTS,
+        max_attempted_blob_bytes: int = MAX_CANDIDATE_ATTEMPTED_BLOB_BYTES,
+        max_blob_wall_seconds: float = MAX_CANDIDATE_BLOB_WALL_SECONDS,
+        max_glob_matches: int = MAX_CANDIDATE_GLOB_MATCHES,
+        max_total_glob_matches: int = MAX_CANDIDATE_TOTAL_GLOB_MATCHES,
+    ) -> None:
+        if GIT_OBJECT_PATTERN.fullmatch(tree) is None:
+            raise ContentViewError("candidate content tree ID is not canonical")
+        if (
+            type(max_blob_wall_seconds) not in {int, float}
+            or max_blob_wall_seconds != max_blob_wall_seconds
+            or max_blob_wall_seconds <= 0
+            or max_blob_wall_seconds > MAX_CANDIDATE_BLOB_WALL_SECONDS
+        ):
+            raise ContentViewError(
+                "candidate blob wall-clock limit must be a finite positive "
+                f"number at most {MAX_CANDIDATE_BLOB_WALL_SECONDS:g} seconds"
+            )
+        limits = (
+            (
+                "unique candidate blob reads",
+                max_unique_blob_reads,
+                MAX_CANDIDATE_UNIQUE_BLOB_READS,
+            ),
+            (
+                "candidate cached blob bytes",
+                max_cached_blob_bytes,
+                MAX_CANDIDATE_CACHED_BLOB_BYTES,
+            ),
+            (
+                "candidate blob-load attempts",
+                max_blob_load_attempts,
+                MAX_CANDIDATE_BLOB_LOAD_ATTEMPTS,
+            ),
+            (
+                "attempted candidate blob bytes",
+                max_attempted_blob_bytes,
+                MAX_CANDIDATE_ATTEMPTED_BLOB_BYTES,
+            ),
+            (
+                "candidate glob matches",
+                max_glob_matches,
+                MAX_CANDIDATE_GLOB_MATCHES,
+            ),
+            (
+                "total candidate glob matches",
+                max_total_glob_matches,
+                MAX_CANDIDATE_TOTAL_GLOB_MATCHES,
+            ),
+        )
+        for label, value, hard_limit in limits:
+            if type(value) is not int or value <= 0 or value > hard_limit:
+                raise ContentViewError(
+                    f"{label} limit must be an integer in 1...{hard_limit}"
+                )
+        blob_deadline = monotonic() + max_blob_wall_seconds
+        root = root.resolve(strict=True)
+        self.tree = tree
+        raw = load_candidate_tree_index(root, tree)
+        if len(raw) > MAX_CANDIDATE_TREE_INDEX_BYTES:
+            raise ContentViewError(
+                "candidate content tree index exceeds the metadata byte limit"
+            )
+        rows = [row for row in raw.split(b"\0") if row]
+        if len(rows) > MAX_CANDIDATE_TREE_ENTRIES:
+            raise ContentViewError(
+                "candidate content tree index exceeds the entry limit"
+            )
+        entries: dict[str, tuple[str, str, str]] = {}
+        for row in rows:
+            try:
+                metadata, encoded_path = row.split(b"\t", 1)
+                mode, object_type, object_id = metadata.decode(
+                    "ascii",
+                    errors="strict",
+                ).split(" ")
+                relative_path = encoded_path.decode("utf-8", errors="strict")
+            except (UnicodeDecodeError, ValueError) as error:
+                raise ContentViewError(
+                    f"candidate content tree index is malformed: {error}"
+                ) from error
+            if (
+                not is_normalized_workspace_path(relative_path)
+                or mode not in {"100644", "100755", "120000", "160000"}
+                or object_type != ("commit" if mode == "160000" else "blob")
+                or GIT_OBJECT_PATTERN.fullmatch(object_id) is None
+                or relative_path in entries
+            ):
+                raise ContentViewError(
+                    "candidate content tree index contains unsupported metadata"
+                )
+            entries[relative_path] = (mode, object_type, object_id)
+        self._entries = entries
+        self._blob_cache: dict[str, bytes] = {}
+        self._blob_failures: dict[str, tuple[int | None, str]] = {}
+        self._blob_read_object_ids: set[str] = set()
+        self.cached_blob_bytes = 0
+        self.blob_load_attempts = 0
+        self.attempted_blob_bytes = 0
+        self._total_glob_matches = 0
+        self._max_unique_blob_reads = max_unique_blob_reads
+        self._max_cached_blob_bytes = max_cached_blob_bytes
+        self._max_blob_load_attempts = max_blob_load_attempts
+        self._max_attempted_blob_bytes = max_attempted_blob_bytes
+        self._blob_deadline = blob_deadline
+        self._max_glob_matches = max_glob_matches
+        self._max_total_glob_matches = max_total_glob_matches
+        self.root = root
+
+    def exists(self, relative_path: str) -> bool:
+        if not is_normalized_workspace_path(relative_path):
+            return False
+        return relative_path in self._entries
+
+    def is_file(self, relative_path: str) -> bool:
+        if not is_normalized_workspace_path(relative_path):
+            return False
+        entry = self._entries.get(relative_path)
+        return entry is not None and entry[0] in {"100644", "100755"}
+
+    def read_text(
+        self,
+        relative_path: str,
+        *,
+        max_bytes: int,
+        label: str,
+    ) -> str:
+        if max_bytes <= 0 or not self.is_file(relative_path):
+            raise ContentViewError(
+                f"{label} is missing from candidate tree: {relative_path}"
+            )
+        object_id = self._entries[relative_path][2]
+        raw = self._blob_cache.get(object_id)
+        if raw is None:
+            remaining_cache_bytes = self._max_cached_blob_bytes - self.cached_blob_bytes
+            if remaining_cache_bytes <= 0:
+                raise ContentViewError(
+                    "cumulative candidate blob cache byte budget is exhausted"
+                )
+            read_limit = min(max_bytes, remaining_cache_bytes)
+            previous_failure = self._blob_failures.get(object_id)
+            if previous_failure is not None:
+                retry_above_limit, failure_reason = previous_failure
+                if retry_above_limit is None or read_limit <= retry_above_limit:
+                    raise ContentViewError(
+                        f"{label} candidate blob is unavailable: {failure_reason}"
+                    )
+            remaining_wall_seconds = self._blob_deadline - monotonic()
+            if remaining_wall_seconds <= 0:
+                raise ContentViewError(
+                    "candidate blob cumulative wall-clock deadline is exhausted"
+                )
+            blob_timeout_seconds = min(
+                GIT_TIMEOUT_SECONDS,
+                remaining_wall_seconds,
+            )
+            if object_id not in self._blob_read_object_ids:
+                if len(self._blob_read_object_ids) >= self._max_unique_blob_reads:
+                    raise ContentViewError(
+                        "unique candidate blob-read budget is exhausted"
+                    )
+            if self.blob_load_attempts >= self._max_blob_load_attempts:
+                raise ContentViewError(
+                    "candidate blob-load attempt budget is exhausted"
+                )
+            reserved_bytes = read_limit + 1
+            if (
+                self.attempted_blob_bytes + reserved_bytes
+                > self._max_attempted_blob_bytes
+            ):
+                raise ContentViewError(
+                    "attempted candidate blob byte budget is exhausted"
+                )
+            self._blob_read_object_ids.add(object_id)
+            self.blob_load_attempts += 1
+            self.attempted_blob_bytes += reserved_bytes
+            try:
+                raw = load_candidate_blob(
+                    self.root,
+                    object_id,
+                    read_limit,
+                    timeout_seconds=blob_timeout_seconds,
+                )
+            except ContentViewError as error:
+                retry_above_limit = (
+                    read_limit
+                    if isinstance(error, CandidateBlobSizeLimitError)
+                    else None
+                )
+                self._blob_failures[object_id] = (
+                    retry_above_limit,
+                    f"{error}",
+                )
+                if (
+                    isinstance(error, CandidateBlobSizeLimitError)
+                    and remaining_cache_bytes < max_bytes
+                ):
+                    raise ContentViewError(
+                        "cumulative candidate blob cache exceeds "
+                        f"{self._max_cached_blob_bytes} bytes"
+                    ) from error
+                raise ContentViewError(
+                    f"{label} candidate blob is unavailable: {error}"
+                ) from error
+            if len(raw) > max_bytes:
+                raise ContentViewError(
+                    f"{label} exceeds {max_bytes} bytes: {relative_path}"
+                )
+            if self.cached_blob_bytes + len(raw) > self._max_cached_blob_bytes:
+                raise ContentViewError(
+                    "cumulative candidate blob cache exceeds "
+                    f"{self._max_cached_blob_bytes} bytes"
+                )
+            self.attempted_blob_bytes -= reserved_bytes - len(raw)
+            self._blob_failures.pop(object_id, None)
+            self._blob_cache[object_id] = raw
+            self.cached_blob_bytes += len(raw)
+        if len(raw) > max_bytes:
+            raise ContentViewError(
+                f"{label} exceeds {max_bytes} bytes: {relative_path}"
+            )
+        try:
+            return raw.decode("utf-8", errors="strict")
+        except UnicodeDecodeError as error:
+            raise ContentViewError(
+                f"{label} cannot be read as UTF-8: {relative_path}: {error}"
+            ) from error
+
+    def glob(self, base_relative: str, pattern: str) -> list[str]:
+        if base_relative and not is_normalized_workspace_path(base_relative):
+            raise ContentViewError(
+                f"candidate glob base is not normalized: {base_relative!r}"
+            )
+        prefix = f"{base_relative}/" if base_relative else ""
+        matches: list[str] = []
+        for relative_path, entry in self._entries.items():
+            if entry[0] not in {"100644", "100755"}:
+                continue
+            if prefix and not relative_path.startswith(prefix):
+                continue
+            relative_to_base = relative_path[len(prefix) :]
+            if content_glob_matches(relative_to_base, pattern):
+                if len(matches) >= self._max_glob_matches:
+                    raise ContentViewError("candidate glob match budget is exhausted")
+                if self._total_glob_matches >= self._max_total_glob_matches:
+                    raise ContentViewError(
+                        "total candidate glob match budget is exhausted"
+                    )
+                matches.append(relative_path)
+                self._total_glob_matches += 1
+        return sorted(matches)
+
+
 def git_commit_exists(root: Path, object_id: str) -> bool:
     try:
-        completed = subprocess.run(
+        completed = run_bounded_process(
             ["git", "cat-file", "-t", object_id],
             cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            timeout_seconds=GIT_TIMEOUT_SECONDS,
+            stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+            stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
             text=True,
-            check=False,
-            env=GIT_SUBPROCESS_ENVIRONMENT,
-            timeout=GIT_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.TimeoutExpired):
         return False
@@ -981,7 +1843,7 @@ def validate_master_work_package_rows(contents: str) -> list[str]:
             "master work-package rows must be exactly W0-W6 once and in order"
         )
         return errors
-    for work_package_id, row in zip(matches, rows, strict=True):
+    for work_package_id, row in zip(matches, rows):
         if (
             sha256_utf8(row)
             != EXPECTED_MASTER_WORK_PACKAGE_ROW_DIGESTS[work_package_id]
@@ -1326,15 +2188,19 @@ def reviewed_create_task_section(
 def load_bounded_json_object(path: Path) -> dict:
     if path.stat().st_size > MAX_JSON_BYTES:
         raise ValueError(f"JSON file exceeds {MAX_JSON_BYTES} bytes: {path}")
-    with path.open("r", encoding="utf-8") as handle:
+    with open(path, "r", encoding="utf-8") as handle:
         value = json.load(handle, object_pairs_hook=reject_duplicate_json_keys)
     if not isinstance(value, dict):
         raise ValueError(f"JSON root must be an object: {path}")
     return value
 
 
-def strip_c_style_comments(contents: str) -> str:
-    """Mask C/Swift comments while preserving quoted and raw-string paths."""
+def strip_c_style_comments(
+    contents: str,
+    *,
+    mask_quoted_contents: bool = False,
+) -> str:
+    """Mask C/Swift comments and optionally mask quoted free text."""
     output: list[str] = []
     index = 0
     line_comment = False
@@ -1369,18 +2235,32 @@ def strip_c_style_comments(contents: str) -> str:
         if string_delimiter is not None:
             terminator = string_delimiter + ("#" * raw_hash_count)
             if contents.startswith(terminator, index):
-                output.append(terminator)
+                output.append(
+                    " " * len(terminator) if mask_quoted_contents else terminator
+                )
                 index += len(terminator)
                 string_delimiter = None
                 raw_hash_count = 0
             elif raw_hash_count == 0 and contents[index] == "\\":
-                output.append(contents[index])
+                output.append(" " if mask_quoted_contents else contents[index])
                 index += 1
                 if index < len(contents):
-                    output.append(contents[index])
+                    output.append(
+                        "\n"
+                        if mask_quoted_contents and contents[index] == "\n"
+                        else " "
+                        if mask_quoted_contents
+                        else contents[index]
+                    )
                     index += 1
             else:
-                output.append(contents[index])
+                output.append(
+                    "\n"
+                    if mask_quoted_contents and contents[index] == "\n"
+                    else " "
+                    if mask_quoted_contents
+                    else contents[index]
+                )
                 index += 1
             continue
 
@@ -1402,18 +2282,39 @@ def strip_c_style_comments(contents: str) -> str:
             raw_hash_count = raw_cursor - index
             string_delimiter = '"""' if contents.startswith('"""', raw_cursor) else '"'
             opener_end = raw_cursor + len(string_delimiter)
-            output.append(contents[index:opener_end])
+            opener = contents[index:opener_end]
+            output.append(" " * len(opener) if mask_quoted_contents else opener)
             index = opener_end
             continue
         if contents[index] == "'":
             string_delimiter = "'"
-            output.append("'")
+            output.append(" " if mask_quoted_contents else "'")
             index += 1
             continue
 
         output.append(contents[index])
         index += 1
     return "".join(output)
+
+
+def swift_source_imports_framework(contents: str, framework: str) -> bool:
+    """Recognize one framework root through Swift's bounded import grammar."""
+    identifier = r"(?:`[^`\r\n;]+`|[_A-Za-z][_A-Za-z0-9]*)"
+    attribute_argument = r"(?:[^()\r\n]|\([^()\r\n]*\))*"
+    attribute = (
+        rf"@{identifier}"
+        rf"(?:[ \t]*\({attribute_argument}\))?"
+    )
+    attribute_separator = r"(?:[ \t]+|\r?\n[ \t]*)"
+    access_level = r"(?:private|fileprivate|internal|package|public)"
+    import_kind = r"(?:class|struct|enum|protocol|func|var|let|typealias)"
+    import_declaration = (
+        rf"(?m)(?:^|;)[ \t]*(?:{attribute}{attribute_separator})*"
+        rf"(?:{access_level}{attribute_separator})?"
+        rf"import[ \t]+(?:{import_kind}[ \t]+)?"
+        rf"{re.escape(framework)}(?:\.{identifier})*[ \t]*(?=;|$)"
+    )
+    return re.search(import_declaration, contents) is not None
 
 
 def strip_yaml_comments(contents: str) -> str:
@@ -1519,6 +2420,10 @@ def call_open_mode(call: ast.Call) -> ast.AST | None:
 
 
 def open_call_is_read_only(call: ast.Call) -> bool:
+    if any(isinstance(argument, ast.Starred) for argument in call.args):
+        return False
+    if any(keyword.arg is None for keyword in call.keywords):
+        return False
     mode_node = call_open_mode(call)
     if mode_node is None:
         return True
@@ -1527,20 +2432,51 @@ def open_call_is_read_only(call: ast.Call) -> bool:
     return not any(flag in mode_node.value for flag in "wax+")
 
 
+def ast_git_command_is_read_only(command: list[ast.AST]) -> bool:
+    projected: list[str] = []
+    for token in command:
+        if isinstance(token, ast.Constant) and type(token.value) is str:
+            projected.append(token.value)
+        elif isinstance(token, ast.Name) and token.id in {
+            "base_tree",
+            "candidate_tree",
+            "commit",
+            "object_id",
+            "tree",
+        }:
+            projected.append("0" * 40)
+        elif isinstance(token, ast.Name) and token.id == "path":
+            projected.append("normalized/path")
+        elif (
+            isinstance(token, ast.JoinedStr)
+            and len(token.values) == 2
+            and isinstance(token.values[0], ast.FormattedValue)
+            and isinstance(token.values[0].value, ast.Name)
+            and token.values[0].value.id == "commit"
+            and token.values[0].conversion == -1
+            and token.values[0].format_spec is None
+            and isinstance(token.values[1], ast.Constant)
+            and token.values[1].value == "^{tree}"
+        ):
+            projected.append(("0" * 40) + "^{tree}")
+        elif (
+            isinstance(token, ast.Subscript)
+            and isinstance(token.value, ast.Name)
+            and token.value.id == "row"
+            and isinstance(token.slice, ast.Constant)
+            and token.slice.value == "newBlob"
+        ):
+            projected.append("0" * 40)
+        else:
+            return False
+    return git_command_is_read_only(projected)
+
+
 def subprocess_call_is_read_only(call: ast.Call) -> bool:
     if len(call.args) != 1 or not isinstance(call.args[0], (ast.List, ast.Tuple)):
         return False
     command = call.args[0].elts
-    if len(command) < 2:
-        return False
-    executable = command[0]
-    subcommand = command[1]
-    if (
-        not isinstance(executable, ast.Constant)
-        or executable.value != "git"
-        or not isinstance(subcommand, ast.Constant)
-        or subcommand.value not in READ_ONLY_GIT_SUBCOMMANDS
-    ):
+    if not ast_git_command_is_read_only(command):
         return False
 
     keyword_values = {
@@ -1574,14 +2510,10 @@ def subprocess_call_is_read_only(call: ast.Call) -> bool:
         isinstance(cwd, ast.Name)
         and cwd.id == "root"
         and qualified_ast_name(stdout) == "subprocess.PIPE"
-        and qualified_ast_name(stderr)
-        in {"subprocess.DEVNULL", "subprocess.PIPE"}
+        and qualified_ast_name(stderr) in {"subprocess.DEVNULL", "subprocess.PIPE"}
         and (
             text_mode is None
-            or (
-                isinstance(text_mode, ast.Constant)
-                and text_mode.value is True
-            )
+            or (isinstance(text_mode, ast.Constant) and text_mode.value is True)
         )
         and isinstance(check, ast.Constant)
         and check.value is False
@@ -1592,8 +2524,652 @@ def subprocess_call_is_read_only(call: ast.Call) -> bool:
     )
 
 
-def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
+def bounded_popen_call_is_read_only(call: ast.Call) -> bool:
+    if (
+        len(call.args) != 1
+        or not isinstance(call.args[0], ast.Name)
+        or call.args[0].id != "command"
+    ):
+        return False
+    keyword_values = {
+        keyword.arg: keyword.value
+        for keyword in call.keywords
+        if keyword.arg is not None
+    }
+    if len(keyword_values) != len(call.keywords) or set(keyword_values) != {
+        "cwd",
+        "env",
+        "pass_fds",
+        "start_new_session",
+        "stderr",
+        "stdout",
+        "text",
+    }:
+        return False
+    pass_fds = keyword_values["pass_fds"]
+    return (
+        isinstance(keyword_values["cwd"], ast.Name)
+        and keyword_values["cwd"].id == "cwd"
+        and isinstance(keyword_values["env"], ast.Name)
+        and keyword_values["env"].id == "environment"
+        and qualified_ast_name(keyword_values["stdout"]) == "subprocess.PIPE"
+        and qualified_ast_name(keyword_values["stderr"]) == "subprocess.PIPE"
+        and isinstance(keyword_values["text"], ast.Constant)
+        and keyword_values["text"].value is False
+        and isinstance(keyword_values["start_new_session"], ast.Constant)
+        and keyword_values["start_new_session"].value is True
+        and isinstance(pass_fds, (ast.List, ast.Tuple))
+        and not pass_fds.elts
+    )
+
+
+def command_index(node: ast.AST, index: int) -> bool:
+    return (
+        isinstance(node, ast.Subscript)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "command"
+        and isinstance(node.slice, ast.Constant)
+        and node.slice.value == index
+    )
+
+
+def bounded_subprocess_guard_is_present(function: ast.FunctionDef) -> bool:
+    for node in function.body:
+        if not isinstance(node, ast.If):
+            continue
+        exact_guard = (
+            isinstance(node.test, ast.UnaryOp)
+            and isinstance(node.test.op, ast.Not)
+            and isinstance(node.test.operand, ast.Call)
+            and qualified_ast_name(node.test.operand.func) == "git_command_is_read_only"
+            and len(node.test.operand.args) == 1
+            and not node.test.operand.keywords
+            and isinstance(node.test.operand.args[0], ast.Name)
+            and node.test.operand.args[0].id == "command"
+        )
+        raises_oserror = any(
+            isinstance(candidate, ast.Raise)
+            and isinstance(candidate.exc, ast.Call)
+            and qualified_ast_name(candidate.exc.func) == "OSError"
+            for candidate in node.body
+        )
+        if exact_guard and raises_oserror:
+            return True
+    return False
+
+
+def bounded_process_call_is_read_only(call: ast.Call) -> bool:
+    if len(call.args) != 1 or not isinstance(call.args[0], (ast.List, ast.Tuple)):
+        return False
+    command = call.args[0].elts
+    if not ast_git_command_is_read_only(command):
+        return False
+    keyword_values = {
+        keyword.arg: keyword.value
+        for keyword in call.keywords
+        if keyword.arg is not None
+    }
+    if len(keyword_values) != len(call.keywords) or set(keyword_values) != {
+        "cwd",
+        "stderr_limit_bytes",
+        "stdout_limit_bytes",
+        "text",
+        "timeout_seconds",
+    }:
+        return False
+    return (
+        isinstance(keyword_values["cwd"], ast.Name)
+        and keyword_values["cwd"].id == "root"
+        and isinstance(keyword_values["text"], ast.Constant)
+        and type(keyword_values["text"].value) is bool
+        and isinstance(keyword_values["timeout_seconds"], ast.Name)
+        and keyword_values["timeout_seconds"].id == "GIT_TIMEOUT_SECONDS"
+        and isinstance(keyword_values["stderr_limit_bytes"], ast.Name)
+        and keyword_values["stderr_limit_bytes"].id == "GIT_STDERR_LIMIT_BYTES"
+        and isinstance(keyword_values["stdout_limit_bytes"], ast.Name)
+        and keyword_values["stdout_limit_bytes"].id
+        in {
+            "GIT_STDOUT_LIMIT_BYTES",
+            "MAX_CANDIDATE_TREE_INDEX_BYTES",
+            "max_bytes",
+        }
+    )
+
+
+def bounded_candidate_blob_process_call_is_read_only(call: ast.Call) -> bool:
+    """Accept only the blob loader's runtime-shortened read-only Git call."""
+    if len(call.args) != 1 or not isinstance(call.args[0], (ast.List, ast.Tuple)):
+        return False
+    command = call.args[0].elts
+    if not ast_git_command_is_read_only(command):
+        return False
+    keyword_values = {
+        keyword.arg: keyword.value
+        for keyword in call.keywords
+        if keyword.arg is not None
+    }
+    if len(keyword_values) != len(call.keywords) or set(keyword_values) != {
+        "cwd",
+        "stderr_limit_bytes",
+        "stdout_limit_bytes",
+        "text",
+        "timeout_seconds",
+    }:
+        return False
+    return (
+        isinstance(keyword_values["cwd"], ast.Name)
+        and keyword_values["cwd"].id == "root"
+        and isinstance(keyword_values["text"], ast.Constant)
+        and type(keyword_values["text"].value) is bool
+        and isinstance(keyword_values["timeout_seconds"], ast.Name)
+        and keyword_values["timeout_seconds"].id == "timeout_seconds"
+        and isinstance(keyword_values["stderr_limit_bytes"], ast.Name)
+        and keyword_values["stderr_limit_bytes"].id == "GIT_STDERR_LIMIT_BYTES"
+        and isinstance(keyword_values["stdout_limit_bytes"], ast.Name)
+        and keyword_values["stdout_limit_bytes"].id == "max_bytes"
+    )
+
+
+def owned_process_group_signal_call(call: ast.Call) -> bool:
+    return (
+        len(call.args) == 2
+        and not call.keywords
+        and qualified_ast_name(call.args[0]) == "process.pid"
+        and qualified_ast_name(call.args[1]) in {"signal.SIGTERM", "signal.SIGKILL"}
+    )
+
+
+def enclosing_function_name(
+    node: ast.AST,
+    parent_by_node: dict[ast.AST, ast.AST],
+) -> str | None:
+    current = parent_by_node.get(node)
+    while current is not None:
+        if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return current.name
+        current = parent_by_node.get(current)
+    return None
+
+
+def literal_string_frozenset(node: ast.AST) -> frozenset[str] | None:
+    if (
+        not isinstance(node, ast.Call)
+        or not isinstance(node.func, ast.Name)
+        or node.func.id != "frozenset"
+        or len(node.args) != 1
+        or node.keywords
+        or not isinstance(node.args[0], ast.Set)
+        or not all(
+            isinstance(element, ast.Constant) and isinstance(element.value, str)
+            for element in node.args[0].elts
+        )
+    ):
+        return None
+    values = tuple(element.value for element in node.args[0].elts)
+    if len(values) != len(set(values)):
+        return None
+    return frozenset(values)
+
+
+def literal_string_tuple_rows(
+    node: ast.AST,
+    *,
+    width: int,
+    allow_none_at: frozenset[int],
+) -> tuple[tuple[str | None, ...], ...] | None:
+    if not isinstance(node, ast.Tuple):
+        return None
+    rows: list[tuple[str | None, ...]] = []
+    for element in node.elts:
+        if not isinstance(element, ast.Tuple) or len(element.elts) != width:
+            return None
+        row: list[str | None] = []
+        for index, value in enumerate(element.elts):
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                row.append(value.value)
+            elif (
+                index in allow_none_at
+                and isinstance(value, ast.Constant)
+                and value.value is None
+            ):
+                row.append(None)
+            else:
+                return None
+        rows.append(tuple(row))
+    if len(rows) != len(set(rows)):
+        return None
+    return tuple(rows)
+
+
+def exact_top_level_function_source_bytes(
+    contents: str,
+    function: ast.FunctionDef,
+) -> bytes | None:
+    """Return one exact, LF-terminated top-level function source slice.
+
+    Python versions add or omit empty AST fields even when source semantics are
+    identical.  Whole-line source slicing is version-independent and stricter:
+    comments and formatting are frozen together with executable control flow.
+    """
+    if (
+        function.col_offset != 0
+        or function.decorator_list
+        or function.end_lineno is None
+        or function.lineno < 1
+        or function.end_lineno < function.lineno
+    ):
+        return None
+    lines = contents.splitlines(keepends=True)
+    if function.end_lineno > len(lines):
+        return None
+    selected = lines[function.lineno - 1 : function.end_lineno]
+    if not selected or any(
+        "\r" in line or not line.endswith("\n") for line in selected
+    ):
+        return None
+    return "".join(selected).encode("utf-8")
+
+
+def validate_owner_gate_read_only(
+    contents: str,
+    source_name: str,
+) -> list[str]:
     """Reject code paths that could make the owner gate an artifact emitter."""
+    _allowed_direct_call_names = frozenset(
+        {
+            "Path",
+            "PurePosixPath",
+            "OSError",
+            "SystemExit",
+            "ValueError",
+            "all",
+            "any",
+            "bool",
+            "bytearray",
+            "bytes",
+            "dict",
+            "datetime",
+            "enumerate",
+            "fnmatchcase",
+            "frozenset",
+            "int",
+            "isinstance",
+            "killpg",
+            "len",
+            "list",
+            "max",
+            "min",
+            "monotonic",
+            "next",
+            "open",
+            "ord",
+            "pow",
+            "print",
+            "range",
+            "read",
+            "set",
+            "set_blocking",
+            "sleep",
+            "sorted",
+            "tuple",
+            "type",
+            "zip",
+        }
+    )
+    _allowed_from_imports = frozenset(
+        {
+            ("__future__", "annotations", None),
+            ("datetime", "datetime", None),
+            ("datetime", "timezone", None),
+            ("fnmatch", "fnmatchcase", None),
+            ("os", "killpg", None),
+            ("os", "read", None),
+            ("os", "set_blocking", None),
+            ("pathlib", "Path", None),
+            ("pathlib", "PurePosixPath", None),
+            ("time", "monotonic", None),
+            ("time", "sleep", None),
+        }
+    )
+    _allowed_method_calls = frozenset(
+        {
+            "add",
+            "add_argument",
+            "append",
+            "as_posix",
+            "astimezone",
+            "casefold",
+            "count",
+            "decode",
+            "digest",
+            "encode",
+            "end",
+            "endswith",
+            "exists",
+            "extend",
+            "find",
+            "findall",
+            "finditer",
+            "fileno",
+            "from_bytes",
+            "fromisoformat",
+            "fullmatch",
+            "get",
+            "glob",
+            "group",
+            "hexdigest",
+            "is_absolute",
+            "is_file",
+            "is_relative_to",
+            "isalnum",
+            "isoformat",
+            "isspace",
+            "items",
+            "join",
+            "lower",
+            "match",
+            "now",
+            "parse_args",
+            "partition",
+            "pop",
+            "read",
+            "read_text",
+            "relative_to",
+            "removeprefix",
+            "removesuffix",
+            "resolve",
+            "register",
+            "rfind",
+            "rstrip",
+            "search",
+            "select",
+            "setdefault",
+            "sort",
+            "split",
+            "splitlines",
+            "start",
+            "startswith",
+            "stat",
+            "strip",
+            "to_bytes",
+            "update",
+            "unregister",
+            "values",
+        }
+    )
+    _allowed_module_imports = frozenset(
+        {
+            "argparse",
+            "ast",
+            "base64",
+            "hashlib",
+            "json",
+            "re",
+            "selectors",
+            "signal",
+            "subprocess",
+            "sys",
+            "unicodedata",
+        }
+    )
+    _allowed_qualified_calls = frozenset(
+        {
+            "argparse.ArgumentParser",
+            "ast.dump",
+            "ast.iter_child_nodes",
+            "ast.parse",
+            "ast.walk",
+            "base64.b64decode",
+            "base64.b64encode",
+            "hashlib.sha256",
+            "hashlib.sha512",
+            "json.dumps",
+            "json.load",
+            "json.loads",
+            "key.fileobj.close",
+            "process.communicate",
+            "process.kill",
+            "process.stderr.close",
+            "process.stdout.close",
+            "process.wait",
+            "re.compile",
+            "re.escape",
+            "re.findall",
+            "re.finditer",
+            "re.fullmatch",
+            "re.match",
+            "re.search",
+            "selectors.DefaultSelector",
+            "selector.close",
+            "str.replace",
+            "subprocess.CompletedProcess",
+            "subprocess.Popen",
+            "subprocess.TimeoutExpired",
+            "subprocess.run",
+            "unicodedata.category",
+            "unicodedata.normalize",
+        }
+    )
+    _dangerous_alias_modules = frozenset(
+        {
+            "builtins",
+            "json",
+            "marshal",
+            "os",
+            "pickle",
+            "shutil",
+            "sqlite3",
+            "subprocess",
+            "yaml",
+        }
+    )
+    _dangerous_alias_targets = frozenset(
+        {
+            "__import__",
+            "builtins.open",
+            "builtins.print",
+            "compile",
+            "delattr",
+            "eval",
+            "exec",
+            "getattr",
+            "json.dump",
+            "marshal.dump",
+            "open",
+            "os.link",
+            "os.makedirs",
+            "os.mkdir",
+            "os.remove",
+            "os.removedirs",
+            "os.rename",
+            "os.renames",
+            "os.replace",
+            "os.rmdir",
+            "os.symlink",
+            "os.system",
+            "os.truncate",
+            "os.unlink",
+            "pickle.dump",
+            "print",
+            "setattr",
+            "shutil.copy",
+            "shutil.copy2",
+            "shutil.copyfile",
+            "shutil.copytree",
+            "shutil.move",
+            "sqlite3.connect",
+            "subprocess.Popen",
+            "subprocess.call",
+            "subprocess.check_call",
+            "subprocess.check_output",
+            "subprocess.run",
+            "yaml.dump",
+        }
+    )
+    _filesystem_write_methods = frozenset(
+        {
+            "chmod",
+            "copy",
+            "copy_into",
+            "hardlink_to",
+            "lchmod",
+            "link_to",
+            "mkdir",
+            "move",
+            "move_into",
+            "rename",
+            "replace",
+            "rmdir",
+            "symlink_to",
+            "touch",
+            "truncate",
+            "unlink",
+            "write",
+            "write_bytes",
+            "write_text",
+            "writelines",
+        }
+    )
+    _forbidden_emit_calls = frozenset(
+        {
+            "json.dump",
+            "marshal.dump",
+            "os.link",
+            "os.makedirs",
+            "os.mkdir",
+            "os.remove",
+            "os.removedirs",
+            "os.rename",
+            "os.renames",
+            "os.replace",
+            "os.rmdir",
+            "os.symlink",
+            "os.truncate",
+            "os.unlink",
+            "pickle.dump",
+            "shutil.copy",
+            "shutil.copy2",
+            "shutil.copyfile",
+            "shutil.copytree",
+            "shutil.move",
+            "sqlite3.connect",
+            "yaml.dump",
+        }
+    )
+    _forbidden_reflection_registries = frozenset(
+        {
+            "sys.argv",
+            "sys.meta_path",
+            "sys.modules",
+            "sys.path",
+            "sys.path_hooks",
+            "sys.path_importer_cache",
+        }
+    )
+    _git_environment_items = (
+        ("GIT_ATTR_NOSYSTEM", "1"),
+        ("GIT_CONFIG_COUNT", "5"),
+        ("GIT_CONFIG_GLOBAL", "/dev/null"),
+        ("GIT_CONFIG_KEY_0", "core.fsmonitor"),
+        ("GIT_CONFIG_KEY_1", "core.hooksPath"),
+        ("GIT_CONFIG_KEY_2", "diff.external"),
+        ("GIT_CONFIG_KEY_3", "core.pager"),
+        ("GIT_CONFIG_KEY_4", "submodule.recurse"),
+        ("GIT_CONFIG_NOSYSTEM", "1"),
+        ("GIT_CONFIG_SYSTEM", "/dev/null"),
+        ("GIT_CONFIG_VALUE_0", "false"),
+        ("GIT_CONFIG_VALUE_1", "/dev/null"),
+        ("GIT_CONFIG_VALUE_2", ""),
+        ("GIT_CONFIG_VALUE_3", "cat"),
+        ("GIT_CONFIG_VALUE_4", "false"),
+        ("GIT_LITERAL_PATHSPECS", "1"),
+        ("GIT_NO_LAZY_FETCH", "1"),
+        ("GIT_NO_REPLACE_OBJECTS", "1"),
+        ("GIT_OPTIONAL_LOCKS", "0"),
+        ("GIT_PAGER", "cat"),
+        ("GIT_TERMINAL_PROMPT", "0"),
+        ("HOME", "/nonexistent"),
+        ("LANG", "C"),
+        ("LC_ALL", "C"),
+        ("PAGER", "cat"),
+        ("PATH", "/usr/bin:/bin"),
+        ("XDG_CONFIG_HOME", "/nonexistent"),
+    )
+    _protected_imported_names = frozenset(
+        {
+            "Path",
+            "PurePosixPath",
+            "argparse",
+            "ast",
+            "base64",
+            "datetime",
+            "fnmatchcase",
+            "hashlib",
+            "json",
+            "killpg",
+            "monotonic",
+            "re",
+            "read",
+            "selectors",
+            "set_blocking",
+            "signal",
+            "sleep",
+            "subprocess",
+            "sys",
+            "timezone",
+            "unicodedata",
+        }
+    )
+    _protected_qualified_roots = frozenset(
+        {
+            "argparse",
+            "ast",
+            "hashlib",
+            "json",
+            "re",
+            "selectors",
+            "signal",
+            "str",
+            "subprocess",
+            "unicodedata",
+        }
+    )
+    _read_only_git_subcommands = frozenset(
+        {
+            "cat-file",
+            "diff-tree",
+            "ls-tree",
+            "rev-parse",
+        }
+    )
+    _subprocess_calls = frozenset(
+        {
+            "subprocess.call",
+            "subprocess.check_call",
+            "subprocess.check_output",
+            "subprocess.Popen",
+            "subprocess.run",
+        }
+    )
+    _policy_binding_names = frozenset(
+        {
+            "ALLOWED_DIRECT_CALL_NAMES",
+            "ALLOWED_FROM_IMPORTS",
+            "ALLOWED_METHOD_CALLS",
+            "ALLOWED_MODULE_IMPORTS",
+            "ALLOWED_QUALIFIED_CALLS",
+            "DANGEROUS_ALIAS_MODULES",
+            "DANGEROUS_ALIAS_TARGETS",
+            "FILESYSTEM_WRITE_METHODS",
+            "FORBIDDEN_EMIT_CALLS",
+            "FORBIDDEN_REFLECTION_REGISTRIES",
+            "GIT_SUBPROCESS_ENVIRONMENT",
+            "PROTECTED_IMPORTED_NAMES",
+            "PROTECTED_QUALIFIED_ROOTS",
+            "READ_ONLY_GIT_SUBCOMMANDS",
+            "SUBPROCESS_CALLS",
+        }
+    )
     try:
         tree = ast.parse(contents, filename=source_name)
     except SyntaxError as error:
@@ -1605,11 +3181,232 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
         for parent in ast.walk(tree)
         for child in ast.iter_child_nodes(parent)
     }
+    module_policy_definitions: dict[str, list[ast.AST]] = {
+        name: [] for name in _policy_binding_names
+    }
+    for statement in tree.body:
+        targets: list[ast.AST] = []
+        if isinstance(statement, ast.Assign):
+            targets = list(statement.targets)
+        elif isinstance(statement, ast.AnnAssign):
+            targets = [statement.target]
+        for target in targets:
+            if isinstance(target, ast.Name) and target.id in module_policy_definitions:
+                module_policy_definitions[target.id].append(statement)
+    is_trusted_owner_gate_source = source_name == OWNER_GATE_RELATIVE_PATH or (
+        Path(source_name).is_absolute()
+        and Path(source_name).as_posix().endswith(f"/{OWNER_GATE_RELATIVE_PATH}")
+    )
+    owner_gate_validator_definitions = [
+        statement
+        for statement in tree.body
+        if isinstance(statement, ast.FunctionDef)
+        and statement.name == "validate_owner_gate_read_only"
+    ]
+    if is_trusted_owner_gate_source and len(owner_gate_validator_definitions) != 1:
+        errors.append(
+            "owner gate trusted source requires exactly one "
+            f"validate_owner_gate_read_only definition at {source_name}"
+        )
+    is_owner_gate_module = is_trusted_owner_gate_source
+    expected_set_definitions = {
+        "ALLOWED_DIRECT_CALL_NAMES": _allowed_direct_call_names,
+        "ALLOWED_METHOD_CALLS": _allowed_method_calls,
+        "ALLOWED_MODULE_IMPORTS": _allowed_module_imports,
+        "ALLOWED_QUALIFIED_CALLS": _allowed_qualified_calls,
+        "DANGEROUS_ALIAS_MODULES": _dangerous_alias_modules,
+        "DANGEROUS_ALIAS_TARGETS": _dangerous_alias_targets,
+        "FILESYSTEM_WRITE_METHODS": _filesystem_write_methods,
+        "FORBIDDEN_EMIT_CALLS": _forbidden_emit_calls,
+        "FORBIDDEN_REFLECTION_REGISTRIES": (_forbidden_reflection_registries),
+        "PROTECTED_IMPORTED_NAMES": _protected_imported_names,
+        "PROTECTED_QUALIFIED_ROOTS": _protected_qualified_roots,
+        "READ_ONLY_GIT_SUBCOMMANDS": _read_only_git_subcommands,
+        "SUBPROCESS_CALLS": _subprocess_calls,
+    }
+    for name, expected_values in expected_set_definitions.items():
+        definitions = module_policy_definitions[name]
+        if len(definitions) != 1:
+            if is_owner_gate_module:
+                errors.append(
+                    "owner gate policy definition freeze requires exactly one "
+                    f"binding {name!r} at {source_name}"
+                )
+            continue
+        definition = definitions[0]
+        value_node = (
+            definition.value
+            if isinstance(definition, (ast.Assign, ast.AnnAssign))
+            else None
+        )
+        if literal_string_frozenset(value_node) != expected_values:
+            errors.append(
+                "owner gate policy definition freeze mismatch for "
+                f"{name!r} at {source_name}"
+            )
+    from_import_definitions = module_policy_definitions["ALLOWED_FROM_IMPORTS"]
+    if len(from_import_definitions) != 1:
+        if is_owner_gate_module:
+            errors.append(
+                "owner gate policy definition freeze requires exactly one "
+                f"binding 'ALLOWED_FROM_IMPORTS' at {source_name}"
+            )
+    else:
+        from_import_definition = from_import_definitions[0]
+        from_import_value = (
+            from_import_definition.value
+            if isinstance(from_import_definition, (ast.Assign, ast.AnnAssign))
+            else None
+        )
+        parsed_from_imports = literal_string_tuple_rows(
+            from_import_value,
+            width=3,
+            allow_none_at=frozenset({2}),
+        )
+        if (
+            parsed_from_imports is None
+            or frozenset(parsed_from_imports) != _allowed_from_imports
+        ):
+            errors.append(
+                "owner gate policy definition freeze mismatch for "
+                f"'ALLOWED_FROM_IMPORTS' at {source_name}"
+            )
+    environment_definitions = module_policy_definitions["GIT_SUBPROCESS_ENVIRONMENT"]
+    if len(environment_definitions) != 1:
+        if is_owner_gate_module:
+            errors.append(
+                "owner gate policy definition freeze requires exactly one "
+                f"binding 'GIT_SUBPROCESS_ENVIRONMENT' at {source_name}"
+            )
+    else:
+        environment_definition = environment_definitions[0]
+        environment_value = (
+            environment_definition.value
+            if isinstance(environment_definition, (ast.Assign, ast.AnnAssign))
+            else None
+        )
+        environment_items = literal_string_tuple_rows(
+            environment_value,
+            width=2,
+            allow_none_at=frozenset(),
+        )
+        if environment_items != _git_environment_items:
+            errors.append(
+                "owner gate policy definition freeze mismatch for "
+                f"'GIT_SUBPROCESS_ENVIRONMENT' at {source_name}"
+            )
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Name) or node.id not in _policy_binding_names:
+            continue
+        parent = parent_by_node.get(node)
+        is_exact_initial_definition = (
+            isinstance(node.ctx, ast.Store)
+            and len(module_policy_definitions[node.id]) == 1
+            and module_policy_definitions[node.id][0] is parent
+        )
+        if not is_exact_initial_definition:
+            errors.append(
+                "owner gate policy mutation/reference is forbidden outside "
+                f"its exact initial definition for {node.id!r} at "
+                f"{source_name}:{node.lineno}"
+            )
     module_declarations = [
         node
         for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
     ]
+    bounded_process_definitions = [
+        node
+        for node in module_declarations
+        if isinstance(node, ast.FunctionDef) and node.name == "run_bounded_process"
+    ]
+    _expected_bounded_process_contract_digest = (
+        "0e05ac870dea44feb06306267ba13b3b2e8eb5b9169b4bc6fe61d067eecf4ad6"
+    )
+    bounded_process_source = (
+        exact_top_level_function_source_bytes(
+            contents,
+            bounded_process_definitions[0],
+        )
+        if len(bounded_process_definitions) == 1
+        else None
+    )
+    if is_trusted_owner_gate_source and (
+        len(bounded_process_definitions) != 1
+        or bounded_process_source is None
+        or hashlib.sha256(bounded_process_source).hexdigest()
+        != _expected_bounded_process_contract_digest
+    ):
+        errors.append(
+            f"owner gate exact bounded process contract mismatch at {source_name}"
+        )
+    _expected_git_command_contract_digests = (
+        (
+            "git_command_is_read_only",
+            "ae0ea633dbb6855100e9b92225c4ace169e390109599df28ccf95a3797e85fc6",
+        ),
+        (
+            "ast_git_command_is_read_only",
+            "88b47626a27605458d83863d60d401257395636c66f9726d7461bc6a31cafcee",
+        ),
+        (
+            "subprocess_call_is_read_only",
+            "3cd0e8c608843adf867db04dbc456ecfff7544f7dfe35d773f21a4093486bd4c",
+        ),
+        (
+            "bounded_process_call_is_read_only",
+            "3d6af84586a43cf93155c207ac23385641b4c23d5e7bf2eab53e420b7fbb51a6",
+        ),
+        (
+            "bounded_candidate_blob_process_call_is_read_only",
+            "d39f48568765af4a77f84f45a5dabd6fae89cb44cdae870f4d3996b6d82e3e16",
+        ),
+        (
+            "load_candidate_blob",
+            "dbc819c80b504f70b7bcf2e9a86c6958370bf370fb5ee1d2ca7c58ee6cdc23f5",
+        ),
+        (
+            "is_normalized_workspace_path",
+            "e786f66d1159060a277301273036fcb13003250bd5bd26472cd21e98d8e1faae",
+        ),
+        (
+            "exact_top_level_function_source_bytes",
+            "3dcf5b39beb7f3bdac5725ecb099e1c982048785127b92d04c85d8eb7bb63742",
+        ),
+    )
+    for function_name, expected_digest in _expected_git_command_contract_digests:
+        definitions = [
+            node
+            for node in module_declarations
+            if isinstance(node, ast.FunctionDef) and node.name == function_name
+        ]
+        definition_source = (
+            exact_top_level_function_source_bytes(contents, definitions[0])
+            if len(definitions) == 1
+            else None
+        )
+        if is_trusted_owner_gate_source and (
+            len(definitions) != 1
+            or definition_source is None
+            or hashlib.sha256(definition_source).hexdigest() != expected_digest
+        ):
+            errors.append(
+                "owner gate exact Git command grammar contract mismatch for "
+                f"{function_name!r} at {source_name}"
+            )
+    contains_popen = any(
+        isinstance(node, ast.Call)
+        and qualified_ast_name(node.func) == "subprocess.Popen"
+        for node in ast.walk(tree)
+    )
+    if contains_popen and (
+        len(bounded_process_definitions) != 1
+        or not bounded_subprocess_guard_is_present(bounded_process_definitions[0])
+    ):
+        errors.append(
+            "owner gate must remain read-only; bounded subprocess read-only "
+            f"Git guard is missing or malformed at {source_name}"
+        )
     module_declaration_names = [node.name for node in module_declarations]
     duplicate_module_declarations = sorted(
         {
@@ -1625,7 +3422,9 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
         )
     declared_callable_names = set(module_declaration_names)
     base_protected_binding_names = (
-        ALLOWED_DIRECT_CALL_NAMES | PROTECTED_IMPORTED_NAMES | PROTECTED_QUALIFIED_ROOTS
+        _allowed_direct_call_names
+        | _protected_imported_names
+        | _protected_qualified_roots
     )
     protected_binding_names = base_protected_binding_names | declared_callable_names
 
@@ -1641,10 +3440,16 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
         elif isinstance(node, ast.ExceptHandler):
             bound_name = node.name
             binding_line = node.lineno
-        elif isinstance(node, (ast.MatchAs, ast.MatchStar)):
+        elif MATCH_NAME_BINDING_NODE_TYPES and isinstance(
+            node,
+            MATCH_NAME_BINDING_NODE_TYPES,
+        ):
             bound_name = node.name
             binding_line = node.lineno
-        elif isinstance(node, ast.MatchMapping):
+        elif MATCH_MAPPING_NODE_TYPES and isinstance(
+            node,
+            MATCH_MAPPING_NODE_TYPES,
+        ):
             bound_name = node.rest
             binding_line = node.lineno
         if (
@@ -1666,7 +3471,17 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             location = f"{source_name}:{node.lineno}"
             is_module_declaration = parent_by_node.get(node) is tree
-            if node.name.startswith("__") and node.name.endswith("__"):
+            parent_declaration = parent_by_node.get(node)
+            is_content_view_initializer = (
+                node.name == "__init__"
+                and isinstance(parent_declaration, ast.ClassDef)
+                and parent_declaration.name in {"LiveContentView", "CandidateTreeView"}
+            )
+            if (
+                node.name.startswith("__")
+                and node.name.endswith("__")
+                and not is_content_view_initializer
+            ):
                 errors.append(
                     "owner gate must remain read-only; reflection through implicit "
                     f"protocol declaration {node.name!r} is forbidden at {location}"
@@ -1695,7 +3510,7 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for imported in node.names:
-                if imported.name not in ALLOWED_MODULE_IMPORTS or imported.asname:
+                if imported.name not in _allowed_module_imports or imported.asname:
                     errors.append(
                         "owner gate must remain read-only; import is outside the "
                         f"audited allowlist at {source_name}:{node.lineno}: "
@@ -1704,8 +3519,11 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
             for imported in node.names:
-                allowed_names = ALLOWED_FROM_IMPORTS.get(module, set())
-                if (imported.name, imported.asname) not in allowed_names:
+                if (
+                    module,
+                    imported.name,
+                    imported.asname,
+                ) not in _allowed_from_imports:
                     errors.append(
                         "owner gate must remain read-only; from-import is outside "
                         f"the audited allowlist at {source_name}:{node.lineno}: "
@@ -1715,8 +3533,8 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
             value = node.value
             referenced_name = qualified_ast_name(value)
             if (
-                referenced_name in DANGEROUS_ALIAS_TARGETS
-                or referenced_name in DANGEROUS_ALIAS_MODULES
+                referenced_name in _dangerous_alias_targets
+                or referenced_name in _dangerous_alias_modules
             ):
                 errors.append(
                     "owner gate must remain read-only; dangerous callable/module "
@@ -1732,7 +3550,7 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
                 "owner gate must remain read-only; reflection through dunder "
                 f"attribute {node.attr!r} is forbidden at {source_name}:{node.lineno}"
             )
-        if referenced_name in FORBIDDEN_REFLECTION_REGISTRIES:
+        if referenced_name in _forbidden_reflection_registries:
             errors.append(
                 "owner gate must remain read-only; reflection through runtime "
                 f"registry {referenced_name!r} is forbidden at "
@@ -1744,7 +3562,7 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
             and isinstance(parent, ast.Call)
             and parent.func is node
         )
-        if node.attr in FILESYSTEM_WRITE_METHODS and not direct_string_replace:
+        if node.attr in _filesystem_write_methods and not direct_string_replace:
             errors.append(
                 "owner gate must remain read-only; forbidden write capability "
                 f"{node.attr} referenced at {source_name}:{node.lineno}"
@@ -1760,13 +3578,21 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
                     "owner gate must remain read-only; open capability may not "
                     f"be aliased at {source_name}:{node.lineno}"
                 )
-        if referenced_name in SUBPROCESS_CALLS:
+        if referenced_name in _subprocess_calls:
             parent = parent_by_node.get(node)
             direct_read_only_call = (
-                referenced_name == "subprocess.run"
-                and isinstance(parent, ast.Call)
+                isinstance(parent, ast.Call)
                 and parent.func is node
-                and subprocess_call_is_read_only(parent)
+                and (
+                    (
+                        referenced_name == "subprocess.run"
+                        and subprocess_call_is_read_only(parent)
+                    )
+                    or (
+                        referenced_name == "subprocess.Popen"
+                        and bounded_popen_call_is_read_only(parent)
+                    )
+                )
             )
             if not direct_read_only_call:
                 errors.append(
@@ -1783,7 +3609,7 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
 
         if isinstance(node.func, ast.Name):
             if node.func.id not in (
-                ALLOWED_DIRECT_CALL_NAMES | declared_callable_names
+                _allowed_direct_call_names | declared_callable_names
             ):
                 errors.append(
                     "owner gate must remain read-only; unapproved direct callable "
@@ -1791,9 +3617,8 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
                 )
         elif isinstance(node.func, ast.Attribute):
             approved_attribute_call = (
-                call_name in ALLOWED_QUALIFIED_CALLS
-                or method_name == "open"
-                or method_name in ALLOWED_METHOD_CALLS
+                call_name in _allowed_qualified_calls
+                or method_name in _allowed_method_calls
             )
             if not approved_attribute_call:
                 errors.append(
@@ -1806,7 +3631,7 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
                 f"at {location}"
             )
 
-        if call_name in FORBIDDEN_EMIT_CALLS:
+        if call_name in _forbidden_emit_calls:
             errors.append(
                 f"owner gate must remain read-only; forbidden emit call "
                 f"{call_name} at {location}"
@@ -1827,16 +3652,91 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
                 f"{call_name} is forbidden at {location}"
             )
             continue
-        if call_name in SUBPROCESS_CALLS:
-            if call_name != "subprocess.run" or not subprocess_call_is_read_only(node):
+        process_control_calls = {
+            "killpg",
+            "os.killpg",
+            "process.communicate",
+            "process.kill",
+            "process.stderr.close",
+            "process.stdout.close",
+            "process.wait",
+            "subprocess.CompletedProcess",
+            "subprocess.Popen",
+            "terminate_process_group",
+        }
+        if call_name in process_control_calls:
+            enclosing_function = enclosing_function_name(
+                node,
+                parent_by_node,
+            )
+            process_control_allowed = (
+                (
+                    call_name in {"killpg", "os.killpg"}
+                    and enclosing_function == "terminate_process_group"
+                    and owned_process_group_signal_call(node)
+                )
+                or (
+                    call_name == "process.communicate"
+                    and enclosing_function
+                    in {"run_bounded_process", "terminate_process_group"}
+                )
+                or (
+                    call_name
+                    in {
+                        "process.kill",
+                        "process.stderr.close",
+                        "process.stdout.close",
+                    }
+                    and enclosing_function == "terminate_process_group"
+                )
+                or (
+                    call_name == "process.wait"
+                    and enclosing_function
+                    in {"run_bounded_process", "terminate_process_group"}
+                )
+                or (
+                    call_name in {"subprocess.CompletedProcess", "subprocess.Popen"}
+                    and enclosing_function == "run_bounded_process"
+                )
+                or (
+                    call_name == "terminate_process_group"
+                    and enclosing_function == "run_bounded_process"
+                )
+            )
+            if not process_control_allowed:
+                errors.append(
+                    "owner gate must remain read-only; process control is "
+                    f"outside the bounded supervisor at {location}"
+                )
+                continue
+        if call_name in _subprocess_calls:
+            approved_subprocess = (
+                call_name == "subprocess.run" and subprocess_call_is_read_only(node)
+            ) or (
+                call_name == "subprocess.Popen"
+                and bounded_popen_call_is_read_only(node)
+            )
+            if not approved_subprocess:
                 errors.append(
                     "owner gate must remain read-only; subprocess execution is "
                     f"limited to audited read-only Git subcommands at {location}"
                 )
             continue
-        if (
-            call_name == "open" or method_name == "open"
-        ) and not open_call_is_read_only(node):
+        if call_name == "run_bounded_process":
+            bounded_candidate_blob_call = (
+                enclosing_function_name(node, parent_by_node) == "load_candidate_blob"
+                and bounded_candidate_blob_process_call_is_read_only(node)
+            )
+            if (
+                not bounded_process_call_is_read_only(node)
+                and not bounded_candidate_blob_call
+            ):
+                errors.append(
+                    "owner gate must remain read-only; bounded subprocess call is "
+                    f"not an exact read-only Git invocation at {location}"
+                )
+                continue
+        if call_name == "open" and not open_call_is_read_only(node):
             errors.append(
                 f"owner gate must remain read-only; writable open at {location}"
             )
@@ -1855,29 +3755,19 @@ def validate_owner_gate_read_only(contents: str, source_name: str) -> list[str]:
 
 
 def read_audit_boundary_source(
-    root: Path, relative_path: str
+    content_view: LiveContentView | CandidateTreeView,
+    relative_path: str,
 ) -> tuple[str | None, str | None]:
-    candidate = root / relative_path
     try:
-        resolved_root = root.resolve(strict=True)
-        resolved_candidate = candidate.resolve(strict=True)
-        resolved_candidate.relative_to(resolved_root)
-    except (FileNotFoundError, OSError, ValueError) as error:
         return (
+            content_view.read_text(
+                relative_path,
+                max_bytes=MAX_AUDIT_BOUNDARY_SOURCE_BYTES,
+                label="audit boundary source",
+            ),
             None,
-            f"audit boundary source is missing or escapes --root: {relative_path}: {error}",
         )
-    if not resolved_candidate.is_file():
-        return None, f"audit boundary source must be a regular file: {relative_path}"
-    try:
-        size = resolved_candidate.stat().st_size
-        if size > MAX_AUDIT_BOUNDARY_SOURCE_BYTES:
-            return None, (
-                "audit boundary source exceeds "
-                f"{MAX_AUDIT_BOUNDARY_SOURCE_BYTES} bytes: {relative_path}"
-            )
-        return resolved_candidate.read_text(encoding="utf-8"), None
-    except (OSError, UnicodeError) as error:
+    except ContentViewError as error:
         return (
             None,
             f"audit boundary source cannot be read as UTF-8: {relative_path}: {error}",
@@ -1978,47 +3868,52 @@ def build_path_references(path: Path, contents: str) -> tuple[set[str], list[str
     return references, errors
 
 
-def build_surface_base(root: Path, relative_path: str) -> Path:
-    path = Path(relative_path)
+def build_surface_base(relative_path: str) -> str:
+    path = PurePosixPath(relative_path)
     parent = path.parent.parent if path.suffix == ".pbxproj" else path.parent
-    return (root / parent).resolve(strict=False)
+    return "" if parent == PurePosixPath(".") else parent.as_posix()
 
 
 def audit_assets_covered_by_reference(
-    root: Path,
+    content_view: LiveContentView | CandidateTreeView,
     relative_path: str,
     reference: str,
 ) -> list[str]:
-    base = build_surface_base(root, relative_path)
-    candidates: list[Path]
+    base = build_surface_base(relative_path)
+    candidates: list[str]
     if any(character in reference for character in "*?["):
         if Path(reference).is_absolute():
             return []
-        try:
-            candidates = [path.resolve(strict=False) for path in base.glob(reference)]
-        except (OSError, ValueError):
+        normalized_pattern = normalized_content_reference(base, reference)
+        if normalized_pattern is None:
             return []
+        candidates = content_view.glob("", normalized_pattern)
     else:
-        candidates = [(base / reference).resolve(strict=False)]
+        normalized = normalized_content_reference(base, reference)
+        candidates = [] if normalized is None else [normalized]
     covered: list[str] = []
     for asset_relative_path in AUDIT_ASSET_RELATIVE_PATHS:
-        asset = (root / asset_relative_path).resolve(strict=False)
+        asset = PurePosixPath(asset_relative_path)
         if any(
-            candidate == asset or candidate in asset.parents for candidate in candidates
+            PurePosixPath(candidate) == asset
+            or PurePosixPath(candidate) in asset.parents
+            for candidate in candidates
         ):
             covered.append(asset_relative_path)
     return covered
 
 
 def candidate_is_xcodegen_spec(
-    root: Path,
-    candidate: Path,
+    content_view: LiveContentView | CandidateTreeView,
     relative_path: str,
 ) -> bool:
     """Recognize conventional or content-identifiable XcodeGen YAML specs."""
-    if candidate.name in CONVENTIONAL_XCODEGEN_FILENAMES:
+    if PurePosixPath(relative_path).name in CONVENTIONAL_XCODEGEN_FILENAMES:
         return True
-    contents, read_error = read_audit_boundary_source(root, relative_path)
+    contents, read_error = read_audit_boundary_source(
+        content_view,
+        relative_path,
+    )
     if read_error is not None:
         return True
     assert contents is not None
@@ -2032,41 +3927,82 @@ def candidate_is_xcodegen_spec(
     )
 
 
-def owned_production_build_surfaces(root: Path) -> list[str]:
+def owned_production_build_surfaces(
+    content_view: LiveContentView | CandidateTreeView,
+) -> list[str]:
     """Discover current Qinao manifests while retaining required known surfaces."""
     surfaces = set(PRODUCTION_BUILD_SURFACES)
     for owned_root_relative in OWNED_PRODUCTION_BUILD_ROOTS:
-        owned_root = root / owned_root_relative
         for pattern in OWNED_BUILD_SURFACE_PATTERNS:
-            for candidate in owned_root.glob(pattern):
-                try:
-                    relative = candidate.relative_to(root)
-                except ValueError:
-                    continue
+            candidates = content_view.glob(
+                owned_root_relative,
+                pattern,
+            )
+            for relative_path in candidates:
+                relative = PurePosixPath(relative_path)
                 if any(
                     component in NON_QINAO_BUILD_COMPONENTS
                     for component in relative.parts
                 ):
                     continue
-                relative_path = relative.as_posix()
-                if candidate.suffix in {
+                if relative.suffix in {
                     ".yaml",
                     ".yml",
                 } and not candidate_is_xcodegen_spec(
-                    root,
-                    candidate,
-                    relative_path,
+                    content_view,
+                    relative.as_posix(),
                 ):
                     continue
-                surfaces.add(relative_path)
+                surfaces.add(relative.as_posix())
+                if len(surfaces) > MAX_CANDIDATE_BUILD_SURFACES:
+                    raise ContentViewError(
+                        "candidate build-surface budget is exhausted"
+                    )
     return sorted(surfaces)
 
 
-def validate_audit_asset_boundary(root: Path) -> list[str]:
+def capture_executed_owner_gate_source() -> tuple[str | None, str | None]:
+    """Capture exactly the bytes this checker execution must self-audit.
+
+    The wave bootstrap injects its already-bound stdin bytes, which gives that
+    mode exact execution/audit byte equality.  Direct ``python script.py`` mode
+    opens ``__file__`` once; this is only a best-effort diagnostic path snapshot
+    because the interpreter may already have read different pathname bytes.
+    Neither mode is self-authentication or replaces the external R2-02
+    signature/trust-root requirement.
+    """
+    try:
+        raw = __qinao_executed_source__
+    except NameError:
+        try:
+            with open(__file__, "rb") as source:
+                raw = source.read(MAX_AUDIT_BOUNDARY_SOURCE_BYTES + 1)
+        except OSError as error:
+            return None, f"executed owner gate source cannot be captured: {error}"
+    if type(raw) is not bytes:
+        return None, "executed owner gate source snapshot must be exact bytes"
+    if not raw or len(raw) > MAX_AUDIT_BOUNDARY_SOURCE_BYTES:
+        return None, (
+            "executed owner gate source snapshot must be non-empty and at most "
+            f"{MAX_AUDIT_BOUNDARY_SOURCE_BYTES} bytes"
+        )
+    try:
+        return raw.decode("utf-8"), None
+    except UnicodeDecodeError as error:
+        return None, f"executed owner gate source is not UTF-8: {error}"
+
+
+def validate_audit_asset_boundary(
+    root: Path,
+    *,
+    executed_owner_gate_source: str | None = None,
+    content_view: LiveContentView | CandidateTreeView | None = None,
+) -> list[str]:
     """Keep architecture audit assets outside production/runtime ownership."""
+    view = content_view if content_view is not None else LiveContentView(root)
     errors: list[str] = []
-    for relative_path in owned_production_build_surfaces(root):
-        contents, read_error = read_audit_boundary_source(root, relative_path)
+    for relative_path in owned_production_build_surfaces(view):
+        contents, read_error = read_audit_boundary_source(view, relative_path)
         if read_error is not None:
             errors.append(read_error)
             continue
@@ -2104,7 +4040,7 @@ def validate_audit_asset_boundary(root: Path) -> list[str]:
                 )
                 continue
             covered_assets = audit_assets_covered_by_reference(
-                root,
+                view,
                 relative_path,
                 reference,
             )
@@ -2115,21 +4051,47 @@ def validate_audit_asset_boundary(root: Path) -> list[str]:
                     f"surface {relative_path!r}"
                 )
 
-    gate_contents, read_error = read_audit_boundary_source(
-        root, OWNER_GATE_RELATIVE_PATH
-    )
-    if read_error is not None:
-        errors.append(read_error)
-    else:
-        assert gate_contents is not None
+    if executed_owner_gate_source is not None:
         errors.extend(
-            validate_owner_gate_read_only(gate_contents, OWNER_GATE_RELATIVE_PATH)
+            validate_owner_gate_read_only(
+                executed_owner_gate_source,
+                OWNER_GATE_RELATIVE_PATH,
+            )
         )
+    else:
+        gate_contents, read_error = read_audit_boundary_source(
+            view,
+            OWNER_GATE_RELATIVE_PATH,
+        )
+        if read_error is not None:
+            errors.append(read_error)
+        else:
+            assert gate_contents is not None
+            errors.extend(
+                validate_owner_gate_read_only(
+                    gate_contents,
+                    OWNER_GATE_RELATIVE_PATH,
+                )
+            )
     return errors
 
 
-def validate_ledger(data: dict, root: Path) -> list[str]:
-    errors = validate_audit_asset_boundary(root)
+def validate_ledger(
+    data: dict,
+    root: Path,
+    *,
+    executed_owner_gate_source: str | None = None,
+    content_view: LiveContentView | CandidateTreeView | None = None,
+) -> list[str]:
+    view = content_view if content_view is not None else LiveContentView(root)
+    try:
+        errors = validate_audit_asset_boundary(
+            root,
+            executed_owner_gate_source=executed_owner_gate_source,
+            content_view=view,
+        )
+    except ContentViewError as error:
+        errors = [f"candidate content budget validation failed: {error}"]
     if set(data) != EXPECTED_TOP_LEVEL_FIELDS:
         errors.append(
             "ledger top-level fields must be exactly "
@@ -2321,8 +4283,7 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                 "controlled document path must be normalized and workspace-relative"
             )
             continue
-        candidate = (root / document_path).resolve()
-        if not candidate.is_relative_to(root) or not candidate.is_file():
+        if not view.is_file(document_path):
             errors.append(f"controlled document does not exist: {document_path}")
             continue
         required_terms = controlled_document.get("required_terms")
@@ -2354,7 +4315,15 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                 f"controlled document {document_path}: forbidden_terms must be a non-empty unique list"
             )
             forbidden_terms = []
-        contents = candidate.read_text(encoding="utf-8")
+        try:
+            contents = view.read_text(
+                document_path,
+                max_bytes=MAX_AUDIT_BOUNDARY_SOURCE_BYTES,
+                label=f"controlled document {document_path}",
+            )
+        except ContentViewError as error:
+            errors.append(f"{error}")
+            continue
         controlled_document_contents[document_path] = contents
         if "Scripts/check_qinao_owner_ledger.py" in contents:
             errors.append(
@@ -2624,8 +4593,7 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                         f"{owner_id}: evidence path must be normalized and workspace-relative"
                     )
                     continue
-                candidate = (root / evidence_path).resolve()
-                if not candidate.is_relative_to(root) or not candidate.exists():
+                if not view.exists(evidence_path):
                     errors.append(
                         f"{owner_id}: evidence path does not exist: {evidence_path}"
                     )
@@ -2688,12 +4656,10 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
             errors.append(f"{owner_id}: status {status!r} is not declared")
         if owner_id == HISTORY_DOCTRINE_OWNER_ID:
             runtime_paths_present = [
-                path
-                for path in HISTORY_DOCTRINE_RUNTIME_PATHS
-                if (root / path).is_file()
+                path for path in HISTORY_DOCTRINE_RUNTIME_PATHS if view.is_file(path)
             ]
             audit_paths_present = [
-                path for path in HISTORY_DOCTRINE_AUDIT_PATHS if (root / path).is_file()
+                path for path in HISTORY_DOCTRINE_AUDIT_PATHS if view.is_file(path)
             ]
             if status == "relocation_candidate":
                 expected_history_evidence = [
@@ -2793,7 +4759,7 @@ def validate_ledger(data: dict, root: Path) -> list[str]:
                     isinstance(path, str) for path in allowed_paths
                 ):
                     existing_paths = [
-                        path for path in allowed_paths if (root / path).is_file()
+                        path for path in allowed_paths if view.is_file(path)
                     ]
                     existing_path_count = len(existing_paths)
                     missing_created_evidence = sorted(
@@ -3022,6 +4988,319 @@ SOURCE_STATUS_SCOPES = {
     "productionSource",
     "other",
 }
+AMENDMENT_2_APPROVED_DESIGN = {
+    "path": (
+        "docs/superpowers/specs/"
+        "2026-07-29-qinao-dual-space-automation-apple-ecosystem-design.md"
+    ),
+    "commit": "c4e6cf23fd28d01abea3b9c5d8b282ba9dd9f271",
+    "tree": "deef57197db409d6e4b33d5bfe9f7521eacefa12",
+    "blob": "bbc586cb5787d872f8980f95a766f8afa90f9221",
+    "byteLength": 113470,
+    "sha256": "50338e28492cd8dc7a81f28a07a871d70f02020af56549cb1384b9431bd5fcf6",
+}
+CONTROLLED_DOCUMENT_PATHS = {
+    "docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md",
+    "docs/superpowers/plans/2026-07-15-iphone-air-architecture-convergence-master.md",
+    "docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md",
+    "docs/superpowers/plans/2026-07-15-iphone-air-silicon-execution-spine.md",
+    "docs/superpowers/plans/2026-07-15-iphone-air-semantic-statelake-context.md",
+    "docs/superpowers/plans/2026-07-15-iphone-air-sovereign-release-effects.md",
+    "docs/superpowers/plans/2026-07-15-iphone-air-runtime-replay-certification.md",
+}
+OWNER_LEDGER_PATH = "docs/superpowers/specs/qinao-owner-ledger-v1.json"
+CHECKER_PATHS = {
+    "BehavioralAISubstrate/scripts/check-ios27-floor.sh",
+    "BehavioralAISubstrate/scripts/test_check_ios27_floor.py",
+    "BehavioralAISubstrate/scripts/build-rust-xcframework.sh",
+    "BehavioralAISubstrate/scripts/check-authoritative-entrypoints.sh",
+    "BehavioralAISubstrate/scripts/check-layercore-purity.sh",
+    "BehavioralAISubstrate/scripts/run-architecture-cert.sh",
+    "BehavioralAISubstrate/scripts/run-concurrent-turns-cert.sh",
+    "BehavioralAISubstrate/scripts/run-coreai-e2e-cert.sh",
+    "BehavioralAISubstrate/scripts/run-device-app-cert.sh",
+    "BehavioralAISubstrate/scripts/run-endurance-watchdog.sh",
+    "BehavioralAISubstrate/scripts/run-spec-decode-cert.sh",
+    "BehavioralAISubstrate/Tools/mamba3_statelake.py",
+    "BehavioralAISubstrate/Tools/mamba3_statelake_device_prep.py",
+    "BehavioralAISubstrate/Tools/test_statelake_state_abi.py",
+    "scripts/assert_qinao_ios27_device_profile.py",
+    "scripts/assert_xcode_test_evidence.py",
+    "scripts/check_qinao_owner_ledger.py",
+    "scripts/check_eventlog_typed_payloads.py",
+    "scripts/fixtures/qinao_admission_canonical_vectors_v1.json",
+    "scripts/fixtures/qinao_admission_canonical_vectors_v2.json",
+    "scripts/fixtures/qinao_authority_entity_policy_v1.json",
+    "scripts/run_nonempty_swift_filter.py",
+    "scripts/run_qinao_k4_ios27_platform_spike.py",
+    "scripts/run_qinao_wave_admission.py",
+    "scripts/test_assert_qinao_ios27_device_profile.py",
+    "scripts/test_assert_xcode_test_evidence.py",
+    "scripts/test_check_qinao_owner_ledger.py",
+    "scripts/test_check_eventlog_typed_payloads.py",
+    "scripts/test_qinao_admission_canonical_vectors.py",
+    "scripts/test_qinao_plan_remediation.py",
+    "scripts/test_run_nonempty_swift_filter.py",
+    "scripts/test_run_qinao_k4_ios27_platform_spike.py",
+    "scripts/test_run_qinao_wave_admission.py",
+    "scripts/test_test_workflow_owner_ledger.py",
+    "scripts/vendor/qinao_jsonschema_draft202012_v1.manifest.json",
+}
+VENDOR_PREFIX = "scripts/vendor/qinao_jsonschema_draft202012_v1/"
+PRODUCTION_EXACT_PATHS = {
+    "BehavioralAISubstrate/Package.swift",
+    "BehavioralAISubstrate/Cargo/Cargo.toml",
+    "BehavioralAISubstrate/Cargo/Cargo.lock",
+    "BehavioralAISubstrate/rust-toolchain.toml",
+    "BehavioralAISubstrate/DeviceTestApp/project.yml",
+    "BehavioralAISubstrate/DeviceTestApp/BASDeviceTest.xcodeproj/project.pbxproj",
+    "BehavioralAISubstrate/DeviceTestApp/BASDeviceTest.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
+    "BehavioralAISubstrate/DeviceTestApp/BASDeviceTest.xcodeproj/xcshareddata/xcschemes/BASDeviceTestApp.xcscheme",
+    "QinaoRuntimeSDK/Package.swift",
+    "SampleHost/Package.swift",
+}
+PRODUCTION_RECURSIVE_PREFIXES = (
+    "BehavioralAISubstrate/Sources/",
+    "BehavioralAISubstrate/DeviceTestApp/Sources/",
+    "BehavioralAISubstrate/DeviceTestApp/Resources/",
+    "BehavioralAISubstrate/Plugins/",
+    "BehavioralAISubstrate/Vendor/",
+    "QinaoRuntimeSDK/Sources/",
+    "SampleHost/",
+)
+RECURSIVE_EXCLUDED_COMPONENTS = {
+    "Archive",
+    "Backups",
+    "DerivedData",
+    "Fixtures",
+    "TestSupport",
+    "Tests",
+    "__pycache__",
+}
+RECURSIVE_EXCLUDED_SUFFIXES = (".bak", ".orig", ".rej", ".swp", ".tmp", "~")
+QINAO_DRAFT202012_ROOT_SCHEMA = "https://json-schema.org/draft/2020-12/schema"
+QINAO_DRAFT202012_ALLOWED_KEYWORDS = frozenset(
+    {
+        "$anchor",
+        "$comment",
+        "$defs",
+        "$dynamicAnchor",
+        "$dynamicRef",
+        "$id",
+        "$ref",
+        "$schema",
+        "additionalProperties",
+        "allOf",
+        "anyOf",
+        "const",
+        "contains",
+        "default",
+        "dependentRequired",
+        "dependentSchemas",
+        "deprecated",
+        "description",
+        "else",
+        "enum",
+        "examples",
+        "exclusiveMaximum",
+        "exclusiveMinimum",
+        "if",
+        "items",
+        "maxContains",
+        "maximum",
+        "maxItems",
+        "maxLength",
+        "maxProperties",
+        "minContains",
+        "minimum",
+        "minItems",
+        "minLength",
+        "minProperties",
+        "multipleOf",
+        "not",
+        "oneOf",
+        "prefixItems",
+        "properties",
+        "propertyNames",
+        "readOnly",
+        "required",
+        "then",
+        "title",
+        "type",
+        "unevaluatedItems",
+        "unevaluatedProperties",
+        "uniqueItems",
+        "writeOnly",
+    }
+)
+QINAO_DRAFT202012_ROOT_METADATA_KEYWORDS = frozenset(
+    {
+        "$id",
+        "$schema",
+    }
+)
+QINAO_DRAFT202012_TEXT_KEYWORDS = frozenset(
+    {
+        "$comment",
+        "description",
+        "title",
+    }
+)
+QINAO_DRAFT202012_BOOLEAN_KEYWORDS = frozenset(
+    {
+        "deprecated",
+        "readOnly",
+        "uniqueItems",
+        "writeOnly",
+    }
+)
+QINAO_DRAFT202012_INSTANCE_DATA_KEYWORDS = frozenset(
+    {
+        "const",
+        "default",
+    }
+)
+QINAO_DRAFT202012_EXAMPLES_KEYWORDS = frozenset(
+    {
+        "examples",
+    }
+)
+QINAO_DRAFT202012_SIGNED_INTEGER_KEYWORDS = frozenset(
+    {
+        "exclusiveMaximum",
+        "exclusiveMinimum",
+        "maximum",
+        "minimum",
+    }
+)
+QINAO_DRAFT202012_NONNEGATIVE_INTEGER_KEYWORDS = frozenset(
+    {
+        "maxContains",
+        "maxItems",
+        "maxLength",
+        "maxProperties",
+        "minContains",
+        "minItems",
+        "minLength",
+        "minProperties",
+    }
+)
+QINAO_DRAFT202012_POSITIVE_INTEGER_KEYWORDS = frozenset(
+    {
+        "multipleOf",
+    }
+)
+QINAO_DRAFT202012_ENUM_KEYWORDS = frozenset(
+    {
+        "enum",
+    }
+)
+QINAO_DRAFT202012_SINGLE_SCHEMA_KEYWORDS = frozenset(
+    {
+        "additionalProperties",
+        "contains",
+        "else",
+        "if",
+        "items",
+        "not",
+        "propertyNames",
+        "then",
+        "unevaluatedItems",
+        "unevaluatedProperties",
+    }
+)
+QINAO_DRAFT202012_SCHEMA_ARRAY_KEYWORDS = frozenset(
+    {
+        "allOf",
+        "anyOf",
+        "oneOf",
+        "prefixItems",
+    }
+)
+QINAO_DRAFT202012_SCHEMA_MAP_KEYWORDS = frozenset(
+    {
+        "$defs",
+        "dependentSchemas",
+        "properties",
+    }
+)
+QINAO_DRAFT202012_TYPE_KEYWORDS = frozenset(
+    {
+        "type",
+    }
+)
+QINAO_DRAFT202012_REQUIRED_KEYWORDS = frozenset(
+    {
+        "required",
+    }
+)
+QINAO_DRAFT202012_DEPENDENT_REQUIRED_KEYWORDS = frozenset(
+    {
+        "dependentRequired",
+    }
+)
+QINAO_DRAFT202012_REFERENCE_KEYWORDS = frozenset(
+    {
+        "$dynamicRef",
+        "$ref",
+    }
+)
+QINAO_DRAFT202012_ANCHOR_KEYWORDS = frozenset(
+    {
+        "$anchor",
+        "$dynamicAnchor",
+    }
+)
+QINAO_DRAFT202012_CLASSIFIED_KEYWORDS = (
+    QINAO_DRAFT202012_ROOT_METADATA_KEYWORDS
+    | QINAO_DRAFT202012_TEXT_KEYWORDS
+    | QINAO_DRAFT202012_BOOLEAN_KEYWORDS
+    | QINAO_DRAFT202012_INSTANCE_DATA_KEYWORDS
+    | QINAO_DRAFT202012_EXAMPLES_KEYWORDS
+    | QINAO_DRAFT202012_SIGNED_INTEGER_KEYWORDS
+    | QINAO_DRAFT202012_NONNEGATIVE_INTEGER_KEYWORDS
+    | QINAO_DRAFT202012_POSITIVE_INTEGER_KEYWORDS
+    | QINAO_DRAFT202012_ENUM_KEYWORDS
+    | QINAO_DRAFT202012_SINGLE_SCHEMA_KEYWORDS
+    | QINAO_DRAFT202012_SCHEMA_ARRAY_KEYWORDS
+    | QINAO_DRAFT202012_SCHEMA_MAP_KEYWORDS
+    | QINAO_DRAFT202012_TYPE_KEYWORDS
+    | QINAO_DRAFT202012_REQUIRED_KEYWORDS
+    | QINAO_DRAFT202012_DEPENDENT_REQUIRED_KEYWORDS
+    | QINAO_DRAFT202012_REFERENCE_KEYWORDS
+    | QINAO_DRAFT202012_ANCHOR_KEYWORDS
+)
+assert QINAO_DRAFT202012_CLASSIFIED_KEYWORDS == QINAO_DRAFT202012_ALLOWED_KEYWORDS
+assert len(QINAO_DRAFT202012_CLASSIFIED_KEYWORDS) == (
+    len(QINAO_DRAFT202012_ROOT_METADATA_KEYWORDS)
+    + len(QINAO_DRAFT202012_TEXT_KEYWORDS)
+    + len(QINAO_DRAFT202012_BOOLEAN_KEYWORDS)
+    + len(QINAO_DRAFT202012_INSTANCE_DATA_KEYWORDS)
+    + len(QINAO_DRAFT202012_EXAMPLES_KEYWORDS)
+    + len(QINAO_DRAFT202012_SIGNED_INTEGER_KEYWORDS)
+    + len(QINAO_DRAFT202012_NONNEGATIVE_INTEGER_KEYWORDS)
+    + len(QINAO_DRAFT202012_POSITIVE_INTEGER_KEYWORDS)
+    + len(QINAO_DRAFT202012_ENUM_KEYWORDS)
+    + len(QINAO_DRAFT202012_SINGLE_SCHEMA_KEYWORDS)
+    + len(QINAO_DRAFT202012_SCHEMA_ARRAY_KEYWORDS)
+    + len(QINAO_DRAFT202012_SCHEMA_MAP_KEYWORDS)
+    + len(QINAO_DRAFT202012_TYPE_KEYWORDS)
+    + len(QINAO_DRAFT202012_REQUIRED_KEYWORDS)
+    + len(QINAO_DRAFT202012_DEPENDENT_REQUIRED_KEYWORDS)
+    + len(QINAO_DRAFT202012_REFERENCE_KEYWORDS)
+    + len(QINAO_DRAFT202012_ANCHOR_KEYWORDS)
+)
+QINAO_DRAFT202012_TYPES = frozenset(
+    {
+        "array",
+        "boolean",
+        "integer",
+        "null",
+        "number",
+        "object",
+        "string",
+    }
+)
 TRUST_ROOT_FIELDS = {
     "schema",
     "repositoryIdentity",
@@ -3073,9 +5352,7 @@ def validate_ordered_wave_schedule(
     schedule: object,
 ) -> tuple[tuple[str, str, int], ...]:
     if not isinstance(schedule, tuple) or len(schedule) != 16:
-        raise ValueError(
-            "ordered wave schedule must contain exactly 16 frozen rows"
-        )
+        raise ValueError("ordered wave schedule must contain exactly 16 frozen rows")
     wave_slice_keys: list[tuple[str, str]] = []
     wave_ordinal_keys: list[tuple[str, int]] = []
     wave_order: list[str] = []
@@ -3098,9 +5375,7 @@ def validate_ordered_wave_schedule(
         wave_ordinal_keys.append((wave, sequence_ordinal))
         if wave != previous_wave:
             if wave in wave_order:
-                raise ValueError(
-                    "ordered wave schedule wave blocks must be contiguous"
-                )
+                raise ValueError("ordered wave schedule wave blocks must be contiguous")
             wave_order.append(wave)
             previous_wave = wave
         wave_ordinals = ordinals_by_wave.get(wave)
@@ -3109,20 +5384,15 @@ def validate_ordered_wave_schedule(
             ordinals_by_wave[wave] = wave_ordinals
         wave_ordinals.append(sequence_ordinal)
     if len(wave_slice_keys) != len(set(wave_slice_keys)):
-        raise ValueError(
-            "ordered wave schedule has duplicate wave/slice rows"
-        )
+        raise ValueError("ordered wave schedule has duplicate wave/slice rows")
     if len(wave_ordinal_keys) != len(set(wave_ordinal_keys)):
-        raise ValueError(
-            "ordered wave schedule has duplicate wave/ordinal rows"
-        )
+        raise ValueError("ordered wave schedule has duplicate wave/ordinal rows")
     if wave_order != [f"W{index}" for index in range(7)]:
         raise ValueError("ordered wave schedule wave order is not W0-W6")
     for wave, ordinals in ordinals_by_wave.items():
         if ordinals != list(range(1, len(ordinals) + 1)):
             raise ValueError(
-                "ordered wave schedule ordinals must be contiguous from 1 "
-                f"for {wave}"
+                f"ordered wave schedule ordinals must be contiguous from 1 for {wave}"
             )
     encoded = json.dumps(
         schedule,
@@ -3130,30 +5400,30 @@ def validate_ordered_wave_schedule(
         separators=(",", ":"),
     ).encode("utf-8")
     if hashlib.sha256(encoded).hexdigest() != ORDERED_WAVE_SCHEDULE_SHA256:
-        raise ValueError(
-            "ordered wave schedule does not match the frozen authority"
-        )
+        raise ValueError("ordered wave schedule does not match the frozen authority")
     return schedule
 
 
-ORDERED_WAVE_SCHEDULE = validate_ordered_wave_schedule((
-    ("W0", "w0.gates", 1),
-    ("W0", "w0.controlled", 2),
-    ("W1", "w1.dual-space", 1),
-    ("W2", "w2.persistence", 1),
-    ("W3", "w3.state", 1),
-    ("W3", "w3.context", 2),
-    ("W4", "w4.model-execution", 1),
-    ("W5", "w5.inspection-publication-apple", 1),
-    ("W6", "w6.runtime.observation-values", 1),
-    ("W6", "w6.semantic.audit-schema", 2),
-    ("W6", "w6.runtime.audit-envelope-freeze", 3),
-    ("W6", "w6.semantic.coordinator-behavior", 4),
-    ("W6", "w6.runtime.integration-population", 5),
-    ("W6", "w6.runtime.engine-cutover", 6),
-    ("W6", "w6.apple-lab", 7),
-    ("W6", "w6.certification", 8),
-))
+ORDERED_WAVE_SCHEDULE = validate_ordered_wave_schedule(
+    (
+        ("W0", "w0.gates", 1),
+        ("W0", "w0.controlled", 2),
+        ("W1", "w1.dual-space", 1),
+        ("W2", "w2.persistence", 1),
+        ("W3", "w3.state", 1),
+        ("W3", "w3.context", 2),
+        ("W4", "w4.model-execution", 1),
+        ("W5", "w5.inspection-publication-apple", 1),
+        ("W6", "w6.runtime.observation-values", 1),
+        ("W6", "w6.semantic.audit-schema", 2),
+        ("W6", "w6.runtime.audit-envelope-freeze", 3),
+        ("W6", "w6.semantic.coordinator-behavior", 4),
+        ("W6", "w6.runtime.integration-population", 5),
+        ("W6", "w6.runtime.engine-cutover", 6),
+        ("W6", "w6.apple-lab", 7),
+        ("W6", "w6.certification", 8),
+    )
+)
 WAVE_SCHEDULE = {
     (wave, wave_slice_id): sequence_ordinal
     for wave, wave_slice_id, sequence_ordinal in ORDERED_WAVE_SCHEDULE
@@ -3268,7 +5538,9 @@ def canonical_json_bytes(value: object) -> bytes:
     return render_canonical_json_value(value)
 
 
-def parse_utc_timestamp(value: object, label: str) -> tuple[datetime | None, str | None]:
+def parse_utc_timestamp(
+    value: object, label: str
+) -> tuple[datetime | None, str | None]:
     if (
         not isinstance(value, str)
         or CANONICAL_TIMESTAMP_PATTERN.fullmatch(value) is None
@@ -3481,11 +5753,7 @@ def validate_trust_root(
             errors.append(not_before_error)
         if not_after_error is not None:
             errors.append(not_after_error)
-        if (
-            not_before is not None
-            and not_after is not None
-            and not_after <= not_before
-        ):
+        if not_before is not None and not_after is not None and not_after <= not_before:
             errors.append(
                 f"trust root keys[{index}] notAfter must be later than notBefore"
             )
@@ -3575,9 +5843,7 @@ def validate_trust_root(
                     "one principalID/role/schemaScope"
                 )
     revoked = document.get("revokedNonces")
-    if not isinstance(revoked, list) or any(
-        not is_nonce(nonce) for nonce in revoked
-    ):
+    if not isinstance(revoked, list) or any(not is_nonce(nonce) for nonce in revoked):
         errors.append("trust root revokedNonces must be a Nonce list")
     elif len(revoked) != len(set(revoked)):
         errors.append("trust root revokedNonces must be unique")
@@ -3656,20 +5922,14 @@ def validate_signed_document(
 ) -> list[str]:
     errors: list[str] = []
     signer = document.get(signer_field) if signer_field is not None else None
-    principal = (
-        document.get(principal_field)
-        if principal_field is not None
-        else None
-    )
+    principal = document.get(principal_field) if principal_field is not None else None
     role = document.get(role_field)
     schema_scope = (
         document.get("schema")
         if expected_schema_scope is None
         else expected_schema_scope
     )
-    if document.get("repositoryIdentity") != trust_root.get(
-        "repositoryIdentity"
-    ):
+    if document.get("repositoryIdentity") != trust_root.get("repositoryIdentity"):
         errors.append(f"{label} repositoryIdentity does not match trust root")
     if (
         signer_field is not None
@@ -3690,7 +5950,9 @@ def validate_signed_document(
     revoked = trust_root.get("revokedNonces")
     if isinstance(revoked, list) and nonce in revoked:
         errors.append(f"{label} nonce is revoked/replayed")
-    issued, issued_error = parse_utc_timestamp(document.get("issuedAt"), f"{label} issuedAt")
+    issued, issued_error = parse_utc_timestamp(
+        document.get("issuedAt"), f"{label} issuedAt"
+    )
     expires, expires_error = parse_utc_timestamp(
         document.get("expiresAt"),
         f"{label} expiresAt",
@@ -3710,11 +5972,7 @@ def validate_signed_document(
     )
     if issued is not None and issued > now:
         errors.append(f"{label} issuedAt must not be in the future")
-    if (
-        issued is not None
-        and trust_issued is not None
-        and issued < trust_issued
-    ):
+    if issued is not None and trust_issued is not None and issued < trust_issued:
         errors.append(f"{label} issuedAt predates trust root")
     if issued is not None and expires is not None and expires <= issued:
         errors.append(f"{label} expiresAt must be later than issuedAt")
@@ -3738,10 +5996,7 @@ def validate_signed_document(
         key.get("notAfter"),
         "key notAfter",
     )
-    if (
-        key_not_after is not None
-        and now >= key_not_after
-    ):
+    if key_not_after is not None and now >= key_not_after:
         errors.append(f"{label} signing key is not active at verification time")
     if trust_expires is not None and now >= trust_expires:
         errors.append(f"{label} trust root is not active at verification time")
@@ -3773,15 +6028,13 @@ def git_tree_exists(root: Path, object_id: str) -> bool:
     if GIT_OBJECT_PATTERN.fullmatch(object_id) is None:
         return False
     try:
-        completed = subprocess.run(
+        completed = run_bounded_process(
             ["git", "cat-file", "-t", object_id],
             cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            timeout_seconds=GIT_TIMEOUT_SECONDS,
+            stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+            stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
             text=True,
-            check=False,
-            env=GIT_SUBPROCESS_ENVIRONMENT,
-            timeout=GIT_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.TimeoutExpired):
         return False
@@ -3792,30 +6045,26 @@ def git_commit_tree(root: Path, commit: str) -> str | None:
     if GIT_OBJECT_PATTERN.fullmatch(commit) is None:
         return None
     try:
-        object_type = subprocess.run(
+        object_type = run_bounded_process(
             ["git", "cat-file", "-t", commit],
             cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            timeout_seconds=GIT_TIMEOUT_SECONDS,
+            stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+            stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
             text=True,
-            check=False,
-            env=GIT_SUBPROCESS_ENVIRONMENT,
-            timeout=GIT_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
     if object_type.returncode != 0 or object_type.stdout.strip() != "commit":
         return None
     try:
-        completed = subprocess.run(
+        completed = run_bounded_process(
             ["git", "rev-parse", f"{commit}^{{tree}}"],
             cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            timeout_seconds=GIT_TIMEOUT_SECONDS,
+            stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+            stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
             text=True,
-            check=False,
-            env=GIT_SUBPROCESS_ENVIRONMENT,
-            timeout=GIT_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -3830,20 +6079,16 @@ def git_tree_blob(
     tree: str,
     path: str,
 ) -> tuple[str, bytes] | None:
-    if (
-        not git_tree_exists(root, tree)
-        or not is_normalized_workspace_path(path)
-    ):
+    if not git_tree_exists(root, tree) or not is_normalized_workspace_path(path):
         return None
     try:
-        listing = subprocess.run(
+        listing = run_bounded_process(
             ["git", "ls-tree", "-z", tree, "--", path],
             cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            env=GIT_SUBPROCESS_ENVIRONMENT,
-            timeout=GIT_TIMEOUT_SECONDS,
+            timeout_seconds=GIT_TIMEOUT_SECONDS,
+            stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+            stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
+            text=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -3866,14 +6111,13 @@ def git_tree_blob(
     ):
         return None
     try:
-        blob = subprocess.run(
+        blob = run_bounded_process(
             ["git", "cat-file", "blob", object_id],
             cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            env=GIT_SUBPROCESS_ENVIRONMENT,
-            timeout=GIT_TIMEOUT_SECONDS,
+            timeout_seconds=GIT_TIMEOUT_SECONDS,
+            stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+            stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
+            text=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -3911,6 +6155,872 @@ def validate_source_status_rows(
     return errors
 
 
+def _is_regular_git_mode(mode: str) -> bool:
+    return mode in {"100644", "100755"}
+
+
+def _is_internal_fixture_path(path: str) -> bool:
+    components = path.split("/")
+    if any(component.startswith(".") for component in components):
+        return False
+    if path.startswith("BehavioralAISubstrate/Tests/"):
+        tail = components[2:]
+    elif path.startswith("BehavioralAISubstrate/DeviceTestApp/Tests/"):
+        tail = components[3:]
+    elif path.startswith("QinaoRuntimeSDK/Tests/"):
+        tail = components[2:]
+    elif path.startswith("SampleHost/Tests/"):
+        tail = components[2:]
+    elif path.startswith("scripts/fixtures/"):
+        tail = components[2:]
+    elif (
+        len(components) >= 5
+        and components[0:2] == ["BehavioralAISubstrate", "Cargo"]
+        and components[3] in {"tests", "benches"}
+    ):
+        tail = components[4:]
+    else:
+        return False
+    return not any(
+        component in RECURSIVE_EXCLUDED_COMPONENTS for component in tail
+    ) and not path.endswith(RECURSIVE_EXCLUDED_SUFFIXES)
+
+
+def _is_production_source_path(path: str) -> bool:
+    if path in PRODUCTION_EXACT_PATHS:
+        return True
+    components = path.split("/")
+    if (
+        len(components) == 4
+        and components[0:2] == ["BehavioralAISubstrate", "Cargo"]
+        and components[3] == "Cargo.toml"
+    ):
+        return True
+    recursive_match = path.startswith(PRODUCTION_RECURSIVE_PREFIXES)
+    if (
+        len(components) >= 5
+        and components[0:2] == ["BehavioralAISubstrate", "Cargo"]
+        and components[3] in {"include", "src"}
+    ):
+        recursive_match = True
+    if not recursive_match:
+        return False
+    if any(component.startswith(".") for component in components):
+        return False
+    if any(component in RECURSIVE_EXCLUDED_COMPONENTS for component in components):
+        return False
+    if path.endswith(RECURSIVE_EXCLUDED_SUFFIXES):
+        return False
+    if path.startswith("SampleHost/") and components[-1] == "README.md":
+        return False
+    return True
+
+
+def _manifest_vendor_paths(root: Path, tree: str) -> tuple[set[str] | None, str | None]:
+    manifest_path = "scripts/vendor/qinao_jsonschema_draft202012_v1.manifest.json"
+    binding = git_tree_blob(root, tree, manifest_path)
+    if binding is None:
+        return None, "vendor descendant has no bound vendor manifest"
+    try:
+        manifest = json.loads(
+            binding[1],
+            object_pairs_hook=reject_duplicate_json_keys,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError, DuplicateJSONKeyError) as error:
+        return None, f"vendor manifest is invalid JSON: {error}"
+    rows = manifest.get("vendorFileRows") if isinstance(manifest, dict) else None
+    if not isinstance(rows, list):
+        return None, "vendor manifest vendorFileRows must be an array"
+    paths: set[str] = set()
+    for index, row in enumerate(rows):
+        path = row.get("path") if isinstance(row, dict) else None
+        if not isinstance(path, str) or not is_normalized_workspace_path(path):
+            return None, f"vendor manifest vendorFileRows[{index}].path is invalid"
+        if not path.startswith(VENDOR_PREFIX):
+            return (
+                None,
+                f"vendor manifest vendorFileRows[{index}].path escapes vendor prefix",
+            )
+        if path in paths:
+            return None, "vendor manifest vendorFileRows paths must be unique"
+        paths.add(path)
+    return paths, None
+
+
+def derive_source_scope(
+    root: Path,
+    tree: str,
+    path: str,
+    mode: str,
+) -> tuple[str | None, str | None]:
+    if path in CONTROLLED_DOCUMENT_PATHS:
+        return "controlledDocument", None
+    if path == OWNER_LEDGER_PATH:
+        return "ownerLedger", None
+    if path in CHECKER_PATHS:
+        return "checker", None
+    if path.startswith(VENDOR_PREFIX):
+        if not _is_regular_git_mode(mode):
+            return None, "vendor descendant must be a regular tracked file"
+        vendor_paths, manifest_error = _manifest_vendor_paths(root, tree)
+        if manifest_error is not None:
+            return None, manifest_error
+        assert vendor_paths is not None
+        if path not in vendor_paths:
+            return None, "vendor descendant is not named by vendor manifest"
+        return "checker", None
+    if path.startswith(".github/workflows/"):
+        relative = path[len(".github/workflows/") :]
+        if "/" in relative:
+            return None, "nested workflow path is forbidden"
+        if _is_regular_git_mode(mode) and (
+            relative.endswith(".yml") or relative.endswith(".yaml")
+        ):
+            return "ci", None
+    authority_kind = authority_path_kind(path)
+    if authority_kind is not None and not _is_regular_git_mode(mode):
+        return (
+            None,
+            "authority namespace entry must be a regular tracked file",
+        )
+    if not _is_regular_git_mode(mode):
+        return "other", None
+    if authority_kind == "fixture" or _is_internal_fixture_path(path):
+        return "other", None
+    if authority_kind == "production":
+        return "productionSource", None
+    return "other", None
+
+
+def derive_committed_source_rows(
+    root: Path,
+    base_tree: str,
+    candidate_tree: str,
+) -> tuple[list[dict] | None, list[str]]:
+    errors: list[str] = []
+    try:
+        completed = run_bounded_process(
+            [
+                "git",
+                "diff-tree",
+                "--no-commit-id",
+                "--no-renames",
+                "--raw",
+                "-r",
+                "-z",
+                base_tree,
+                candidate_tree,
+            ],
+            cwd=root,
+            timeout_seconds=GIT_TIMEOUT_SECONDS,
+            stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+            stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
+            text=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None, ["source selection Git derivation unavailable or timed out"]
+    if completed.returncode != 0:
+        return None, ["source selection Git derivation failed"]
+    if completed.stdout and not completed.stdout.endswith(b"\0"):
+        return None, ["source selection Git derivation emitted a truncated NUL stream"]
+    tokens = completed.stdout.split(b"\0")
+    if tokens and tokens[-1] == b"":
+        tokens.pop()
+    if len(tokens) % 2 != 0:
+        return None, ["source selection Git derivation emitted malformed raw rows"]
+    rows: list[dict] = []
+    for offset in range(0, len(tokens), 2):
+        metadata = tokens[offset]
+        raw_path = tokens[offset + 1]
+        if not metadata.startswith(b":"):
+            return None, ["source selection Git derivation emitted malformed metadata"]
+        fields = metadata[1:].split()
+        if len(fields) != 5:
+            return None, ["source selection Git derivation emitted malformed metadata"]
+        try:
+            old_mode = fields[0].decode("ascii")
+            new_mode = fields[1].decode("ascii")
+            status = fields[4].decode("ascii")
+            path = raw_path.decode("utf-8", "strict")
+        except UnicodeDecodeError:
+            return None, ["source selection Git derivation emitted non-UTF-8 data"]
+        if not is_normalized_workspace_path(path):
+            return None, [f"source selection Git path is not normalized: {path!r}"]
+        if status == "A":
+            change = "add"
+            scope, scope_error = derive_source_scope(
+                root, candidate_tree, path, new_mode
+            )
+        elif status == "D":
+            change = "delete"
+            scope, scope_error = derive_source_scope(root, base_tree, path, old_mode)
+        elif status == "M":
+            change = "modify" if old_mode == new_mode else "typeChange"
+            old_scope, old_error = derive_source_scope(root, base_tree, path, old_mode)
+            new_scope, new_error = derive_source_scope(
+                root, candidate_tree, path, new_mode
+            )
+            if old_error is not None or new_error is not None:
+                scope = None
+                scope_error = old_error or new_error
+            else:
+                governed = {
+                    value for value in (old_scope, new_scope) if value != "other"
+                }
+                if len(governed) > 1:
+                    scope = None
+                    scope_error = "path has incompatible endpoint scopes"
+                elif change == "typeChange" and (
+                    not _is_regular_git_mode(old_mode)
+                    or not _is_regular_git_mode(new_mode)
+                ):
+                    scope = None
+                    scope_error = "typeChange includes a special Git mode"
+                else:
+                    scope = sorted(governed)[0] if governed else "other"
+                    scope_error = None
+        elif status == "T":
+            change = "typeChange"
+            old_scope, old_error = derive_source_scope(root, base_tree, path, old_mode)
+            new_scope, new_error = derive_source_scope(
+                root, candidate_tree, path, new_mode
+            )
+            governed = {value for value in (old_scope, new_scope) if value != "other"}
+            scope = (
+                (sorted(governed)[0] if governed else "other")
+                if len(governed) <= 1
+                else None
+            )
+            scope_error = (
+                old_error
+                or new_error
+                or (
+                    "path has incompatible endpoint scopes"
+                    if len(governed) > 1
+                    else "typeChange includes a special Git mode"
+                )
+            )
+        else:
+            return None, [
+                f"source selection Git derivation status {status!r} is unsupported"
+            ]
+        if scope_error is not None or scope is None:
+            errors.append(
+                f"source selection cannot derive scope for {path!r}: {scope_error}"
+            )
+            continue
+        rows.append({"path": path, "change": change, "scope": scope})
+    if errors:
+        return None, errors
+    rows.sort(key=canonical_json_bytes)
+    return rows, []
+
+
+def _is_unique_profile_json_array(values: list[object]) -> bool:
+    try:
+        fingerprints = [canonical_json_bytes(value) for value in values]
+    except ValueError:
+        return False
+    return len(fingerprints) == len(set(fingerprints))
+
+
+def _is_profile_schema(value: object) -> bool:
+    return type(value) is bool or isinstance(value, dict)
+
+
+def _is_safe_profile_integer(value: object) -> bool:
+    return type(value) is int and -9007199254740991 <= value <= 9007199254740991
+
+
+def _profile_pointer_escape(value: str) -> str:
+    output = ""
+    for character in value:
+        if character == "~":
+            output += "~0"
+        elif character == "/":
+            output += "~1"
+        else:
+            output += character
+    return output
+
+
+def _profile_pointer_tokens(reference: str) -> list[str] | None:
+    if not reference.startswith("#/"):
+        return None
+    tokens: list[str] = []
+    for encoded in reference[2:].split("/"):
+        output = ""
+        index = 0
+        while index < len(encoded):
+            if encoded[index] != "~":
+                output += encoded[index]
+                index += 1
+                continue
+            if index + 1 >= len(encoded) or encoded[index + 1] not in {"0", "1"}:
+                return None
+            output += "~" if encoded[index + 1] == "0" else "/"
+            index += 2
+        tokens.append(output)
+    return tokens
+
+
+def resolve_qinao_local_json_pointer(
+    root: object,
+    reference: str,
+) -> tuple[bool, object | None]:
+    """Resolve one strict, same-document RFC 6901 JSON Pointer.
+
+    Array tokens are canonical decimal indices.  Their magnitude is bounded
+    lexically against the array length before conversion so an attacker cannot
+    trigger Python's unbounded-decimal conversion limit.
+    """
+    if type(reference) is not str:
+        return False, None
+    if reference == "#":
+        return True, root
+    tokens = _profile_pointer_tokens(reference)
+    if tokens is None:
+        return False, None
+    current = root
+    for token in tokens:
+        if type(current) is dict and token in current:
+            current = current[token]
+            continue
+        if type(current) is not list:
+            return False, None
+        if token == "0":
+            array_index = 0
+        else:
+            if (
+                not token
+                or token[0] == "0"
+                or any(character < "0" or character > "9" for character in token)
+            ):
+                return False, None
+            # A live Python list cannot have an index wider than the native
+            # ssize_t domain.  This bound is deliberately checked before int()
+            # so arbitrarily long attacker-controlled decimals never reach the
+            # interpreter's decimal conversion path.
+            if len(token) > 19:
+                return False, None
+            array_index = int(token)
+        if array_index >= len(current):
+            return False, None
+        current = current[array_index]
+    return True, current
+
+
+def index_qinao_same_document_schema_targets(
+    root: object,
+) -> tuple[
+    dict[str, object],
+    dict[str, object],
+    dict[str, object],
+]:
+    """Index eligible schema locations and the two local anchor classes."""
+    eligible_schemas: dict[str, object] = {}
+    static_anchors: dict[str, object] = {}
+    dynamic_anchors: dict[str, object] = {}
+    stack: list[tuple[object, str, int]] = [(root, "#", 0)]
+    node_count = 0
+    while stack:
+        current, pointer, depth = stack.pop()
+        node_count += 1
+        if node_count > 100000 or depth > 128:
+            break
+        if type(current) is not dict and type(current) is not bool:
+            continue
+        eligible_schemas[pointer] = current
+        if type(current) is bool:
+            continue
+        static_anchor = current.get("$anchor")
+        if type(static_anchor) is str and static_anchor not in static_anchors:
+            static_anchors[static_anchor] = current
+        dynamic_anchor = current.get("$dynamicAnchor")
+        if type(dynamic_anchor) is str and dynamic_anchor not in dynamic_anchors:
+            dynamic_anchors[dynamic_anchor] = current
+        for keyword in QINAO_DRAFT202012_SINGLE_SCHEMA_KEYWORDS:
+            child = current.get(keyword)
+            if type(child) is dict or type(child) is bool:
+                stack.append(
+                    (
+                        child,
+                        f"{pointer}/{_profile_pointer_escape(keyword)}",
+                        depth + 1,
+                    )
+                )
+        for keyword in QINAO_DRAFT202012_SCHEMA_ARRAY_KEYWORDS:
+            children = current.get(keyword)
+            if type(children) is not list:
+                continue
+            for index, child in enumerate(children):
+                if type(child) is dict or type(child) is bool:
+                    stack.append(
+                        (
+                            child,
+                            (f"{pointer}/{_profile_pointer_escape(keyword)}/{index}"),
+                            depth + 1,
+                        )
+                    )
+        for keyword in QINAO_DRAFT202012_SCHEMA_MAP_KEYWORDS:
+            children = current.get(keyword)
+            if type(children) is not dict:
+                continue
+            for name, child in children.items():
+                if type(name) is str and (type(child) is dict or type(child) is bool):
+                    stack.append(
+                        (
+                            child,
+                            (
+                                f"{pointer}/{_profile_pointer_escape(keyword)}"
+                                f"/{_profile_pointer_escape(name)}"
+                            ),
+                            depth + 1,
+                        )
+                    )
+    return eligible_schemas, static_anchors, dynamic_anchors
+
+
+def resolve_qinao_same_document_schema_reference(
+    root: object,
+    reference: str,
+    *,
+    eligible_schemas: dict[str, object],
+    static_anchors: dict[str, object],
+    dynamic_anchors: dict[str, object],
+    reference_kind: str,
+) -> tuple[bool, object | None]:
+    """Resolve one closed Draft 2020-12 same-document schema reference."""
+    if type(reference) is not str or reference_kind not in {"static", "dynamic"}:
+        return False, None
+    if reference_kind == "static" and (reference == "#" or reference.startswith("#/")):
+        resolved, target = resolve_qinao_local_json_pointer(root, reference)
+        if (
+            not resolved
+            or reference not in eligible_schemas
+            or target is not eligible_schemas[reference]
+        ):
+            return False, None
+        return True, target
+    if not reference.startswith("#") or len(reference) < 2 or "/" in reference:
+        return False, None
+    anchor_name = reference[1:]
+    if reference_kind == "dynamic":
+        target = dynamic_anchors.get(anchor_name)
+        if target is None:
+            # Draft 2020-12 resolves the plain-name URI first.  A static
+            # $anchor is therefore the required fallback when the initial
+            # target was not created by $dynamicAnchor.
+            target = static_anchors.get(anchor_name)
+    else:
+        target = static_anchors.get(anchor_name)
+        if target is None:
+            # Both anchor keywords create plain-name fragments.  $ref may
+            # statically address a fragment created by $dynamicAnchor.
+            target = dynamic_anchors.get(anchor_name)
+    if type(target) is not dict and type(target) is not bool:
+        return False, None
+    return True, target
+
+
+def validate_qinao_draft202012_profile(schema: object) -> list[str]:
+    errors: list[str] = []
+    if type(schema) is not dict:
+        return ["QinaoDraft202012ProfileV1 root must be an object"]
+
+    decoded_node_count = 0
+    host_model_is_valid = True
+    value_stack: list[tuple[object, int, tuple[object, ...]]] = [(schema, 0, ())]
+    while value_stack:
+        value, depth, ancestors = value_stack.pop()
+        decoded_node_count += 1
+        if decoded_node_count > 100000:
+            errors.append("QinaoDraft202012ProfileV1 decoded JSON nodes exceeds 100000")
+            return errors
+        if depth > 128:
+            errors.append("QinaoDraft202012ProfileV1 decoded JSON depth exceeds 128")
+            return errors
+        if value is None or type(value) is bool:
+            continue
+        if type(value) is int:
+            if value < -9007199254740991 or value > 9007199254740991:
+                errors.append(
+                    "QinaoDraft202012ProfileV1 integer exceeds safe JSON range"
+                )
+        elif type(value) is float:
+            errors.append(
+                "QinaoDraft202012ProfileV1 floating-point values are forbidden"
+            )
+        elif type(value) is str:
+            try:
+                encoded_value = value.encode("utf-8")
+            except UnicodeEncodeError:
+                errors.append(
+                    "QinaoDraft202012ProfileV1 JSON host model string is "
+                    "not valid UTF-8"
+                )
+                host_model_is_valid = False
+                continue
+            if len(encoded_value) > 1048576:
+                errors.append(
+                    "QinaoDraft202012ProfileV1 JSON host model string exceeds 1 MiB"
+                )
+                host_model_is_valid = False
+        elif type(value) is list:
+            if any(value is ancestor for ancestor in ancestors):
+                errors.append("QinaoDraft202012ProfileV1 JSON host model is cyclic")
+                return errors
+            if len(value) > 100000 - decoded_node_count - len(value_stack):
+                errors.append(
+                    "QinaoDraft202012ProfileV1 decoded JSON nodes exceeds 100000"
+                )
+                return errors
+            next_ancestors = ancestors + (value,)
+            value_stack.extend((item, depth + 1, next_ancestors) for item in value)
+        elif type(value) is dict:
+            if any(value is ancestor for ancestor in ancestors):
+                errors.append("QinaoDraft202012ProfileV1 JSON host model is cyclic")
+                return errors
+            exact_string_keys = all(type(key) is str for key in value)
+            if not exact_string_keys:
+                errors.append(
+                    "QinaoDraft202012ProfileV1 JSON host model object keys "
+                    "must be exact strings"
+                )
+                host_model_is_valid = False
+            else:
+                for key in value:
+                    try:
+                        encoded_key = key.encode("utf-8")
+                    except UnicodeEncodeError:
+                        errors.append(
+                            "QinaoDraft202012ProfileV1 JSON host model object "
+                            "key is not valid UTF-8"
+                        )
+                        host_model_is_valid = False
+                        continue
+                    if len(encoded_key) > 1048576:
+                        errors.append(
+                            "QinaoDraft202012ProfileV1 JSON host model object "
+                            "key exceeds 1 MiB"
+                        )
+                        host_model_is_valid = False
+            if len(value) > 100000 - decoded_node_count - len(value_stack):
+                errors.append(
+                    "QinaoDraft202012ProfileV1 decoded JSON nodes exceeds 100000"
+                )
+                return errors
+            next_ancestors = ancestors + (value,)
+            value_stack.extend(
+                (item, depth + 1, next_ancestors) for item in value.values()
+            )
+        else:
+            errors.append(
+                "QinaoDraft202012ProfileV1 JSON host model requires exact "
+                "built-in JSON types"
+            )
+            host_model_is_valid = False
+    if not host_model_is_valid:
+        return errors
+
+    if schema.get("$schema") != QINAO_DRAFT202012_ROOT_SCHEMA:
+        errors.append(
+            "QinaoDraft202012ProfileV1 root $schema must be the exact Draft 2020-12 URI"
+        )
+    identifier = schema.get("$id")
+    identifier_match = (
+        re.fullmatch(
+            r"qinao://schemas/[A-Za-z][A-Za-z0-9._-]{0,63}/"
+            r"(0|[1-9][0-9]{0,9})\."
+            r"(0|[1-9][0-9]{0,9})\."
+            r"(0|[1-9][0-9]{0,9})",
+            identifier,
+        )
+        if type(identifier) is str
+        else None
+    )
+    if "$id" in schema and (
+        type(identifier) is not str
+        or identifier_match is None
+        or any(int(identifier_match.group(index)) > 2147483647 for index in (1, 2, 3))
+        or len(identifier.encode("ascii", "ignore")) != len(identifier)
+        or len(identifier.encode("ascii")) > 113
+    ):
+        errors.append("QinaoDraft202012ProfileV1 root $id is invalid")
+
+    eligible_pointers: dict[str, object] = {}
+    anchors: dict[str, object] = {}
+    dynamic_anchors: dict[str, object] = {}
+    references: list[tuple[str, str, str]] = []
+    dynamic_references: list[tuple[str, str, str]] = []
+    schema_stack: list[tuple[object, str, str, bool]] = [(schema, "schema", "#", True)]
+    while schema_stack:
+        current, label, pointer, is_root = schema_stack.pop()
+        eligible_pointers[pointer] = current
+        if type(current) is bool:
+            continue
+        if not isinstance(current, dict):
+            errors.append(f"{label} must be an object or boolean schema")
+            continue
+        unknown = set(current) - QINAO_DRAFT202012_ALLOWED_KEYWORDS
+        if unknown:
+            errors.append(f"{label} has unsupported keywords: {sorted(unknown)!r}")
+        if not is_root and "$schema" in current:
+            errors.append(f"{label} must not contain nested $schema")
+        if not is_root and "$id" in current:
+            errors.append(f"{label} must not contain nested $id")
+
+        for keyword in QINAO_DRAFT202012_TEXT_KEYWORDS:
+            if keyword in current and not isinstance(current[keyword], str):
+                errors.append(f"{label} {keyword} must be a string")
+
+        for keyword in QINAO_DRAFT202012_BOOLEAN_KEYWORDS:
+            if keyword in current and type(current[keyword]) is not bool:
+                errors.append(f"{label} {keyword} must be a boolean")
+
+        examples = current.get("examples")
+        if "examples" in current and not isinstance(examples, list):
+            errors.append(f"{label} examples must be an array")
+
+        for keyword in QINAO_DRAFT202012_SIGNED_INTEGER_KEYWORDS:
+            if keyword in current and not _is_safe_profile_integer(current[keyword]):
+                errors.append(f"{label} {keyword} must be a safe integer")
+
+        for keyword in QINAO_DRAFT202012_NONNEGATIVE_INTEGER_KEYWORDS:
+            if keyword in current and (
+                not _is_safe_profile_integer(current[keyword]) or current[keyword] < 0
+            ):
+                errors.append(f"{label} {keyword} must be a nonnegative safe integer")
+
+        enum_value = current.get("enum")
+        if "enum" in current and not isinstance(enum_value, list):
+            errors.append(f"{label} enum must be an array")
+        elif isinstance(enum_value, list) and (
+            not enum_value or not _is_unique_profile_json_array(enum_value)
+        ):
+            errors.append(f"{label} enum must be non-empty and unique")
+
+        reference = current.get("$ref")
+        if "$ref" in current and (
+            not isinstance(reference, str)
+            or (
+                reference != "#"
+                and not reference.startswith("#/")
+                and re.fullmatch(r"#[A-Za-z_][A-Za-z0-9._-]*", reference) is None
+            )
+            or "%" in reference
+        ):
+            errors.append(f"{label} $ref must be same-document")
+        dynamic_reference = current.get("$dynamicRef")
+        if "$dynamicRef" in current and (
+            not isinstance(dynamic_reference, str)
+            or re.fullmatch(
+                r"#[A-Za-z_][A-Za-z0-9._-]*",
+                dynamic_reference,
+            )
+            is None
+        ):
+            errors.append(f"{label} $dynamicRef must be a local anchor")
+        if isinstance(reference, str) and (
+            reference == "#"
+            or reference.startswith("#/")
+            or re.fullmatch(r"#[A-Za-z_][A-Za-z0-9._-]*", reference) is not None
+        ):
+            references.append((pointer, label, reference))
+        if (
+            isinstance(dynamic_reference, str)
+            and re.fullmatch(
+                r"#[A-Za-z_][A-Za-z0-9._-]*",
+                dynamic_reference,
+            )
+            is not None
+        ):
+            dynamic_references.append((pointer, label, dynamic_reference))
+
+        anchor = current.get("$anchor")
+        if "$anchor" in current and (
+            not isinstance(anchor, str)
+            or re.fullmatch(r"[A-Za-z_][A-Za-z0-9._-]*", anchor) is None
+        ):
+            errors.append(f"{label} $anchor is invalid")
+        elif isinstance(anchor, str):
+            if anchor in anchors:
+                errors.append(f"{label} $anchor is duplicated")
+            if anchor in dynamic_anchors:
+                errors.append(f"{label} anchor classes collide")
+            if anchor not in anchors:
+                anchors[anchor] = current
+        dynamic_anchor = current.get("$dynamicAnchor")
+        if "$dynamicAnchor" in current and (
+            not isinstance(dynamic_anchor, str)
+            or re.fullmatch(
+                r"[A-Za-z_][A-Za-z0-9._-]*",
+                dynamic_anchor,
+            )
+            is None
+        ):
+            errors.append(f"{label} $dynamicAnchor is invalid")
+        elif isinstance(dynamic_anchor, str):
+            if dynamic_anchor in dynamic_anchors:
+                errors.append(f"{label} $dynamicAnchor is duplicated")
+            if dynamic_anchor in anchors:
+                errors.append(f"{label} anchor classes collide")
+            if dynamic_anchor not in dynamic_anchors:
+                dynamic_anchors[dynamic_anchor] = current
+
+        required = current.get("required")
+        if "required" in current and (
+            not isinstance(required, list)
+            or not all(isinstance(item, str) for item in required)
+            or len(required) != len(set(required))
+        ):
+            errors.append(f"{label} required must be an array of unique strings")
+
+        type_value = current.get("type")
+        valid_type_array = (
+            isinstance(type_value, list)
+            and bool(type_value)
+            and all(
+                isinstance(item, str) and item in QINAO_DRAFT202012_TYPES
+                for item in type_value
+            )
+            and len(type_value) == len(set(type_value))
+        )
+        if (
+            "type" in current
+            and not (
+                isinstance(type_value, str) and type_value in QINAO_DRAFT202012_TYPES
+            )
+            and not valid_type_array
+        ):
+            errors.append(f"{label} type is invalid")
+
+        dependent_required = current.get("dependentRequired")
+        if "dependentRequired" in current and (
+            not isinstance(dependent_required, dict)
+            or not all(
+                isinstance(row, list)
+                and all(isinstance(item, str) for item in row)
+                and len(row) == len(set(row))
+                for row in (
+                    dependent_required.values()
+                    if isinstance(dependent_required, dict)
+                    else []
+                )
+            )
+        ):
+            errors.append(
+                f"{label} dependentRequired values must be arrays of unique strings"
+            )
+
+        multiple_of = current.get("multipleOf")
+        if "multipleOf" in current and (
+            not _is_safe_profile_integer(multiple_of) or multiple_of <= 0
+        ):
+            errors.append(f"{label} multipleOf must be a positive safe integer")
+
+        for keyword in QINAO_DRAFT202012_SINGLE_SCHEMA_KEYWORDS:
+            if keyword not in current:
+                continue
+            child = current[keyword]
+            if not _is_profile_schema(child):
+                errors.append(f"{label} {keyword} must be a schema")
+            else:
+                schema_stack.append(
+                    (
+                        child,
+                        f"{label}.{keyword}",
+                        f"{pointer}/{_profile_pointer_escape(keyword)}",
+                        False,
+                    )
+                )
+        for keyword in QINAO_DRAFT202012_SCHEMA_ARRAY_KEYWORDS:
+            if keyword not in current:
+                continue
+            children = current[keyword]
+            if (
+                not isinstance(children, list)
+                or not children
+                or not all(_is_profile_schema(child) for child in children)
+            ):
+                errors.append(f"{label} {keyword} must be a schema array")
+                continue
+            for index, child in enumerate(children):
+                schema_stack.append(
+                    (
+                        child,
+                        f"{label}.{keyword}[{index}]",
+                        (f"{pointer}/{_profile_pointer_escape(keyword)}/{index}"),
+                        False,
+                    )
+                )
+        for keyword in QINAO_DRAFT202012_SCHEMA_MAP_KEYWORDS:
+            if keyword not in current:
+                continue
+            children = current[keyword]
+            if not isinstance(children, dict) or not all(
+                _is_profile_schema(child) for child in children.values()
+            ):
+                errors.append(f"{label} {keyword} must be a schema map")
+                continue
+            for name, child in children.items():
+                schema_stack.append(
+                    (
+                        child,
+                        f"{label}.{keyword}[{name!r}]",
+                        (
+                            f"{pointer}/{_profile_pointer_escape(keyword)}"
+                            f"/{_profile_pointer_escape(name)}"
+                        ),
+                        False,
+                    )
+                )
+    distinct_reference_edges = {
+        (pointer, "$ref", reference) for pointer, _label, reference in references
+    } | {
+        (pointer, "$dynamicRef", reference)
+        for pointer, _label, reference in dynamic_references
+    }
+    if len(distinct_reference_edges) > 4096:
+        errors.append("QinaoDraft202012ProfileV1 distinct reference edges exceeds 4096")
+    if len(anchors) + len(dynamic_anchors) > 4096:
+        errors.append(
+            "QinaoDraft202012ProfileV1 anchors plus dynamic anchors exceeds 4096"
+        )
+    for _pointer, label, reference in references:
+        resolved, target = resolve_qinao_same_document_schema_reference(
+            schema,
+            reference,
+            eligible_schemas=eligible_pointers,
+            static_anchors=anchors,
+            dynamic_anchors=dynamic_anchors,
+            reference_kind="static",
+        )
+        if not resolved:
+            if reference.startswith("#/"):
+                pointer_resolved, _pointer_target = resolve_qinao_local_json_pointer(
+                    schema, reference
+                )
+                if pointer_resolved:
+                    errors.append(f"{label} $ref target is not an eligible schema")
+                else:
+                    errors.append(f"{label} $ref target is unresolved")
+            else:
+                errors.append(f"{label} $ref anchor target is unresolved")
+    for _pointer, label, reference in dynamic_references:
+        resolved, target = resolve_qinao_same_document_schema_reference(
+            schema,
+            reference,
+            eligible_schemas=eligible_pointers,
+            static_anchors=anchors,
+            dynamic_anchors=dynamic_anchors,
+            reference_kind="dynamic",
+        )
+        if not resolved:
+            errors.append(f"{label} $dynamicRef anchor target is unresolved")
+    return errors
+
+
 def validate_source_selection(
     document: dict,
     trust_root: dict,
@@ -3944,6 +7054,8 @@ def validate_source_selection(
     ):
         errors.append("source selection approvedDesign fields mismatch")
     else:
+        if approved_design != AMENDMENT_2_APPROVED_DESIGN:
+            errors.append("source selection approvedDesign must equal the frozen tuple")
         design_commit = approved_design.get("commit")
         design_tree = approved_design.get("tree")
         design_path = approved_design.get("path")
@@ -3973,9 +7085,7 @@ def validate_source_selection(
                 or approved_design.get("byteLength") < 0
                 or approved_design.get("byteLength") != len(raw)
             ):
-                errors.append(
-                    "source selection approvedDesign byteLength mismatch"
-                )
+                errors.append("source selection approvedDesign byteLength mismatch")
             if approved_design.get("sha256") != hashlib.sha256(raw).hexdigest():
                 errors.append("source selection approvedDesign sha256 mismatch")
     comparisons_value = document.get("candidateComparisons")
@@ -4003,10 +7113,12 @@ def validate_source_selection(
         head = comparison.get("head")
         tree = comparison.get("tree")
         comparison_base = comparison.get("comparisonBaseHEAD")
-        if (
-            not isinstance(comparison_base, str)
-            or git_commit_tree(root, comparison_base) is None
-        ):
+        comparison_base_tree = (
+            git_commit_tree(root, comparison_base)
+            if isinstance(comparison_base, str)
+            else None
+        )
+        if not isinstance(comparison_base, str) or comparison_base_tree is None:
             errors.append(f"{label} comparisonBaseHEAD must be a commit")
         if (
             not isinstance(head, str)
@@ -4030,6 +7142,21 @@ def validate_source_selection(
                     f"{label}.{field}",
                 )
             )
+        for field in ("stagedRows", "unstagedRows", "untrackedRows"):
+            if comparison.get(field) != []:
+                errors.append(f"{label}.{field} must be empty")
+        if comparison_base_tree is not None and isinstance(tree, str):
+            derived_rows, derivation_errors = derive_committed_source_rows(
+                root,
+                comparison_base_tree,
+                tree,
+            )
+            errors.extend(f"{label}: {error}" for error in derivation_errors)
+            if (
+                derived_rows is not None
+                and comparison.get("committedRows") != derived_rows
+            ):
+                errors.append(f"{label}.committedRows do not match Git derivation")
         try:
             comparison_fingerprints.append(canonical_json_bytes(comparison))
         except ValueError as error:
@@ -4037,9 +7164,7 @@ def validate_source_selection(
     if len(candidate_ids) != len(set(candidate_ids)):
         errors.append("source selection candidateID values must be unique")
     if comparison_fingerprints != sorted(comparison_fingerprints):
-        errors.append(
-            "source selection candidateComparisons must be RFC 8785 sorted"
-        )
+        errors.append("source selection candidateComparisons must be RFC 8785 sorted")
     if len(selected_rows) != 1:
         errors.append("source selection must select exactly one candidate")
     else:
@@ -4051,11 +7176,6 @@ def validate_source_selection(
             errors.append(
                 "source selection selected candidate does not bind selectedHEAD/tree"
             )
-        for field in ("stagedRows", "unstagedRows", "untrackedRows"):
-            if selected.get(field) != []:
-                errors.append(
-                    f"source selection selected candidate {field} must be empty"
-                )
     errors.extend(
         validate_signed_document(
             document,
@@ -4077,7 +7197,7 @@ def load_governance_document(path: Path, label: str) -> tuple[dict | None, list[
     try:
         if path.stat().st_size > MAX_JSON_BYTES:
             return None, [f"{label} document exceeds {MAX_JSON_BYTES} bytes"]
-        with path.open("rb") as handle:
+        with open(path, "rb") as handle:
             raw = handle.read(MAX_JSON_BYTES + 1)
         if not raw:
             return None, [f"{label} category document is empty"]
@@ -4088,9 +7208,7 @@ def load_governance_document(path: Path, label: str) -> tuple[dict | None, list[
         if not isinstance(document, dict):
             return None, [f"{label} root must be an object"]
         if raw != canonical_json_bytes(document) + b"\n":
-            return None, [
-                f"{label} bytes must be RFC 8785 JSON followed by one LF"
-            ]
+            return None, [f"{label} bytes must be RFC 8785 JSON followed by one LF"]
     except (
         OSError,
         json.JSONDecodeError,
@@ -4109,14 +7227,13 @@ def resolve_anchor_paths(
     resolved: list[str] = []
     errors: list[str] = []
     try:
-        completed = subprocess.run(
+        completed = run_bounded_process(
             ["git", "ls-tree", "-r", "-z", candidate_tree],
             cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            env=GIT_SUBPROCESS_ENVIRONMENT,
-            timeout=GIT_TIMEOUT_SECONDS,
+            timeout_seconds=GIT_TIMEOUT_SECONDS,
+            stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+            stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
+            text=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         return [], ["anchor scanner tool error: git ls-tree unavailable or timed out"]
@@ -4187,42 +7304,112 @@ def validate_swift_authority_source(path: str, contents: str) -> list[str]:
                 f"{path}: forbidden second automation store/scheduler/event log/"
                 f"compiler authority {authority}"
             )
-    if "ZoneCAppleEffectExecutor" not in path:
-        imports_apple_mutation_framework = re.search(
-            r"(?m)^\s*import\s+(?:CloudKit|EventKit|HomeKit|UserNotifications)\s*$",
-            stripped,
-        )
-        mutation_call = re.search(
-            r"\.\s*(?:add|delete|modifySubscriptions|remove|save)\s*\(",
-            stripped,
-        )
-        if imports_apple_mutation_framework and mutation_call:
+    is_exact_normalized_adapter = (
+        path == APPLE_EFFECT_ADAPTER_PATH and is_normalized_workspace_path(path)
+    )
+    if not is_exact_normalized_adapter:
+        swift_code = strip_c_style_comments(contents, mask_quoted_contents=True)
+        direct_mutation = False
+        for framework, mutation_selectors in APPLE_MUTATION_SELECTORS_BY_FRAMEWORK:
+            if not swift_source_imports_framework(swift_code, framework):
+                continue
+            direct_mutation = any(
+                re.search(
+                    rf"\.\s*{re.escape(selector)}\s*\(",
+                    swift_code,
+                )
+                is not None
+                for selector in mutation_selectors
+            )
+            if direct_mutation:
+                break
+        if direct_mutation:
             errors.append(
                 f"{path}: direct Apple mutation must be routed only through "
-                "ZoneCAppleEffectExecutor"
+                f"{APPLE_EFFECT_ADAPTER_PATH}"
             )
     return errors
 
 
+def authority_path_kind(path: str) -> str | None:
+    """Classify one path through the single governed authority topology."""
+    if not is_normalized_workspace_path(path):
+        return None
+    parts = PurePosixPath(path).parts
+    if (
+        not parts
+        or parts[0] in {".git", ".github", "docs", "scripts"}
+        or parts[0] in NON_QINAO_BUILD_COMPONENTS
+    ):
+        return None
+    approved_vendor_root = len(parts) >= 2 and parts[0:2] == (
+        "BehavioralAISubstrate",
+        "Vendor",
+    )
+    anchor_index: int | None = None
+    anchor_kind: str | None = None
+    for index, component in enumerate(parts[1:], start=1):
+        if component in {"Sources", "Tests", "Fixtures"}:
+            anchor_index = index
+            anchor_kind = (
+                "fixture" if component in {"Tests", "Fixtures"} else "production"
+            )
+            break
+        if (
+            index == 3
+            and parts[0:2] == ("BehavioralAISubstrate", "Cargo")
+            and component in {"src", "include", "tests", "benches"}
+        ):
+            anchor_index = index
+            anchor_kind = (
+                "fixture" if component in {"tests", "benches"} else "production"
+            )
+            break
+    if anchor_index is not None:
+        for prefix_index, prefix_component in enumerate(parts[:anchor_index]):
+            if (
+                approved_vendor_root
+                and prefix_index == 1
+                and prefix_component == "Vendor"
+            ):
+                continue
+            if prefix_component in NON_QINAO_BUILD_COMPONENTS:
+                return None
+        return anchor_kind
+    if (
+        len(parts) == 4
+        and parts[0:2] == ("BehavioralAISubstrate", "Cargo")
+        and parts[3] == "Cargo.toml"
+    ):
+        if parts[2] in NON_QINAO_BUILD_COMPONENTS:
+            return None
+        return "production"
+    if approved_vendor_root and any(
+        component in NON_QINAO_BUILD_COMPONENTS for component in parts[2:]
+    ):
+        return None
+    if _is_production_source_path(path):
+        return "production"
+    if any(
+        path == prefix.removesuffix("/") for prefix in PRODUCTION_RECURSIVE_PREFIXES
+    ):
+        return "production"
+    filename = parts[-1]
+    if (
+        filename == "Package.swift"
+        or (filename.startswith("Package@swift-") and filename.endswith(".swift"))
+    ) and not any(component in NON_QINAO_BUILD_COMPONENTS for component in parts[:-1]):
+        return "production"
+    return None
+
+
+def is_authority_namespace_path(path: str) -> bool:
+    """Return whether a path inhabits the governed authority topology."""
+    return authority_path_kind(path) is not None
+
+
 def is_authority_diff_path(path: str) -> bool:
-    if "/Tests/" in path or "/Fixtures/" in path:
-        return path.endswith((".json", ".plist", ".sql", ".swift"))
-    if path in {
-        "BehavioralAISubstrate/Package.swift",
-        "QinaoRuntimeSDK/Package.swift",
-        "SampleHost/Package.swift",
-        "BehavioralAISubstrate/DeviceTestApp/project.yml",
-        (
-            "BehavioralAISubstrate/DeviceTestApp/"
-            "BASDeviceTest.xcodeproj/project.pbxproj"
-        ),
-    }:
-        return True
-    return (
-        path.startswith("BehavioralAISubstrate/Sources/")
-        or path.startswith("QinaoRuntimeSDK/Sources/")
-        or path.startswith("SampleHost/Sources/")
-    ) and path.endswith((".sql", ".swift"))
+    return authority_path_kind(path) is not None
 
 
 def git_tree_diff(
@@ -4231,7 +7418,7 @@ def git_tree_diff(
     candidate_tree: str,
 ) -> tuple[list[dict], list[str]]:
     try:
-        completed = subprocess.run(
+        completed = run_bounded_process(
             [
                 "git",
                 "diff-tree",
@@ -4244,11 +7431,10 @@ def git_tree_diff(
                 candidate_tree,
             ],
             cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            env=GIT_SUBPROCESS_ENVIRONMENT,
-            timeout=GIT_TIMEOUT_SECONDS,
+            timeout_seconds=GIT_TIMEOUT_SECONDS,
+            stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+            stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
+            text=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         return [], ["git diff-tree unavailable or timed out"]
@@ -4334,14 +7520,23 @@ def derive_authority_rows(
     owners_by_id = {
         owner.get("owner_id"): owner
         for owner in owners
-        if isinstance(owner, dict)
-        and is_nonempty_string(owner.get("owner_id"))
+        if isinstance(owner, dict) and is_nonempty_string(owner.get("owner_id"))
     }
     for diff_row in diff_rows:
         path = diff_row["path"]
-        if not is_authority_diff_path(path):
+        authority_kind = authority_path_kind(path)
+        if (
+            authority_kind is not None
+            and diff_row["change"] != "delete"
+            and not _is_regular_git_mode(diff_row["newMode"])
+        ):
+            errors.append(
+                f"{path}: authority namespace entry must be a regular tracked file"
+            )
             continue
-        if "/Tests/" in path or "/Fixtures/" in path:
+        if authority_kind is None:
+            continue
+        if authority_kind == "fixture":
             category = "fixture"
             owner_id = "fixture"
             classification = "fixture"
@@ -4368,9 +7563,7 @@ def derive_authority_rows(
                     owner_id = owner.get("owner_id")
                     classification = owner.get("classification")
                     symbol = owner.get("authority_owner")
-                    category = (
-                        "adapter" if classification == "A" else "extension"
-                    )
+                    category = "adapter" if classification == "A" else "extension"
         if owner_id != "fixture" and owner_id not in owners_by_id:
             errors.append(f"production diff row references unknown owner {owner_id!r}")
         categorized[category].append(
@@ -4431,21 +7624,14 @@ def validate_category_evidence(
         document.get("waveSliceID"),
         document.get("sequenceOrdinal"),
     ) != (wave, wave_slice_id, sequence_ordinal):
-        errors.append(
-            f"{label} does not equal the requested wave schedule tuple"
-        )
+        errors.append(f"{label} does not equal the requested wave schedule tuple")
     schedule_ordinal = WAVE_SCHEDULE.get(
         (document.get("wave"), document.get("waveSliceID"))
     )
-    if (
-        schedule_ordinal is None
-        or document.get("sequenceOrdinal") != schedule_ordinal
-    ):
+    if schedule_ordinal is None or document.get("sequenceOrdinal") != schedule_ordinal:
         errors.append(f"{label} waveSliceID/sequenceOrdinal is not scheduled")
     if document.get("category") != category:
-        errors.append(
-            f"{label} category discriminator must be exactly {category!r}"
-        )
+        errors.append(f"{label} category discriminator must be exactly {category!r}")
     if document.get("baseTree") != base_tree:
         errors.append(f"{label} baseTree is stale or mismatched")
     if document.get("productionDiffRoot") != production_diff_root:
@@ -4471,44 +7657,47 @@ def validate_category_evidence(
         row_fingerprints.append(fingerprint)
         classification = row.get("classification")
         if category == "create" and classification != "M":
-            errors.append(
-                f"{label} classification must be M; found={classification!r}"
-            )
+            errors.append(f"{label} classification must be M; found={classification!r}")
         if category == "extension" and classification not in {"E", "M"}:
-            errors.append(
-                f"{label} classification must be E or existing-M extension"
-            )
+            errors.append(f"{label} classification must be E or existing-M extension")
         if category == "adapter" and classification != "A":
             errors.append(f"{label} classification must be A")
         claims = row.get("authorityClaims")
         if category == "adapter" and claims:
             errors.append(
-                f"{label} may not claim writer or external effect authority: "
-                f"{claims!r}"
+                f"{label} may not claim writer or external effect authority: {claims!r}"
             )
         owner_id = row.get("ownerID")
         owners = ledger.get("owners")
-        known_owner_ids = {
-            owner.get("owner_id")
-            for owner in owners
-            if isinstance(owners, list) and isinstance(owner, dict)
-        } if isinstance(owners, list) else set()
+        known_owner_ids = (
+            {
+                owner.get("owner_id")
+                for owner in owners
+                if isinstance(owners, list) and isinstance(owner, dict)
+            }
+            if isinstance(owners, list)
+            else set()
+        )
         if category != "fixture" and owner_id not in known_owner_ids:
             errors.append(
                 f"{label} reviewed path {row.get('path')!r} references unknown "
                 f"owner {owner_id!r}"
             )
         if category in {"extension", "adapter"}:
-            owner = next(
-                (
-                    item
-                    for item in owners
-                    if isinstance(owners, list)
-                    and isinstance(item, dict)
-                    and item.get("owner_id") == owner_id
-                ),
-                None,
-            ) if isinstance(owners, list) else None
+            owner = (
+                next(
+                    (
+                        item
+                        for item in owners
+                        if isinstance(owners, list)
+                        and isinstance(item, dict)
+                        and item.get("owner_id") == owner_id
+                    ),
+                    None,
+                )
+                if isinstance(owners, list)
+                else None
+            )
             evidence_paths = owner.get("evidence_paths", []) if owner else []
             if row.get("path") not in evidence_paths:
                 errors.append(
@@ -4566,9 +7755,7 @@ def validate_category_evidence(
             )
         if not is_nonempty_string(document.get("reason")):
             errors.append(f"{label} notApplicable reason must be non-empty")
-    expected_fingerprints = {
-        canonical_json_bytes(row) for row in derived_rows
-    }
+    expected_fingerprints = {canonical_json_bytes(row) for row in derived_rows}
     actual_fingerprints = set(row_fingerprints)
     missing = expected_fingerprints - actual_fingerprints
     extra = actual_fingerprints - expected_fingerprints
@@ -4612,14 +7799,13 @@ def validate_changed_swift_sources(
         if row["change"] == "delete" or not path.endswith(".swift"):
             continue
         try:
-            completed = subprocess.run(
+            completed = run_bounded_process(
                 ["git", "cat-file", "blob", row["newBlob"]],
                 cwd=root,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
-                env=GIT_SUBPROCESS_ENVIRONMENT,
-                timeout=GIT_TIMEOUT_SECONDS,
+                timeout_seconds=GIT_TIMEOUT_SECONDS,
+                stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+                stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES,
+                text=False,
             )
         except (OSError, subprocess.TimeoutExpired):
             errors.append(f"{path}: git cat-file unavailable or timed out")
@@ -4743,12 +7929,47 @@ def main() -> int:
     root = args.root.resolve()
     ledger_path = args.ledger
     errors: list[str] = []
+    executed_owner_gate_source, source_capture_error = (
+        capture_executed_owner_gate_source()
+    )
+    if source_capture_error is not None:
+        errors.append(source_capture_error)
     try:
         data = load_bounded_json_object(ledger_path)
     except (OSError, json.JSONDecodeError, DuplicateJSONKeyError, ValueError) as error:
         print(f"owner-ledger: ERROR: {error}", file=sys.stderr)
         return 1
-    ledger_errors = validate_ledger(data, root)
+    base_tree_exists = git_tree_exists(root, args.base_tree)
+    candidate_tree_exists = git_tree_exists(root, args.candidate_tree)
+    if not base_tree_exists:
+        errors.append("--base-tree must name an existing canonical Git tree")
+    if not candidate_tree_exists:
+        errors.append("--candidate-tree must name an existing canonical Git tree")
+    candidate_content_view: CandidateTreeView | None = None
+    if candidate_tree_exists:
+        try:
+            candidate_content_view = CandidateTreeView(
+                root,
+                args.candidate_tree,
+            )
+        except ContentViewError as error:
+            errors.append(f"candidate content view is invalid: {error}")
+    if candidate_content_view is None:
+        ledger_errors = [
+            "owner ledger semantic validation skipped because candidate "
+            "content view is unavailable"
+        ]
+    else:
+        ledger_errors = validate_ledger(
+            data,
+            root,
+            executed_owner_gate_source=(
+                executed_owner_gate_source
+                if executed_owner_gate_source is not None
+                else ""
+            ),
+            content_view=candidate_content_view,
+        )
     errors.extend(ledger_errors)
 
     trust_root, trust_errors = load_governance_document(
@@ -4778,24 +7999,11 @@ def main() -> int:
                 verification_time=verification_time,
             )
         )
-    if (
-        WAVE_SCHEDULE.get((args.wave, args.wave_slice_id))
-        != args.sequence_ordinal
-    ):
-        errors.append(
-            "requested wave/slice/ordinal is not an exact schedule tuple"
-        )
-    if not git_tree_exists(root, args.base_tree):
-        errors.append("--base-tree must name an existing canonical Git tree")
-    if not git_tree_exists(root, args.candidate_tree):
-        errors.append("--candidate-tree must name an existing canonical Git tree")
-
+    if WAVE_SCHEDULE.get((args.wave, args.wave_slice_id)) != args.sequence_ordinal:
+        errors.append("requested wave/slice/ordinal is not an exact schedule tuple")
     diff_rows: list[dict] = []
     categorized = {category: [] for category in WAVE_CATEGORIES}
-    if git_tree_exists(root, args.base_tree) and git_tree_exists(
-        root,
-        args.candidate_tree,
-    ):
+    if base_tree_exists and candidate_tree_exists:
         diff_rows, diff_errors = git_tree_diff(
             root,
             args.base_tree,
@@ -4808,11 +8016,7 @@ def main() -> int:
         )
         errors.extend(category_derivation_errors)
         errors.extend(validate_changed_swift_sources(root, diff_rows))
-    flat_rows = [
-        row
-        for category in WAVE_CATEGORIES
-        for row in categorized[category]
-    ]
+    flat_rows = [row for category in WAVE_CATEGORIES for row in categorized[category]]
     flat_rows.sort(key=lambda row: (row["path"], row["ownerID"], row["symbol"]))
     production_diff_root = canonical_json_digest(flat_rows)
 
@@ -4850,14 +8054,10 @@ def main() -> int:
                     verification_time=verification_time,
                 )
             )
-        if (
-            source_selection is not None
-            and document.get("approvedDesignBlob")
-            != (
-                source_selection.get("approvedDesign", {}).get("sha256")
-                if isinstance(source_selection.get("approvedDesign"), dict)
-                else None
-            )
+        if source_selection is not None and document.get("approvedDesignBlob") != (
+            source_selection.get("approvedDesign", {}).get("sha256")
+            if isinstance(source_selection.get("approvedDesign"), dict)
+            else None
         ):
             errors.append(
                 f"{category} category approvedDesignBlob does not match "

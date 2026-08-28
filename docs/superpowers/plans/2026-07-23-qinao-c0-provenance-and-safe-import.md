@@ -1,6 +1,13 @@
 # Qinao C0 Provenance and Safe Import Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **QINAO-PLAN-REGISTRY-V1: SUPERSEDED_HISTORICAL**
+
+> **SUPERSEDED; HISTORICAL; DO NOT EXECUTE; GRANTS NO AUTHORITY.** Historical
+> child of the superseded 2026-07-23 program. Every worker directive, checkbox,
+> command, branch action, and authority claim below is inert. Its reviewed
+> requirements may enter only through
+> `2026-07-29-qinao-dual-space-automation-controlled-convergence.md` and the
+> controlled 2026-07-15 master/domain plans.
 
 **Goal:** Repair and preserve the adopted 22-commit clean-candidate lineage, then add a read-only, byte-exact provenance and reviewed-import mechanism that cannot mutate the dirty source or overwrite an intervening clean-candidate edit.
 

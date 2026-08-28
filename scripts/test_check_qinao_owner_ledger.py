@@ -1,11 +1,16 @@
+from __future__ import annotations
+
+import ast
 import copy
 import base64
 import hashlib
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,6 +37,77 @@ CREATE_PROOF = {
     "compatibility_retirement": "legacy projection has a bounded retirement gate",
     "verification": "mutation, crash, replay, and duplicate-owner checks",
 }
+GIT_REPOSITORY_LOCATOR_VARIABLES = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_CEILING_DIRECTORIES",
+)
+
+
+def _isolated_git_environment(
+    base_environment: dict[str, str],
+    *,
+    object_directory: Path,
+    alternate_object_directory: Path,
+) -> dict[str, str]:
+    environment = dict(base_environment)
+    for name in GIT_REPOSITORY_LOCATOR_VARIABLES:
+        environment.pop(name, None)
+    environment.update(
+        {
+            "GIT_OBJECT_DIRECTORY": str(object_directory),
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES": str(alternate_object_directory),
+        }
+    )
+    return environment
+
+
+def _wait_for_pid_exit(pid: int, timeout_seconds: float = 2.0) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        except PermissionError:
+            return False
+        time.sleep(0.02)
+    return False
+
+
+def _replace_top_level_definition(
+    source: str,
+    name: str,
+    replacement: str,
+) -> str:
+    tree = ast.parse(source)
+    definitions = []
+    for statement in tree.body:
+        if not isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = (
+            statement.targets
+            if isinstance(statement, ast.Assign)
+            else [statement.target]
+        )
+        if any(
+            isinstance(target, ast.Name) and target.id == name for target in targets
+        ):
+            definitions.append(statement)
+    if len(definitions) != 1:
+        raise AssertionError(
+            f"expected one top-level definition for {name}, got {len(definitions)}"
+        )
+    statement = definitions[0]
+    lines = source.splitlines(keepends=True)
+    offsets = [0]
+    for line in lines:
+        offsets.append(offsets[-1] + len(line))
+    start = offsets[statement.lineno - 1] + statement.col_offset
+    end = offsets[statement.end_lineno - 1] + statement.end_col_offset
+    return source[:start] + replacement + source[end:]
 
 
 class QinaoOwnerLedgerCLITests(unittest.TestCase):
@@ -49,7 +125,7 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
     @staticmethod
     def make_audit_boundary_root(
         directory: str,
-        checker_source: str = "print('read-only audit gate')\n",
+        checker_source: str | None = None,
     ) -> Path:
         root = Path(directory)
         for relative_path in (
@@ -69,7 +145,14 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
             path.write_text(comment, encoding="utf-8")
         checker_path = root / "scripts" / "check_qinao_owner_ledger.py"
         checker_path.parent.mkdir(parents=True, exist_ok=True)
-        checker_path.write_text(checker_source, encoding="utf-8")
+        checker_path.write_text(
+            (
+                SCRIPT.read_text(encoding="utf-8")
+                if checker_source is None
+                else checker_source
+            ),
+            encoding="utf-8",
+        )
         return root
 
     @classmethod
@@ -112,9 +195,7 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
         owner_id: str,
     ) -> list[str]:
         permission = next(
-            item
-            for item in data["create_permissions"]
-            if item["owner_id"] == owner_id
+            item for item in data["create_permissions"] if item["owner_id"] == owner_id
         )
         absent_paths = {
             (ROOT / relative_path).resolve(strict=False)
@@ -230,6 +311,48 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
         )
         self.assertIn("owner-ledger: PASS", completed.stdout)
 
+    def test_repository_owner_ledger_runs_under_protected_python_39(
+        self,
+    ) -> None:
+        protected_python = Path("/usr/bin/python3")
+        if not protected_python.is_file() or not os.access(protected_python, os.X_OK):
+            self.skipTest("protected /usr/bin/python3 is unavailable")
+        version = subprocess.run(
+            [str(protected_python), "--version"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        observed_version = (version.stdout or version.stderr).strip()
+        if version.returncode != 0 or observed_version != "Python 3.9.6":
+            self.skipTest(
+                "protected /usr/bin/python3 is not exact Python 3.9.6 "
+                f"(observed {observed_version or f'exit {version.returncode}'})"
+            )
+        completed = subprocess.run(
+            [
+                str(protected_python),
+                str(SCRIPT),
+                "--root",
+                str(ROOT),
+                "--ledger",
+                str(LEDGER),
+                *self.WAVE_ARGUMENTS,
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(
+            completed.returncode,
+            0,
+            msg=f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}",
+        )
+        self.assertIn("owner-ledger: PASS", completed.stdout)
+
     def test_audit_asset_boundary_validator_is_installed(self) -> None:
         self.assertTrue(
             hasattr(checker, "validate_audit_asset_boundary"),
@@ -285,6 +408,44 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
             errors = checker.validate_audit_asset_boundary(root)
 
         self.assertEqual(errors, [])
+
+    def test_audit_boundary_uses_executed_checker_source_not_root_path(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_audit_boundary_root(
+                directory,
+                checker_source="pass\n",
+            )
+            errors = checker.validate_audit_asset_boundary(
+                root,
+                executed_owner_gate_source=SCRIPT.read_text(encoding="utf-8"),
+            )
+
+        self.assertEqual(errors, [])
+
+    def test_direct_checker_source_capture_is_one_fd_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source_path = Path(directory) / "bound-checker.py"
+            expected = b"print('bound source')\n"
+            source_path.write_bytes(expected)
+            with (
+                mock.patch.object(
+                    checker,
+                    "__file__",
+                    str(source_path),
+                ),
+                mock.patch(
+                    "builtins.open",
+                    wraps=open,
+                ) as bound_open,
+            ):
+                captured, error = checker.capture_executed_owner_gate_source()
+
+        self.assertIsNone(error)
+        self.assertEqual(captured, expected.decode("utf-8"))
+        self.assertEqual(bound_open.call_count, 1)
+        self.assertEqual(bound_open.call_args.args[:2], (str(source_path), "rb"))
 
     def test_xcodegen_project_cannot_include_owner_ledger(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -621,12 +782,13 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
             "lambda": "lambda print: None\n",
             "function": "def print():\n    pass\n",
             "class": "class print:\n    pass\n",
-            "match": "match 0:\n    case print:\n        pass\n",
             "delete": "del print\n",
             "qualified-root": (
                 "from pathlib import Path\nfor str in [Path]:\n    pass\n"
             ),
         }
+        if checker.MATCH_NAME_BINDING_NODE_TYPES:
+            binding_forms["match"] = "match 0:\n    case print:\n        pass\n"
         for case, source in binding_forms.items():
             with self.subTest(case=case):
                 errors = checker.validate_owner_gate_read_only(source, case)
@@ -656,6 +818,921 @@ class QinaoOwnerLedgerCLITests(unittest.TestCase):
                 self.assertTrue(
                     any(
                         "read-only" in error and "reflection" in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+    def test_owner_gate_rejects_runtime_import_and_argument_registry_mutation(
+        self,
+    ) -> None:
+        sources = {
+            "pop-append.py": (
+                "import sys\n"
+                "while sys.path:\n"
+                "    sys.path.pop()\n"
+                "sys.path.append('/tmp/attacker')\n"
+                "import json\n"
+            ),
+            "extend.py": (
+                "import sys\nsys.path.extend(['/tmp/attacker'])\nimport json\n"
+            ),
+            "slice-store.py": (
+                "import sys\nsys.path[:] = ['/tmp/attacker']\nimport json\n"
+            ),
+            "alias.py": (
+                "import sys\n"
+                "paths = sys.path\n"
+                "paths.pop()\n"
+                "paths.append('/tmp/attacker')\n"
+                "import json\n"
+            ),
+            "argv.py": (
+                "import sys\n"
+                "while sys.argv:\n"
+                "    sys.argv.pop()\n"
+                "sys.argv.extend(['--root', '/tmp/attacker'])\n"
+            ),
+            "argv-alias.py": ("import sys\narguments = sys.argv\narguments.pop()\n"),
+        }
+        for source_name, source in sources.items():
+            with self.subTest(source_name=source_name):
+                errors = checker.validate_owner_gate_read_only(
+                    source,
+                    source_name,
+                )
+                self.assertTrue(
+                    any(
+                        "runtime registry 'sys.path'" in error
+                        or "runtime registry 'sys.argv'" in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+    def test_owner_gate_policy_globals_cannot_be_poisoned_before_main(
+        self,
+    ) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        injection = """
+ALLOWED_DIRECT_CALL_NAMES = frozenset({"evil"})
+ALLOWED_MODULE_IMPORTS = frozenset()
+FORBIDDEN_EMIT_CALLS = frozenset()
+READ_ONLY_GIT_SUBCOMMANDS = frozenset({"commit"})
+GIT_SUBPROCESS_ENVIRONMENT = (("PATH", "/tmp/attacker"),)
+"""
+        marker = '\nif __name__ == "__main__":\n'
+        self.assertIn(marker, source)
+        mutated = source.replace(marker, injection + marker, 1)
+        namespace = {
+            "__file__": str(SCRIPT),
+            "__name__": "test_policy_poisoned_checker",
+        }
+        exec(compile(mutated, str(SCRIPT), "exec"), namespace)
+        poisoned_validator = namespace["validate_owner_gate_read_only"]
+
+        emitted_errors = poisoned_validator(
+            "evil()\n",
+            "poisoned-emitter.py",
+        )
+        mutation_errors = poisoned_validator(
+            mutated,
+            "poisoned-checker.py",
+        )
+        definition_mutation = source.replace(
+            '    "write_text",\n',
+            "",
+            1,
+        )
+        self.assertNotEqual(definition_mutation, source)
+        definition_errors = poisoned_validator(
+            definition_mutation,
+            "definition-mutated-checker.py",
+        )
+
+        self.assertTrue(
+            any("read-only" in error for error in emitted_errors),
+            emitted_errors,
+        )
+        self.assertTrue(
+            any("policy" in error and "mutation" in error for error in mutation_errors),
+            mutation_errors,
+        )
+        self.assertTrue(
+            any(
+                "policy definition freeze mismatch" in error
+                for error in definition_errors
+            ),
+            definition_errors,
+        )
+
+    def test_owner_gate_rejects_process_control_on_alternate_receivers(
+        self,
+    ) -> None:
+        sources = {
+            "alternate-communicate.py": (
+                "def run_bounded_process(evil):\n    evil.communicate(timeout=1)\n"
+            ),
+            "alternate-kill.py": (
+                "def terminate_process_group(evil):\n    evil.kill()\n"
+            ),
+            "alternate-wait.py": (
+                "def terminate_process_group(evil):\n    evil.wait(timeout=1)\n"
+            ),
+            "alternate-pipe-close.py": (
+                "def terminate_process_group(evil):\n    evil.stdout.close()\n"
+            ),
+        }
+        for source_name, source in sources.items():
+            with self.subTest(source_name=source_name):
+                errors = checker.validate_owner_gate_read_only(
+                    source,
+                    source_name,
+                )
+                self.assertTrue(
+                    any(
+                        "unapproved method/capability" in error
+                        or "process control" in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+    def test_owner_gate_open_calls_are_receiver_aware_and_fail_closed(
+        self,
+    ) -> None:
+        rejected = {
+            "path-write.py": (
+                "from pathlib import Path\nPath('/tmp/qinao-owned').open('w')\n"
+            ),
+            "path-expanded-keywords.py": (
+                "from pathlib import Path\n"
+                "Path('/tmp/qinao-owned').open(**{'mode': 'w'})\n"
+            ),
+            "unknown-read.py": ("def inspect(unknown):\n    unknown.open('r')\n"),
+            "starred-builtins-open.py": "open(*['/tmp/qinao-owned', 'w'])\n",
+            "expanded-builtins-open.py": (
+                "open('/tmp/qinao-owned', **{'mode': 'w'})\n"
+            ),
+        }
+        for source_name, source in rejected.items():
+            with self.subTest(source_name=source_name):
+                errors = checker.validate_owner_gate_read_only(
+                    source,
+                    source_name,
+                )
+                self.assertTrue(
+                    any("read-only" in error for error in errors),
+                    errors,
+                )
+
+        self.assertEqual(
+            checker.validate_owner_gate_read_only(
+                "with open('/tmp/qinao-input', 'r', encoding='utf-8') as source:\n"
+                "    source.read()\n",
+                "direct-read.py",
+            ),
+            [],
+        )
+
+    def test_owner_gate_requires_bounded_read_only_git_runtime_guard(
+        self,
+    ) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        mutated = source.replace(
+            "if not git_command_is_read_only(command):",
+            "if git_command_is_read_only(command):",
+            1,
+        )
+        self.assertNotEqual(mutated, source)
+
+        errors = checker.validate_owner_gate_read_only(
+            mutated,
+            "mutated-checker.py",
+        )
+
+        self.assertTrue(
+            any("bounded subprocess read-only Git guard" in error for error in errors),
+            errors,
+        )
+
+    def test_owner_gate_exact_freezes_bounded_process_contract(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        mutations = {
+            "false-guard-branch": source.replace(
+                "    if not git_command_is_read_only(command):\n",
+                "    if not git_command_is_read_only(command) or False:\n",
+                1,
+            ),
+            "command-rebind-after-guard": source.replace(
+                '        raise OSError("owner gate subprocess is not an allowed '
+                'read-only Git command")\n',
+                '        raise OSError("owner gate subprocess is not an allowed '
+                'read-only Git command")\n'
+                '    command = ["git", "cat-file", "-t", "0" * 40]\n',
+                1,
+            ),
+            "environment-rebind": source.replace(
+                "    environment = dict(_git_environment_items)\n",
+                "    environment = dict(_git_environment_items)\n"
+                '    environment = {"PATH": "/tmp/attacker"}\n',
+                1,
+            ),
+            "signature-drift": source.replace(
+                "    text: bool,\n) -> subprocess.CompletedProcess:\n",
+                "    text: bool,\n"
+                "    env: dict | None = None,\n"
+                ") -> subprocess.CompletedProcess:\n",
+                1,
+            ),
+        }
+        for mutation, mutated in mutations.items():
+            with self.subTest(mutation=mutation):
+                self.assertNotEqual(mutated, source)
+                errors = checker.validate_owner_gate_read_only(
+                    mutated,
+                    checker.OWNER_GATE_RELATIVE_PATH,
+                )
+                self.assertTrue(
+                    any("exact bounded process contract" in error for error in errors),
+                    errors,
+                )
+
+    def test_exact_function_freezes_are_cross_python_version_stable(
+        self,
+    ) -> None:
+        probe = (
+            "from pathlib import Path\n"
+            "from scripts import check_qinao_owner_ledger as checker\n"
+            "source = Path('scripts/check_qinao_owner_ledger.py').read_text("
+            "encoding='utf-8')\n"
+            "errors = checker.validate_owner_gate_read_only("
+            "source, checker.OWNER_GATE_RELATIVE_PATH)\n"
+            "if errors:\n"
+            "    raise SystemExit('\\n'.join(errors))\n"
+        )
+        candidates = (
+            Path("/usr/bin/python3"),
+            Path.home() / ".local/bin/python3.12",
+            Path(sys.executable),
+        )
+        tested: set[Path] = set()
+        for candidate in candidates:
+            if not candidate.is_file():
+                continue
+            resolved = candidate.resolve()
+            if resolved in tested:
+                continue
+            tested.add(resolved)
+            with self.subTest(interpreter=str(candidate)):
+                completed = subprocess.run(
+                    [str(candidate), "-c", probe],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(
+                    completed.returncode,
+                    0,
+                    completed.stderr,
+                )
+        self.assertTrue(tested)
+
+    def test_runtime_git_command_grammar_accepts_only_exact_templates(
+        self,
+    ) -> None:
+        self.assertTrue(
+            hasattr(checker, "git_command_is_read_only"),
+            "the bounded runner needs one closed runtime Git argv grammar",
+        )
+        object_id = "a" * 40
+        tree = "b" * 64
+        path = "BehavioralAISubstrate/Sources/Runtime.swift"
+        accepted = (
+            ["git", "cat-file", "-t", "a" * 7],
+            ["git", "cat-file", "-t", object_id],
+            ["git", "cat-file", "blob", object_id],
+            ["git", "rev-parse", f"{object_id}^{{tree}}"],
+            ["git", "ls-tree", "-z", tree, "--", path],
+            ["git", "ls-tree", "-r", "-z", tree],
+            [
+                "git",
+                "diff-tree",
+                "--no-commit-id",
+                "--no-renames",
+                "--raw",
+                "-r",
+                "-z",
+                object_id,
+                tree,
+            ],
+        )
+        for command in accepted:
+            with self.subTest(accepted=command):
+                self.assertTrue(checker.git_command_is_read_only(command))
+
+        rejected = (
+            ["git", "cat-file", "-t", object_id, "--help"],
+            ["git", "cat-file", "blob", object_id, "--filters"],
+            ["git", "rev-parse", object_id],
+            ["git", "rev-parse", f"{object_id}^{{tree}}", "--verify"],
+            ["git", "ls-tree", tree, "-z", "--", path],
+            ["git", "ls-tree", "-z", tree, "--", "../escape"],
+            ["git", "ls-tree", "-r", "-z", tree, "--name-only"],
+            [
+                "git",
+                "diff-tree",
+                "--no-commit-id",
+                "--no-renames",
+                "--raw",
+                "-r",
+                "-z",
+                object_id,
+                tree,
+                "--stat",
+            ],
+            [
+                "git",
+                "diff-tree",
+                "--no-renames",
+                "--no-commit-id",
+                "--raw",
+                "-r",
+                "-z",
+                object_id,
+                tree,
+            ],
+            ["git", "-c", "core.pager=cat", "cat-file", "-t", object_id],
+            ["git", "cat-file", "-t", "a" * 6],
+            ["git", "cat-file", "-t", "A" * 40],
+            ["git", "cat-file", "-t", b"a" * 40],
+            ["git", "cat-file", "-t", None],
+            ["git", "ls-tree", "-z", tree, "--", b"safe/path"],
+            ("git", "cat-file", "-t", object_id),
+        )
+        for command in rejected:
+            with self.subTest(rejected=command):
+                self.assertFalse(checker.git_command_is_read_only(command))
+
+    def test_owner_git_snapshot_ignores_replacement_refs_and_lazy_fetch(
+        self,
+    ) -> None:
+        environment = dict(checker.GIT_SUBPROCESS_ENVIRONMENT)
+        self.assertEqual(environment.get("GIT_NO_REPLACE_OBJECTS"), "1")
+        self.assertEqual(environment.get("GIT_NO_LAZY_FETCH"), "1")
+        self.assertEqual(environment.get("GIT_OPTIONAL_LOCKS"), "0")
+        self.assertEqual(environment.get("GIT_ATTR_NOSYSTEM"), "1")
+        self.assertEqual(environment.get("GIT_LITERAL_PATHSPECS"), "1")
+        self.assertEqual(environment.get("XDG_CONFIG_HOME"), "/nonexistent")
+        self.assertEqual(environment.get("GIT_PAGER"), "cat")
+        self.assertEqual(environment.get("PAGER"), "cat")
+        self.assertEqual(environment.get("GIT_CONFIG_COUNT"), "5")
+        self.assertEqual(environment.get("GIT_CONFIG_KEY_4"), "submodule.recurse")
+        self.assertEqual(environment.get("GIT_CONFIG_VALUE_4"), "false")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def git(*arguments: str) -> str:
+                return subprocess.run(
+                    ["git", *arguments],
+                    cwd=root,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+
+            git("init", "-q")
+            git("config", "user.email", "test-only@example.invalid")
+            git("config", "user.name", "Qinao Test Only")
+            (root / "value.txt").write_text("first\n", encoding="utf-8")
+            git("add", "value.txt")
+            git("commit", "-qm", "first")
+            original_commit = git("rev-parse", "HEAD")
+            original_tree = git("rev-parse", "HEAD^{tree}")
+            (root / "value.txt").write_text("second\n", encoding="utf-8")
+            git("commit", "-qam", "second")
+            replacement_commit = git("rev-parse", "HEAD")
+            self.assertNotEqual(
+                git("rev-parse", f"{replacement_commit}^{{tree}}"),
+                original_tree,
+            )
+            git("replace", original_commit, replacement_commit)
+
+            self.assertEqual(
+                checker.git_commit_tree(root, original_commit),
+                original_tree,
+            )
+
+    def test_static_git_command_grammar_matches_runtime_templates(self) -> None:
+        object_id = "a" * 40
+        tree = "b" * 64
+        path = "BehavioralAISubstrate/Sources/Runtime.swift"
+        accepted = (
+            ["git", "cat-file", "-t", "a" * 7],
+            ["git", "cat-file", "-t", object_id],
+            ["git", "cat-file", "blob", object_id],
+            ["git", "rev-parse", f"{object_id}^{{tree}}"],
+            ["git", "ls-tree", "-z", tree, "--", path],
+            ["git", "ls-tree", "-r", "-z", tree],
+            [
+                "git",
+                "diff-tree",
+                "--no-commit-id",
+                "--no-renames",
+                "--raw",
+                "-r",
+                "-z",
+                object_id,
+                tree,
+            ],
+        )
+        rejected = (
+            ["git", "cat-file", "-t", "a" * 6],
+            ["git", "cat-file", "-t", object_id, "--help"],
+            ["git", "cat-file", "blob", object_id, "--filters"],
+            ["git", "rev-parse", object_id],
+            ["git", "ls-tree", tree, "-z", "--", path],
+            ["git", "ls-tree", "-z", tree, "--", "../escape"],
+            ["git", "ls-tree", "-r", "-z", tree, "--name-only"],
+            [
+                "git",
+                "diff-tree",
+                "--no-commit-id",
+                "--no-renames",
+                "--raw",
+                "-r",
+                "-z",
+                object_id,
+                tree,
+                "--stat",
+            ],
+        )
+
+        def audited_call(command: object) -> ast.Call:
+            expression = (
+                "run_bounded_process("
+                f"{command!r}, "
+                "cwd=root, timeout_seconds=GIT_TIMEOUT_SECONDS, "
+                "stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES, "
+                "stderr_limit_bytes=GIT_STDERR_LIMIT_BYTES, text=True)"
+            )
+            statement = ast.parse(expression).body[0]
+            self.assertIsInstance(statement, ast.Expr)
+            self.assertIsInstance(statement.value, ast.Call)
+            return statement.value
+
+        for command in accepted:
+            with self.subTest(accepted=command):
+                self.assertTrue(
+                    checker.bounded_process_call_is_read_only(audited_call(command))
+                )
+        for command in rejected:
+            with self.subTest(rejected=command):
+                self.assertFalse(
+                    checker.bounded_process_call_is_read_only(audited_call(command))
+                )
+
+    def test_owner_gate_exact_freezes_git_command_grammar_helper(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        helper_marker = (
+            "def git_command_is_read_only(command: object) -> bool:\n"
+            "    if type(command) is not list"
+        )
+        self.assertIn(helper_marker, source)
+        mutations = {
+            "helper-body": source.replace(
+                helper_marker,
+                "def git_command_is_read_only(command: object) -> bool:\n"
+                "    return True\n"
+                "    if type(command) is not list",
+                1,
+            ),
+            "grammar-literal": source.replace(
+                '{"-t", "blob"}',
+                '{"--batch", "blob"}',
+                1,
+            ),
+        }
+        for mutation, mutated in mutations.items():
+            with self.subTest(mutation=mutation):
+                self.assertNotEqual(mutated, source)
+                errors = checker.validate_owner_gate_read_only(
+                    mutated,
+                    checker.OWNER_GATE_RELATIVE_PATH,
+                )
+                self.assertTrue(
+                    any("exact Git command grammar" in error for error in errors),
+                    errors,
+                )
+
+    def test_owner_gate_exact_freezes_candidate_blob_timeout_contract(
+        self,
+    ) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        mutations = {
+            "loader-hard-cap": source.replace(
+                "or timeout_seconds > GIT_TIMEOUT_SECONDS",
+                "or False",
+                1,
+            ),
+            "audit-callsite-scope": source.replace(
+                'and keyword_values["timeout_seconds"].id == "timeout_seconds"',
+                'and isinstance(keyword_values["timeout_seconds"], ast.Name)',
+                1,
+            ),
+        }
+        expected_functions = {
+            "loader-hard-cap": "load_candidate_blob",
+            "audit-callsite-scope": (
+                "bounded_candidate_blob_process_call_is_read_only"
+            ),
+        }
+        for mutation, mutated in mutations.items():
+            with self.subTest(mutation=mutation):
+                self.assertNotEqual(mutated, source)
+                errors = checker.validate_owner_gate_read_only(
+                    mutated,
+                    checker.OWNER_GATE_RELATIVE_PATH,
+                )
+                self.assertTrue(
+                    any(
+                        "exact Git command grammar contract" in error
+                        and expected_functions[mutation] in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+    def test_owner_gate_policy_definitions_are_exact_complete_and_unique(
+        self,
+    ) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertEqual(
+            checker.validate_owner_gate_read_only(source, str(SCRIPT)),
+            [],
+        )
+        policy_names = (
+            "ALLOWED_DIRECT_CALL_NAMES",
+            "ALLOWED_FROM_IMPORTS",
+            "ALLOWED_METHOD_CALLS",
+            "ALLOWED_MODULE_IMPORTS",
+            "ALLOWED_QUALIFIED_CALLS",
+            "DANGEROUS_ALIAS_MODULES",
+            "DANGEROUS_ALIAS_TARGETS",
+            "FILESYSTEM_WRITE_METHODS",
+            "FORBIDDEN_EMIT_CALLS",
+            "FORBIDDEN_REFLECTION_REGISTRIES",
+            "GIT_SUBPROCESS_ENVIRONMENT",
+            "PROTECTED_IMPORTED_NAMES",
+            "PROTECTED_QUALIFIED_ROOTS",
+            "READ_ONLY_GIT_SUBCOMMANDS",
+            "SUBPROCESS_CALLS",
+        )
+        for name in policy_names:
+            with self.subTest(name=name, mutation="value-drift"):
+                mutated = _replace_top_level_definition(
+                    source,
+                    name,
+                    f"{name} = frozenset()",
+                )
+                errors = checker.validate_owner_gate_read_only(
+                    mutated,
+                    checker.OWNER_GATE_RELATIVE_PATH,
+                )
+                self.assertTrue(
+                    any(
+                        "policy definition freeze mismatch" in error for error in errors
+                    ),
+                    errors,
+                )
+
+        with_missing = _replace_top_level_definition(
+            source,
+            "FORBIDDEN_EMIT_CALLS",
+            "",
+        )
+        with_duplicate = _replace_top_level_definition(
+            source,
+            "FORBIDDEN_EMIT_CALLS",
+            "FORBIDDEN_EMIT_CALLS = frozenset()\nFORBIDDEN_EMIT_CALLS = frozenset()",
+        )
+        with_member_added = _replace_top_level_definition(
+            source,
+            "FORBIDDEN_EMIT_CALLS",
+            'FORBIDDEN_EMIT_CALLS = frozenset({"os.remove", "os.remove.extra"})',
+        )
+        with_member_deleted = _replace_top_level_definition(
+            source,
+            "FORBIDDEN_EMIT_CALLS",
+            'FORBIDDEN_EMIT_CALLS = frozenset({"os.remove"})',
+        )
+        for mutation, mutated in (
+            ("missing", with_missing),
+            ("duplicate", with_duplicate),
+            ("member-added", with_member_added),
+            ("member-deleted", with_member_deleted),
+        ):
+            with self.subTest(mutation=mutation):
+                errors = checker.validate_owner_gate_read_only(
+                    mutated,
+                    checker.OWNER_GATE_RELATIVE_PATH,
+                )
+                self.assertTrue(
+                    any("policy definition freeze" in error for error in errors),
+                    errors,
+                )
+
+    def test_owner_gate_rejects_recursive_policy_reference_paths(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        marker = '\nif __name__ == "__main__":\n'
+        self.assertIn(marker, source)
+        attacks = {
+            "environment-subscript-store": (
+                'GIT_SUBPROCESS_ENVIRONMENT["PATH"] = "/tmp/attacker"\n'
+            ),
+            "environment-subscript-delete": (
+                'del GIT_SUBPROCESS_ENVIRONMENT["PATH"]\n'
+            ),
+            "environment-subscript-augassign": (
+                'GIT_SUBPROCESS_ENVIRONMENT["PATH"] += ":/tmp/attacker"\n'
+            ),
+            "nested-set-add": ('ALLOWED_FROM_IMPORTS["os"].add(("remove", None))\n'),
+            "tuple-receiver": ('(ALLOWED_METHOD_CALLS,)[0].add("write_text")\n'),
+            "list-receiver": ('[ALLOWED_METHOD_CALLS][0].add("write_text")\n'),
+            "dict-receiver": (
+                '{"policy": ALLOWED_METHOD_CALLS}["policy"].update({"write_text"})\n'
+            ),
+            "helper-poison": (
+                "def poison(policy):\n"
+                '    policy.add("write_text")\n'
+                "poison(ALLOWED_METHOD_CALLS)\n"
+            ),
+            "return-alias": ("def leak_policy():\n    return FORBIDDEN_EMIT_CALLS\n"),
+            "default-alias": (
+                "def leak_policy(policy=FORBIDDEN_EMIT_CALLS):\n    return None\n"
+            ),
+            "tuple-alias": "captured = (FORBIDDEN_EMIT_CALLS,)\n",
+            "list-alias": "captured = [FORBIDDEN_EMIT_CALLS]\n",
+            "dict-alias": 'captured = {"policy": FORBIDDEN_EMIT_CALLS}\n',
+            "comprehension-alias": (
+                "captured = [policy for policy in (FORBIDDEN_EMIT_CALLS,)]\n"
+            ),
+            "walrus-alias": ("captured = ((policy := FORBIDDEN_EMIT_CALLS),)\n"),
+        }
+        for attack_name, injection in attacks.items():
+            with self.subTest(attack=attack_name):
+                mutated = source.replace(marker, "\n" + injection + marker, 1)
+                errors = checker.validate_owner_gate_read_only(
+                    mutated,
+                    f"{attack_name}.py",
+                )
+                self.assertTrue(
+                    any("policy" in error for error in errors),
+                    errors,
+                )
+
+    def test_owner_gate_runtime_decisions_ignore_rebound_policy_globals(
+        self,
+    ) -> None:
+        cases = (
+            (
+                {"ALLOWED_DIRECT_CALL_NAMES": frozenset({"evil"})},
+                "evil()\n",
+            ),
+            (
+                {"ALLOWED_MODULE_IMPORTS": frozenset({"socket"})},
+                "import socket\n",
+            ),
+            (
+                {
+                    "ALLOWED_FROM_IMPORTS": {
+                        "socket": {("socket", None)},
+                    },
+                },
+                "from socket import socket\n",
+            ),
+            (
+                {"ALLOWED_METHOD_CALLS": frozenset({"destroy"})},
+                "victim.destroy()\n",
+            ),
+            (
+                {"ALLOWED_QUALIFIED_CALLS": frozenset({"victim.destroy"})},
+                "victim.destroy()\n",
+            ),
+            (
+                {"DANGEROUS_ALIAS_MODULES": frozenset()},
+                "alias = json\n",
+            ),
+            (
+                {"DANGEROUS_ALIAS_TARGETS": frozenset()},
+                "alias = open\n",
+            ),
+            (
+                {"FILESYSTEM_WRITE_METHODS": frozenset()},
+                "victim.write_text('owned')\n",
+            ),
+            (
+                {
+                    "ALLOWED_QUALIFIED_CALLS": frozenset({"os.remove"}),
+                    "FORBIDDEN_EMIT_CALLS": frozenset(),
+                },
+                "os.remove('/tmp/owned')\n",
+            ),
+            (
+                {"FORBIDDEN_REFLECTION_REGISTRIES": frozenset()},
+                "import sys\nsys.path\n",
+            ),
+            (
+                {
+                    "PROTECTED_IMPORTED_NAMES": frozenset(),
+                    "PROTECTED_QUALIFIED_ROOTS": frozenset(),
+                },
+                "json = 1\n",
+            ),
+            (
+                {"SUBPROCESS_CALLS": frozenset()},
+                "import subprocess\nsubprocess.run([])\n",
+            ),
+        )
+        for patches, candidate in cases:
+            with self.subTest(patches=sorted(patches)):
+                with mock.patch.multiple(checker, **patches):
+                    errors = checker.validate_owner_gate_read_only(
+                        candidate,
+                        "rebound-policy.py",
+                    )
+                self.assertTrue(errors)
+
+    def test_owner_gate_policy_snapshots_are_not_keyword_injectable(
+        self,
+    ) -> None:
+        injected_snapshots = {
+            "_allowed_direct_call_names": frozenset(),
+            "_allowed_from_imports": frozenset(),
+            "_allowed_method_calls": frozenset(),
+            "_allowed_module_imports": frozenset(),
+            "_allowed_qualified_calls": frozenset(),
+            "_dangerous_alias_modules": frozenset(),
+            "_dangerous_alias_targets": frozenset(),
+            "_filesystem_write_methods": frozenset(),
+            "_forbidden_emit_calls": frozenset(),
+            "_forbidden_reflection_registries": frozenset(),
+            "_git_environment_items": (),
+            "_protected_imported_names": frozenset(),
+            "_protected_qualified_roots": frozenset(),
+            "_read_only_git_subcommands": frozenset(),
+            "_subprocess_calls": frozenset(),
+            "_policy_binding_names": frozenset(),
+        }
+        for parameter, injected in injected_snapshots.items():
+            with self.subTest(parameter=parameter):
+                with self.assertRaises(TypeError):
+                    checker.validate_owner_gate_read_only(
+                        "pass\n",
+                        "snapshot-injection.py",
+                        **{parameter: injected},
+                    )
+
+        with self.assertRaises(TypeError):
+            checker.validate_owner_gate_read_only(
+                "os.remove('/tmp/owned')\n",
+                "snapshot-bypass.py",
+                _allowed_qualified_calls=frozenset({"os.remove"}),
+                _forbidden_emit_calls=frozenset(),
+            )
+
+    def test_owner_gate_identity_is_derived_from_trusted_source_name(
+        self,
+    ) -> None:
+        trusted_names = (
+            checker.OWNER_GATE_RELATIVE_PATH,
+            str(SCRIPT),
+            "/private/tmp/candidate/scripts/check_qinao_owner_ledger.py",
+        )
+        for source_name in trusted_names:
+            for candidate in ("", "pass\n"):
+                with self.subTest(
+                    source_name=source_name,
+                    candidate=repr(candidate),
+                ):
+                    errors = checker.validate_owner_gate_read_only(
+                        candidate,
+                        source_name,
+                    )
+                    self.assertTrue(
+                        any(
+                            "exactly one validate_owner_gate_read_only" in error
+                            for error in errors
+                        ),
+                        errors,
+                    )
+                    self.assertTrue(
+                        any("policy definition freeze" in error for error in errors),
+                        errors,
+                    )
+
+        duplicate_validator = (
+            "def validate_owner_gate_read_only(contents, source_name):\n"
+            "    return []\n"
+            "def validate_owner_gate_read_only(contents, source_name):\n"
+            "    return []\n"
+        )
+        errors = checker.validate_owner_gate_read_only(
+            duplicate_validator,
+            checker.OWNER_GATE_RELATIVE_PATH,
+        )
+        self.assertTrue(
+            any(
+                "exactly one validate_owner_gate_read_only" in error for error in errors
+            ),
+            errors,
+        )
+
+        self.assertEqual(
+            checker.validate_owner_gate_read_only("", "snippet.py"),
+            [],
+        )
+        self.assertEqual(
+            checker.validate_owner_gate_read_only("pass\n", "snippet.py"),
+            [],
+        )
+
+    def test_bounded_process_owns_git_policy_and_environment(self) -> None:
+        with mock.patch.object(
+            checker,
+            "READ_ONLY_GIT_SUBCOMMANDS",
+            frozenset({"status"}),
+        ):
+            with self.assertRaises(OSError):
+                checker.run_bounded_process(
+                    ["git", "status"],
+                    cwd=ROOT,
+                    timeout_seconds=1,
+                    stdout_limit_bytes=1024,
+                    stderr_limit_bytes=1024,
+                    text=True,
+                )
+
+        with self.assertRaises(TypeError):
+            checker.run_bounded_process(
+                ["git", "cat-file", "-t", "0" * 40],
+                cwd=ROOT,
+                env={"PATH": "/tmp/attacker"},
+                timeout_seconds=1,
+                stdout_limit_bytes=1024,
+                stderr_limit_bytes=1024,
+                text=True,
+            )
+        with self.assertRaises(TypeError):
+            checker.run_bounded_process(
+                ["git", "cat-file", "-t", "0" * 40],
+                cwd=ROOT,
+                timeout_seconds=1,
+                stdout_limit_bytes=1024,
+                stderr_limit_bytes=1024,
+                text=True,
+                _git_environment_items=(("PATH", "/tmp/attacker"),),
+            )
+
+    def test_bounded_process_rejects_stdout_at_cap_plus_one(self) -> None:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+        with self.assertRaises(checker.ProcessOutputLimitExceeded):
+            checker.run_bounded_process(
+                ["git", "rev-parse", f"{commit}^{{tree}}"],
+                cwd=ROOT,
+                timeout_seconds=5,
+                stdout_limit_bytes=40,
+                stderr_limit_bytes=1024,
+                text=False,
+            )
+
+    def test_owner_gate_rejects_process_control_outside_supervisor(self) -> None:
+        sources = {
+            "signal-group.py": (
+                "import os\n"
+                "import signal\n"
+                "def attack(process):\n"
+                "    os.killpg(process.pid, signal.SIGKILL)\n"
+            ),
+            "kill-child.py": ("def attack(process):\n    process.kill()\n"),
+        }
+        for source_name, source in sources.items():
+            with self.subTest(source_name=source_name):
+                errors = checker.validate_owner_gate_read_only(
+                    source,
+                    source_name,
+                )
+                self.assertTrue(
+                    any(
+                        "process control is outside the bounded supervisor" in error
                         for error in errors
                     ),
                     errors,
@@ -2000,19 +3077,13 @@ def _canonical_test_json(value: object) -> bytes:
             separators=(",", ":"),
         ).encode("utf-8")
     if isinstance(value, list):
-        return (
-            b"["
-            + b",".join(_canonical_test_json(item) for item in value)
-            + b"]"
-        )
+        return b"[" + b",".join(_canonical_test_json(item) for item in value) + b"]"
     if isinstance(value, dict):
         keys = sorted(value, key=lambda key: key.encode("utf-16-be"))
         return (
             b"{"
             + b",".join(
-                _canonical_test_json(key)
-                + b":"
-                + _canonical_test_json(value[key])
+                _canonical_test_json(key) + b":" + _canonical_test_json(value[key])
                 for key in keys
             )
             + b"}"
@@ -2035,6 +3106,18 @@ _TEST_ROLE_SCHEMA_SCOPES = (
     ("k4-evidence-signer", "QinaoK4IOS27PlatformSpikeV1"),
     ("runtime-chain-signer", "QinaoW6RuntimeReceiptChainV1"),
 )
+
+_AMENDMENT_2_APPROVED_DESIGN = {
+    "path": (
+        "docs/superpowers/specs/"
+        "2026-07-29-qinao-dual-space-automation-apple-ecosystem-design.md"
+    ),
+    "commit": "c4e6cf23fd28d01abea3b9c5d8b282ba9dd9f271",
+    "tree": "deef57197db409d6e4b33d5bfe9f7521eacefa12",
+    "blob": "bbc586cb5787d872f8980f95a766f8afa90f9221",
+    "byteLength": 113470,
+    "sha256": "50338e28492cd8dc7a81f28a07a871d70f02020af56549cb1384b9431bd5fcf6",
+}
 
 
 def _test_scoped_trust_key(
@@ -2137,9 +3220,7 @@ def _make_default_wave_arguments(directory: Path) -> list[str]:
                     ),
                     "role": "source-selector",
                     "schemaScope": "QinaoDualSpaceSourceSelectionV1",
-                    "publicKey": base64.b64encode(source_public_key).decode(
-                        "ascii"
-                    ),
+                    "publicKey": base64.b64encode(source_public_key).decode("ascii"),
                     "publicKeyFingerprintSHA256": hashlib.sha256(
                         source_public_key
                     ).hexdigest(),
@@ -2148,14 +3229,10 @@ def _make_default_wave_arguments(directory: Path) -> list[str]:
                 },
                 {
                     "keyID": QinaoWaveAuthorityGateTests.CATEGORY_REVIEW_KEY_ID,
-                    "principalID": (
-                        QinaoWaveAuthorityGateTests.CATEGORY_REVIEW_KEY_ID
-                    ),
+                    "principalID": (QinaoWaveAuthorityGateTests.CATEGORY_REVIEW_KEY_ID),
                     "role": "wave-bundle-reviewer",
                     "schemaScope": "QinaoWaveCategoryEvidenceV1",
-                    "publicKey": base64.b64encode(category_public_key).decode(
-                        "ascii"
-                    ),
+                    "publicKey": base64.b64encode(category_public_key).decode("ascii"),
                     "publicKeyFingerprintSHA256": hashlib.sha256(
                         category_public_key
                     ).hexdigest(),
@@ -2166,16 +3243,7 @@ def _make_default_wave_arguments(directory: Path) -> list[str]:
         ),
         "revokedNonces": [],
     }
-    design_digest = hashlib.sha256(
-        QinaoWaveAuthorityGateTests.DESIGN_PATH.read_bytes()
-    ).hexdigest()
-    design_path = QinaoWaveAuthorityGateTests.DESIGN_PATH.relative_to(
-        ROOT
-    ).as_posix()
-    design_binding = checker.git_tree_blob(ROOT, base_tree, design_path)
-    if design_binding is None:
-        raise AssertionError("test approved design must be present in HEAD tree")
-    design_blob, design_bytes = design_binding
+    design_digest = _AMENDMENT_2_APPROVED_DESIGN["sha256"]
     selected_head = git("rev-parse", "HEAD")
     source_selection = signed(
         {
@@ -2183,14 +3251,7 @@ def _make_default_wave_arguments(directory: Path) -> list[str]:
             "repositoryIdentity": QinaoWaveAuthorityGateTests.REPOSITORY_IDENTITY,
             "selectedHEAD": selected_head,
             "selectedTree": base_tree,
-            "approvedDesign": {
-                "path": design_path,
-                "commit": selected_head,
-                "tree": base_tree,
-                "blob": design_blob,
-                "byteLength": len(design_bytes),
-                "sha256": design_digest,
-            },
+            "approvedDesign": copy.deepcopy(_AMENDMENT_2_APPROVED_DESIGN),
             "candidateComparisons": [
                 {
                     "candidateID": "selected-worktree",
@@ -2204,9 +3265,7 @@ def _make_default_wave_arguments(directory: Path) -> list[str]:
                     "untrackedRows": [],
                 }
             ],
-            "reviewerPrincipal": (
-                QinaoWaveAuthorityGateTests.SOURCE_SELECTION_KEY_ID
-            ),
+            "reviewerPrincipal": (QinaoWaveAuthorityGateTests.SOURCE_SELECTION_KEY_ID),
             "reviewerRole": "source-selector",
             "issuedAt": QinaoWaveAuthorityGateTests.ISSUED_AT,
             "expiresAt": QinaoWaveAuthorityGateTests.EXPIRES_AT,
@@ -2279,10 +3338,139 @@ def _make_default_wave_arguments(directory: Path) -> list[str]:
 class QinaoStrictEd25519AndTrustRootTests(unittest.TestCase):
     """Critical RED coverage for strict signature and role separation."""
 
+    def test_termination_never_reaps_leader_before_final_group_kill(
+        self,
+    ) -> None:
+        events: list[object] = []
+
+        class Stream:
+            def close(self) -> None:
+                events.append("close")
+
+        class Process:
+            pid = 424_242
+            stdout = Stream()
+            stderr = Stream()
+
+            def wait(self, *, timeout: float) -> int:
+                events.append(("wait", timeout))
+                return 0
+
+            def kill(self) -> None:
+                events.append("kill")
+
+        def observe_killpg(_pid: int, signal_value: int) -> None:
+            events.append(("killpg", signal_value))
+
+        with (
+            mock.patch.object(
+                checker,
+                "killpg",
+                side_effect=observe_killpg,
+            ),
+            mock.patch.object(
+                checker,
+                "waitid",
+                create=True,
+                return_value=object(),
+            ),
+            mock.patch.object(
+                checker,
+                "sleep",
+                create=True,
+            ),
+        ):
+            checker.terminate_process_group(Process(), grace_seconds=0.01)
+
+        kill_index = events.index(("killpg", signal.SIGKILL))
+        wait_index = next(
+            index
+            for index, event in enumerate(events)
+            if isinstance(event, tuple) and event[0] == "wait"
+        )
+        self.assertLess(kill_index, wait_index, events)
+
+    def test_bounded_subprocess_kills_pipe_holding_descendants(self) -> None:
+        if not hasattr(os, "fork") or not hasattr(os, "killpg"):
+            self.skipTest("process-group descendant test requires POSIX fork/killpg")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tool = root / "git"
+            parent_pid_path = root / "hanging-owner-parent.pid"
+            child_pid_path = root / "hanging-owner-child.pid"
+            tool.write_text(
+                f"""#!{sys.executable}
+import os
+from pathlib import Path
+import signal
+import time
+parent_path = Path(os.environ["HANGING_PARENT_PID"])
+child_path = Path(os.environ["HANGING_CHILD_PID"])
+parent_path.write_text(str(os.getpid()), encoding="ascii")
+child = os.fork()
+if child == 0:
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    child_path.write_text(str(os.getpid()), encoding="ascii")
+    while True:
+        print("pipe held", flush=True)
+        time.sleep(0.02)
+while True:
+    time.sleep(0.02)
+""",
+                encoding="utf-8",
+            )
+            tool.chmod(0o755)
+            environment = {
+                "PATH": str(root),
+                "HANGING_PARENT_PID": str(parent_pid_path),
+                "HANGING_CHILD_PID": str(child_pid_path),
+            }
+
+            def force_cleanup() -> None:
+                if not parent_pid_path.exists():
+                    return
+                try:
+                    os.killpg(
+                        int(parent_pid_path.read_text(encoding="ascii")),
+                        signal.SIGKILL,
+                    )
+                except (ProcessLookupError, PermissionError, ValueError):
+                    pass
+
+            self.addCleanup(force_cleanup)
+            started = time.monotonic()
+            real_popen = subprocess.Popen
+
+            def launch_hanging_process(_command, **kwargs):
+                kwargs["env"] = environment
+                return real_popen([sys.executable, str(tool)], **kwargs)
+
+            with mock.patch.object(
+                checker.subprocess,
+                "Popen",
+                side_effect=launch_hanging_process,
+            ):
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    checker.run_bounded_process(
+                        ["git", "cat-file", "-t", "a" * 7],
+                        cwd=root,
+                        timeout_seconds=1.0,
+                        termination_grace_seconds=0.10,
+                        stdout_limit_bytes=1024,
+                        stderr_limit_bytes=1024,
+                        text=True,
+                    )
+            self.assertLess(time.monotonic() - started, 3.0)
+            self.assertTrue(child_pid_path.is_file())
+            child_pid = int(child_pid_path.read_text(encoding="ascii"))
+            self.assertTrue(
+                _wait_for_pid_exit(child_pid),
+                "descendant remained after timeout",
+            )
+
     def test_rfc8032_ed25519_vector_verifies(self) -> None:
         public_key = bytes.fromhex(
-            "d75a980182b10ab7d54bfed3c964073a"
-            "0ee172f3daa62325af021a68f707511a"
+            "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
         )
         signature = bytes.fromhex(
             "e5564300c360ac729086e2cc806e828a"
@@ -2291,9 +3479,7 @@ class QinaoStrictEd25519AndTrustRootTests(unittest.TestCase):
             "d25bf5f0595bbe24655141438e7a100b"
         )
 
-        self.assertTrue(
-            checker.verify_ed25519_signature(public_key, b"", signature)
-        )
+        self.assertTrue(checker.verify_ed25519_signature(public_key, b"", signature))
 
     def test_tree_object_cannot_masquerade_as_selected_commit(self) -> None:
         tree = subprocess.run(
@@ -2336,8 +3522,8 @@ class QinaoStrictEd25519AndTrustRootTests(unittest.TestCase):
 
     def test_git_object_checks_fail_closed_on_timeout(self) -> None:
         with mock.patch.object(
-            checker.subprocess,
-            "run",
+            checker,
+            "run_bounded_process",
             side_effect=subprocess.TimeoutExpired(["git"], 30),
         ):
             self.assertIsNone(checker.git_commit_tree(ROOT, "a" * 40))
@@ -2405,9 +3591,7 @@ class QinaoStrictEd25519AndTrustRootTests(unittest.TestCase):
         default_scopes = {
             "source-selector": "QinaoDualSpaceSourceSelectionV1",
             "root-admission-signer": "QinaoRootAdmissionReceiptV1",
-            (
-                "design-edge-admission-signer"
-            ): "QinaoDesignEdgeAdmissionReceiptV1",
+            ("design-edge-admission-signer"): "QinaoDesignEdgeAdmissionReceiptV1",
             "wave-bundle-reviewer": "QinaoWaveCategoryEvidenceV1",
             "wave-admission-signer": "QinaoWaveAdmissionReceiptV1",
             "k4-evidence-signer": "QinaoK4PhysicalDeviceProfileV1",
@@ -2539,10 +3723,7 @@ class QinaoStrictEd25519AndTrustRootTests(unittest.TestCase):
             root_errors,
         )
         self.assertTrue(
-            any(
-                "issuedAt" in error and "future" in error
-                for error in document_errors
-            ),
+            any("issuedAt" in error and "future" in error for error in document_errors),
             document_errors,
         )
 
@@ -2596,9 +3777,9 @@ class QinaoStrictEd25519AndTrustRootTests(unittest.TestCase):
         }
         raw_signed = {
             **unsigned,
-            "signature": base64.b64encode(
-                _test_ed25519_sign(seed, canonical)
-            ).decode("ascii"),
+            "signature": base64.b64encode(_test_ed25519_sign(seed, canonical)).decode(
+                "ascii"
+            ),
         }
 
         self.assertEqual(
@@ -2613,13 +3794,13 @@ class QinaoStrictEd25519AndTrustRootTests(unittest.TestCase):
             [],
         )
         raw_errors = checker.validate_signed_document(
-                raw_signed,
-                trust_root,
+            raw_signed,
+            trust_root,
             expected_role="root-admission-signer",
             label="raw preimage",
             expected_schema_scope="QinaoRootAdmissionReceiptV1",
             verification_time=VERIFICATION_TIME,
-            )
+        )
         self.assertTrue(
             any("signature is invalid" in error for error in raw_errors),
             raw_errors,
@@ -2642,9 +3823,7 @@ class QinaoStrictEd25519AndTrustRootTests(unittest.TestCase):
             capture_output=True,
             text=True,
         ).stdout.strip()
-        trust_root = self.trust_root(
-            [self.trust_key(seed, key_id, "source-selector")]
-        )
+        trust_root = self.trust_root([self.trust_key(seed, key_id, "source-selector")])
         unsigned_selection = {
             "schemaVersion": 1,
             "repositoryIdentity": trust_root["repositoryIdentity"],
@@ -2661,8 +3840,7 @@ class QinaoStrictEd25519AndTrustRootTests(unittest.TestCase):
                 "blob": "bbc586cb5787d872f8980f95a766f8afa90f9221",
                 "byteLength": 113470,
                 "sha256": (
-                    "50338e28492cd8dc7a81f28a07a871d70f02020af"
-                    "56549cb1384b9431bd5fcf6"
+                    "50338e28492cd8dc7a81f28a07a871d70f02020af56549cb1384b9431bd5fcf6"
                 ),
             },
             "candidateComparisons": [
@@ -2725,17 +3903,52 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
         self.temp_directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_directory.cleanup)
         self.directory = Path(self.temp_directory.name)
+        self.root = self.directory / "repository"
+        self.root.mkdir()
+        subprocess.run(
+            ["git", "init", "-q"],
+            cwd=self.root,
+            check=True,
+        )
+        real_git_common = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        real_git_common_path = Path(real_git_common)
+        if not real_git_common_path.is_absolute():
+            real_git_common_path = (ROOT / real_git_common_path).resolve()
+        self.real_object_directory = real_git_common_path / "objects"
+        self.temporary_object_directory = self.root / ".git/objects"
+        alternates = self.temporary_object_directory / "info/alternates"
+        alternates.parent.mkdir(parents=True, exist_ok=True)
+        alternates.write_text(
+            f"{self.real_object_directory}\n",
+            encoding="utf-8",
+        )
+        self.git_environment = _isolated_git_environment(
+            os.environ,
+            object_directory=self.temporary_object_directory,
+            alternate_object_directory=self.real_object_directory,
+        )
+        self.base_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        self.git("symbolic-ref", "HEAD", "refs/heads/qinao-test-base")
+        self.git(
+            "update-ref",
+            "refs/heads/qinao-test-base",
+            self.base_commit,
+        )
         self.base_tree = self.git("rev-parse", "HEAD^{tree}")
         self.candidate_tree = self.base_tree
-        self.design_digest = hashlib.sha256(self.DESIGN_PATH.read_bytes()).hexdigest()
-        design_binding = checker.git_tree_blob(
-            ROOT,
-            self.base_tree,
-            self.DESIGN_PATH.relative_to(ROOT).as_posix(),
-        )
-        self.assertIsNotNone(design_binding)
-        assert design_binding is not None
-        self.design_blob, self.design_bytes = design_binding
+        self.design_digest = _AMENDMENT_2_APPROVED_DESIGN["sha256"]
         self.empty_diff_root = hashlib.sha256(_canonical_test_json([])).hexdigest()
         source_public_key, _prefix, _scalar = _test_ed25519_key(
             self.SOURCE_SELECTION_SEED
@@ -2786,21 +3999,14 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             {
                 "schemaVersion": 1,
                 "repositoryIdentity": self.REPOSITORY_IDENTITY,
-                "selectedHEAD": self.git("rev-parse", "HEAD"),
+                "selectedHEAD": self.base_commit,
                 "selectedTree": self.base_tree,
-                "approvedDesign": {
-                    "path": self.DESIGN_PATH.relative_to(ROOT).as_posix(),
-                    "commit": self.git("rev-parse", "HEAD"),
-                    "tree": self.base_tree,
-                    "blob": self.design_blob,
-                    "byteLength": len(self.design_bytes),
-                    "sha256": self.design_digest,
-                },
+                "approvedDesign": copy.deepcopy(_AMENDMENT_2_APPROVED_DESIGN),
                 "candidateComparisons": [
                     {
                         "candidateID": "selected-worktree",
-                        "comparisonBaseHEAD": self.git("rev-parse", "HEAD"),
-                        "head": self.git("rev-parse", "HEAD"),
+                        "comparisonBaseHEAD": self.base_commit,
+                        "head": self.base_commit,
                         "tree": self.base_tree,
                         "selected": True,
                         "committedRows": [],
@@ -2823,15 +4029,60 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             for category in ("create", "extension", "adapter", "fixture")
         }
 
-    @staticmethod
-    def git(*arguments: str) -> str:
+    def test_temporary_git_environment_drops_repository_locator_overrides(
+        self,
+    ) -> None:
+        poisoned = {
+            "HOME": "/test-only/home",
+            "GIT_DIR": "/attacker/repository.git",
+            "GIT_WORK_TREE": "/attacker/worktree",
+            "GIT_INDEX_FILE": "/attacker/index",
+            "GIT_COMMON_DIR": "/attacker/common",
+            "GIT_CEILING_DIRECTORIES": "/attacker/ceiling",
+            "GIT_OBJECT_DIRECTORY": "/attacker/objects",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES": "/attacker/alternates",
+        }
+
+        isolated = _isolated_git_environment(
+            poisoned,
+            object_directory=self.temporary_object_directory,
+            alternate_object_directory=self.real_object_directory,
+        )
+
+        self.assertEqual(isolated["HOME"], "/test-only/home")
+        for name in (
+            "GIT_DIR",
+            "GIT_WORK_TREE",
+            "GIT_INDEX_FILE",
+            "GIT_COMMON_DIR",
+            "GIT_CEILING_DIRECTORIES",
+        ):
+            self.assertNotIn(name, isolated)
+        self.assertEqual(
+            isolated["GIT_OBJECT_DIRECTORY"],
+            str(self.temporary_object_directory),
+        )
+        self.assertEqual(
+            isolated["GIT_ALTERNATE_OBJECT_DIRECTORIES"],
+            str(self.real_object_directory),
+        )
+
+    def git(self, *arguments: str) -> str:
         return subprocess.run(
             ["git", *arguments],
-            cwd=ROOT,
+            cwd=self.root,
+            env=self.git_environment,
             check=True,
             capture_output=True,
             text=True,
         ).stdout.strip()
+
+    def assert_temporary_object(self, object_id: str) -> None:
+        object_path = self.temporary_object_directory / object_id[:2] / object_id[2:]
+        self.assertTrue(
+            object_path.is_file(),
+            f"new Git object escaped the temporary object DB: {object_id}",
+        )
 
     def signed(self, value: dict, *, seed: bytes | None = None) -> dict:
         signed = copy.deepcopy(value)
@@ -2866,9 +4117,7 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
                 "productionDiffRoot": self.empty_diff_root,
                 "reviewedRows": rows,
                 "reviewedRowsRoot": hashlib.sha256(
-                    _canonical_test_json(
-                        sorted(rows, key=_canonical_test_json)
-                    )
+                    _canonical_test_json(sorted(rows, key=_canonical_test_json))
                 ).hexdigest(),
                 "anchors": [] if anchors is None else anchors,
                 "reason": (
@@ -2904,7 +4153,7 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             sys.executable,
             str(SCRIPT),
             "--root",
-            str(ROOT),
+            str(self.root),
             "--ledger",
             str(LEDGER),
             "--source-selection",
@@ -2931,10 +4180,12 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             str(paths["fixture"]),
         ]
 
-    def run_gate(self, command: list[str] | None = None) -> subprocess.CompletedProcess[str]:
+    def run_gate(
+        self, command: list[str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             self.command() if command is None else command,
-            cwd=ROOT,
+            cwd=self.root,
             capture_output=True,
             text=True,
             check=False,
@@ -2946,20 +4197,43 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
         mutation(document)
         self.documents[category] = self.signed(document)
 
+    def mutate_source_selection(self, mutation: Callable[[dict], None]) -> None:
+        document = copy.deepcopy(self.source_selection)
+        document.pop("signature")
+        mutation(document)
+        self.source_selection = self.signed(
+            document,
+            seed=self.SOURCE_SELECTION_SEED,
+        )
+
+    def source_selection_errors(self) -> list[str]:
+        return checker.validate_source_selection(
+            self.source_selection,
+            self.trust_root,
+            root=self.root,
+            verification_time=VERIFICATION_TIME,
+        )
+
     def candidate_tree_with_blob(self, path: str, contents: bytes) -> str:
-        object_id = subprocess.run(
-            ["git", "hash-object", "-w", "--stdin"],
-            cwd=ROOT,
-            input=contents,
-            check=True,
-            capture_output=True,
-        ).stdout.decode("ascii").strip()
+        object_id = (
+            subprocess.run(
+                ["git", "hash-object", "-w", "--stdin"],
+                cwd=self.root,
+                env=self.git_environment,
+                input=contents,
+                check=True,
+                capture_output=True,
+            )
+            .stdout.decode("ascii")
+            .strip()
+        )
+        self.assert_temporary_object(object_id)
         index = self.directory / "index"
-        environment = dict(os.environ)
+        environment = dict(self.git_environment)
         environment["GIT_INDEX_FILE"] = str(index)
         subprocess.run(
             ["git", "read-tree", self.base_tree],
-            cwd=ROOT,
+            cwd=self.root,
             env=environment,
             check=True,
         )
@@ -2971,18 +4245,1181 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
                 "--cacheinfo",
                 f"100644,{object_id},{path}",
             ],
-            cwd=ROOT,
+            cwd=self.root,
             env=environment,
             check=True,
         )
-        return subprocess.run(
+        tree = subprocess.run(
             ["git", "write-tree"],
-            cwd=ROOT,
+            cwd=self.root,
             env=environment,
             check=True,
             capture_output=True,
             text=True,
         ).stdout.strip()
+        self.assert_temporary_object(tree)
+        return tree
+
+    def candidate_tree_with_entry(
+        self,
+        path: str,
+        contents: bytes,
+        *,
+        mode: str,
+    ) -> tuple[str, str]:
+        object_id = (
+            subprocess.run(
+                ["git", "hash-object", "-w", "--stdin"],
+                cwd=self.root,
+                env=self.git_environment,
+                input=contents,
+                check=True,
+                capture_output=True,
+            )
+            .stdout.decode("ascii")
+            .strip()
+        )
+        self.assert_temporary_object(object_id)
+        tree = self.candidate_tree_with_object(
+            path,
+            object_id,
+            mode=mode,
+        )
+        return tree, object_id
+
+    def candidate_tree_with_object(
+        self,
+        path: str,
+        object_id: str,
+        *,
+        mode: str,
+    ) -> str:
+        index = self.directory / f"index-{hashlib.sha256(path.encode()).hexdigest()}"
+        environment = dict(self.git_environment)
+        environment["GIT_INDEX_FILE"] = str(index)
+        subprocess.run(
+            ["git", "read-tree", self.base_tree],
+            cwd=self.root,
+            env=environment,
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                f"{mode},{object_id},{path}",
+            ],
+            cwd=self.root,
+            env=environment,
+            check=True,
+        )
+        tree = subprocess.run(
+            ["git", "write-tree"],
+            cwd=self.root,
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        self.assert_temporary_object(tree)
+        return tree
+
+    def candidate_commit(self, tree: str) -> str:
+        environment = dict(self.git_environment)
+        environment.update(
+            {
+                "GIT_AUTHOR_NAME": "Qinao Test",
+                "GIT_AUTHOR_EMAIL": "qinao-test@example.invalid",
+                "GIT_AUTHOR_DATE": "2026-07-29T00:00:00Z",
+                "GIT_COMMITTER_NAME": "Qinao Test",
+                "GIT_COMMITTER_EMAIL": "qinao-test@example.invalid",
+                "GIT_COMMITTER_DATE": "2026-07-29T00:00:00Z",
+            }
+        )
+        commit = subprocess.run(
+            [
+                "git",
+                "commit-tree",
+                tree,
+                "-p",
+                self.git("rev-parse", "HEAD"),
+                "-m",
+                "test-only candidate",
+            ],
+            cwd=self.root,
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        self.assert_temporary_object(commit)
+        return commit
+
+    def test_candidate_git_objects_are_written_only_to_temporary_object_db(
+        self,
+    ) -> None:
+        tree, blob = self.candidate_tree_with_entry(
+            "SampleHost/TestOnlyCandidateObjectIsolation/value.txt",
+            b"unique candidate object isolation bytes\n",
+            mode="100644",
+        )
+        commit = self.candidate_commit(tree)
+
+        self.assertNotEqual(
+            self.temporary_object_directory.resolve(),
+            self.real_object_directory.resolve(),
+        )
+        self.assertEqual(
+            self.git_environment["GIT_OBJECT_DIRECTORY"],
+            str(self.temporary_object_directory),
+        )
+        self.assertEqual(
+            self.git_environment["GIT_ALTERNATE_OBJECT_DIRECTORIES"],
+            str(self.real_object_directory),
+        )
+        for object_id in (blob, tree, commit):
+            self.assert_temporary_object(object_id)
+
+    def test_extensionless_authority_symlink_tree_row_fails_closed(
+        self,
+    ) -> None:
+        paths = (
+            "FourthPackage/Sources/DirectoryLink",
+            "BehavioralAISubstrate/DeviceTestApp/Sources/DirectoryLink",
+            "FourthPackage/Sources/Vendor/DirectoryLink",
+            "FourthPackage/Sources/.build/DirectoryLink",
+            "BehavioralAISubstrate/Cargo/layercore/src/GeneratedLink",
+        )
+        ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
+        for path in paths:
+            with self.subTest(path=path):
+                candidate_tree, _blob = self.candidate_tree_with_entry(
+                    path,
+                    b"../Elsewhere",
+                    mode="120000",
+                )
+                diff_rows, diff_errors = checker.git_tree_diff(
+                    self.root,
+                    self.base_tree,
+                    candidate_tree,
+                )
+                self.assertEqual(diff_errors, [])
+                self.assertEqual(
+                    next(row["newMode"] for row in diff_rows if row["path"] == path),
+                    "120000",
+                )
+
+                _categorized, errors = checker.derive_authority_rows(
+                    diff_rows,
+                    ledger,
+                )
+
+                self.assertTrue(
+                    any(
+                        path in error
+                        and "authority namespace" in error
+                        and "regular tracked file" in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+    def test_regular_authority_entries_across_supported_topologies_are_governed(
+        self,
+    ) -> None:
+        cases = (
+            (
+                "BehavioralAISubstrate/DeviceTestApp/Sources/BASStateCommitStore.swift",
+                "100644",
+                "extension",
+            ),
+            (
+                "BehavioralAISubstrate/Cargo/layercore/src/authority.rs",
+                "100755",
+                "extension",
+            ),
+            (
+                "BehavioralAISubstrate/Cargo/layercore/tests/integration.rs",
+                "100644",
+                "fixture",
+            ),
+            (
+                "BehavioralAISubstrate/Cargo/layercore/benches/throughput",
+                "100755",
+                "fixture",
+            ),
+            (
+                "FourthPackage/Sources/ExtensionlessAuthority",
+                "100644",
+                "extension",
+            ),
+            (
+                "QinaoRuntimeSDK/Sources/Vendor/authority.cpp",
+                "100644",
+                "extension",
+            ),
+            (
+                "QinaoRuntimeSDK/Sources/.build/authority.metal",
+                "100644",
+                "extension",
+            ),
+            (
+                "BehavioralAISubstrate/DeviceTestApp/Resources/model.bin",
+                "100644",
+                "extension",
+            ),
+            (
+                "BehavioralAISubstrate/Plugins/BuildTool/plugin.swift",
+                "100644",
+                "extension",
+            ),
+            (
+                "BehavioralAISubstrate/Vendor/Runtime/runtime.h",
+                "100644",
+                "extension",
+            ),
+            (
+                "SampleHost/Resources/Info.plist",
+                "100644",
+                "extension",
+            ),
+            (
+                "BehavioralAISubstrate/DeviceTestApp/"
+                "BASDeviceTest.xcodeproj/project.xcworkspace/"
+                "contents.xcworkspacedata",
+                "100644",
+                "extension",
+            ),
+            (
+                "BehavioralAISubstrate/DeviceTestApp/"
+                "BASDeviceTest.xcodeproj/xcshareddata/xcschemes/"
+                "BASDeviceTestApp.xcscheme",
+                "100644",
+                "extension",
+            ),
+        )
+        ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
+        for path, mode, expected_category in cases:
+            with self.subTest(path=path, mode=mode):
+                candidate_tree, _object_id = self.candidate_tree_with_entry(
+                    path,
+                    b"test-only governed authority entry\n",
+                    mode=mode,
+                )
+                diff_rows, diff_errors = checker.git_tree_diff(
+                    self.root,
+                    self.base_tree,
+                    candidate_tree,
+                )
+                self.assertEqual(diff_errors, [])
+
+                categorized, errors = checker.derive_authority_rows(
+                    diff_rows,
+                    ledger,
+                )
+
+                governed_rows = [
+                    row
+                    for rows in categorized.values()
+                    for row in rows
+                    if row["path"] == path
+                ]
+                self.assertEqual(len(governed_rows), 1, (categorized, errors))
+                self.assertEqual(
+                    categorized[expected_category][0]["path"],
+                    path,
+                )
+                if expected_category == "extension":
+                    self.assertTrue(
+                        any("unknown or ambiguous owner" in error for error in errors),
+                        errors,
+                    )
+                else:
+                    self.assertEqual(errors, [])
+
+    def test_vendor_swiftpm_source_anchor_locks_production_kind_and_rows(
+        self,
+    ) -> None:
+        paths = (
+            "BehavioralAISubstrate/Vendor/swift-transformers/"
+            "Sources/Tokenizers/Tests/Evil.swift",
+            "BehavioralAISubstrate/Vendor/swift-transformers/"
+            "Sources/Tokenizers/Fixtures/Evil.swift",
+            "BehavioralAISubstrate/Vendor/swift-transformers/"
+            "Sources/Tokenizers/DerivedData/Evil.swift",
+            "BehavioralAISubstrate/Vendor/swift-transformers/"
+            "Sources/Tokenizers/.build/Evil.swift",
+            "BehavioralAISubstrate/Vendor/swift-transformers/"
+            "Sources/Tokenizers/cache.tmp",
+        )
+        ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
+        for path in paths:
+            with self.subTest(path=path):
+                candidate_tree, _object_id = self.candidate_tree_with_entry(
+                    path,
+                    b"test-only nested vendor production entry\n",
+                    mode="100644",
+                )
+                diff_rows, diff_errors = checker.git_tree_diff(
+                    self.root,
+                    self.base_tree,
+                    candidate_tree,
+                )
+                self.assertEqual(diff_errors, [])
+
+                categorized, errors = checker.derive_authority_rows(
+                    diff_rows,
+                    ledger,
+                )
+                scope, scope_error = checker.derive_source_scope(
+                    self.root,
+                    candidate_tree,
+                    path,
+                    "100644",
+                )
+
+                self.assertEqual(checker.authority_path_kind(path), "production")
+                self.assertEqual(scope, "productionSource")
+                self.assertIsNone(scope_error)
+                self.assertEqual(
+                    [row["path"] for row in categorized["extension"]],
+                    [path],
+                )
+                self.assertTrue(
+                    any("unknown or ambiguous owner" in error for error in errors),
+                    errors,
+                )
+
+    def test_vendor_swiftpm_source_anchor_rejects_symlink_and_gitlink(
+        self,
+    ) -> None:
+        cases = (
+            (
+                "BehavioralAISubstrate/Vendor/swift-transformers/"
+                "Sources/Tokenizers/Tests/DirectoryLink",
+                "120000",
+            ),
+            (
+                "BehavioralAISubstrate/Vendor/swift-transformers/"
+                "Sources/Tokenizers/Fixtures/Gitlink",
+                "160000",
+            ),
+        )
+        ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
+        commit = self.candidate_commit(self.base_tree)
+        for path, mode in cases:
+            with self.subTest(path=path, mode=mode):
+                if mode == "120000":
+                    candidate_tree, _object_id = self.candidate_tree_with_entry(
+                        path,
+                        b"../Elsewhere",
+                        mode=mode,
+                    )
+                else:
+                    candidate_tree = self.candidate_tree_with_object(
+                        path,
+                        commit,
+                        mode=mode,
+                    )
+                diff_rows, diff_errors = checker.git_tree_diff(
+                    self.root,
+                    self.base_tree,
+                    candidate_tree,
+                )
+                self.assertEqual(diff_errors, [])
+
+                categorized, errors = checker.derive_authority_rows(
+                    diff_rows,
+                    ledger,
+                )
+                scope, scope_error = checker.derive_source_scope(
+                    self.root,
+                    candidate_tree,
+                    path,
+                    mode,
+                )
+
+                self.assertEqual(checker.authority_path_kind(path), "production")
+                self.assertIsNone(scope)
+                self.assertIn("regular tracked file", scope_error or "")
+                self.assertFalse(
+                    any(
+                        row["path"] == path
+                        for rows in categorized.values()
+                        for row in rows
+                    )
+                )
+                self.assertTrue(
+                    any(
+                        path in error and "regular tracked file" in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+    def test_authority_gitlinks_fail_closed_across_nested_topologies(self) -> None:
+        paths = (
+            "BehavioralAISubstrate/DeviceTestApp/Sources/Gitlink",
+            "BehavioralAISubstrate/Cargo/layercore/src/Gitlink",
+            "FourthPackage/Sources/Vendor/Gitlink",
+            "FourthPackage/Sources/.build/Gitlink",
+        )
+        ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
+        commit = self.candidate_commit(self.base_tree)
+        for path in paths:
+            with self.subTest(path=path):
+                candidate_tree = self.candidate_tree_with_object(
+                    path,
+                    commit,
+                    mode="160000",
+                )
+                diff_rows, diff_errors = checker.git_tree_diff(
+                    self.root,
+                    self.base_tree,
+                    candidate_tree,
+                )
+                self.assertEqual(diff_errors, [])
+
+                _categorized, errors = checker.derive_authority_rows(
+                    diff_rows,
+                    ledger,
+                )
+
+                self.assertTrue(
+                    any(
+                        path in error
+                        and "authority namespace" in error
+                        and "regular tracked file" in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+    def test_components_before_authority_root_remain_outside_boundary(self) -> None:
+        paths = (
+            "Vendor/FourthPackage/Sources/Authority.swift",
+            ".build/FourthPackage/Sources/Authority.swift",
+            ".swiftpm/FourthPackage/Sources/Authority.swift",
+            "DerivedData/FourthPackage/Sources/Authority.swift",
+            "FourthPackage/Vendor/Sources/Authority.swift",
+            "FourthPackage/.build/Sources/Authority.swift",
+            "FourthPackage/.swiftpm/Sources/Authority.swift",
+            "FourthPackage/DerivedData/Sources/Authority.swift",
+            "BehavioralAISubstrate/Cargo/.build/src/authority.rs",
+            "BehavioralAISubstrate/Cargo/Vendor/src/authority.rs",
+            "BehavioralAISubstrate/Cargo/DerivedData/tests/authority.rs",
+            (
+                "BehavioralAISubstrate/Vendor/swift-transformers/"
+                ".build/Sources/Tokenizers/Evil.swift"
+            ),
+            (
+                "BehavioralAISubstrate/Vendor/swift-transformers/"
+                ".swiftpm/Sources/Tokenizers/Evil.swift"
+            ),
+            (
+                "BehavioralAISubstrate/Vendor/swift-transformers/"
+                "DerivedData/Sources/Tokenizers/Evil.swift"
+            ),
+            (
+                "BehavioralAISubstrate/Vendor/swift-transformers/"
+                "Vendor/Sources/Tokenizers/Evil.swift"
+            ),
+        )
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertFalse(checker.is_authority_namespace_path(path))
+                self.assertFalse(checker.is_authority_diff_path(path))
+
+        governed_after_anchor = (
+            "BehavioralAISubstrate/Cargo/layercore/src/Vendor/authority.rs",
+            "BehavioralAISubstrate/Cargo/layercore/include/.build/authority.h",
+        )
+        for path in governed_after_anchor:
+            with self.subTest(path=path):
+                self.assertTrue(checker.is_authority_namespace_path(path))
+                self.assertTrue(checker.is_authority_diff_path(path))
+
+    def test_candidate_blob_budget_charges_one_unique_oid_only_once(self) -> None:
+        path = "SampleHost/TestOnlyCandidateBudget/shared.txt"
+        tree, object_id = self.candidate_tree_with_entry(
+            path,
+            b"shared candidate blob\n",
+            mode="100644",
+        )
+        view = checker.CandidateTreeView(
+            self.root,
+            tree,
+            max_unique_blob_reads=1,
+            max_cached_blob_bytes=1024,
+        )
+        with mock.patch.object(
+            checker,
+            "load_candidate_blob",
+            wraps=checker.load_candidate_blob,
+        ) as observed:
+            first = view.read_text(path, max_bytes=1024, label="shared blob")
+            second = view.read_text(path, max_bytes=1024, label="shared blob")
+
+        self.assertEqual(first, second)
+        self.assertEqual(observed.call_count, 1)
+        self.assertEqual(observed.call_args.args[1], object_id)
+
+    def test_candidate_blob_cap_plus_one_does_not_pollute_cache(self) -> None:
+        path = "SampleHost/TestOnlyCandidateBudget/oversize.txt"
+        tree, object_id = self.candidate_tree_with_entry(
+            path,
+            b"12345",
+            mode="100644",
+        )
+        view = checker.CandidateTreeView(
+            self.root,
+            tree,
+            max_unique_blob_reads=2,
+            max_cached_blob_bytes=4,
+        )
+
+        with self.assertRaisesRegex(
+            checker.ContentViewError,
+            "cumulative candidate blob cache",
+        ):
+            view.read_text(path, max_bytes=5, label="oversize blob")
+
+        self.assertNotIn(object_id, view._blob_cache)
+        self.assertEqual(view.cached_blob_bytes, 0)
+
+    def test_candidate_terminal_blob_failure_is_memoized_per_oid(self) -> None:
+        raw_index = b"100644 blob " + b"1" * 40 + b"\tPackage/Sources/One.swift\0"
+        with mock.patch.object(
+            checker,
+            "load_candidate_tree_index",
+            return_value=raw_index,
+        ):
+            view = checker.CandidateTreeView(
+                self.root,
+                "a" * 40,
+                max_unique_blob_reads=1,
+                max_cached_blob_bytes=1024,
+            )
+        with mock.patch.object(
+            checker,
+            "run_bounded_process",
+            side_effect=OSError("test-only terminal blob failure"),
+        ) as observed:
+            for _attempt in range(2):
+                with self.assertRaises(checker.ContentViewError):
+                    view.read_text(
+                        "Package/Sources/One.swift",
+                        max_bytes=1024,
+                        label="terminal blob",
+                    )
+
+        self.assertEqual(observed.call_count, 1)
+
+    def test_candidate_size_failure_can_retry_with_a_larger_bound(self) -> None:
+        raw_index = b"100644 blob " + b"1" * 40 + b"\tPackage/Sources/One.swift\0"
+        with mock.patch.object(
+            checker,
+            "load_candidate_tree_index",
+            return_value=raw_index,
+        ):
+            view = checker.CandidateTreeView(
+                self.root,
+                "a" * 40,
+                max_unique_blob_reads=1,
+                max_cached_blob_bytes=16,
+                max_attempted_blob_bytes=16,
+            )
+        completed = subprocess.CompletedProcess(
+            ["git", "cat-file", "blob", "1" * 40],
+            0,
+            b"12345",
+            b"",
+        )
+        with mock.patch.object(
+            checker,
+            "run_bounded_process",
+            side_effect=(
+                checker.ProcessOutputLimitExceeded("test-only cap + 1"),
+                completed,
+            ),
+        ) as observed:
+            with self.assertRaises(checker.ContentViewError):
+                view.read_text(
+                    "Package/Sources/One.swift",
+                    max_bytes=4,
+                    label="small blob bound",
+                )
+            contents = view.read_text(
+                "Package/Sources/One.swift",
+                max_bytes=5,
+                label="larger blob bound",
+            )
+
+        self.assertEqual(contents, "12345")
+        self.assertEqual(observed.call_count, 2)
+
+    def test_candidate_attempted_blob_bytes_charge_failures_before_spawn(
+        self,
+    ) -> None:
+        raw_index = (
+            b"100644 blob " + b"1" * 40 + b"\tPackage/Sources/One.swift\0"
+            b"100644 blob " + b"2" * 40 + b"\tPackage/Sources/Two.swift\0"
+        )
+        with mock.patch.object(
+            checker,
+            "load_candidate_tree_index",
+            return_value=raw_index,
+        ):
+            view = checker.CandidateTreeView(
+                self.root,
+                "a" * 40,
+                max_unique_blob_reads=2,
+                max_cached_blob_bytes=16,
+                max_blob_load_attempts=2,
+                max_attempted_blob_bytes=5,
+            )
+        with mock.patch.object(
+            checker,
+            "run_bounded_process",
+            side_effect=checker.ProcessOutputLimitExceeded("test-only oversized blob"),
+        ) as observed:
+            with self.assertRaises(checker.ContentViewError):
+                view.read_text(
+                    "Package/Sources/One.swift",
+                    max_bytes=4,
+                    label="first oversized blob",
+                )
+            with self.assertRaisesRegex(
+                checker.ContentViewError,
+                "attempted candidate blob byte budget",
+            ):
+                view.read_text(
+                    "Package/Sources/Two.swift",
+                    max_bytes=1,
+                    label="second blob",
+                )
+
+        self.assertEqual(observed.call_count, 1)
+
+    def test_candidate_success_settles_attempted_bytes_to_actual_output(
+        self,
+    ) -> None:
+        raw_index = (
+            b"100644 blob " + b"1" * 40 + b"\tPackage/Sources/One.swift\0"
+            b"100644 blob " + b"2" * 40 + b"\tPackage/Sources/Two.swift\0"
+        )
+        with mock.patch.object(
+            checker,
+            "load_candidate_tree_index",
+            return_value=raw_index,
+        ):
+            view = checker.CandidateTreeView(
+                self.root,
+                "a" * 40,
+                max_unique_blob_reads=2,
+                max_cached_blob_bytes=16,
+                max_blob_load_attempts=2,
+                max_attempted_blob_bytes=5,
+            )
+        with mock.patch.object(
+            checker,
+            "load_candidate_blob",
+            return_value=b"1234",
+        ) as observed:
+            self.assertEqual(
+                view.read_text(
+                    "Package/Sources/One.swift",
+                    max_bytes=4,
+                    label="exact reservation",
+                ),
+                "1234",
+            )
+            with self.assertRaisesRegex(
+                checker.ContentViewError,
+                "attempted candidate blob byte budget",
+            ):
+                view.read_text(
+                    "Package/Sources/Two.swift",
+                    max_bytes=1,
+                    label="cap plus one",
+                )
+
+        self.assertEqual(view.attempted_blob_bytes, 4)
+        self.assertEqual(observed.call_count, 1)
+
+    def test_candidate_blob_load_attempt_budget_precedes_spawn(self) -> None:
+        raw_index = (
+            b"100644 blob " + b"1" * 40 + b"\tPackage/Sources/One.swift\0"
+            b"100644 blob " + b"2" * 40 + b"\tPackage/Sources/Two.swift\0"
+        )
+        with mock.patch.object(
+            checker,
+            "load_candidate_tree_index",
+            return_value=raw_index,
+        ):
+            view = checker.CandidateTreeView(
+                self.root,
+                "a" * 40,
+                max_unique_blob_reads=2,
+                max_cached_blob_bytes=16,
+                max_blob_load_attempts=1,
+                max_attempted_blob_bytes=16,
+            )
+        with mock.patch.object(
+            checker,
+            "load_candidate_blob",
+            return_value=b"x",
+        ) as observed:
+            view.read_text(
+                "Package/Sources/One.swift",
+                max_bytes=1,
+                label="first blob",
+            )
+            with self.assertRaisesRegex(
+                checker.ContentViewError,
+                "candidate blob-load attempt budget",
+            ):
+                view.read_text(
+                    "Package/Sources/Two.swift",
+                    max_bytes=1,
+                    label="second blob",
+                )
+
+        self.assertEqual(observed.call_count, 1)
+
+    def test_candidate_blob_default_wall_budget_preserves_git_timeout(
+        self,
+    ) -> None:
+        raw_index = b"100644 blob " + b"1" * 40 + b"\tPackage/Sources/One.swift\0"
+        clock = [0.0]
+        with (
+            mock.patch.object(
+                checker,
+                "load_candidate_tree_index",
+                return_value=raw_index,
+            ),
+            mock.patch.object(
+                checker,
+                "monotonic",
+                side_effect=lambda: clock[0],
+            ),
+        ):
+            view = checker.CandidateTreeView(
+                self.root,
+                "a" * 40,
+                max_unique_blob_reads=1,
+                max_cached_blob_bytes=1,
+            )
+            observed_timeouts: list[float] = []
+
+            def load_tiny_blob(*args, **kwargs) -> bytes:
+                timeout_seconds = kwargs.get("timeout_seconds")
+                if timeout_seconds is None:
+                    self.fail(
+                        "candidate blob loader did not receive its remaining "
+                        "wall-clock timeout"
+                    )
+                observed_timeouts.append(timeout_seconds)
+                return b"x"
+
+            with mock.patch.object(
+                checker,
+                "load_candidate_blob",
+                side_effect=load_tiny_blob,
+            ):
+                contents = view.read_text(
+                    "Package/Sources/One.swift",
+                    max_bytes=1,
+                    label="default wall budget",
+                )
+
+        self.assertEqual(contents, "x")
+        self.assertEqual(
+            observed_timeouts,
+            [30],
+        )
+
+    def test_candidate_blob_wall_deadline_bounds_thousands_of_tiny_loads(
+        self,
+    ) -> None:
+        entry_count = 4_096
+        raw_index = b"".join(
+            (f"100644 blob {index:040x}\tPackage/Sources/{index:04d}.swift\0").encode(
+                "ascii"
+            )
+            for index in range(entry_count)
+        )
+        clock = [0]
+        observed_timeouts: list[float] = []
+
+        def fake_monotonic() -> float:
+            return clock[0] / entry_count
+
+        def load_tiny_blob(*args, **kwargs) -> bytes:
+            timeout_seconds = kwargs.get("timeout_seconds")
+            if timeout_seconds is None:
+                self.fail("candidate blob loader did not receive a bounded timeout")
+            observed_timeouts.append(timeout_seconds)
+            clock[0] += 1
+            return b"x"
+
+        with (
+            mock.patch.object(
+                checker,
+                "load_candidate_tree_index",
+                return_value=raw_index,
+            ),
+            mock.patch.object(
+                checker,
+                "monotonic",
+                side_effect=fake_monotonic,
+            ),
+        ):
+            try:
+                view = checker.CandidateTreeView(
+                    self.root,
+                    "a" * 40,
+                    max_unique_blob_reads=entry_count,
+                    max_cached_blob_bytes=entry_count,
+                    max_blob_load_attempts=entry_count,
+                    max_attempted_blob_bytes=entry_count,
+                    max_blob_wall_seconds=1.0,
+                )
+            except TypeError as error:
+                self.fail(
+                    "CandidateTreeView has no cumulative blob wall-clock "
+                    f"budget: {error}"
+                )
+            with mock.patch.object(
+                checker,
+                "load_candidate_blob",
+                side_effect=load_tiny_blob,
+            ):
+                for index in range(entry_count - 1):
+                    self.assertEqual(
+                        view.read_text(
+                            f"Package/Sources/{index:04d}.swift",
+                            max_bytes=1,
+                            label="tiny candidate blob",
+                        ),
+                        "x",
+                    )
+                clock[0] = entry_count
+                with self.assertRaisesRegex(
+                    checker.ContentViewError,
+                    "wall-clock deadline",
+                ):
+                    view.read_text(
+                        f"Package/Sources/{entry_count - 1:04d}.swift",
+                        max_bytes=1,
+                        label="deadline candidate blob",
+                    )
+
+        self.assertEqual(view.blob_load_attempts, entry_count - 1)
+        self.assertEqual(len(observed_timeouts), entry_count - 1)
+        self.assertEqual(observed_timeouts[0], 1.0)
+        self.assertEqual(observed_timeouts[-1], 2 / 4_096)
+
+    def test_candidate_blob_wall_deadline_rejects_above_outer_bound(
+        self,
+    ) -> None:
+        with mock.patch.object(
+            checker,
+            "load_candidate_tree_index",
+            return_value=b"",
+        ):
+            try:
+                with self.assertRaisesRegex(
+                    checker.ContentViewError,
+                    "wall-clock.*at most 120",
+                ):
+                    checker.CandidateTreeView(
+                        self.root,
+                        "a" * 40,
+                        max_blob_wall_seconds=120.001,
+                    )
+            except TypeError as error:
+                self.fail(
+                    "CandidateTreeView does not validate a standalone wall "
+                    f"clock bound: {error}"
+                )
+
+    def test_default_attempted_blob_budget_includes_all_lookahead_bytes(
+        self,
+    ) -> None:
+        self.assertEqual(
+            checker.MAX_CANDIDATE_ATTEMPTED_BLOB_BYTES,
+            checker.MAX_CANDIDATE_CACHED_BLOB_BYTES
+            + checker.MAX_CANDIDATE_BLOB_LOAD_ATTEMPTS,
+        )
+
+    def test_candidate_unique_blob_read_budget_fails_before_second_read(
+        self,
+    ) -> None:
+        raw_index = (
+            b"100644 blob " + b"1" * 40 + b"\tPackage/Sources/One.swift\0"
+            b"100644 blob " + b"2" * 40 + b"\tPackage/Sources/Two.swift\0"
+        )
+        with mock.patch.object(
+            checker,
+            "load_candidate_tree_index",
+            return_value=raw_index,
+        ):
+            view = checker.CandidateTreeView(
+                self.root,
+                "a" * 40,
+                max_unique_blob_reads=1,
+                max_cached_blob_bytes=1024,
+            )
+        with mock.patch.object(
+            checker,
+            "load_candidate_blob",
+            return_value=b"public struct Value {}\n",
+        ) as observed:
+            view.read_text(
+                "Package/Sources/One.swift",
+                max_bytes=1024,
+                label="first blob",
+            )
+            with self.assertRaisesRegex(
+                checker.ContentViewError,
+                "unique candidate blob-read budget",
+            ):
+                view.read_text(
+                    "Package/Sources/Two.swift",
+                    max_bytes=1024,
+                    label="second blob",
+                )
+
+        self.assertEqual(observed.call_count, 1)
+
+    def test_candidate_glob_budget_rejects_malicious_200k_match_tree(
+        self,
+    ) -> None:
+        raw_index = b"".join(
+            b"100644 blob "
+            + b"1" * 40
+            + f"\tPackage/Sources/File{index:06d}.swift".encode("ascii")
+            + b"\0"
+            for index in range(200_000)
+        )
+        with mock.patch.object(
+            checker,
+            "load_candidate_tree_index",
+            return_value=raw_index,
+        ):
+            view = checker.CandidateTreeView(
+                self.root,
+                "a" * 40,
+                max_glob_matches=64,
+                max_total_glob_matches=128,
+            )
+
+        with self.assertRaisesRegex(
+            checker.ContentViewError,
+            "candidate glob match budget",
+        ):
+            view.glob("Package", "**/*.swift")
+
+    def test_candidate_build_surface_budget_is_fail_closed(self) -> None:
+        class ExcessiveBuildSurfaceView:
+            def glob(self, _base: str, _pattern: str) -> list[str]:
+                return [
+                    f"SampleHost/Generated{index:04d}/Package.swift"
+                    for index in range(checker.MAX_CANDIDATE_BUILD_SURFACES + 1)
+                ]
+
+        with self.assertRaisesRegex(
+            checker.ContentViewError,
+            "candidate build-surface budget",
+        ):
+            checker.owned_production_build_surfaces(
+                ExcessiveBuildSurfaceView(),
+            )
+
+    def test_cli_reads_controlled_documents_only_from_candidate_tree(
+        self,
+    ) -> None:
+        relative_path = checker.EXPECTED_CONTROLLED_DOCUMENTS[0]
+        live = (ROOT / relative_path).read_text(encoding="utf-8")
+        required_term = next(
+            term
+            for term in sorted(checker.MANDATORY_DOCUMENT_SPECIFIC_TERMS[relative_path])
+            if term in live
+        )
+        candidate = live.replace(required_term, "candidate-removed-term", 1)
+        self.candidate_tree = self.candidate_tree_with_blob(
+            relative_path,
+            candidate.encode("utf-8"),
+        )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing required term", result.stderr)
+        self.assertIn(required_term, result.stderr)
+
+    def test_live_only_xcodegen_surface_does_not_affect_candidate_gate(
+        self,
+    ) -> None:
+        relative_path = "SampleHost/TestOnlyCandidateTreeView/project.yml"
+        live_path = self.root / relative_path
+        live_path.parent.mkdir(parents=True, exist_ok=True)
+        live_path.write_text(
+            "targets:\n"
+            "  TestOnly:\n"
+            "    sources:\n"
+            "      - ../../scripts/check_qinao_owner_ledger.py\n",
+            encoding="utf-8",
+        )
+        self.addCleanup(live_path.unlink)
+
+        result = self.run_gate()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_candidate_only_xcodegen_surface_is_audited_when_live_missing(
+        self,
+    ) -> None:
+        relative_path = "SampleHost/TestOnlyCandidateTreeView/project.yml"
+        self.assertFalse((self.root / relative_path).exists())
+        self.candidate_tree = self.candidate_tree_with_blob(
+            relative_path,
+            (
+                "targets:\n"
+                "  TestOnly:\n"
+                "    sources:\n"
+                "      - ../../scripts/check_qinao_owner_ledger.py\n"
+            ).encode("utf-8"),
+        )
+
+        result = self.run_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("audit asset", result.stderr)
+        self.assertIn(relative_path, result.stderr)
+
+    def test_candidate_view_is_immutable_after_live_path_swap(self) -> None:
+        relative_path = "SampleHost/TestOnlyCandidateTreeView/value.txt"
+        candidate_bytes = b"candidate-only bytes\n"
+        tree = self.candidate_tree_with_blob(relative_path, candidate_bytes)
+        view = checker.CandidateTreeView(self.root, tree)
+        live_path = self.root / relative_path
+        live_path.parent.mkdir(parents=True, exist_ok=True)
+        live_path.write_bytes(b"attacker live bytes\n")
+        self.addCleanup(live_path.unlink)
+
+        self.assertEqual(
+            view.read_text(
+                relative_path,
+                max_bytes=1024,
+                label="test-only candidate value",
+            ),
+            candidate_bytes.decode("utf-8"),
+        )
+
+    def test_candidate_validation_performs_no_live_content_path_reads(
+        self,
+    ) -> None:
+        data = json.loads(LEDGER.read_text(encoding="utf-8"))
+        executed_source = SCRIPT.read_text(encoding="utf-8")
+        view = checker.CandidateTreeView(self.root, self.base_tree)
+
+        def forbidden(*_args, **_kwargs):
+            raise AssertionError("candidate validation attempted a live path read")
+
+        with (
+            mock.patch.object(
+                Path,
+                "read_text",
+                new=forbidden,
+            ),
+            mock.patch.object(
+                Path,
+                "is_file",
+                new=forbidden,
+            ),
+            mock.patch.object(
+                Path,
+                "exists",
+                new=forbidden,
+            ),
+            mock.patch.object(
+                Path,
+                "glob",
+                new=forbidden,
+            ),
+        ):
+            errors = checker.validate_ledger(
+                data,
+                self.root,
+                executed_owner_gate_source=executed_source,
+                content_view=view,
+            )
+
+        self.assertEqual(errors, [])
+
+    def test_live_only_history_and_m_paths_remain_absent_in_candidate_view(
+        self,
+    ) -> None:
+        data = json.loads(LEDGER.read_text(encoding="utf-8"))
+        view = checker.CandidateTreeView(self.root, self.base_tree)
+        m_path = next(
+            permission["allowed_paths"][0]
+            for permission in data["create_permissions"]
+            if permission["owner_id"] == "execution.state-abi"
+        )
+        history_path = checker.HISTORY_DOCTRINE_AUDIT_PATHS[0]
+        for relative_path in (m_path, history_path):
+            self.assertFalse(view.is_file(relative_path))
+            live_path = self.root / relative_path
+            live_path.parent.mkdir(parents=True, exist_ok=True)
+            live_path.write_text("test-only live substitution\n", encoding="utf-8")
+            self.addCleanup(live_path.unlink)
+
+        errors = checker.validate_ledger(
+            data,
+            self.root,
+            executed_owner_gate_source=SCRIPT.read_text(encoding="utf-8"),
+            content_view=view,
+        )
+
+        self.assertFalse(
+            any("approved_missing" in error for error in errors),
+            errors,
+        )
+        self.assertFalse(
+            any("cannot coexist with BASHistoryAudit" in error for error in errors),
+            errors,
+        )
+
+    def test_live_only_evidence_path_is_absent_from_candidate_view(self) -> None:
+        data = json.loads(LEDGER.read_text(encoding="utf-8"))
+        relative_path = "SampleHost/Sources/TestOnlyCandidateTreeViewEvidence.swift"
+        live_path = self.root / relative_path
+        live_path.parent.mkdir(parents=True, exist_ok=True)
+        live_path.write_text("public struct LiveOnlyEvidence {}\n", encoding="utf-8")
+        self.addCleanup(live_path.unlink)
+        mutated = copy.deepcopy(data)
+        mutated["owners"][0]["evidence_paths"].append(relative_path)
+        view = checker.CandidateTreeView(self.root, self.base_tree)
+
+        errors = checker.validate_ledger(
+            mutated,
+            self.root,
+            executed_owner_gate_source=SCRIPT.read_text(encoding="utf-8"),
+            content_view=view,
+        )
+
+        self.assertTrue(
+            any(
+                f"evidence path does not exist: {relative_path}" in error
+                for error in errors
+            ),
+            errors,
+        )
 
     def test_all_required_wave_arguments_are_accepted_and_valid_w0_passes(self) -> None:
         result = self.run_gate()
@@ -2992,6 +5429,1124 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
         self.assertIn("extension=0", result.stdout)
         self.assertIn("adapter=0", result.stdout)
         self.assertIn("fixture=0", result.stdout)
+
+    def test_source_selection_requires_the_frozen_approved_design_tuple(self) -> None:
+        design_path = self.DESIGN_PATH.relative_to(ROOT).as_posix()
+        design_binding = checker.git_tree_blob(ROOT, self.base_tree, design_path)
+        self.assertIsNotNone(design_binding)
+        assert design_binding is not None
+        design_blob, design_bytes = design_binding
+
+        self.mutate_source_selection(
+            lambda document: document.__setitem__(
+                "approvedDesign",
+                {
+                    "path": design_path,
+                    "commit": self.git("rev-parse", "HEAD"),
+                    "tree": self.base_tree,
+                    "blob": design_blob,
+                    "byteLength": len(design_bytes),
+                    "sha256": hashlib.sha256(design_bytes).hexdigest(),
+                },
+            )
+        )
+
+        errors = self.source_selection_errors()
+
+        self.assertTrue(
+            any(
+                "approvedDesign must equal the frozen tuple" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_source_selection_rederives_complete_committed_rows(self) -> None:
+        self.mutate_source_selection(
+            lambda document: document["candidateComparisons"][0].__setitem__(
+                "committedRows",
+                [
+                    {
+                        "path": "SampleHost/Sources/Forged.swift",
+                        "change": "add",
+                        "scope": "productionSource",
+                    }
+                ],
+            )
+        )
+
+        errors = self.source_selection_errors()
+
+        self.assertTrue(
+            any(
+                "committedRows do not match Git derivation" in error for error in errors
+            ),
+            errors,
+        )
+
+    def test_source_selection_rejects_dirty_nonselected_comparison(self) -> None:
+        def add_dirty_nonselected(document: dict) -> None:
+            comparison = copy.deepcopy(document["candidateComparisons"][0])
+            comparison["candidateID"] = "nonselected-worktree"
+            comparison["selected"] = False
+            comparison["untrackedRows"] = [
+                {
+                    "path": "scratch.txt",
+                    "change": "untracked",
+                    "scope": "other",
+                }
+            ]
+            document["candidateComparisons"].append(comparison)
+            document["candidateComparisons"].sort(key=_canonical_test_json)
+
+        self.mutate_source_selection(add_dirty_nonselected)
+
+        errors = self.source_selection_errors()
+
+        self.assertTrue(
+            any(
+                "candidateComparisons[" in error
+                and "untrackedRows must be empty" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_git_committed_rows_are_nul_derived_and_rfc8785_sorted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def git(*arguments: str) -> str:
+                completed = subprocess.run(
+                    ["git", *arguments],
+                    cwd=root,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                return completed.stdout.strip()
+
+            git("init", "-q")
+            git("config", "user.email", "test-only@example.invalid")
+            git("config", "user.name", "Qinao Test Only")
+            workflow = root / ".github/workflows/qinao-wave-admission.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text("name: base\n", encoding="utf-8")
+            git("add", ".github/workflows/qinao-wave-admission.yml")
+            git("commit", "-qm", "test-only base")
+            base_tree = git("rev-parse", "HEAD^{tree}")
+            workflow.write_text("name: candidate\n", encoding="utf-8")
+            fixture = (
+                root / "scripts/fixtures/qinao_admission_canonical_vectors_v1.json"
+            )
+            fixture.parent.mkdir(parents=True)
+            fixture.write_text("{}\n", encoding="utf-8")
+            git("add", ".github/workflows/qinao-wave-admission.yml")
+            git(
+                "add",
+                "scripts/fixtures/qinao_admission_canonical_vectors_v1.json",
+            )
+            candidate_tree = git("write-tree")
+
+            rows, errors = checker.derive_committed_source_rows(
+                root,
+                base_tree,
+                candidate_tree,
+            )
+
+        self.assertEqual(errors, [])
+        self.assertIsNotNone(rows)
+        assert rows is not None
+        self.assertEqual(rows, sorted(rows, key=_canonical_test_json))
+        self.assertIn(
+            {
+                "path": ".github/workflows/qinao-wave-admission.yml",
+                "change": "modify",
+                "scope": "ci",
+            },
+            rows,
+        )
+        self.assertIn(
+            {
+                "path": "scripts/fixtures/qinao_admission_canonical_vectors_v1.json",
+                "change": "add",
+                "scope": "checker",
+            },
+            rows,
+        )
+
+    def test_amendment_2_source_scope_rules_are_closed(self) -> None:
+        cases = {
+            "docs/superpowers/specs/qinao-owner-ledger-v1.json": "ownerLedger",
+            "scripts/check_qinao_owner_ledger.py": "checker",
+            ".github/workflows/qinao.yml": "ci",
+            "BehavioralAISubstrate/Cargo/layercore/Cargo.toml": "productionSource",
+            "BehavioralAISubstrate/Cargo/layercore/src/lib.rs": "productionSource",
+            "BehavioralAISubstrate/Cargo/layercore/include/layer.h": (
+                "productionSource"
+            ),
+            "BehavioralAISubstrate/Cargo/layercore/generated/src/lib.rs": "other",
+            "SampleHost/Sources/App.swift": "productionSource",
+            "SampleHost/README.md": "other",
+            "SampleHost/Tests/AppTests.swift": "other",
+            "SampleHost/.build/generated.swift": "other",
+            "SampleHost/Sources/cache.tmp": "productionSource",
+            "docs/uncontrolled.md": "other",
+        }
+
+        for path, expected_scope in cases.items():
+            with self.subTest(path=path):
+                scope, error = checker.derive_source_scope(
+                    ROOT,
+                    self.base_tree,
+                    path,
+                    "100644",
+                )
+                self.assertIsNone(error)
+                self.assertEqual(scope, expected_scope)
+
+        nested_scope, nested_error = checker.derive_source_scope(
+            ROOT,
+            self.base_tree,
+            ".github/workflows/nested/qinao.yml",
+            "100644",
+        )
+        self.assertIsNone(nested_scope)
+        self.assertIn("nested workflow", nested_error or "")
+
+    def test_authority_predicate_covers_any_top_level_package_and_exclusions(
+        self,
+    ) -> None:
+        authority_paths = (
+            "FourthPackage/Package.swift",
+            "FourthPackage/Sources/Feature.swift",
+            "FourthPackage/Sources/SQL/schema.sql",
+            "FourthPackage/Tests/FeatureTests.swift",
+            "FourthPackage/Fixtures/state.json",
+        )
+        excluded_paths = (
+            ".git/FourthPackage/Tests/Hidden.swift",
+            "Vendor/FourthPackage/Tests/Vendored.swift",
+            "FourthPackage/.build/Tests/Generated.swift",
+            "FourthPackage/DerivedData/Tests/Generated.swift",
+        )
+        for path in authority_paths:
+            with self.subTest(authority=path):
+                self.assertTrue(checker.is_authority_diff_path(path))
+        for path in excluded_paths:
+            with self.subTest(excluded=path):
+                self.assertFalse(checker.is_authority_diff_path(path))
+
+    def test_authority_namespace_is_independent_from_file_extensions(self) -> None:
+        boundary_paths = (
+            "FourthPackage/Sources/DirectoryLink",
+            "FourthPackage/Tests/FixtureDirectory",
+            "FourthPackage/Fixtures/Corpus",
+            "BehavioralAISubstrate/DeviceTestApp/Sources/DirectoryLink",
+            "FourthPackage/Sources/Vendor/DirectoryLink",
+            "FourthPackage/Sources/.build/DirectoryLink",
+            "BehavioralAISubstrate/Cargo/layercore/src/GeneratedLink",
+            "BehavioralAISubstrate/Cargo/layercore/include/GeneratedLink",
+        )
+        excluded_paths = (
+            ".git/FourthPackage/Sources/DirectoryLink",
+            "Vendor/FourthPackage/Sources/DirectoryLink",
+            "FourthPackage/.build/Sources/DirectoryLink",
+            "FourthPackage/DerivedData/Tests/FixtureDirectory",
+        )
+
+        for path in boundary_paths:
+            with self.subTest(boundary=path):
+                self.assertTrue(checker.is_authority_namespace_path(path))
+                self.assertTrue(checker.is_authority_diff_path(path))
+        for path in excluded_paths:
+            with self.subTest(excluded=path):
+                self.assertFalse(checker.is_authority_namespace_path(path))
+
+    def test_authority_namespace_special_mode_fails_source_scope_closed(
+        self,
+    ) -> None:
+        scope, error = checker.derive_source_scope(
+            ROOT,
+            self.base_tree,
+            "FourthPackage/Sources/DirectoryLink",
+            "120000",
+        )
+
+        self.assertIsNone(scope)
+        self.assertIn("authority namespace", error or "")
+        self.assertIn("regular tracked file", error or "")
+
+    def test_workspace_path_normalization_is_strict(self) -> None:
+        self.assertTrue(
+            checker.is_normalized_workspace_path(
+                "BehavioralAISubstrate/Sources/Runtime.swift"
+            )
+        )
+        invalid_paths = (
+            ".",
+            "Sources/./Runtime.swift",
+            "Sources/../Runtime.swift",
+            "Sources//Runtime.swift",
+            "Sources/\x00Runtime.swift",
+            "Sources/\tRuntime.swift",
+            "Sources/\nRuntime.swift",
+            "Sources/\x7fRuntime.swift",
+            "Sources/\x85Runtime.swift",
+            "Sources/Cafe\u0301.swift",
+            "Sources/\ud800.swift",
+        )
+        for path in invalid_paths:
+            with self.subTest(path=repr(path)):
+                self.assertFalse(checker.is_normalized_workspace_path(path))
+
+    def test_git_committed_row_derivation_rejects_non_normalized_raw_paths(
+        self,
+    ) -> None:
+        raw_paths = (
+            b"",
+            b".",
+            b"Sources/./Runtime.swift",
+            b"Sources/\x00Runtime.swift",
+            b"Sources/\tRuntime.swift",
+            b"Sources/\nRuntime.swift",
+            b"Sources/\x7fRuntime.swift",
+            "Sources/\x85Runtime.swift".encode("utf-8"),
+            "Sources/Cafe\u0301.swift".encode("utf-8"),
+            b"Sources/\xff.swift",
+        )
+        metadata = b":000000 100644 " + (b"0" * 40) + b" " + (b"1" * 40) + b" A\0"
+        for raw_path in raw_paths:
+            with self.subTest(raw_path=raw_path):
+                completed = subprocess.CompletedProcess(
+                    ["git", "diff-tree"],
+                    0,
+                    stdout=metadata + raw_path + b"\0",
+                    stderr=b"",
+                )
+                with mock.patch.object(
+                    checker,
+                    "run_bounded_process",
+                    return_value=completed,
+                ):
+                    rows, errors = checker.derive_committed_source_rows(
+                        ROOT,
+                        self.base_tree,
+                        self.base_tree,
+                    )
+
+                self.assertIsNone(rows)
+                self.assertTrue(errors)
+
+    def test_git_committed_row_derivation_rejects_truncated_nul_stream(self) -> None:
+        raw = (
+            b":100644 100644 "
+            + (b"1" * 40)
+            + b" "
+            + (b"2" * 40)
+            + b" M\0scripts/check_qinao_owner_ledger.py"
+        )
+        completed = subprocess.CompletedProcess(
+            ["git", "diff-tree"],
+            0,
+            stdout=raw,
+            stderr=b"",
+        )
+
+        with mock.patch.object(
+            checker,
+            "run_bounded_process",
+            return_value=completed,
+        ):
+            rows, errors = checker.derive_committed_source_rows(
+                ROOT,
+                self.base_tree,
+                self.base_tree,
+            )
+
+        self.assertIsNone(rows)
+        self.assertTrue(
+            any("truncated NUL" in error for error in errors),
+            errors,
+        )
+
+    def test_git_committed_row_derivation_rejects_unknown_status(self) -> None:
+        raw = (
+            b":100644 100644 "
+            + (b"1" * 40)
+            + b" "
+            + (b"2" * 40)
+            + b" X\0scripts/check_qinao_owner_ledger.py\0"
+        )
+        completed = subprocess.CompletedProcess(
+            ["git", "diff-tree"],
+            0,
+            stdout=raw,
+            stderr=b"",
+        )
+
+        with mock.patch.object(
+            checker,
+            "run_bounded_process",
+            return_value=completed,
+        ):
+            rows, errors = checker.derive_committed_source_rows(
+                ROOT,
+                self.base_tree,
+                self.base_tree,
+            )
+
+        self.assertIsNone(rows)
+        self.assertTrue(
+            any("status 'X' is unsupported" in error for error in errors),
+            errors,
+        )
+
+    def test_vendor_descendant_requires_bound_tree_manifest_membership(self) -> None:
+        scope, error = checker.derive_source_scope(
+            ROOT,
+            self.base_tree,
+            "scripts/vendor/qinao_jsonschema_draft202012_v1/jsonschema/__init__.py",
+            "100644",
+        )
+
+        self.assertIsNone(scope)
+        self.assertIn("bound vendor manifest", error or "")
+
+    def test_git_committed_row_derivation_rejects_special_mode_type_change(
+        self,
+    ) -> None:
+        raw = (
+            b":100644 160000 "
+            + (b"1" * 40)
+            + b" "
+            + (b"2" * 40)
+            + b" T\0scripts/check_qinao_owner_ledger.py\0"
+        )
+        completed = subprocess.CompletedProcess(
+            ["git", "diff-tree"],
+            0,
+            stdout=raw,
+            stderr=b"",
+        )
+
+        with mock.patch.object(
+            checker,
+            "run_bounded_process",
+            return_value=completed,
+        ):
+            rows, errors = checker.derive_committed_source_rows(
+                ROOT,
+                self.base_tree,
+                self.base_tree,
+            )
+
+        self.assertIsNone(rows)
+        self.assertTrue(
+            any("special Git mode" in error for error in errors),
+            errors,
+        )
+
+    def test_internal_fixture_predicate_keeps_frozen_test_roots(self) -> None:
+        fixture_paths = (
+            "BehavioralAISubstrate/Tests/LayerCoreTests.swift",
+            "BehavioralAISubstrate/Cargo/layercore/tests/integration.rs",
+            "BehavioralAISubstrate/Cargo/layercore/benches/throughput.rs",
+            "BehavioralAISubstrate/DeviceTestApp/Tests/AppTests.swift",
+            "QinaoRuntimeSDK/Tests/RuntimeTests.swift",
+            "SampleHost/Tests/HostTests.swift",
+            "scripts/fixtures/non-authority-fixture.json",
+        )
+        for path in fixture_paths:
+            with self.subTest(path=path):
+                self.assertTrue(checker._is_internal_fixture_path(path))
+        for path in (
+            "SampleHost/Tests/.hidden.swift",
+            "SampleHost/Tests/Backups/old.swift",
+            "SampleHost/Tests/cache.tmp",
+        ):
+            with self.subTest(path=path):
+                self.assertFalse(checker._is_internal_fixture_path(path))
+
+    def test_draft202012_profile_rejects_scalar_enum(self) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["enum"] = "not-an-array"
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(
+            any("enum must be an array" in error for error in errors), errors
+        )
+
+    def test_draft202012_profile_rejects_nonlocal_ref(self) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["$ref"] = "https://example.invalid/schema"
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(
+            any("$ref must be same-document" in error for error in errors), errors
+        )
+
+    def test_draft202012_profile_rejects_nonlocal_dynamic_ref(self) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["$dynamicRef"] = "qinao://schemas/foreign/1.0.0"
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(
+            any("$dynamicRef must be a local anchor" in error for error in errors),
+            errors,
+        )
+
+    def test_draft202012_profile_rejects_wrong_required_type(self) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["required"] = "value"
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(
+            any(
+                "required must be an array of unique strings" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_draft202012_profile_rejects_wrong_type_keyword_type(self) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["type"] = 7
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(any("type is invalid" in error for error in errors), errors)
+
+    def test_draft202012_profile_rejects_wrong_one_of_type(self) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["oneOf"] = {"type": "string"}
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(
+            any("oneOf must be a schema array" in error for error in errors), errors
+        )
+
+    def test_draft202012_profile_rejects_wrong_dependent_required_type(
+        self,
+    ) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["dependentRequired"] = {"name": "value"}
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(
+            any(
+                "dependentRequired values must be arrays of unique strings" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_draft202012_profile_closes_keyword_value_types(self) -> None:
+        invalid_values = {
+            "$comment": None,
+            "title": 7,
+            "description": [],
+            "deprecated": 0,
+            "readOnly": 1,
+            "writeOnly": "false",
+            "uniqueItems": None,
+            "examples": {},
+            "maximum": "1",
+            "minimum": [],
+            "exclusiveMaximum": None,
+            "exclusiveMinimum": True,
+            "maxContains": "1",
+            "minContains": False,
+            "maxItems": None,
+            "minItems": [],
+            "maxLength": "1",
+            "minLength": True,
+            "maxProperties": {},
+            "minProperties": False,
+            "multipleOf": "1",
+        }
+        for keyword, invalid in invalid_values.items():
+            with self.subTest(keyword=keyword):
+                schema = self.valid_draft202012_profile_schema()
+                schema[keyword] = invalid
+
+                errors = checker.validate_qinao_draft202012_profile(schema)
+
+                self.assertTrue(
+                    any(keyword in error for error in errors),
+                    errors,
+                )
+
+    def test_draft202012_profile_enforces_integer_keyword_boundaries(
+        self,
+    ) -> None:
+        safe = 9007199254740991
+        signed_keywords = (
+            "maximum",
+            "minimum",
+            "exclusiveMaximum",
+            "exclusiveMinimum",
+        )
+        nonnegative_keywords = (
+            "maxContains",
+            "minContains",
+            "maxItems",
+            "minItems",
+            "maxLength",
+            "minLength",
+            "maxProperties",
+            "minProperties",
+        )
+        for keyword in signed_keywords:
+            for accepted in (-safe, -1, 0, 1, safe):
+                with self.subTest(keyword=keyword, accepted=accepted):
+                    schema = self.valid_draft202012_profile_schema()
+                    schema[keyword] = accepted
+                    self.assertEqual(
+                        checker.validate_qinao_draft202012_profile(schema),
+                        [],
+                    )
+            for rejected in (False, True, -safe - 1, safe + 1):
+                with self.subTest(keyword=keyword, rejected=rejected):
+                    schema = self.valid_draft202012_profile_schema()
+                    schema[keyword] = rejected
+                    errors = checker.validate_qinao_draft202012_profile(schema)
+                    self.assertTrue(
+                        any(keyword in error for error in errors),
+                        errors,
+                    )
+        for keyword in nonnegative_keywords:
+            for accepted in (0, 1, safe):
+                with self.subTest(keyword=keyword, accepted=accepted):
+                    schema = self.valid_draft202012_profile_schema()
+                    schema[keyword] = accepted
+                    self.assertEqual(
+                        checker.validate_qinao_draft202012_profile(schema),
+                        [],
+                    )
+            for rejected in (-1, False, True, safe + 1):
+                with self.subTest(keyword=keyword, rejected=rejected):
+                    schema = self.valid_draft202012_profile_schema()
+                    schema[keyword] = rejected
+                    errors = checker.validate_qinao_draft202012_profile(schema)
+                    self.assertTrue(
+                        any(keyword in error for error in errors),
+                        errors,
+                    )
+        for accepted in (1, safe):
+            with self.subTest(keyword="multipleOf", accepted=accepted):
+                schema = self.valid_draft202012_profile_schema()
+                schema["multipleOf"] = accepted
+                self.assertEqual(
+                    checker.validate_qinao_draft202012_profile(schema),
+                    [],
+                )
+        for rejected in (-1, 0, False, True, safe + 1):
+            with self.subTest(keyword="multipleOf", rejected=rejected):
+                schema = self.valid_draft202012_profile_schema()
+                schema["multipleOf"] = rejected
+                errors = checker.validate_qinao_draft202012_profile(schema)
+                self.assertTrue(
+                    any("multipleOf" in error for error in errors),
+                    errors,
+                )
+
+    def test_draft202012_profile_accepts_empty_controls_and_instance_data(
+        self,
+    ) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema.update(
+            {
+                "$comment": "",
+                "title": "",
+                "description": "",
+                "deprecated": False,
+                "readOnly": False,
+                "writeOnly": True,
+                "uniqueItems": False,
+                "const": {"nested": [None, False, 0, ""]},
+                "default": [],
+                "examples": [],
+                "maximum": 1,
+                "minimum": -1,
+                "exclusiveMaximum": 1,
+                "exclusiveMinimum": -1,
+                "maxContains": 0,
+                "minContains": 0,
+                "maxItems": 0,
+                "minItems": 0,
+                "maxLength": 0,
+                "minLength": 0,
+                "maxProperties": 0,
+                "minProperties": 0,
+                "multipleOf": 1,
+            }
+        )
+
+        self.assertEqual(
+            checker.validate_qinao_draft202012_profile(schema),
+            [],
+        )
+
+    def test_draft202012_profile_accepts_local_cycle_and_ignores_const_data(
+        self,
+    ) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["$defs"] = {
+            "node": {
+                "$anchor": "node",
+                "properties": {
+                    "next": {"$ref": "#node"},
+                },
+            }
+        }
+        schema["properties"]["root"] = {"$ref": "#/$defs/node"}
+        schema["const"] = {"looksLikeSchema": {"$ref": "https://data.invalid"}}
+
+        self.assertEqual(
+            checker.validate_qinao_draft202012_profile(schema),
+            [],
+        )
+
+    def test_local_pointer_resolver_is_strict_rfc6901_and_array_safe(
+        self,
+    ) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["prefixItems"] = [{"type": "string"}]
+        schema["$defs"] = {
+            "slash/name": {"type": "integer"},
+            "tilde~name": {"type": "boolean"},
+        }
+        accepted = {
+            "#": schema,
+            "#/prefixItems/0": schema["prefixItems"][0],
+            "#/$defs/slash~1name": schema["$defs"]["slash/name"],
+            "#/$defs/tilde~0name": schema["$defs"]["tilde~name"],
+        }
+        for reference, expected in accepted.items():
+            with self.subTest(accepted=reference):
+                resolved, target = checker.resolve_qinao_local_json_pointer(
+                    schema,
+                    reference,
+                )
+                self.assertTrue(resolved)
+                self.assertIs(target, expected)
+
+        for reference in (
+            "#/prefixItems/1",
+            "#/prefixItems/00",
+            "#/prefixItems/-1",
+            "#/prefixItems/" + ("9" * 10000),
+            "#/$defs/slash~2name",
+            "#/$defs/tilde~",
+        ):
+            with self.subTest(rejected=reference):
+                self.assertEqual(
+                    checker.resolve_qinao_local_json_pointer(
+                        schema,
+                        reference,
+                    ),
+                    (False, None),
+                )
+
+    def test_draft202012_profile_accepts_array_pointer_and_rejects_bad_indices(
+        self,
+    ) -> None:
+        accepted = self.valid_draft202012_profile_schema()
+        accepted["prefixItems"] = [{"type": "string"}]
+        accepted["$ref"] = "#/prefixItems/0"
+        self.assertEqual(
+            checker.validate_qinao_draft202012_profile(accepted),
+            [],
+        )
+
+        for reference in (
+            "#/prefixItems/1",
+            "#/prefixItems/00",
+            "#/prefixItems/" + ("9" * 10000),
+        ):
+            with self.subTest(reference=reference):
+                rejected = self.valid_draft202012_profile_schema()
+                rejected["prefixItems"] = [{"type": "string"}]
+                rejected["$ref"] = reference
+                errors = checker.validate_qinao_draft202012_profile(rejected)
+                self.assertTrue(
+                    any("$ref target is unresolved" in error for error in errors),
+                    errors,
+                )
+
+    def test_same_document_schema_resolver_separates_anchor_classes(
+        self,
+    ) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        static_target = {"$anchor": "staticTarget", "type": "string"}
+        dynamic_target = {
+            "$dynamicAnchor": "dynamicTarget",
+            "type": "integer",
+        }
+        schema["$defs"] = {
+            "static": static_target,
+            "dynamic": dynamic_target,
+        }
+        (
+            eligible,
+            static_anchors,
+            dynamic_anchors,
+        ) = checker.index_qinao_same_document_schema_targets(schema)
+
+        self.assertEqual(
+            checker.resolve_qinao_same_document_schema_reference(
+                schema,
+                "#staticTarget",
+                eligible_schemas=eligible,
+                static_anchors=static_anchors,
+                dynamic_anchors=dynamic_anchors,
+                reference_kind="static",
+            ),
+            (True, static_target),
+        )
+        self.assertEqual(
+            checker.resolve_qinao_same_document_schema_reference(
+                schema,
+                "#dynamicTarget",
+                eligible_schemas=eligible,
+                static_anchors=static_anchors,
+                dynamic_anchors=dynamic_anchors,
+                reference_kind="dynamic",
+            ),
+            (True, dynamic_target),
+        )
+        self.assertEqual(
+            checker.resolve_qinao_same_document_schema_reference(
+                schema,
+                "#dynamicTarget",
+                eligible_schemas=eligible,
+                static_anchors=static_anchors,
+                dynamic_anchors=dynamic_anchors,
+                reference_kind="static",
+            ),
+            (True, dynamic_target),
+        )
+        self.assertEqual(
+            checker.resolve_qinao_same_document_schema_reference(
+                schema,
+                "#staticTarget",
+                eligible_schemas=eligible,
+                static_anchors=static_anchors,
+                dynamic_anchors=dynamic_anchors,
+                reference_kind="dynamic",
+            ),
+            (True, static_target),
+        )
+
+        instance_data = self.valid_draft202012_profile_schema()
+        instance_data["const"] = {
+            "$anchor": "notASchemaAnchor",
+            "type": "string",
+        }
+        (
+            instance_eligible,
+            instance_static,
+            instance_dynamic,
+        ) = checker.index_qinao_same_document_schema_targets(instance_data)
+        self.assertEqual(
+            checker.resolve_qinao_same_document_schema_reference(
+                instance_data,
+                "#notASchemaAnchor",
+                eligible_schemas=instance_eligible,
+                static_anchors=instance_static,
+                dynamic_anchors=instance_dynamic,
+                reference_kind="static",
+            ),
+            (False, None),
+        )
+
+    def test_draft202012_profile_rejects_unresolved_local_pointer(self) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["$ref"] = "#/$defs/missing"
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(
+            any("$ref target is unresolved" in error for error in errors),
+            errors,
+        )
+
+    def test_draft202012_profile_rejects_pointer_into_instance_data(self) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["const"] = {"schemaLike": {"type": "string"}}
+        schema["$ref"] = "#/const/schemaLike"
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(
+            any("$ref target is not an eligible schema" in error for error in errors),
+            errors,
+        )
+
+    def test_draft202012_profile_distinguishes_missing_and_null_root_id(
+        self,
+    ) -> None:
+        missing_identifier = self.valid_draft202012_profile_schema()
+        del missing_identifier["$id"]
+        self.assertEqual(
+            checker.validate_qinao_draft202012_profile(missing_identifier),
+            [],
+        )
+
+        null_identifier = self.valid_draft202012_profile_schema()
+        null_identifier["$id"] = None
+        errors = checker.validate_qinao_draft202012_profile(null_identifier)
+
+        self.assertTrue(
+            any("root $id is invalid" in error for error in errors),
+            errors,
+        )
+
+    def test_draft202012_profile_rejects_semver_component_over_int32(
+        self,
+    ) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["$id"] = "qinao://schemas/test-profile/2147483648.0.0"
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(any("root $id is invalid" in error for error in errors), errors)
+
+    def test_draft202012_profile_rejects_4097_distinct_reference_edges(
+        self,
+    ) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["$defs"] = {f"edge{index}": {"$ref": "#"} for index in range(4097)}
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(
+            any("distinct reference edges exceeds 4096" in error for error in errors),
+            errors,
+        )
+
+    def test_draft202012_profile_enforces_anchor_name_and_class_rules(
+        self,
+    ) -> None:
+        underscored = self.valid_draft202012_profile_schema()
+        underscored["$anchor"] = "_ok"
+        underscored["$ref"] = "#_ok"
+        self.assertEqual(
+            checker.validate_qinao_draft202012_profile(underscored),
+            [],
+        )
+
+        bad_colon = self.valid_draft202012_profile_schema()
+        bad_colon["$anchor"] = "bad:name"
+        bad_colon_errors = checker.validate_qinao_draft202012_profile(bad_colon)
+        self.assertTrue(
+            any("$anchor is invalid" in error for error in bad_colon_errors),
+            bad_colon_errors,
+        )
+
+        cross_class = self.valid_draft202012_profile_schema()
+        cross_class["$anchor"] = "shared"
+        cross_class["$dynamicAnchor"] = "shared"
+        cross_class_errors = checker.validate_qinao_draft202012_profile(cross_class)
+        self.assertTrue(
+            any("anchor classes collide" in error for error in cross_class_errors),
+            cross_class_errors,
+        )
+
+        for keyword in ("$anchor", "$dynamicAnchor"):
+            with self.subTest(duplicate_keyword=keyword):
+                duplicated = self.valid_draft202012_profile_schema()
+                duplicated["$defs"] = {
+                    "first": {keyword: "repeated"},
+                    "second": {keyword: "repeated"},
+                }
+                duplicate_errors = checker.validate_qinao_draft202012_profile(
+                    duplicated
+                )
+                self.assertTrue(
+                    any("is duplicated" in error for error in duplicate_errors),
+                    duplicate_errors,
+                )
+
+    def test_draft202012_profile_rejects_non_json_host_values_and_cycles(
+        self,
+    ) -> None:
+        invalid_values = (
+            b"bytes",
+            {"set-member"},
+            ("tuple",),
+            object(),
+            {1: "non-string key"},
+            "\ud800",
+            {"\ud800": "non-Unicode-scalar key"},
+            {("k" * 1048577): "oversized key"},
+        )
+        for invalid in invalid_values:
+            with self.subTest(invalid_type=type(invalid).__name__):
+                schema = self.valid_draft202012_profile_schema()
+                schema["const"] = invalid
+                errors = checker.validate_qinao_draft202012_profile(schema)
+                self.assertTrue(
+                    any("JSON host model" in error for error in errors),
+                    errors,
+                )
+
+        for invalid_float in (0.0, float("inf"), float("-inf"), float("nan")):
+            with self.subTest(invalid_float=repr(invalid_float)):
+                schema = self.valid_draft202012_profile_schema()
+                schema["const"] = invalid_float
+                errors = checker.validate_qinao_draft202012_profile(schema)
+                self.assertTrue(
+                    any(
+                        "floating-point values are forbidden" in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+        cyclic: list[object] = []
+        cyclic.append(cyclic)
+        schema = self.valid_draft202012_profile_schema()
+        schema["const"] = cyclic
+        cycle_errors = checker.validate_qinao_draft202012_profile(schema)
+        self.assertTrue(
+            any("cyclic" in error for error in cycle_errors),
+            cycle_errors,
+        )
+
+    def test_draft202012_profile_rejects_builtin_subclasses_without_dispatch(
+        self,
+    ) -> None:
+        class HostileDict(dict):
+            def get(self, *_args, **_kwargs):
+                raise AssertionError("hostile dict method was invoked")
+
+            def values(self):
+                raise AssertionError("hostile dict method was invoked")
+
+        class HostileList(list):
+            def __iter__(self):
+                raise AssertionError("hostile list method was invoked")
+
+        class HostileString(str):
+            def encode(self, *_args, **_kwargs):
+                raise AssertionError("hostile string method was invoked")
+
+        class HostileInt(int):
+            pass
+
+        hostile_root = HostileDict(self.valid_draft202012_profile_schema())
+        root_errors = checker.validate_qinao_draft202012_profile(hostile_root)
+        self.assertTrue(
+            any("root must be an object" in error for error in root_errors),
+            root_errors,
+        )
+
+        for invalid in (
+            HostileDict({"value": 1}),
+            HostileList([1]),
+            HostileString("value"),
+            HostileInt(1),
+        ):
+            with self.subTest(invalid_type=type(invalid).__name__):
+                schema = self.valid_draft202012_profile_schema()
+                schema["const"] = invalid
+                errors = checker.validate_qinao_draft202012_profile(schema)
+                self.assertTrue(
+                    any("JSON host model" in error for error in errors),
+                    errors,
+                )
+
+    def test_draft202012_profile_counts_distinct_anchor_ref_kinds_as_edges(
+        self,
+    ) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["$anchor"] = "static"
+        schema["$dynamicAnchor"] = "dynamic"
+        schema["$ref"] = "#static"
+        schema["$defs"] = {
+            f"edge{index}": {
+                "$ref": "#static",
+                "$dynamicRef": "#dynamic",
+            }
+            for index in range(2048)
+        }
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(
+            any("distinct reference edges exceeds 4096" in error for error in errors),
+            errors,
+        )
+
+    def test_draft202012_profile_accepts_4096_distinct_anchor_ref_kind_edges(
+        self,
+    ) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["$anchor"] = "static"
+        schema["$dynamicAnchor"] = "dynamic"
+        schema["$defs"] = {
+            f"edge{index}": {
+                "$ref": "#static",
+                "$dynamicRef": "#dynamic",
+            }
+            for index in range(2048)
+        }
+
+        self.assertEqual(
+            checker.validate_qinao_draft202012_profile(schema),
+            [],
+        )
+
+    def test_draft202012_profile_rejects_4097_total_anchors(self) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["$defs"] = {
+            f"anchor{index}": {"$anchor": f"anchor{index}"} for index in range(4097)
+        }
+
+        errors = checker.validate_qinao_draft202012_profile(schema)
+
+        self.assertTrue(
+            any(
+                "anchors plus dynamic anchors exceeds 4096" in error for error in errors
+            ),
+            errors,
+        )
+
+    def test_draft202012_profile_accepts_4096_edges_and_anchors(self) -> None:
+        schema = self.valid_draft202012_profile_schema()
+        schema["$defs"] = {
+            f"edge{index}": {
+                "$anchor": f"anchor{index}",
+                "$ref": "#",
+            }
+            for index in range(4096)
+        }
+
+        self.assertEqual(
+            checker.validate_qinao_draft202012_profile(schema),
+            [],
+        )
+
+    @staticmethod
+    def valid_draft202012_profile_schema() -> dict:
+        return {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "qinao://schemas/test-profile/1.0.0",
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+            },
+            "required": ["name"],
+            "additionalProperties": False,
+        }
 
     def test_ordered_wave_schedule_is_the_exact_frozen_authority(self) -> None:
         expected = (
@@ -3041,8 +6596,8 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
     ) -> None:
         source_path = Path(checker.__file__).resolve()
         source = source_path.read_text(encoding="utf-8")
-        state_row = '    ("W3", "w3.state", 1),\n'
-        context_row = '    ("W3", "w3.context", 2),\n'
+        state_row = '        ("W3", "w3.state", 1),\n'
+        context_row = '        ("W3", "w3.context", 2),\n'
         mutations = {
             "duplicate ordinal": source.replace(
                 '    ("W0", "w0.controlled", 2),\n',
@@ -3061,10 +6616,7 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             ),
             "extra row": source.replace(
                 '    ("W2", "w2.persistence", 1),\n',
-                (
-                    '    ("W2", "w2.persistence", 1),\n'
-                    '    ("W2", "w2.extra", 2),\n'
-                ),
+                ('    ("W2", "w2.persistence", 1),\n    ("W2", "w2.extra", 2),\n'),
                 1,
             ),
         }
@@ -3093,7 +6645,7 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             with self.subTest(option=option):
                 command = self.command()
                 index = command.index(option)
-                del command[index:index + 2]
+                del command[index : index + 2]
                 result = self.run_gate(command)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("required", result.stderr)
@@ -3141,14 +6693,17 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
                 return VERIFICATION_TIME
 
         command = self.command()
-        with mock.patch.object(
-            checker,
-            "datetime",
-            CountingDateTime,
-        ), mock.patch.object(
-            sys,
-            "argv",
-            [str(SCRIPT), *command[2:]],
+        with (
+            mock.patch.object(
+                checker,
+                "datetime",
+                CountingDateTime,
+            ),
+            mock.patch.object(
+                sys,
+                "argv",
+                [str(SCRIPT), *command[2:]],
+            ),
         ):
             self.assertEqual(checker.main(), 0)
         self.assertEqual(CountingDateTime.calls, 1)
@@ -3313,8 +6868,7 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             rows=[
                 {
                     "path": (
-                        "QinaoRuntimeSDK/Sources/QinaoLoop/"
-                        "QinaoOrganEndpoint.swift"
+                        "QinaoRuntimeSDK/Sources/QinaoLoop/QinaoOrganEndpoint.swift"
                     ),
                     "blob": "c" * 40,
                     "change": "modify",
@@ -3412,9 +6966,7 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             "fixture",
             anchors=[
                 {
-                    "path": (
-                        "BehavioralAISubstrate/Tests/DefinitelyMissing.swift"
-                    ),
+                    "path": ("BehavioralAISubstrate/Tests/DefinitelyMissing.swift"),
                     "blob": "a" * 40,
                 },
                 {
@@ -3437,8 +6989,8 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             "the authority gate needs a fail-closed anchor resolver",
         )
         with mock.patch.object(
-            checker.subprocess,
-            "run",
+            checker,
+            "run_bounded_process",
             side_effect=subprocess.TimeoutExpired(["git", "ls-tree"], 30),
         ):
             _paths, errors = checker.resolve_anchor_paths(
@@ -3475,13 +7027,17 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             text=True,
         ).stdout.strip()
         candidate_only_path = "docs/test-only-candidate-anchor.txt"
-        object_id = subprocess.run(
-            ["git", "hash-object", "-w", "--stdin"],
-            cwd=repository,
-            input=b"candidate-only anchor\n",
-            check=True,
-            capture_output=True,
-        ).stdout.decode("ascii").strip()
+        object_id = (
+            subprocess.run(
+                ["git", "hash-object", "-w", "--stdin"],
+                cwd=repository,
+                input=b"candidate-only anchor\n",
+                check=True,
+                capture_output=True,
+            )
+            .stdout.decode("ascii")
+            .strip()
+        )
         subprocess.run(
             [
                 "git",
@@ -3544,7 +7100,57 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
         self.assertTrue(any("AutomationStore" in error for error in errors), errors)
         self.assertTrue(any("second" in error for error in errors), errors)
 
-    def test_direct_apple_mutation_outside_zone_c_is_rejected(self) -> None:
+    def test_exact_apple_effect_adapter_path_is_allowed(self) -> None:
+        errors = checker.validate_swift_authority_source(
+            (
+                "BehavioralAISubstrate/Sources/BASAppleEdgeWiring/"
+                "BASToolEffectAdapter.swift"
+            ),
+            (
+                "import EventKit\n"
+                "func mutate(_ store: EKEventStore, _ event: EKEvent) throws {\n"
+                "  try store.save(event, span: .thisEvent)\n"
+                "}\n"
+            ),
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_apple_effect_adapter_path_near_misses_are_rejected(self) -> None:
+        near_miss_paths = (
+            (
+                "BehavioralAISubstrate/Sources/BASAppleEdgeWiring/"
+                "BASToolEffectAdapterCopy.swift"
+            ),
+            (
+                "BehavioralAISubstrate/Sources/BASRuntimeCore/"
+                "BASToolEffectAdapter.swift"
+            ),
+            (
+                "BehavioralAISubstrate/Sources/BASAppleEdgeWiring/../"
+                "BASAppleEdgeWiring/BASToolEffectAdapter.swift"
+            ),
+            (
+                "BehavioralAISubstrate/Sources/BASAppleEdgeWiring/"
+                "ZoneCAppleEffectExecutor.swift"
+            ),
+        )
+        source = (
+            "import EventKit\n"
+            "func mutate(_ store: EKEventStore, _ event: EKEvent) throws {\n"
+            "  try store.save(event, span: .thisEvent)\n"
+            "}\n"
+        )
+
+        for path in near_miss_paths:
+            with self.subTest(path=path):
+                errors = checker.validate_swift_authority_source(path, source)
+                self.assertTrue(
+                    any("direct Apple mutation" in error for error in errors),
+                    errors,
+                )
+
+    def test_direct_apple_mutation_outside_effect_adapter_is_rejected(self) -> None:
         path = "BehavioralAISubstrate/Sources/BASRuntimeCore/UnsafeCalendar.swift"
         self.assertTrue(
             hasattr(checker, "validate_swift_authority_source"),
@@ -3560,11 +7166,284 @@ class QinaoWaveAuthorityGateTests(unittest.TestCase):
             ),
         )
 
-        self.assertTrue(any("UnsafeCalendar.swift" in error for error in errors), errors)
         self.assertTrue(
-            any("ZoneCAppleEffectExecutor" in error for error in errors),
+            any("UnsafeCalendar.swift" in error for error in errors), errors
+        )
+        self.assertTrue(
+            any("BASToolEffectAdapter.swift" in error for error in errors),
             errors,
         )
+
+    def test_core_spotlight_mutation_selectors_are_rejected(self) -> None:
+        selectors = (
+            "index.indexSearchableItems([])",
+            "index.deleteSearchableItems(withIdentifiers: [])",
+            "index.deleteAllSearchableItems()",
+        )
+
+        for selector in selectors:
+            with self.subTest(selector=selector):
+                errors = checker.validate_swift_authority_source(
+                    "BehavioralAISubstrate/Sources/BASRuntimeCore/UnsafeIndex.swift",
+                    (
+                        "import CoreSpotlight\n"
+                        "func mutate(_ index: CSSearchableIndex) async throws {\n"
+                        f"  try await {selector}\n"
+                        "}\n"
+                    ),
+                )
+                self.assertTrue(
+                    any("direct Apple mutation" in error for error in errors),
+                    errors,
+                )
+
+    def test_notification_removal_selectors_are_rejected(self) -> None:
+        selectors = (
+            "center.removePendingNotificationRequests(withIdentifiers: [])",
+            "center.removeDeliveredNotifications(withIdentifiers: [])",
+            "center.removeAllPendingNotificationRequests()",
+            "center.removeAllDeliveredNotifications()",
+        )
+
+        for selector in selectors:
+            with self.subTest(selector=selector):
+                errors = checker.validate_swift_authority_source(
+                    (
+                        "BehavioralAISubstrate/Sources/BASRuntimeCore/"
+                        "UnsafeNotification.swift"
+                    ),
+                    (
+                        "import UserNotifications\n"
+                        "func mutate(_ center: UNUserNotificationCenter) {\n"
+                        f"  {selector}\n"
+                        "}\n"
+                    ),
+                )
+                self.assertTrue(
+                    any("direct Apple mutation" in error for error in errors),
+                    errors,
+                )
+
+    def test_cloudkit_sync_engine_send_and_fetch_are_rejected(self) -> None:
+        selectors = (
+            "engine.sendChanges()",
+            "engine.fetchChanges()",
+        )
+
+        for selector in selectors:
+            with self.subTest(selector=selector):
+                errors = checker.validate_swift_authority_source(
+                    "BehavioralAISubstrate/Sources/BASRuntimeCore/UnsafeSync.swift",
+                    (
+                        "import CloudKit\n"
+                        "func mutate(_ engine: CKSyncEngine) async throws {\n"
+                        f"  try await {selector}\n"
+                        "}\n"
+                    ),
+                )
+                self.assertTrue(
+                    any("direct Apple mutation" in error for error in errors),
+                    errors,
+                )
+
+    def test_attributed_and_specific_apple_imports_are_gated(self) -> None:
+        fixtures = (
+            (
+                "EventKit",
+                (
+                    "@preconcurrency import class EventKit.EKEventStore\n"
+                    "func mutate(_ store: EKEventStore, _ event: EKEvent) throws {\n"
+                    "  try store.save(event, span: .thisEvent)\n"
+                    "}\n"
+                ),
+            ),
+            (
+                "CoreSpotlight",
+                (
+                    "@_implementationOnly import class "
+                    "CoreSpotlight.CSSearchableIndex\n"
+                    "func mutate(_ index: CSSearchableIndex) async throws {\n"
+                    "  try await index.indexSearchableItems([])\n"
+                    "}\n"
+                ),
+            ),
+            (
+                "CloudKit",
+                (
+                    "@_spi(Qinao) @preconcurrency "
+                    "import struct CloudKit.CKSyncEngine;\n"
+                    "func mutate(_ engine: CKSyncEngine) async throws {\n"
+                    "  try await engine.sendChanges()\n"
+                    "}\n"
+                ),
+            ),
+            (
+                "UserNotifications",
+                (
+                    "@_spi(Qinao)\n"
+                    "@preconcurrency\n"
+                    "import class "
+                    "UserNotifications.UNUserNotificationCenter\n"
+                    "func mutate(_ center: UNUserNotificationCenter) {\n"
+                    "  center.removeAllDeliveredNotifications()\n"
+                    "}\n"
+                ),
+            ),
+        )
+
+        for framework, source in fixtures:
+            with self.subTest(framework=framework):
+                errors = checker.validate_swift_authority_source(
+                    (
+                        "BehavioralAISubstrate/Sources/BASRuntimeCore/"
+                        f"Unsafe{framework}Import.swift"
+                    ),
+                    source,
+                )
+                self.assertTrue(
+                    any("direct Apple mutation" in error for error in errors),
+                    errors,
+                )
+
+    def test_all_swift_specific_import_kinds_are_gated(self) -> None:
+        import_kinds = (
+            "class",
+            "struct",
+            "enum",
+            "protocol",
+            "func",
+            "var",
+            "let",
+            "typealias",
+        )
+
+        for import_kind in import_kinds:
+            with self.subTest(import_kind=import_kind):
+                errors = checker.validate_swift_authority_source(
+                    "BehavioralAISubstrate/Sources/BASRuntimeCore/UnsafeImport.swift",
+                    (
+                        f"import {import_kind} EventKit.ImportedSymbol\n"
+                        "func mutate(_ store: EKEventStore, _ event: EKEvent) throws {\n"
+                        "  try store.save(event, span: .thisEvent)\n"
+                        "}\n"
+                    ),
+                )
+                self.assertTrue(
+                    any("direct Apple mutation" in error for error in errors),
+                    errors,
+                )
+
+    def test_swift_access_level_imports_are_gated(self) -> None:
+        imports = (
+            "public import EventKit",
+            "package import EventKit",
+            "@preconcurrency internal import class EventKit.EKEventStore",
+            "fileprivate import EventKit.Calendar",
+            "@_spi(Qinao) private import struct EventKit.ImportedSymbol;",
+        )
+
+        for import_declaration in imports:
+            with self.subTest(import_declaration=import_declaration):
+                errors = checker.validate_swift_authority_source(
+                    "BehavioralAISubstrate/Sources/BASRuntimeCore/UnsafeImport.swift",
+                    (
+                        f"{import_declaration}\n"
+                        "func mutate(_ store: EKEventStore, _ event: EKEvent) throws {\n"
+                        "  try store.save(event, span: .thisEvent)\n"
+                        "}\n"
+                    ),
+                )
+                self.assertTrue(
+                    any("direct Apple mutation" in error for error in errors),
+                    errors,
+                )
+
+    def test_open_is_not_accepted_as_a_swift_import_access_level(self) -> None:
+        errors = checker.validate_swift_authority_source(
+            "BehavioralAISubstrate/Sources/BASRuntimeCore/InvalidImport.swift",
+            (
+                "open import EventKit\n"
+                "func mutate(_ store: Store, _ event: Event) throws {\n"
+                "  try store.save(event)\n"
+                "}\n"
+            ),
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_submodule_import_with_trailing_semicolon_is_gated(self) -> None:
+        errors = checker.validate_swift_authority_source(
+            "BehavioralAISubstrate/Sources/BASRuntimeCore/UnsafeSubmodule.swift",
+            (
+                "import EventKit.Calendar.Submodule; "
+                "func mutate(_ store: EKEventStore, _ event: EKEvent) throws { "
+                "try store.save(event, span: .thisEvent) }\n"
+            ),
+        )
+
+        self.assertTrue(
+            any("direct Apple mutation" in error for error in errors),
+            errors,
+        )
+
+    def test_apple_import_parser_ignores_free_text_and_similar_modules(
+        self,
+    ) -> None:
+        errors = checker.validate_swift_authority_source(
+            "BehavioralAISubstrate/Sources/BASRuntimeCore/EventKitUIHelper.swift",
+            (
+                "import EventKitUI\n"
+                "let help = \"@preconcurrency import class EventKit.EKEventStore;\"\n"
+                "// @_spi(Qinao) import EventKit\n"
+                "/* import class EventKit.EKEventStore; */\n"
+                "func mutate(_ store: Store, _ event: Event) throws {\n"
+                "  try store.save(event)\n"
+                "}\n"
+            ),
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_apple_mutation_scanner_ignores_comments_and_string_literals(
+        self,
+    ) -> None:
+        errors = checker.validate_swift_authority_source(
+            "BehavioralAISubstrate/Sources/BASRuntimeCore/AppleHelpText.swift",
+            (
+                "import EventKit\n"
+                "let help = \"store.save(event, span: .thisEvent)\"\n"
+                "// store.save(event, span: .thisEvent)\n"
+                "/* store.remove(event, span: .thisEvent) */\n"
+            ),
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_apple_mutation_selectors_are_scoped_to_imported_framework(
+        self,
+    ) -> None:
+        fixtures = (
+            (
+                "import UserNotifications\n"
+                "func update(_ values: inout [String]) { values.remove(at: 0) }\n"
+            ),
+            (
+                "import CoreSpotlight\n"
+                "func update(_ cache: Cache) throws { try cache.save() }\n"
+            ),
+            (
+                "import EventKit\n"
+                "func update(_ index: Index) { index.deleteAllSearchableItems() }\n"
+            ),
+        )
+
+        for source in fixtures:
+            with self.subTest(source=source):
+                errors = checker.validate_swift_authority_source(
+                    "BehavioralAISubstrate/Sources/BASRuntimeCore/Helper.swift",
+                    source,
+                )
+                self.assertEqual(errors, [])
 
 
 if __name__ == "__main__":

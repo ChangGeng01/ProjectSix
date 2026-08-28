@@ -1,6 +1,18 @@
 # Qinao Core AI Agent Controlled-Document Convergence Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **QINAO-PLAN-REGISTRY-V1: SUPERSEDED_HISTORICAL**
+
+> **SUPERSEDED; HISTORICAL; DO NOT EXECUTE; GRANTS NO AUTHORITY.** This file is
+> retained only as review provenance. Every checkbox, worker instruction,
+> execution status, branch action, and command below is inert historical text.
+> The active order authority is
+> `docs/superpowers/plans/2026-07-15-iphone-air-architecture-convergence-master.md`;
+> its sole active Tasks-0-2 implementation annex is
+> `docs/superpowers/plans/2026-07-29-qinao-dual-space-automation-controlled-convergence.md`
+> and exposes only `resume-series`.
+
+> **Historical quotation only:** the former agent-worker directive is void and
+> grants no permission to implement this file task-by-task.
 
 **Goal:** Convert the approved Qinao Core AI/Agent/context/memory/RSI addendum—including the later fine-grained capability-substitution, three-track causality, optional-slot terminal-closure, and per-finding proof decisions—into one non-vacuous W0 controlled-document and gate closure, so the existing W1–W6 domain plans can be executed without contradictory authority, wave, or release semantics.
 

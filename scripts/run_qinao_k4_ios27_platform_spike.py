@@ -18,16 +18,25 @@ import json
 import os
 import plistlib
 import re
+import selectors
+import signal
 import stat
 import subprocess
 import sys
+import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 try:
     from check_qinao_owner_ledger import (
         DuplicateJSONKeyError,
+        NON_QINAO_BUILD_COMPONENTS,
+        authority_path_kind,
         canonical_json_bytes,
+        is_authority_diff_path,
+        is_authority_namespace_path,
+        is_normalized_workspace_path,
         reject_duplicate_json_keys,
         validate_signed_document,
         validate_trust_root,
@@ -35,7 +44,12 @@ try:
 except ModuleNotFoundError:
     from scripts.check_qinao_owner_ledger import (
         DuplicateJSONKeyError,
+        NON_QINAO_BUILD_COMPONENTS,
+        authority_path_kind,
         canonical_json_bytes,
+        is_authority_diff_path,
+        is_authority_namespace_path,
+        is_normalized_workspace_path,
         reject_duplicate_json_keys,
         validate_signed_document,
         validate_trust_root,
@@ -145,9 +159,9 @@ FRAMEWORK_OBSERVATION_COMMON_FIELDS = {
     "framework",
     "processSupportInference",
 }
-FRAMEWORK_PRESENT_OBSERVATION_FIELDS = (
-    FRAMEWORK_OBSERVATION_COMMON_FIELDS | {"declarationDigest"}
-)
+FRAMEWORK_PRESENT_OBSERVATION_FIELDS = FRAMEWORK_OBSERVATION_COMMON_FIELDS | {
+    "declarationDigest"
+}
 FRAMEWORK_ABSENT_OBSERVATION_FIELDS = FRAMEWORK_OBSERVATION_COMMON_FIELDS
 SQLITE_FIELDS = {"fileProtection", "open", "wal"}
 TRANSPORT_FIELDS = {"feasibility", "kind"}
@@ -206,22 +220,250 @@ EVIDENCE_FIELDS = (
 ) | SIGNATURE_METADATA_FIELDS
 GIT_TIMEOUT_SECONDS = 30
 GIT_SUBPROCESS_ENVIRONMENT = {
+    "GIT_ATTR_NOSYSTEM": "1",
+    "GIT_CONFIG_COUNT": "5",
     "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_KEY_0": "core.fsmonitor",
+    "GIT_CONFIG_KEY_1": "core.hooksPath",
+    "GIT_CONFIG_KEY_2": "diff.external",
+    "GIT_CONFIG_KEY_3": "core.pager",
+    "GIT_CONFIG_KEY_4": "submodule.recurse",
     "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_SYSTEM": "/dev/null",
+    "GIT_CONFIG_VALUE_0": "false",
+    "GIT_CONFIG_VALUE_1": "/dev/null",
+    "GIT_CONFIG_VALUE_2": "",
+    "GIT_CONFIG_VALUE_3": "cat",
+    "GIT_CONFIG_VALUE_4": "false",
+    "GIT_LITERAL_PATHSPECS": "1",
+    "GIT_NO_LAZY_FETCH": "1",
+    "GIT_NO_REPLACE_OBJECTS": "1",
+    "GIT_OPTIONAL_LOCKS": "0",
+    "GIT_PAGER": "cat",
     "GIT_TERMINAL_PROMPT": "0",
     "HOME": "/nonexistent",
     "LANG": "C",
     "LC_ALL": "C",
+    "PAGER": "cat",
     "PATH": "/usr/bin:/bin",
+    "XDG_CONFIG_HOME": "/nonexistent",
 }
+XCRUN_TIMEOUT_SECONDS = 30
+PROCESS_TERMINATION_GRACE_SECONDS = 5.0
+PROCESS_READ_CHUNK_BYTES = 64 * 1024
+GIT_STDOUT_LIMIT_BYTES = 64 * 1024 * 1024
+XCRUN_STDOUT_LIMIT_BYTES = 64 * 1024
+PROCESS_STDERR_LIMIT_BYTES = 4 * 1024 * 1024
+XCRUN_SUBPROCESS_ENVIRONMENT = {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+}
+RAW_WORKTREE_FILE_LIMIT = 200000
+RAW_WORKTREE_SINGLE_FILE_BYTE_LIMIT = 256 * 1024 * 1024
+RAW_WORKTREE_TOTAL_BYTE_LIMIT = 2 * 1024 * 1024 * 1024
+RAW_WORKTREE_GIT_METADATA_BYTE_LIMIT = 64 * 1024 * 1024
+RAW_WORKTREE_DIRECTORY_DEPTH_LIMIT = 128
+AUTHORITY_WORKTREE_SCAN_ROOTS = (
+    "BehavioralAISubstrate/Sources",
+    "BehavioralAISubstrate/Tests",
+    "BehavioralAISubstrate/Fixtures",
+    "QinaoRuntimeSDK/Sources",
+    "QinaoRuntimeSDK/Tests",
+    "QinaoRuntimeSDK/Fixtures",
+    "SampleHost/Sources",
+    "SampleHost/Tests",
+    "SampleHost/Fixtures",
+)
+AUTHORITY_WORKTREE_EXACT_PATHS = (
+    "BehavioralAISubstrate/Package.swift",
+    "BehavioralAISubstrate/DeviceTestApp/project.yml",
+    ("BehavioralAISubstrate/DeviceTestApp/BASDeviceTest.xcodeproj/project.pbxproj"),
+    "QinaoRuntimeSDK/Package.swift",
+    "SampleHost/Package.swift",
+)
 
 
 class GateError(RuntimeError):
     """A fail-closed K4 gate diagnostic."""
 
 
+class ProcessOutputLimitExceeded(OSError):
+    """A protected child emitted one byte beyond its declared stream cap."""
+
+
+class RawWorktreeError(RuntimeError):
+    """A raw worktree observation that cannot be bound to a Git tree."""
+
+    def __init__(self, path: str | None, reason: str) -> None:
+        self.path = path
+        self.reason = reason
+        super().__init__(f"{path}: {reason}" if path is not None else reason)
+
+
+@dataclass(frozen=True)
+class RawGitTreeEntry:
+    mode: str
+    object_type: str
+    object_id: str
+
+
+@dataclass(frozen=True)
+class RawGitIndexEntry:
+    mode: str
+    object_id: str
+    skip_worktree: bool
+
+
+@dataclass
+class RawWorktreeBudget:
+    total_bytes: int = 0
+
+
 def fail(message: str) -> None:
     raise GateError(message)
+
+
+def terminate_process_group(
+    process: subprocess.Popen,
+    *,
+    grace_seconds: float,
+) -> None:
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except (PermissionError, ProcessLookupError):
+        pass
+    time.sleep(grace_seconds)
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (PermissionError, ProcessLookupError):
+        pass
+    if process.stdout is not None:
+        process.stdout.close()
+    if process.stderr is not None:
+        process.stderr.close()
+    try:
+        process.wait(timeout=grace_seconds)
+    except ChildProcessError:
+        return
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=grace_seconds)
+
+
+def run_bounded_process(
+    command: list[str],
+    *,
+    cwd: Path | str,
+    env: dict[str, str],
+    timeout_seconds: float,
+    termination_grace_seconds: float = PROCESS_TERMINATION_GRACE_SECONDS,
+    stdout_limit_bytes: int,
+    stderr_limit_bytes: int,
+    text: bool,
+) -> subprocess.CompletedProcess:
+    if (
+        timeout_seconds <= 0
+        or termination_grace_seconds <= 0
+        or stdout_limit_bytes <= 0
+        or stderr_limit_bytes <= 0
+    ):
+        raise OSError("protected subprocess requires positive time and output bounds")
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=False,
+        start_new_session=True,
+        pass_fds=(),
+    )
+    if process.stdout is None or process.stderr is None:
+        terminate_process_group(
+            process,
+            grace_seconds=termination_grace_seconds,
+        )
+        raise OSError("protected subprocess pipes are unavailable")
+    stdout_buffer = bytearray()
+    stderr_buffer = bytearray()
+    selector = selectors.DefaultSelector()
+    deadline = time.monotonic() + timeout_seconds
+    try:
+        os.set_blocking(process.stdout.fileno(), False)
+        os.set_blocking(process.stderr.fileno(), False)
+        selector.register(
+            process.stdout,
+            selectors.EVENT_READ,
+            ("stdout", stdout_buffer, stdout_limit_bytes),
+        )
+        selector.register(
+            process.stderr,
+            selectors.EVENT_READ,
+            ("stderr", stderr_buffer, stderr_limit_bytes),
+        )
+        open_streams = 2
+        while open_streams:
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                raise subprocess.TimeoutExpired(
+                    command,
+                    timeout_seconds,
+                    output=bytes(stdout_buffer),
+                    stderr=bytes(stderr_buffer),
+                )
+            events = selector.select(remaining_seconds)
+            if not events:
+                continue
+            for key, _mask in events:
+                stream_name, buffer, limit_bytes = key.data
+                read_size = min(
+                    PROCESS_READ_CHUNK_BYTES,
+                    limit_bytes + 1 - len(buffer),
+                )
+                chunk = os.read(key.fd, read_size)
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    key.fileobj.close()
+                    open_streams -= 1
+                    continue
+                buffer.extend(chunk)
+                if len(buffer) > limit_bytes:
+                    raise ProcessOutputLimitExceeded(
+                        f"protected subprocess {stream_name} limit exceeded "
+                        f"({limit_bytes} bytes)"
+                    )
+        remaining_seconds = deadline - time.monotonic()
+        if remaining_seconds <= 0:
+            raise subprocess.TimeoutExpired(
+                command,
+                timeout_seconds,
+                output=bytes(stdout_buffer),
+                stderr=bytes(stderr_buffer),
+            )
+        returncode = process.wait(timeout=remaining_seconds)
+    except (OSError, subprocess.TimeoutExpired):
+        terminate_process_group(
+            process,
+            grace_seconds=termination_grace_seconds,
+        )
+        raise
+    finally:
+        selector.close()
+    stdout: bytes | str = bytes(stdout_buffer)
+    stderr: bytes | str = bytes(stderr_buffer)
+    if text:
+        stdout = stdout.decode("utf-8", errors="strict")
+        stderr = stderr.decode("utf-8", errors="strict")
+    return subprocess.CompletedProcess(
+        command,
+        returncode,
+        stdout,
+        stderr,
+    )
 
 
 def sha256(value: bytes) -> str:
@@ -241,22 +483,26 @@ def path_is_within(path: Path, root: Path) -> bool:
 
 
 def run_git(root: Path, *arguments: str) -> str:
-    return run_git_bytes(root, *arguments).decode(
-        "utf-8",
-        errors="strict",
-    ).strip()
+    return (
+        run_git_bytes(root, *arguments)
+        .decode(
+            "utf-8",
+            errors="strict",
+        )
+        .strip()
+    )
 
 
 def run_git_bytes(root: Path, *arguments: str) -> bytes:
     try:
-        completed = subprocess.run(
+        completed = run_bounded_process(
             ["git", *arguments],
             cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
             env=GIT_SUBPROCESS_ENVIRONMENT,
-            timeout=GIT_TIMEOUT_SECONDS,
+            timeout_seconds=GIT_TIMEOUT_SECONDS,
+            stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+            stderr_limit_bytes=PROCESS_STDERR_LIMIT_BYTES,
+            text=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         fail(f"Git command unavailable or timed out ({' '.join(arguments)})")
@@ -270,6 +516,701 @@ def run_git_bytes(root: Path, *arguments: str) -> bytes:
             f"{diagnostic or f'exit {completed.returncode}'}"
         )
     return completed.stdout
+
+
+def _raw_stat_binding(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _raw_git_path(encoded: bytes, label: str) -> str:
+    try:
+        relative_path = encoded.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as error:
+        raise RawWorktreeError(
+            None,
+            f"{label} contains a non-UTF-8 path: {error}",
+        ) from error
+    if not is_normalized_workspace_path(relative_path):
+        raise RawWorktreeError(
+            relative_path,
+            f"worktree drift path is not normalized: {relative_path!r}",
+        )
+    return relative_path
+
+
+def load_raw_git_tree_entries(
+    root: Path,
+    tree: str,
+    *,
+    label: str,
+) -> dict[str, RawGitTreeEntry]:
+    raw = run_git_bytes(
+        root,
+        "ls-tree",
+        "-r",
+        "-z",
+        "--full-tree",
+        tree,
+    )
+    if len(raw) > RAW_WORKTREE_GIT_METADATA_BYTE_LIMIT:
+        raise RawWorktreeError(
+            None,
+            f"{label} metadata exceeds the byte limit",
+        )
+    rows = [row for row in raw.split(b"\0") if row]
+    if len(rows) > RAW_WORKTREE_FILE_LIMIT:
+        raise RawWorktreeError(
+            None,
+            f"{label} exceeds the raw worktree file-count limit",
+        )
+    entries: dict[str, RawGitTreeEntry] = {}
+    expected_types = {
+        "100644": "blob",
+        "100755": "blob",
+        "120000": "blob",
+        "160000": "commit",
+    }
+    for row in rows:
+        try:
+            encoded_metadata, encoded_path = row.split(b"\t", 1)
+            mode, object_type, object_id = encoded_metadata.decode(
+                "ascii",
+                errors="strict",
+            ).split(" ")
+        except (UnicodeDecodeError, ValueError) as error:
+            raise RawWorktreeError(
+                None,
+                f"{label} contains malformed tree metadata: {error}",
+            ) from error
+        relative_path = _raw_git_path(encoded_path, label)
+        if (
+            mode not in expected_types
+            or object_type != expected_types[mode]
+            or GIT_ID.fullmatch(object_id) is None
+        ):
+            raise RawWorktreeError(
+                relative_path,
+                f"{label} contains unsupported tree metadata",
+            )
+        if relative_path in entries:
+            raise RawWorktreeError(
+                relative_path,
+                f"{label} contains a duplicate path",
+            )
+        entries[relative_path] = RawGitTreeEntry(
+            mode=mode,
+            object_type=object_type,
+            object_id=object_id,
+        )
+    return entries
+
+
+def load_raw_git_index_entries(
+    root: Path,
+    *,
+    label: str,
+) -> dict[str, RawGitIndexEntry]:
+    raw = run_git_bytes(
+        root,
+        "ls-files",
+        "--stage",
+        "-v",
+        "-z",
+        "--",
+    )
+    if len(raw) > RAW_WORKTREE_GIT_METADATA_BYTE_LIMIT:
+        raise RawWorktreeError(
+            None,
+            f"{label} metadata exceeds the byte limit",
+        )
+    rows = [row for row in raw.split(b"\0") if row]
+    if len(rows) > RAW_WORKTREE_FILE_LIMIT:
+        raise RawWorktreeError(
+            None,
+            f"{label} exceeds the raw worktree file-count limit",
+        )
+    entries: dict[str, RawGitIndexEntry] = {}
+    for row in rows:
+        try:
+            encoded_metadata, encoded_path = row.split(b"\t", 1)
+            tag, mode, object_id, stage = encoded_metadata.decode(
+                "ascii",
+                errors="strict",
+            ).split(" ")
+        except (UnicodeDecodeError, ValueError) as error:
+            raise RawWorktreeError(
+                None,
+                f"{label} contains malformed index metadata: {error}",
+            ) from error
+        relative_path = _raw_git_path(encoded_path, label)
+        if stage != "0":
+            raise RawWorktreeError(
+                relative_path,
+                f"{label} contains an unresolved index stage",
+            )
+        if object_id and set(object_id) == {"0"}:
+            raise RawWorktreeError(
+                relative_path,
+                f"{label} contains an intent-to-add entry",
+            )
+        if (
+            tag not in {"H", "h", "S", "s"}
+            or mode not in {"100644", "100755", "120000", "160000"}
+            or GIT_ID.fullmatch(object_id) is None
+        ):
+            raise RawWorktreeError(
+                relative_path,
+                f"{label} contains unsupported index metadata",
+            )
+        if relative_path in entries:
+            raise RawWorktreeError(
+                relative_path,
+                f"{label} contains a duplicate path",
+            )
+        entries[relative_path] = RawGitIndexEntry(
+            mode=mode,
+            object_id=object_id,
+            skip_worktree=tag in {"S", "s"},
+        )
+    return entries
+
+
+def _git_blob_digest(raw: bytes, object_id: str) -> str:
+    try:
+        digest = hashlib.sha1() if len(object_id) == 40 else hashlib.sha256()
+    except (ValueError, OSError) as error:
+        raise RawWorktreeError(
+            None,
+            f"repository object hash is unavailable: {error}",
+        ) from error
+    digest.update(f"blob {len(raw)}\0".encode("ascii"))
+    digest.update(raw)
+    return digest.hexdigest()
+
+
+def _open_raw_directory(
+    root: Path,
+    components: tuple[str, ...],
+    *,
+    missing_ok: bool,
+) -> int | None:
+    required_flags = ("O_DIRECTORY", "O_NOFOLLOW", "O_CLOEXEC")
+    if any(not hasattr(os, flag) for flag in required_flags):
+        raise RawWorktreeError(
+            None,
+            "raw worktree verification requires descriptor-safe POSIX open flags",
+        )
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(root, flags)
+        for component in components:
+            try:
+                next_descriptor = os.open(
+                    os.fsencode(component),
+                    flags,
+                    dir_fd=descriptor,
+                )
+            except FileNotFoundError:
+                if missing_ok:
+                    os.close(descriptor)
+                    return None
+                raise
+            metadata = os.fstat(next_descriptor)
+            if not stat.S_ISDIR(metadata.st_mode):
+                os.close(next_descriptor)
+                raise RawWorktreeError(
+                    "/".join(components),
+                    "worktree parent is not a real directory",
+                )
+            os.close(descriptor)
+            descriptor = next_descriptor
+        return descriptor
+    except RawWorktreeError:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise
+    except OSError as error:
+        if descriptor is not None:
+            os.close(descriptor)
+        if missing_ok and isinstance(error, FileNotFoundError):
+            return None
+        raise RawWorktreeError(
+            "/".join(components) or None,
+            f"worktree parent cannot be opened safely: {error}",
+        ) from error
+
+
+def _raw_leaf_metadata(
+    parent_descriptor: int,
+    leaf: bytes,
+) -> os.stat_result | None:
+    try:
+        return os.stat(
+            leaf,
+            dir_fd=parent_descriptor,
+            follow_symlinks=False,
+        )
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise RawWorktreeError(
+            None,
+            f"worktree entry cannot be observed safely: {error}",
+        ) from error
+
+
+def _verify_raw_regular_file(
+    parent_descriptor: int,
+    leaf: bytes,
+    relative_path: str,
+    expected: RawGitTreeEntry,
+    metadata: os.stat_result,
+    budget: RawWorktreeBudget,
+) -> None:
+    executable = bool(metadata.st_mode & stat.S_IXUSR)
+    if executable != (expected.mode == "100755"):
+        raise RawWorktreeError(
+            relative_path,
+            "worktree executable mode differs from candidate tree",
+        )
+    if metadata.st_nlink != 1:
+        raise RawWorktreeError(
+            relative_path,
+            "worktree regular file must have exactly one hard link",
+        )
+    if metadata.st_size > RAW_WORKTREE_SINGLE_FILE_BYTE_LIMIT:
+        raise RawWorktreeError(
+            relative_path,
+            "worktree regular file exceeds the single-file byte limit",
+        )
+    projected_total = budget.total_bytes + metadata.st_size
+    if projected_total > RAW_WORKTREE_TOTAL_BYTE_LIMIT:
+        raise RawWorktreeError(
+            relative_path,
+            "raw worktree snapshot exceeds the total byte limit",
+        )
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(leaf, flags, dir_fd=parent_descriptor)
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or _raw_stat_binding(
+            before
+        ) != _raw_stat_binding(metadata):
+            raise RawWorktreeError(
+                relative_path,
+                "worktree entry changed before raw read",
+            )
+        try:
+            digest = (
+                hashlib.sha1() if len(expected.object_id) == 40 else hashlib.sha256()
+            )
+        except (ValueError, OSError) as error:
+            raise RawWorktreeError(
+                relative_path,
+                f"repository object hash is unavailable: {error}",
+            ) from error
+        digest.update(f"blob {before.st_size}\0".encode("ascii"))
+        read_count = 0
+        while True:
+            chunk = os.read(descriptor, 64 * 1024)
+            if not chunk:
+                break
+            read_count += len(chunk)
+            if read_count > RAW_WORKTREE_SINGLE_FILE_BYTE_LIMIT:
+                raise RawWorktreeError(
+                    relative_path,
+                    "worktree regular file exceeds the single-file byte limit",
+                )
+            if budget.total_bytes + read_count > RAW_WORKTREE_TOTAL_BYTE_LIMIT:
+                raise RawWorktreeError(
+                    relative_path,
+                    "raw worktree snapshot exceeds the total byte limit",
+                )
+            digest.update(chunk)
+        after = os.fstat(descriptor)
+        after_name = _raw_leaf_metadata(parent_descriptor, leaf)
+        if (
+            read_count != before.st_size
+            or _raw_stat_binding(before) != _raw_stat_binding(after)
+            or after_name is None
+            or _raw_stat_binding(metadata) != _raw_stat_binding(after_name)
+        ):
+            raise RawWorktreeError(
+                relative_path,
+                "worktree regular file changed while being read",
+            )
+        if digest.hexdigest() != expected.object_id:
+            raise RawWorktreeError(
+                relative_path,
+                "worktree raw bytes differ from candidate tree",
+            )
+        budget.total_bytes += read_count
+    except RawWorktreeError:
+        raise
+    except OSError as error:
+        raise RawWorktreeError(
+            relative_path,
+            f"worktree regular file cannot be read safely: {error}",
+        ) from error
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def verify_raw_worktree_entry(
+    root: Path,
+    relative_path: str,
+    expected: RawGitTreeEntry | None,
+    index_entry: RawGitIndexEntry | None,
+    budget: RawWorktreeBudget,
+) -> None:
+    if not is_normalized_workspace_path(relative_path):
+        raise RawWorktreeError(
+            relative_path,
+            f"worktree drift path is not normalized: {relative_path!r}",
+        )
+    if expected is not None and (
+        index_entry is None
+        or index_entry.mode != expected.mode
+        or index_entry.object_id != expected.object_id
+    ):
+        raise RawWorktreeError(
+            relative_path,
+            "index metadata differs from candidate tree",
+        )
+    if expected is None and index_entry is not None:
+        raise RawWorktreeError(
+            relative_path,
+            "index contains a path absent from candidate tree",
+        )
+    if (
+        expected is not None
+        and is_authority_namespace_path(relative_path)
+        and expected.mode not in {"100644", "100755"}
+    ):
+        raise RawWorktreeError(
+            relative_path,
+            "authority namespace entry must be a regular tracked file",
+        )
+    if expected is not None and expected.mode == "160000":
+        raise RawWorktreeError(
+            relative_path,
+            "gitlink worktree content cannot be verified without executing "
+            "submodule-controlled code",
+        )
+    components = tuple(relative_path.split("/"))
+    parent_descriptor = _open_raw_directory(
+        root,
+        components[:-1],
+        missing_ok=expected is None
+        or bool(index_entry is not None and index_entry.skip_worktree),
+    )
+    if parent_descriptor is None:
+        return
+    leaf = os.fsencode(components[-1])
+    try:
+        parent_before = os.fstat(parent_descriptor)
+        metadata = _raw_leaf_metadata(parent_descriptor, leaf)
+        if metadata is None:
+            parent_after = os.fstat(parent_descriptor)
+            if _raw_stat_binding(parent_before) != _raw_stat_binding(parent_after):
+                raise RawWorktreeError(
+                    relative_path,
+                    "worktree parent changed during missing-path observation",
+                )
+            if expected is None or (
+                index_entry is not None and index_entry.skip_worktree
+            ):
+                return
+            raise RawWorktreeError(
+                relative_path,
+                "worktree path is missing without a skip-worktree index flag",
+            )
+        if expected is None:
+            raise RawWorktreeError(
+                relative_path,
+                "worktree path exists but is absent from candidate tree",
+            )
+        if expected.mode in {"100644", "100755"}:
+            if not stat.S_ISREG(metadata.st_mode):
+                raise RawWorktreeError(
+                    relative_path,
+                    "worktree type differs from candidate regular file",
+                )
+            _verify_raw_regular_file(
+                parent_descriptor,
+                leaf,
+                relative_path,
+                expected,
+                metadata,
+                budget,
+            )
+            return
+        if expected.mode == "120000":
+            if not stat.S_ISLNK(metadata.st_mode):
+                raise RawWorktreeError(
+                    relative_path,
+                    "worktree type differs from candidate symlink",
+                )
+            try:
+                target = os.readlink(leaf, dir_fd=parent_descriptor)
+            except OSError as error:
+                raise RawWorktreeError(
+                    relative_path,
+                    f"worktree symlink cannot be read safely: {error}",
+                ) from error
+            after = _raw_leaf_metadata(parent_descriptor, leaf)
+            if after is None or _raw_stat_binding(metadata) != _raw_stat_binding(after):
+                raise RawWorktreeError(
+                    relative_path,
+                    "worktree symlink changed while being read",
+                )
+            target_bytes = target if isinstance(target, bytes) else os.fsencode(target)
+            if len(target_bytes) > RAW_WORKTREE_SINGLE_FILE_BYTE_LIMIT:
+                raise RawWorktreeError(
+                    relative_path,
+                    "worktree symlink exceeds the single-file byte limit",
+                )
+            if budget.total_bytes + len(target_bytes) > RAW_WORKTREE_TOTAL_BYTE_LIMIT:
+                raise RawWorktreeError(
+                    relative_path,
+                    "raw worktree snapshot exceeds the total byte limit",
+                )
+            if _git_blob_digest(target_bytes, expected.object_id) != (
+                expected.object_id
+            ):
+                raise RawWorktreeError(
+                    relative_path,
+                    "worktree symlink target differs from candidate tree",
+                )
+            budget.total_bytes += len(target_bytes)
+            return
+        raise RawWorktreeError(
+            relative_path,
+            "candidate tree mode is unsupported for raw verification",
+        )
+    finally:
+        os.close(parent_descriptor)
+
+
+def _scan_raw_authority_directory(
+    descriptor: int,
+    prefix: str,
+    *,
+    depth: int,
+    observed: set[str],
+    counter: list[int],
+) -> None:
+    if depth > RAW_WORKTREE_DIRECTORY_DEPTH_LIMIT:
+        raise RawWorktreeError(
+            prefix,
+            "authority scan exceeds the directory-depth limit",
+        )
+    before = os.fstat(descriptor)
+    try:
+        with os.scandir(descriptor) as iterator:
+            entries = sorted(iterator, key=lambda entry: os.fsencode(entry.name))
+    except OSError as error:
+        raise RawWorktreeError(
+            prefix,
+            f"authority directory cannot be scanned safely: {error}",
+        ) from error
+    for entry in entries:
+        counter[0] += 1
+        if counter[0] > RAW_WORKTREE_FILE_LIMIT:
+            raise RawWorktreeError(
+                prefix,
+                "authority scan exceeds the raw worktree file-count limit",
+            )
+        relative_path = f"{prefix}/{entry.name}" if prefix else entry.name
+        if not is_normalized_workspace_path(relative_path):
+            raise RawWorktreeError(
+                relative_path,
+                f"worktree drift path is not normalized: {relative_path!r}",
+            )
+        try:
+            metadata = entry.stat(follow_symlinks=False)
+        except OSError as error:
+            raise RawWorktreeError(
+                relative_path,
+                f"authority entry cannot be observed safely: {error}",
+            ) from error
+        authority_kind = authority_path_kind(relative_path)
+        if stat.S_ISDIR(metadata.st_mode):
+            if (
+                entry.name == ".git" or entry.name in NON_QINAO_BUILD_COMPONENTS
+            ) and authority_kind is None:
+                continue
+            flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+            try:
+                child = os.open(
+                    os.fsencode(entry.name),
+                    flags,
+                    dir_fd=descriptor,
+                )
+            except OSError as error:
+                raise RawWorktreeError(
+                    relative_path,
+                    f"authority directory cannot be opened safely: {error}",
+                ) from error
+            try:
+                if _raw_stat_binding(metadata) != _raw_stat_binding(os.fstat(child)):
+                    raise RawWorktreeError(
+                        relative_path,
+                        "authority directory changed before traversal",
+                    )
+                _scan_raw_authority_directory(
+                    child,
+                    relative_path,
+                    depth=depth + 1,
+                    observed=observed,
+                    counter=counter,
+                )
+            finally:
+                os.close(child)
+        else:
+            if authority_kind is not None and not stat.S_ISREG(metadata.st_mode):
+                raise RawWorktreeError(
+                    relative_path,
+                    "authority namespace entry must be a regular tracked file",
+                )
+            if authority_kind is not None:
+                observed.add(relative_path)
+    after = os.fstat(descriptor)
+    if _raw_stat_binding(before) != _raw_stat_binding(after):
+        raise RawWorktreeError(
+            prefix,
+            "authority directory changed during traversal",
+        )
+
+
+def scan_raw_authority_paths(root: Path) -> set[str]:
+    observed: set[str] = set()
+    counter = [0]
+    descriptor = _open_raw_directory(root, (), missing_ok=False)
+    assert descriptor is not None
+    try:
+        _scan_raw_authority_directory(
+            descriptor,
+            "",
+            depth=0,
+            observed=observed,
+            counter=counter,
+        )
+    finally:
+        os.close(descriptor)
+    return observed
+
+
+def verify_raw_worktree_against_tree(
+    root: Path,
+    tree: str,
+    *,
+    relevant_paths: set[str] | None,
+    scan_authority: bool,
+) -> None:
+    tree_entries = load_raw_git_tree_entries(
+        root,
+        tree,
+        label="candidate tree",
+    )
+    index_entries = load_raw_git_index_entries(
+        root,
+        label="repository index",
+    )
+    tree_paths = set(tree_entries)
+    index_paths = set(index_entries)
+    if tree_paths != index_paths:
+        differing_path = min(tree_paths ^ index_paths)
+        raise RawWorktreeError(
+            differing_path,
+            "index path set differs from candidate tree",
+        )
+    for relative_path in tree_paths:
+        index_entry = index_entries[relative_path]
+        tree_entry = tree_entries[relative_path]
+        if (
+            index_entry.mode != tree_entry.mode
+            or index_entry.object_id != tree_entry.object_id
+        ):
+            raise RawWorktreeError(
+                relative_path,
+                "index metadata differs from candidate tree",
+            )
+    if relevant_paths is None:
+        selected_paths = set(tree_paths)
+    else:
+        selected_paths = set(relevant_paths)
+        for relative_path in selected_paths:
+            if not is_normalized_workspace_path(relative_path):
+                raise RawWorktreeError(
+                    relative_path,
+                    f"worktree drift path is not normalized: {relative_path!r}",
+                )
+    if scan_authority:
+        selected_paths.update(
+            relative_path
+            for relative_path, tree_entry in tree_entries.items()
+            if (
+                is_authority_diff_path(relative_path)
+                or (
+                    is_authority_namespace_path(relative_path)
+                    and tree_entry.mode not in {"100644", "100755"}
+                )
+            )
+        )
+    budget = RawWorktreeBudget()
+    for relative_path in sorted(selected_paths):
+        verify_raw_worktree_entry(
+            root,
+            relative_path,
+            tree_entries.get(relative_path),
+            index_entries.get(relative_path),
+            budget,
+        )
+    if scan_authority:
+        observed_authority_paths = scan_raw_authority_paths(root)
+        unexpected = sorted(observed_authority_paths - tree_paths)
+        if unexpected:
+            raise RawWorktreeError(
+                unexpected[0],
+                "untracked or ignored authority path exists in worktree",
+            )
+
+
+def run_stock_xcrun(*arguments: str) -> str:
+    try:
+        completed = run_bounded_process(
+            ["/usr/bin/xcrun", *arguments],
+            cwd="/",
+            env=XCRUN_SUBPROCESS_ENVIRONMENT,
+            timeout_seconds=XCRUN_TIMEOUT_SECONDS,
+            stdout_limit_bytes=XCRUN_STDOUT_LIMIT_BYTES,
+            stderr_limit_bytes=PROCESS_STDERR_LIMIT_BYTES,
+            text=True,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        fail(f"stock xcrun unavailable or timed out ({' '.join(arguments)})")
+    if completed.returncode != 0:
+        diagnostic = completed.stderr.strip()
+        fail(
+            f"stock xcrun failed ({' '.join(arguments)}): "
+            f"{diagnostic or f'exit {completed.returncode}'}"
+        )
+    output = completed.stdout.strip()
+    if not output or "\n" in output or "\r" in output:
+        fail(f"stock xcrun returned an invalid path ({' '.join(arguments)})")
+    return output
 
 
 def ensure_repository(
@@ -292,8 +1233,41 @@ def ensure_repository(
     tree = run_git(root, "rev-parse", "HEAD^{tree}")
     if GIT_ID.fullmatch(commit) is None or GIT_ID.fullmatch(tree) is None:
         fail("repository HEAD commit/tree is not a canonical Git object ID")
-    if require_clean and run_git(root, "status", "--porcelain=v1"):
-        fail("repository must be clean before K4 collection")
+    if require_clean:
+        try:
+            load_raw_git_index_entries(
+                root,
+                label="repository index",
+            )
+        except RawWorktreeError as error:
+            fail(f"repository must be clean before K4 collection: {error}")
+        cached_drift = run_git_bytes(
+            root,
+            "diff-index",
+            "--cached",
+            "--raw",
+            "-z",
+            "--no-renames",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--ignore-submodules=none",
+            tree,
+            "--",
+        )
+        if cached_drift:
+            fail(
+                "repository must be clean before K4 collection: "
+                "index differs from HEAD tree"
+            )
+        try:
+            verify_raw_worktree_against_tree(
+                root,
+                tree,
+                relevant_paths=None,
+                scan_authority=True,
+            )
+        except RawWorktreeError as error:
+            fail(f"repository must be clean before K4 collection: {error}")
     return root, commit, tree
 
 
@@ -350,7 +1324,7 @@ def read_bound_file(
     try:
         descriptor = os.open(
             path,
-            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK,
         )
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode):
@@ -457,16 +1431,6 @@ def read_evidence_file_from_tree(
         fail("evidence must be one unambiguous regular repository-tree blob")
     raw = run_git_bytes(root, "cat-file", "blob", object_id)
     return absolute, raw, ("git-blob", object_id)
-    try:
-        parent = path_argument.parent.resolve(strict=True)
-    except OSError as error:
-        fail(f"evidence parent cannot be resolved: {error}")
-    path = parent / path_argument.name
-    return read_bound_file(
-        path,
-        label="evidence",
-        require_mode_0600=not path_is_within(path, root),
-    )
 
 
 def require_exact_fields(document: dict, expected: set[str], label: str) -> None:
@@ -555,7 +1519,9 @@ def validate_framework_queries(value: object) -> list[dict]:
     return result
 
 
-def validate_lifecycle(value: object, label: str = "probe matrix lifecycle") -> list[dict]:
+def validate_lifecycle(
+    value: object, label: str = "probe matrix lifecycle"
+) -> list[dict]:
     if not isinstance(value, list):
         fail(f"{label} must be a list")
     rows: list[dict] = []
@@ -619,6 +1585,37 @@ def supported_profile_digest(
     )
 
 
+def derive_status(
+    *,
+    target: dict,
+    entitlement_inventory: list[str],
+    required_entitlements: list[str],
+    sqlite: dict,
+    transport: dict,
+    lifecycle: list[dict],
+    framework_observations: list[dict] | None = None,
+) -> str:
+    missing_entitlements = sorted(
+        set(required_entitlements) - set(entitlement_inventory)
+    )
+    target_missing = target["processModel"] == "missing"
+    framework_missing = framework_observations is not None and any(
+        row["declarationPresence"] == "absent" for row in framework_observations
+    )
+    device_proof_missing = (
+        any(row["observation"] != "passed" for row in lifecycle)
+        or any(sqlite[field] != "passed" for field in SQLITE_FIELDS)
+        or transport["feasibility"] != "passed"
+    )
+    if target_missing or framework_missing:
+        return "disabledMissingTarget"
+    elif missing_entitlements:
+        return "disabledMissingEntitlement"
+    elif device_proof_missing:
+        return "disabledMissingDeviceProof"
+    return "supportedExactProfile"
+
+
 def validate_status_derivation(
     *,
     status_value: object,
@@ -634,27 +1631,15 @@ def validate_status_derivation(
     if status_value not in ALLOWED_STATUSES:
         fail(f"{label} status is invalid")
     status = str(status_value)
-    missing_entitlements = sorted(
-        set(required_entitlements) - set(entitlement_inventory)
+    expected = derive_status(
+        target=target,
+        entitlement_inventory=entitlement_inventory,
+        required_entitlements=required_entitlements,
+        sqlite=sqlite,
+        transport=transport,
+        lifecycle=lifecycle,
+        framework_observations=framework_observations,
     )
-    target_missing = target["processModel"] == "missing"
-    framework_missing = framework_observations is not None and any(
-        row["declarationPresence"] == "absent"
-        for row in framework_observations
-    )
-    device_proof_missing = (
-        any(row["observation"] != "passed" for row in lifecycle)
-        or any(sqlite[field] != "passed" for field in SQLITE_FIELDS)
-        or transport["feasibility"] != "passed"
-    )
-    if target_missing or framework_missing:
-        expected = "disabledMissingTarget"
-    elif missing_entitlements:
-        expected = "disabledMissingEntitlement"
-    elif device_proof_missing:
-        expected = "disabledMissingDeviceProof"
-    else:
-        expected = "supportedExactProfile"
     if status != expected:
         fail(
             f"{label} status does not follow deterministic precedence: "
@@ -776,15 +1761,21 @@ def load_device_profile(
     if errors:
         fail("; ".join(errors))
     require_hex(profile.get("approvedDesignBlob"), "device profile approvedDesignBlob")
-    if require_git_id(
-        profile.get("candidateCommit"),
-        "device profile candidateCommit",
-    ) != commit:
+    if (
+        require_git_id(
+            profile.get("candidateCommit"),
+            "device profile candidateCommit",
+        )
+        != commit
+    ):
         fail("device profile candidateCommit does not match repository HEAD")
-    if require_git_id(
-        profile.get("candidateTree"),
-        "device profile candidateTree",
-    ) != tree:
+    if (
+        require_git_id(
+            profile.get("candidateTree"),
+            "device profile candidateTree",
+        )
+        != tree
+    ):
         fail("device profile candidateTree does not match repository HEAD tree")
     if profile.get("platform") != "iOS":
         fail("device profile platform must be iOS")
@@ -829,6 +1820,45 @@ def inspect_installed_sdk(
         fail(f"Xcode developer directory cannot be resolved: {error}")
     if not developer.is_dir():
         fail("Xcode developer directory must be a directory")
+    try:
+        active_xcodebuild = Path(run_stock_xcrun("--find", "xcodebuild")).resolve(
+            strict=True
+        )
+        active_sdk = Path(
+            run_stock_xcrun("--sdk", "iphoneos", "--show-sdk-path")
+        ).resolve(strict=True)
+    except OSError as error:
+        fail(f"stock xcrun path cannot be resolved: {error}")
+    if not active_xcodebuild.is_file() or active_xcodebuild.name != "xcodebuild":
+        fail("stock xcrun xcodebuild path is not a regular xcodebuild file")
+    try:
+        active_developer = active_xcodebuild.parents[2]
+    except IndexError:
+        fail("stock xcrun xcodebuild path has no active Xcode developer root")
+    developer_metadata = developer.stat()
+    active_developer_metadata = active_developer.stat()
+    if (
+        developer_metadata.st_dev,
+        developer_metadata.st_ino,
+    ) != (
+        active_developer_metadata.st_dev,
+        active_developer_metadata.st_ino,
+    ):
+        fail(
+            "caller Xcode developer directory does not match the active "
+            "Xcode developer selected by stock xcrun"
+        )
+    try:
+        active_sdk.relative_to(developer)
+    except ValueError:
+        fail("stock xcrun SDK is outside the active Xcode developer directory")
+    active_sdk_metadata = active_sdk.stat()
+    if not stat.S_ISDIR(active_sdk_metadata.st_mode):
+        fail("stock xcrun SDK path is not a directory")
+    active_sdk_identity = (
+        active_sdk_metadata.st_dev,
+        active_sdk_metadata.st_ino,
+    )
     version_path = developer.parent / "version.plist"
     try:
         version_raw = version_path.read_bytes()
@@ -842,34 +1872,34 @@ def inspect_installed_sdk(
     if version.get("ProductBuildVersion") != profile["xcodeBuild"]:
         fail("installed Xcode build does not match signed device profile")
 
-    sdk_parent = (
-        developer
-        / "Platforms/iPhoneOS.platform/Developer/SDKs"
-    )
+    sdk_parent = developer / "Platforms/iPhoneOS.platform/Developer/SDKs"
     try:
         sdk_candidates = sorted(sdk_parent.glob("*.sdk"))
     except OSError as error:
         fail(f"installed iPhoneOS SDKs cannot be enumerated: {error}")
-    resolved_sdks: dict[Path, Path] = {}
+    resolved_sdks: dict[tuple[int, int], Path] = {}
     for candidate in sdk_candidates:
         try:
             sdk = candidate.resolve(strict=True)
             sdk.relative_to(developer)
-            if not sdk.is_dir():
+            metadata = sdk.stat()
+            if not stat.S_ISDIR(metadata.st_mode):
                 continue
         except (OSError, ValueError):
             continue
-        resolved_sdks.setdefault(sdk, candidate)
+        resolved_sdks.setdefault(
+            (metadata.st_dev, metadata.st_ino),
+            sdk,
+        )
 
-    matches: list[tuple[Path, bytes, bytes]] = []
-    for sdk in sorted(resolved_sdks):
+    matches: list[tuple[tuple[int, int], Path, bytes, bytes]] = []
+    for identity, sdk in sorted(resolved_sdks.items()):
         try:
             settings_path = sdk / "SDKSettings.json"
             settings_raw = settings_path.read_bytes()
             settings = json.loads(settings_raw)
             system_version_raw = (
-                sdk
-                / "System/Library/CoreServices/SystemVersion.plist"
+                sdk / "System/Library/CoreServices/SystemVersion.plist"
             ).read_bytes()
             system_version = plistlib.loads(system_version_raw)
         except (
@@ -887,13 +1917,15 @@ def inspect_installed_sdk(
             and system_version.get("ProductVersion") == profile["sdkVersion"]
             and system_version.get("ProductBuildVersion") == profile["sdkBuild"]
         ):
-            matches.append((sdk, settings_raw, system_version_raw))
+            matches.append((identity, sdk, settings_raw, system_version_raw))
     if len(matches) != 1:
         fail(
             "signed device profile must match exactly one installed iPhoneOS SDK; "
             f"matched={len(matches)}"
         )
-    sdk, settings_raw, system_version_raw = matches[0]
+    sdk_identity, sdk, settings_raw, system_version_raw = matches[0]
+    if sdk_identity != active_sdk_identity:
+        fail("signed device profile SDK does not match the stock xcrun SDK identity")
     observations: list[dict] = []
     for query in profile["probeMatrix"]["frameworkAPIs"]:
         relative = normalized_sdk_relative_path(
@@ -921,7 +1953,7 @@ def inspect_installed_sdk(
             "processSupportInference": "notInferred",
             "entitlementSupportInference": "notInferred",
         }
-        if digest is not None:
+        if presence == "present":
             observation["declarationDigest"] = digest
         observations.append(observation)
     return (
@@ -943,18 +1975,14 @@ def validate_profile_to_spike_projection(
             fail(f"collection report profile projection mismatch: {field}")
     for spike_field, matrix_field in PROFILE_MATRIX_PROJECTION_FIELDS:
         if report.get(spike_field) != matrix.get(matrix_field):
-            fail(
-                "collection report probeMatrix projection mismatch: "
-                f"{spike_field}"
-            )
+            fail(f"collection report probeMatrix projection mismatch: {spike_field}")
     if report.get("deviceProfileDigest") != sha256(profile_raw):
         fail("collection report deviceProfileDigest mismatch")
     if report.get("probeMatrixDigest") != sha256(canonical_json_bytes(matrix)):
         fail("collection report probeMatrixDigest mismatch")
 
     projected_fields = set(PROFILE_TOP_LEVEL_PROJECTION_FIELDS) | {
-        spike_field
-        for spike_field, _matrix_field in PROFILE_MATRIX_PROJECTION_FIELDS
+        spike_field for spike_field, _matrix_field in PROFILE_MATRIX_PROJECTION_FIELDS
     }
     only_derived_or_envelope_fields = {
         "collectionStatus",
@@ -967,10 +1995,7 @@ def validate_profile_to_spike_projection(
         "signaturePresent",
         "status",
     }
-    if (
-        set(report) - projected_fields
-        != only_derived_or_envelope_fields
-    ):
+    if set(report) - projected_fields != only_derived_or_envelope_fields:
         fail("collection report only-derived field whitelist mismatch")
 
 
@@ -985,8 +2010,7 @@ def derive_collection_report(
     framework_observations: list[dict],
 ) -> dict:
     matrix = profile["probeMatrix"]
-    validate_status_derivation(
-        status_value=matrix["status"],
+    final_status = derive_status(
         target=matrix["target"],
         entitlement_inventory=profile["entitlementInventory"],
         required_entitlements=matrix["requiredEntitlements"],
@@ -994,7 +2018,6 @@ def derive_collection_report(
         transport=matrix["transport"],
         lifecycle=matrix["lifecycle"],
         framework_observations=framework_observations,
-        label="probe matrix",
     )
     derived_profile_digest = supported_profile_digest(
         framework_apis=matrix["frameworkAPIs"],
@@ -1043,7 +2066,7 @@ def derive_collection_report(
         "probeMatrixDigest": sha256(canonical_json_bytes(matrix)),
         "resultBundleDigest": matrix["resultBundleDigest"],
         "supportedProfileDigest": matrix["supportedProfileDigest"],
-        "status": matrix["status"],
+        "status": final_status,
     }
     if set(report) != COLLECTION_REPORT_FIELDS:
         fail("internal collection report field contract drifted")
@@ -1083,10 +2106,7 @@ def write_exclusive_json(path: Path, document: dict) -> None:
     try:
         descriptor = os.open(
             path,
-            os.O_WRONLY
-            | os.O_CREAT
-            | os.O_EXCL
-            | getattr(os, "O_NOFOLLOW", 0),
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
             0o600,
         )
         created = True
@@ -1159,10 +2179,7 @@ def validate_framework_observations(value: object) -> list[dict]:
     if len(identities) != len(set(identities)):
         fail("evidence frameworkAPIAvailability identities must be unique")
     if rows != sorted(rows, key=canonical_json_bytes):
-        fail(
-            "evidence frameworkAPIAvailability must use global RFC 8785 "
-            "element order"
-        )
+        fail("evidence frameworkAPIAvailability must use global RFC 8785 element order")
     return rows
 
 
@@ -1248,9 +2265,7 @@ def validate_evidence_bindings(
         evidence.get("frameworkAPIAvailability")
     )
     framework_apis = validate_framework_queries(evidence.get("frameworkAPIs"))
-    declared_identities = [
-        (row["framework"], row["api"]) for row in framework_apis
-    ]
+    declared_identities = [(row["framework"], row["api"]) for row in framework_apis]
     observed_identities = [
         (row["framework"], row["api"]) for row in framework_observations
     ]
@@ -1322,10 +2337,7 @@ def main() -> int:
         )
         if args.unsigned_output is not None:
             if args.device_profile is None or args.xcode_developer_dir is None:
-                fail(
-                    "collection requires --device-profile and "
-                    "--xcode-developer-dir"
-                )
+                fail("collection requires --device-profile and --xcode-developer-dir")
             profile_path, profile_raw, profile, profile_identity = load_device_profile(
                 args.device_profile,
                 root=root,
@@ -1334,10 +2346,7 @@ def main() -> int:
                 tree=tree,
                 verification_time=verification_time,
             )
-            if (
-                profile_path == trust_path
-                or profile_identity == trust_identity
-            ):
+            if profile_path == trust_path or profile_identity == trust_identity:
                 fail(
                     "trust root and device profile path/device-inode "
                     "bindings must be distinct"
@@ -1377,10 +2386,7 @@ def main() -> int:
                     tree,
                 )
             )
-            if (
-                evidence_path == trust_path
-                or evidence_identity == trust_identity
-            ):
+            if evidence_path == trust_path or evidence_identity == trust_identity:
                 fail(
                     "trust root and evidence path/device-inode bindings "
                     "must be distinct"
@@ -1401,10 +2407,7 @@ def main() -> int:
                 root=root,
                 trust_root=trust_root,
             )
-            print(
-                "qinao K4 platform spike: PASS "
-                "(verified external signature only)"
-            )
+            print("qinao K4 platform spike: PASS (verified external signature only)")
     except GateError as error:
         print(f"qinao K4 platform spike gate failed: {error}", file=sys.stderr)
         return 1

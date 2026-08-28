@@ -12,12 +12,17 @@ import hashlib
 import json
 import os
 import re
+import selectors
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import time
+from contextlib import ExitStack, contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 try:
     from check_qinao_owner_ledger import (
@@ -25,11 +30,16 @@ try:
         ORDERED_WAVE_SCHEDULE,
         WAVE_SCHEDULE,
         canonical_json_bytes,
+        index_qinao_same_document_schema_targets,
         is_authority_diff_path,
+        is_authority_namespace_path,
+        is_normalized_workspace_path,
         parse_utc_timestamp,
         reject_duplicate_json_keys,
+        resolve_qinao_same_document_schema_reference,
         trusted_key,
         validate_signed_document,
+        validate_qinao_draft202012_profile,
         validate_source_selection,
         validate_trust_root,
     )
@@ -39,11 +49,16 @@ except ModuleNotFoundError:
         ORDERED_WAVE_SCHEDULE,
         WAVE_SCHEDULE,
         canonical_json_bytes,
+        index_qinao_same_document_schema_targets,
         is_authority_diff_path,
+        is_authority_namespace_path,
+        is_normalized_workspace_path,
         parse_utc_timestamp,
         reject_duplicate_json_keys,
+        resolve_qinao_same_document_schema_reference,
         trusted_key,
         validate_signed_document,
+        validate_qinao_draft202012_profile,
         validate_source_selection,
         validate_trust_root,
     )
@@ -51,11 +66,15 @@ except ModuleNotFoundError:
 try:
     from run_qinao_k4_ios27_platform_spike import (
         EVIDENCE_FIELDS as K4_EVIDENCE_FIELDS,
+        RawWorktreeError,
+        verify_raw_worktree_against_tree,
         validate_evidence_bindings as validate_k4_evidence_bindings,
     )
 except ModuleNotFoundError:
     from scripts.run_qinao_k4_ios27_platform_spike import (
         EVIDENCE_FIELDS as K4_EVIDENCE_FIELDS,
+        RawWorktreeError,
+        verify_raw_worktree_against_tree,
         validate_evidence_bindings as validate_k4_evidence_bindings,
     )
 
@@ -103,15 +122,12 @@ PRIOR_ADMISSION_REQUIREMENT_FIELDS = {
     "sequenceOrdinal",
     "waveSliceID",
 }
-PRIOR_ADMISSION_OBSERVATION_FIELDS = (
-    PRIOR_ADMISSION_REQUIREMENT_FIELDS
-    | {
-        "baseTree",
-        "candidateTree",
-        "outcome",
-        "previousReceiptBlobDigest",
-    }
-)
+PRIOR_ADMISSION_OBSERVATION_FIELDS = PRIOR_ADMISSION_REQUIREMENT_FIELDS | {
+    "baseTree",
+    "candidateTree",
+    "outcome",
+    "previousReceiptBlobDigest",
+}
 RUNTIME_ENTRY_PREDECESSOR_FIELDS = {
     "blobDigest",
     "candidateTree",
@@ -227,9 +243,7 @@ EVIDENCE_REQUIREMENT_FIELDS = {
     "blobDigest",
     "requiredStatus",
 }
-K4_EVIDENCE_REQUIREMENT_FIELDS = EVIDENCE_REQUIREMENT_FIELDS | {
-    "requiredProfileDigest"
-}
+K4_EVIDENCE_REQUIREMENT_FIELDS = EVIDENCE_REQUIREMENT_FIELDS | {"requiredProfileDigest"}
 VERIFIED_EVIDENCE_FIELDS = EVIDENCE_REQUIREMENT_FIELDS | {"verifiedStatus"}
 VERIFIED_K4_EVIDENCE_FIELDS = K4_EVIDENCE_REQUIREMENT_FIELDS | {
     "verifiedProfileDigest",
@@ -252,19 +266,170 @@ RUNTIME_SLICE_IDS = (
 )
 GIT_TIMEOUT_SECONDS = 30
 OWNER_LEDGER_CHECKER_TIMEOUT_SECONDS = 120
+PROCESS_TERMINATION_GRACE_SECONDS = 5.0
+PROCESS_IO_CHUNK_BYTES = 64 * 1024
+GIT_STDOUT_LIMIT_BYTES = 64 * 1024 * 1024
+OWNER_CHECKER_STDOUT_LIMIT_BYTES = 16 * 1024 * 1024
+PROCESS_STDERR_LIMIT_BYTES = 16 * 1024 * 1024
+CHECKER_STDIN_BOOTSTRAP = (
+    "import sys\n"
+    "source = sys.stdin.buffer.read()\n"
+    "filename = sys.argv[1]\n"
+    "sys.argv = sys.argv[1:]\n"
+    "namespace = {'__file__': filename, "
+    "'__name__': '__qinao_bound_checker__'}\n"
+    "exec(compile(source, filename, 'exec'), namespace)\n"
+    "namespace['__qinao_executed_source__'] = source\n"
+    "namespace['__name__'] = '__main__'\n"
+    "raise SystemExit(namespace['main']())\n"
+)
 GIT_SUBPROCESS_ENVIRONMENT = {
+    "GIT_ATTR_NOSYSTEM": "1",
+    "GIT_CONFIG_COUNT": "5",
     "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_KEY_0": "core.fsmonitor",
+    "GIT_CONFIG_KEY_1": "core.hooksPath",
+    "GIT_CONFIG_KEY_2": "diff.external",
+    "GIT_CONFIG_KEY_3": "core.pager",
+    "GIT_CONFIG_KEY_4": "submodule.recurse",
     "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_SYSTEM": "/dev/null",
+    "GIT_CONFIG_VALUE_0": "false",
+    "GIT_CONFIG_VALUE_1": "/dev/null",
+    "GIT_CONFIG_VALUE_2": "",
+    "GIT_CONFIG_VALUE_3": "cat",
+    "GIT_CONFIG_VALUE_4": "false",
+    "GIT_LITERAL_PATHSPECS": "1",
+    "GIT_NO_LAZY_FETCH": "1",
+    "GIT_NO_REPLACE_OBJECTS": "1",
+    "GIT_OPTIONAL_LOCKS": "0",
+    "GIT_PAGER": "cat",
     "GIT_TERMINAL_PROMPT": "0",
     "HOME": "/nonexistent",
     "LANG": "C",
     "LC_ALL": "C",
+    "PAGER": "cat",
     "PATH": "/usr/bin:/bin",
+    "XDG_CONFIG_HOME": "/nonexistent",
 }
 
 
 class GateError(RuntimeError):
     """One fail-closed admission-gate diagnostic."""
+
+
+class ProcessOutputLimitExceeded(OSError):
+    """A protected child emitted one byte beyond its declared stream cap."""
+
+
+class StoreOnceAction(argparse.Action):
+    """Reject repeated security-sensitive command-line bindings."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: object,
+        option_string: str | None = None,
+    ) -> None:
+        if getattr(namespace, self.dest, None) is not None:
+            parser.error(f"{option_string} may only be specified once")
+        setattr(namespace, self.dest, values)
+
+
+def _executable_identity(value: os.stat_result) -> tuple[int, ...]:
+    return (
+        value.st_dev,
+        value.st_ino,
+        value.st_mode,
+        value.st_nlink,
+        value.st_uid,
+        value.st_gid,
+        value.st_size,
+        value.st_mtime_ns,
+        value.st_ctime_ns,
+    )
+
+
+class BoundGitExecutable:
+    """One stable-open, canonical Git executable binding."""
+
+    def __init__(self, argument: Path) -> None:
+        if not argument.is_absolute():
+            fail("--git-executable must be absolute")
+        try:
+            canonical = argument.resolve(strict=True)
+        except OSError as error:
+            fail(f"--git-executable cannot be resolved: {error}")
+        if canonical != argument:
+            fail("--git-executable must be canonical and non-symlink")
+        try:
+            path_status = argument.lstat()
+        except OSError as error:
+            fail(f"--git-executable cannot be inspected: {error}")
+        if stat.S_ISLNK(path_status.st_mode):
+            fail("--git-executable must be non-symlink")
+        if not stat.S_ISREG(path_status.st_mode):
+            fail("--git-executable must be a regular file")
+        if path_status.st_mode & 0o111 == 0 or not os.access(argument, os.X_OK):
+            fail("--git-executable must be executable")
+        flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        try:
+            descriptor = os.open(argument, flags)
+        except OSError as error:
+            fail(f"--git-executable cannot be opened stably: {error}")
+        try:
+            descriptor_status = os.fstat(descriptor)
+            if not stat.S_ISREG(descriptor_status.st_mode) or _executable_identity(
+                descriptor_status
+            ) != _executable_identity(path_status):
+                fail("--git-executable changed while it was being bound")
+        except BaseException:
+            os.close(descriptor)
+            raise
+        self.path = argument
+        self.descriptor = descriptor
+        self.identity = _executable_identity(descriptor_status)
+
+    def verify_not_replaced(self) -> None:
+        try:
+            path_status = self.path.lstat()
+            descriptor_status = os.fstat(self.descriptor)
+        except OSError as error:
+            fail(f"bound --git-executable was replaced: {error}")
+        if (
+            stat.S_ISLNK(path_status.st_mode)
+            or not stat.S_ISREG(path_status.st_mode)
+            or not stat.S_ISREG(descriptor_status.st_mode)
+            or _executable_identity(path_status) != self.identity
+            or _executable_identity(descriptor_status) != self.identity
+            or path_status.st_mode & 0o111 == 0
+            or not os.access(self.path, os.X_OK)
+        ):
+            fail("bound --git-executable was replaced or modified")
+
+    def close(self) -> None:
+        if self.descriptor >= 0:
+            os.close(self.descriptor)
+            self.descriptor = -1
+
+
+_BOUND_GIT_EXECUTABLE: ContextVar[BoundGitExecutable | None] = ContextVar(
+    "qinao_bound_git_executable",
+    default=None,
+)
+
+
+@contextmanager
+def bind_git_executable(argument: Path):
+    bound = BoundGitExecutable(argument)
+    token = _BOUND_GIT_EXECUTABLE.set(bound)
+    try:
+        yield bound
+    finally:
+        _BOUND_GIT_EXECUTABLE.reset(token)
+        bound.close()
 
 
 def expected_predecessor_tuple(
@@ -302,10 +467,7 @@ def validate_operation_nonce_collisions(
             seen[key] = identity
             continue
         if previous[0] != identity[0]:
-            fail(
-                "signed document nonce collision between "
-                f"{previous[1]} and {label}"
-            )
+            fail(f"signed document nonce collision between {previous[1]} and {label}")
 
 
 def required_document_timestamp(
@@ -345,9 +507,7 @@ def validate_receipt_time_relationships(
         label,
     )
     if not verified_at <= receipt_issued_at < receipt_expires_at:
-        fail(
-            f"{label} must satisfy verifiedAt <= issuedAt < expiresAt"
-        )
+        fail(f"{label} must satisfy verifiedAt <= issuedAt < expiresAt")
     trust_issued_at = required_document_timestamp(
         trust_root,
         "issuedAt",
@@ -373,10 +533,7 @@ def validate_receipt_time_relationships(
             input_label,
         )
         if not input_issued_at <= verified_at < input_expires_at:
-            fail(
-                f"{label} verifiedAt is outside {input_label} input "
-                "time window"
-            )
+            fail(f"{label} verifiedAt is outside {input_label} input time window")
         is_source_selection = "schemaVersion" in document
         role = (
             document.get("reviewerRole")
@@ -392,9 +549,7 @@ def validate_receipt_time_relationships(
             trust_root,
             signer=None if is_source_selection else document.get("signer"),
             principal=(
-                document.get("reviewerPrincipal")
-                if is_source_selection
-                else None
+                document.get("reviewerPrincipal") if is_source_selection else None
             ),
             role=role,
             schema_scope=schema_scope,
@@ -414,17 +569,195 @@ def validate_receipt_time_relationships(
             f"{input_label} signing key",
         )
         if not key_not_before <= verified_at < key_not_after:
-            fail(
-                f"{label} verifiedAt is outside {input_label} signing-key "
-                "time window"
-            )
+            fail(f"{label} verifiedAt is outside {input_label} signing-key time window")
 
 
 def fail(message: str) -> None:
     raise GateError(message)
 
 
+def terminate_process_group(
+    process: subprocess.Popen,
+    *,
+    grace_seconds: float,
+) -> None:
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except (PermissionError, ProcessLookupError):
+        pass
+    time.sleep(grace_seconds)
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (PermissionError, ProcessLookupError):
+        pass
+    if process.stdin is not None:
+        process.stdin.close()
+    if process.stdout is not None:
+        process.stdout.close()
+    if process.stderr is not None:
+        process.stderr.close()
+    try:
+        process.wait(timeout=grace_seconds)
+    except ChildProcessError:
+        return
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=grace_seconds)
+
+
+def run_bounded_process(
+    command: list[str],
+    *,
+    cwd: Path | str,
+    env: dict[str, str] | None,
+    timeout_seconds: float,
+    termination_grace_seconds: float = PROCESS_TERMINATION_GRACE_SECONDS,
+    stdout_limit_bytes: int,
+    stderr_limit_bytes: int,
+    text: bool,
+    input_bytes: bytes | None = None,
+    pass_fds: tuple[int, ...] = (),
+) -> subprocess.CompletedProcess:
+    if (
+        timeout_seconds <= 0
+        or termination_grace_seconds <= 0
+        or stdout_limit_bytes <= 0
+        or stderr_limit_bytes <= 0
+    ):
+        raise OSError("protected subprocess requires positive time and output bounds")
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        stdin=subprocess.PIPE if input_bytes is not None else None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=False,
+        start_new_session=True,
+        pass_fds=pass_fds,
+    )
+    if process.stdout is None or process.stderr is None:
+        terminate_process_group(
+            process,
+            grace_seconds=termination_grace_seconds,
+        )
+        raise OSError("protected subprocess pipes are unavailable")
+    stdout_buffer = bytearray()
+    stderr_buffer = bytearray()
+    selector = selectors.DefaultSelector()
+    deadline = time.monotonic() + timeout_seconds
+    input_offset = 0
+    try:
+        os.set_blocking(process.stdout.fileno(), False)
+        os.set_blocking(process.stderr.fileno(), False)
+        selector.register(
+            process.stdout,
+            selectors.EVENT_READ,
+            ("stdout", stdout_buffer, stdout_limit_bytes),
+        )
+        selector.register(
+            process.stderr,
+            selectors.EVENT_READ,
+            ("stderr", stderr_buffer, stderr_limit_bytes),
+        )
+        open_streams = 2
+        if process.stdin is not None:
+            os.set_blocking(process.stdin.fileno(), False)
+            if input_bytes:
+                selector.register(
+                    process.stdin,
+                    selectors.EVENT_WRITE,
+                    ("stdin", None, None),
+                )
+                open_streams += 1
+            else:
+                process.stdin.close()
+        while open_streams:
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                raise subprocess.TimeoutExpired(
+                    command,
+                    timeout_seconds,
+                    output=bytes(stdout_buffer),
+                    stderr=bytes(stderr_buffer),
+                )
+            events = selector.select(remaining_seconds)
+            if not events:
+                continue
+            for key, _mask in events:
+                stream_name, buffer, limit_bytes = key.data
+                if stream_name == "stdin":
+                    try:
+                        written = os.write(
+                            key.fd,
+                            input_bytes[
+                                input_offset : input_offset + PROCESS_IO_CHUNK_BYTES
+                            ],
+                        )
+                    except BrokenPipeError:
+                        written = 0
+                    input_offset += written
+                    if written == 0 or input_offset == len(input_bytes):
+                        selector.unregister(key.fileobj)
+                        key.fileobj.close()
+                        open_streams -= 1
+                    continue
+                read_size = min(
+                    PROCESS_IO_CHUNK_BYTES,
+                    limit_bytes + 1 - len(buffer),
+                )
+                chunk = os.read(key.fd, read_size)
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    key.fileobj.close()
+                    open_streams -= 1
+                    continue
+                buffer.extend(chunk)
+                if len(buffer) > limit_bytes:
+                    raise ProcessOutputLimitExceeded(
+                        f"protected subprocess {stream_name} limit exceeded "
+                        f"({limit_bytes} bytes)"
+                    )
+        remaining_seconds = deadline - time.monotonic()
+        if remaining_seconds <= 0:
+            raise subprocess.TimeoutExpired(
+                command,
+                timeout_seconds,
+                output=bytes(stdout_buffer),
+                stderr=bytes(stderr_buffer),
+            )
+        returncode = process.wait(timeout=remaining_seconds)
+    except (OSError, subprocess.TimeoutExpired):
+        terminate_process_group(
+            process,
+            grace_seconds=termination_grace_seconds,
+        )
+        raise
+    finally:
+        selector.close()
+    stdout: bytes | str = bytes(stdout_buffer)
+    stderr: bytes | str = bytes(stderr_buffer)
+    if text:
+        stdout = stdout.decode("utf-8", errors="strict")
+        stderr = stderr.decode("utf-8", errors="strict")
+    return subprocess.CompletedProcess(
+        command,
+        returncode,
+        stdout,
+        stderr,
+    )
+
+
 def add_common_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--git-executable",
+        type=Path,
+        action=StoreOnceAction,
+        required=True,
+    )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--source-selection", type=Path, required=True)
@@ -464,17 +797,24 @@ def run_git(
     *,
     input_bytes: bytes | None = None,
 ) -> bytes:
+    bound_git = _BOUND_GIT_EXECUTABLE.get()
+    if bound_git is None:
+        fail("--git-executable is not stably bound")
+    bound_git.verify_not_replaced()
     try:
-        completed = subprocess.run(
-            ["git", *arguments],
-            cwd=root,
-            input=input_bytes,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            env=GIT_SUBPROCESS_ENVIRONMENT,
-            timeout=GIT_TIMEOUT_SECONDS,
-        )
+        try:
+            completed = run_bounded_process(
+                [str(bound_git.path), *arguments],
+                cwd=root,
+                env=GIT_SUBPROCESS_ENVIRONMENT,
+                timeout_seconds=GIT_TIMEOUT_SECONDS,
+                stdout_limit_bytes=GIT_STDOUT_LIMIT_BYTES,
+                stderr_limit_bytes=PROCESS_STDERR_LIMIT_BYTES,
+                text=False,
+                input_bytes=input_bytes,
+            )
+        finally:
+            bound_git.verify_not_replaced()
     except (OSError, subprocess.TimeoutExpired):
         fail(f"Git command unavailable or timed out ({' '.join(arguments)})")
     if completed.returncode != 0:
@@ -490,23 +830,6 @@ def sha256(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def is_normalized_path(value: object) -> bool:
-    if (
-        not isinstance(value, str)
-        or not value
-        or "\\" in value
-        or any(ord(character) < 0x20 for character in value)
-    ):
-        return False
-    path = PurePosixPath(value)
-    return (
-        not path.is_absolute()
-        and ".." not in path.parts
-        and "." not in path.parts
-        and str(path) == value
-    )
-
-
 def ensure_repository(root_argument: Path) -> Path:
     try:
         root = root_argument.resolve(strict=True)
@@ -514,10 +837,14 @@ def ensure_repository(root_argument: Path) -> Path:
         fail(f"--root cannot be resolved: {error}")
     if not root.is_dir():
         fail("--root must be a directory")
-    discovered = run_git(
-        root,
-        ["rev-parse", "--show-toplevel"],
-    ).decode("utf-8", errors="strict").strip()
+    discovered = (
+        run_git(
+            root,
+            ["rev-parse", "--show-toplevel"],
+        )
+        .decode("utf-8", errors="strict")
+        .strip()
+    )
     try:
         discovered_root = Path(discovered).resolve(strict=True)
     except OSError as error:
@@ -579,7 +906,7 @@ def external_file_bytes(
     try:
         descriptor = os.open(
             path,
-            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK,
         )
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode):
@@ -631,7 +958,9 @@ def external_file_bytes(
             os.close(descriptor)
 
 
-def repository_file_path(path_argument: Path, root: Path, label: str) -> tuple[Path, str]:
+def repository_file_path(
+    path_argument: Path, root: Path, label: str
+) -> tuple[Path, str]:
     try:
         parent = path_argument.parent.resolve(strict=True)
     except OSError as error:
@@ -641,7 +970,7 @@ def repository_file_path(path_argument: Path, root: Path, label: str) -> tuple[P
         relative = path.relative_to(root).as_posix()
     except ValueError as error:
         fail(f"{label} must be inside the repository: {error}")
-    if not is_normalized_path(relative):
+    if not is_normalized_workspace_path(relative):
         fail(f"{label} path is not normalized: {relative!r}")
     return path, relative
 
@@ -661,7 +990,7 @@ def open_bound_checker(
     try:
         descriptor = os.open(
             path,
-            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK,
         )
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode):
@@ -694,15 +1023,19 @@ def open_bound_checker(
             before.st_ctime_ns,
         )
         after = os.fstat(descriptor)
-        if binding != (
-            after.st_dev,
-            after.st_ino,
-            after.st_mode,
-            after.st_nlink,
-            after.st_size,
-            after.st_mtime_ns,
-            after.st_ctime_ns,
-        ) or byte_count != before.st_size:
+        if (
+            binding
+            != (
+                after.st_dev,
+                after.st_ino,
+                after.st_mode,
+                after.st_nlink,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            )
+            or byte_count != before.st_size
+        ):
             fail(f"{label} changed while its bound descriptor was read")
         return descriptor, b"".join(chunks), binding
     except OSError as error:
@@ -719,6 +1052,7 @@ def read_only_snapshot_descriptor(raw: bytes, label: str) -> int:
     descriptor: int | None = None
     read_descriptor: int | None = None
     snapshot_path: str | None = None
+    retain_read_descriptor = False
     try:
         descriptor, snapshot_path = tempfile.mkstemp(
             prefix="qinao-bound-",
@@ -731,29 +1065,79 @@ def read_only_snapshot_descriptor(raw: bytes, label: str) -> int:
                 raise OSError("short snapshot write")
             offset += written
         os.fsync(descriptor)
-        os.close(descriptor)
-        descriptor = None
+        writer_metadata = os.fstat(descriptor)
         read_descriptor = os.open(
             snapshot_path,
-            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK,
         )
-        metadata = os.fstat(read_descriptor)
+        read_before = os.fstat(read_descriptor)
+        writer_identity = (
+            writer_metadata.st_dev,
+            writer_metadata.st_ino,
+            writer_metadata.st_mode,
+            writer_metadata.st_nlink,
+            writer_metadata.st_size,
+        )
+        read_identity = (
+            read_before.st_dev,
+            read_before.st_ino,
+            read_before.st_mode,
+            read_before.st_nlink,
+            read_before.st_size,
+        )
         if (
-            not stat.S_ISREG(metadata.st_mode)
-            or metadata.st_nlink != 1
-            or metadata.st_size != len(raw)
+            writer_identity != read_identity
+            or not stat.S_ISREG(read_before.st_mode)
+            or read_before.st_nlink != 1
+            or read_before.st_size != len(raw)
         ):
+            fail(f"{label} captured-byte snapshot binding is invalid")
+        chunks: list[bytes] = []
+        read_offset = 0
+        while read_offset < len(raw):
+            chunk = os.pread(
+                read_descriptor,
+                min(64 * 1024, len(raw) - read_offset),
+                read_offset,
+            )
+            if not chunk:
+                break
+            chunks.append(chunk)
+            read_offset += len(chunk)
+        read_after = os.fstat(read_descriptor)
+        read_before_binding = (
+            read_before.st_dev,
+            read_before.st_ino,
+            read_before.st_mode,
+            read_before.st_nlink,
+            read_before.st_size,
+            read_before.st_mtime_ns,
+            read_before.st_ctime_ns,
+        )
+        read_after_binding = (
+            read_after.st_dev,
+            read_after.st_ino,
+            read_after.st_mode,
+            read_after.st_nlink,
+            read_after.st_size,
+            read_after.st_mtime_ns,
+            read_after.st_ctime_ns,
+        )
+        if read_before_binding != read_after_binding or b"".join(chunks) != raw:
             fail(f"{label} captured-byte snapshot binding is invalid")
         os.unlink(snapshot_path)
         snapshot_path = None
+        os.close(descriptor)
+        descriptor = None
+        retain_read_descriptor = True
         return read_descriptor
     except OSError as error:
-        if read_descriptor is not None:
-            os.close(read_descriptor)
         fail(f"{label} captured-byte snapshot cannot be created: {error}")
     finally:
         if descriptor is not None:
             os.close(descriptor)
+        if read_descriptor is not None and not retain_read_descriptor:
+            os.close(read_descriptor)
         if snapshot_path is not None:
             try:
                 os.unlink(snapshot_path)
@@ -769,7 +1153,7 @@ def read_tree_file(
     *,
     expected_mode: str | None = None,
 ) -> bytes:
-    if not is_normalized_path(relative_path):
+    if not is_normalized_workspace_path(relative_path):
         fail(f"{label} path is not normalized: {relative_path!r}")
     listing = run_git(
         root,
@@ -803,7 +1187,7 @@ def git_tree_blob_entry(
 ) -> tuple[str, str] | None:
     if not isinstance(tree, str) or HEX_40.fullmatch(tree) is None:
         fail(f"{label} tree must be a Git object ID")
-    if not is_normalized_path(relative_path):
+    if not is_normalized_workspace_path(relative_path):
         fail(f"{label} path is not normalized: {relative_path!r}")
     listing = run_git(
         root,
@@ -879,7 +1263,7 @@ def git_tree_diff_entries(
         old_mode, new_mode, old_blob, new_blob, status = fields
         if (
             status not in {"A", "D", "M", "T"}
-            or not is_normalized_path(path)
+            or not is_normalized_workspace_path(path)
             or re.fullmatch(r"[0-7]{6}", old_mode) is None
             or re.fullmatch(r"[0-7]{6}", new_mode) is None
             or HEX_40.fullmatch(old_blob) is None
@@ -920,21 +1304,36 @@ def validate_inline_json_schema(
         fail(f"{label} jsonSchema $id mismatch")
     if schema.get("title") != name:
         fail(f"{label} jsonSchema title mismatch")
+    profile_errors = validate_qinao_draft202012_profile(schema)
+    if profile_errors:
+        fail(f"{label} jsonSchema profile failed: {'; '.join(profile_errors)}")
+    (
+        eligible_schemas,
+        static_anchors,
+        dynamic_anchors,
+    ) = index_qinao_same_document_schema_targets(schema)
 
-    def resolve_local_reference(reference: str) -> object:
-        if reference == "#":
-            return schema
-        if not reference.startswith("#/"):
-            fail(f"{label} jsonSchema contains a remote or non-local $ref")
-        current: object = schema
-        for encoded_part in reference[2:].split("/"):
-            part = encoded_part.replace("~1", "/").replace("~0", "~")
-            if not isinstance(current, dict) or part not in current:
-                fail(f"{label} jsonSchema contains an unresolved local $ref")
-            current = current[part]
-        if not isinstance(current, (dict, bool)):
+    def resolve_local_reference(
+        reference: str,
+        *,
+        reference_kind: str,
+    ) -> object:
+        resolved, target = resolve_qinao_same_document_schema_reference(
+            schema,
+            reference,
+            eligible_schemas=eligible_schemas,
+            static_anchors=static_anchors,
+            dynamic_anchors=dynamic_anchors,
+            reference_kind=reference_kind,
+        )
+        if not resolved:
+            fail(f"{label} jsonSchema contains an unresolved local $ref")
+        # The shared profile validator above proves that every local reference
+        # resolves to a schema-keyword position; keep this runtime assertion so
+        # later refactors cannot turn instance data into an executable schema.
+        if type(target) is not dict and type(target) is not bool:
             fail(f"{label} jsonSchema $ref does not resolve to a schema")
-        return current
+        return target
 
     visited: set[int] = set()
 
@@ -952,7 +1351,24 @@ def validate_inline_json_schema(
         if reference is not None:
             if not isinstance(reference, str) or not reference:
                 fail(f"{label} jsonSchema {pointer}/$ref must be non-empty")
-            walk(resolve_local_reference(reference), f"{pointer}/$ref")
+            walk(
+                resolve_local_reference(
+                    reference,
+                    reference_kind="static",
+                ),
+                f"{pointer}/$ref",
+            )
+        dynamic_reference = node.get("$dynamicRef")
+        if dynamic_reference is not None:
+            if not isinstance(dynamic_reference, str) or not dynamic_reference:
+                fail(f"{label} jsonSchema {pointer}/$dynamicRef must be non-empty")
+            walk(
+                resolve_local_reference(
+                    dynamic_reference,
+                    reference_kind="dynamic",
+                ),
+                f"{pointer}/$dynamicRef",
+            )
 
         schema_type = node.get("type")
         allowed_types = {
@@ -983,10 +1399,7 @@ def validate_inline_json_schema(
         required = node.get("required")
         object_branch = (
             schema_type == "object"
-            or (
-                isinstance(schema_type, list)
-                and "object" in schema_type
-            )
+            or (isinstance(schema_type, list) and "object" in schema_type)
             or properties is not None
             or required is not None
         )
@@ -1003,23 +1416,18 @@ def validate_inline_json_schema(
                 fail(f"{label} jsonSchema {pointer}/properties must be an object")
             for property_name, child in properties.items():
                 if not isinstance(property_name, str) or not property_name:
-                    fail(
-                        f"{label} jsonSchema {pointer}/properties has "
-                        "an invalid name"
-                    )
+                    fail(f"{label} jsonSchema {pointer}/properties has an invalid name")
                 walk(child, f"{pointer}/properties/{property_name}")
         if required is not None:
             if (
                 not isinstance(required, list)
-                or not required
                 or not all(isinstance(value, str) and value for value in required)
                 or len(required) != len(set(required))
             ):
                 fail(f"{label} jsonSchema {pointer}/required is invalid")
             if isinstance(properties, dict) and not set(required) <= set(properties):
                 fail(
-                    f"{label} jsonSchema {pointer}/required names an "
-                    "undefined property"
+                    f"{label} jsonSchema {pointer}/required names an undefined property"
                 )
 
         definitions = node.get("$defs")
@@ -1115,6 +1523,36 @@ def validate_frozen_schema_digests(
         fail("bundle frozenSchemaDigests order is not scheduled")
 
 
+def validate_frozen_schema_continuity(
+    current_rows: object,
+    previous_rows: object,
+) -> None:
+    if not isinstance(current_rows, list) or not isinstance(previous_rows, list):
+        fail("frozen schema continuity inputs must be arrays")
+    current_by_identity: dict[tuple[str, str], dict] = {}
+    previous_by_identity: dict[tuple[str, str], dict] = {}
+    for label, rows, target in (
+        ("current", current_rows, current_by_identity),
+        ("previous", previous_rows, previous_by_identity),
+    ):
+        for index, row in enumerate(rows):
+            if not isinstance(row, dict) or set(row) != FROZEN_SCHEMA_FIELDS:
+                fail(f"frozen schema continuity {label}[{index}] fields mismatch")
+            identity = (row.get("name"), row.get("version"))
+            if (
+                not all(isinstance(value, str) and value for value in identity)
+                or identity in target
+            ):
+                fail(f"frozen schema continuity {label} identity is invalid")
+            target[identity] = row
+    for identity, previous in previous_by_identity.items():
+        current = current_by_identity.get(identity)
+        if current is None:
+            fail(f"frozen schema continuity missing {identity!r}")
+        if canonical_json_bytes(current) != canonical_json_bytes(previous):
+            fail(f"frozen schema continuity redefinition {identity!r}")
+
+
 def validate_prior_admission_bindings(
     value: object,
     *,
@@ -1130,10 +1568,7 @@ def validate_prior_admission_bindings(
     if len(value) != 5:
         fail("W6.6 priorAdmissionReceipts must contain exactly receipts 01–05")
     for ordinal, row in enumerate(value, start=1):
-        if (
-            not isinstance(row, dict)
-            or set(row) != PRIOR_ADMISSION_REQUIREMENT_FIELDS
-        ):
+        if not isinstance(row, dict) or set(row) != PRIOR_ADMISSION_REQUIREMENT_FIELDS:
             fail(f"W6.6 priorAdmissionReceipts[{ordinal - 1}] fields mismatch")
         if (
             row.get("waveSliceID") != RUNTIME_SLICE_IDS[ordinal - 1]
@@ -1229,8 +1664,7 @@ def validate_bundle(
     if (
         type(sequence_ordinal) is not int
         or sequence_ordinal < 1
-        or WAVE_SCHEDULE.get((wave, document.get("waveSliceID")))
-        != sequence_ordinal
+        or WAVE_SCHEDULE.get((wave, document.get("waveSliceID"))) != sequence_ordinal
     ):
         fail("bundle waveSliceID/sequenceOrdinal is not on the exact schedule")
     require_hex(document.get("baseCommit"), "bundle baseCommit", HEX_40)
@@ -1335,9 +1769,7 @@ def validate_previous_receipt(
         fail(str(error))
     if expected_predecessor is not None:
         if schema != "QinaoWaveAdmissionReceiptV1":
-            fail(
-                "previous receipt must be the exact preceding schedule row"
-            )
+            fail("previous receipt must be the exact preceding schedule row")
         expected_wave, expected_slice, expected_ordinal = expected_predecessor
         observed_predecessor = (
             document.get("wave"),
@@ -1345,10 +1777,7 @@ def validate_previous_receipt(
             document.get("sequenceOrdinal"),
         )
         if observed_predecessor != expected_predecessor:
-            fail(
-                "previous receipt does not equal the exact preceding "
-                "schedule row"
-            )
+            fail("previous receipt does not equal the exact preceding schedule row")
         validate_uniform_wave_receipt(
             document,
             label="previous wave admission receipt",
@@ -1361,10 +1790,7 @@ def validate_previous_receipt(
             verification_time=verification_time,
         )
         if document.get("candidateTree") != base_tree:
-            fail(
-                "previous wave receipt candidateTree does not equal "
-                "bundle base tree"
-            )
+            fail("previous wave receipt candidateTree does not equal bundle base tree")
         validate_receipt_time_relationships(
             document,
             label="previous wave admission receipt",
@@ -1384,10 +1810,7 @@ def validate_previous_receipt(
         approved_path,
         "source selection approved design",
     )
-    if (
-        approved_entry is None
-        or approved_entry[1] != approved_design.get("blob")
-    ):
+    if approved_entry is None or approved_entry[1] != approved_design.get("blob"):
         fail("source selection approved design tree/blob binding mismatch")
     selected_entry = git_tree_blob_entry(
         root,
@@ -1427,10 +1850,7 @@ def validate_previous_receipt(
             "root admission receipt signingProvider",
         )
         if not exact_design_already_present:
-            fail(
-                "W0.1 root predecessor cannot skip the required "
-                "design-edge receipt"
-            )
+            fail("W0.1 root predecessor cannot skip the required design-edge receipt")
         selector = document.get("verifiedSelector")
         if not isinstance(selector, dict) or set(selector) != {
             "principalID",
@@ -1445,10 +1865,7 @@ def validate_previous_receipt(
             "source selection issuedAt",
         )
         if source_issued_at_error is not None or source_issued_at is None:
-            fail(
-                source_issued_at_error
-                or "source selection issuedAt is invalid"
-            )
+            fail(source_issued_at_error or "source selection issuedAt is invalid")
         resolved_selector = trusted_key(
             trust_root,
             signer=None,
@@ -1465,9 +1882,7 @@ def validate_previous_receipt(
             "keyID": key["keyID"],
             "role": key["role"],
             "schemaScope": key["schemaScope"],
-            "publicKeyFingerprintSHA256": key[
-                "publicKeyFingerprintSHA256"
-            ],
+            "publicKeyFingerprintSHA256": key["publicKeyFingerprintSHA256"],
         }
         if selector != expected_selector:
             fail("root admission receipt verifiedSelector mismatch")
@@ -1485,8 +1900,7 @@ def validate_previous_receipt(
         if (
             document.get("baseCommit") != source_selection.get("selectedHEAD")
             or document.get("baseTree") != source_selection.get("selectedTree")
-            or document.get("approvedDesign")
-            != source_selection.get("approvedDesign")
+            or document.get("approvedDesign") != source_selection.get("approvedDesign")
         ):
             fail("design-edge admission receipt source/root binding mismatch")
         if document.get("candidateTree") != base_tree:
@@ -1570,13 +1984,11 @@ def validate_uniform_wave_receipt(
         fail(f"{label} fields mismatch")
     if (
         document.get("schema") != "QinaoWaveAdmissionReceiptV1"
-        or document.get("repositoryIdentity")
-        != trust_root.get("repositoryIdentity")
+        or document.get("repositoryIdentity") != trust_root.get("repositoryIdentity")
         or document.get("wave") != expected_wave
         or document.get("waveSliceID") != expected_slice
         or document.get("sequenceOrdinal") != expected_ordinal
-        or WAVE_SCHEDULE.get((expected_wave, expected_slice))
-        != expected_ordinal
+        or WAVE_SCHEDULE.get((expected_wave, expected_slice)) != expected_ordinal
         or document.get("outcome") != "admitted"
     ):
         fail(f"{label} identity/schedule/outcome mismatch")
@@ -1652,8 +2064,7 @@ def validate_uniform_wave_receipt(
             or row.get("schema") != "QinaoK4IOS27PlatformSpikeV1"
             or row.get("requiredStatus") != "supportedExactProfile"
             or row.get("verifiedStatus") != row.get("requiredStatus")
-            or row.get("verifiedProfileDigest")
-            != row.get("requiredProfileDigest")
+            or row.get("verifiedProfileDigest") != row.get("requiredProfileDigest")
         ):
             fail(f"{label} W5 K4 evidence observation mismatch")
         for field in (
@@ -1762,8 +2173,7 @@ def validate_prior_admission_receipts(
     is_w6_chain_consumer = (
         bundle.get("wave") == "W6"
         and bundle.get("sequenceOrdinal") in {7, 8}
-        and bundle.get("waveSliceID")
-        in {"w6.apple-lab", "w6.certification"}
+        and bundle.get("waveSliceID") in {"w6.apple-lab", "w6.certification"}
     )
     if not is_w6_6 and not is_w6_chain_consumer:
         if arguments:
@@ -1871,14 +2281,14 @@ def validate_prior_admission_receipts(
             expected_ordinal=ordinal,
             verification_time=verification_time,
         )
-        signed_documents.append(
-            (f"prior admission receipt {slice_id}", receipt)
-        )
+        signed_documents.append((f"prior admission receipt {slice_id}", receipt))
         if sha256(raw) != requirement["receiptBlobDigest"]:
             fail(f"prior admission receipt {slice_id} blob digest mismatch")
         predecessor_raw = entry_raw if ordinal == 1 else prior_raws[-1]
-        predecessor_receipt = (
-            entry_receipt if ordinal == 1 else prior_receipts[-1]
+        predecessor_receipt = entry_receipt if ordinal == 1 else prior_receipts[-1]
+        validate_frozen_schema_continuity(
+            receipt.get("frozenSchemaDigests"),
+            predecessor_receipt.get("frozenSchemaDigests", []),
         )
         if (
             receipt["previousReceiptBlobDigest"] != sha256(predecessor_raw)
@@ -1901,9 +2311,7 @@ def validate_prior_admission_receipts(
             **requirement,
             "baseTree": receipt["baseTree"],
             "candidateTree": receipt["candidateTree"],
-            "previousReceiptBlobDigest": receipt[
-                "previousReceiptBlobDigest"
-            ],
+            "previousReceiptBlobDigest": receipt["previousReceiptBlobDigest"],
             "outcome": receipt["outcome"],
         }
         if set(observation) != PRIOR_ADMISSION_OBSERVATION_FIELDS:
@@ -1932,7 +2340,7 @@ def parse_path_list(raw: bytes) -> list[str]:
     paths = contents.splitlines()
     if not paths:
         fail("path list must be non-empty")
-    if any(not is_normalized_path(path) for path in paths):
+    if any(not is_normalized_workspace_path(path) for path in paths):
         fail("path list contains a non-normalized repository path")
     if paths != sorted(paths):
         fail("path list must be lexicographically sorted")
@@ -1948,6 +2356,9 @@ def index_diff_paths(root: Path, base_tree: str, candidate_tree: str) -> set[str
             "diff",
             "--name-only",
             "--no-renames",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--ignore-submodules=all",
             "-z",
             base_tree,
             candidate_tree,
@@ -1955,11 +2366,7 @@ def index_diff_paths(root: Path, base_tree: str, candidate_tree: str) -> set[str
         ],
     )
     try:
-        return {
-            value.decode("utf-8")
-            for value in raw.split(b"\0")
-            if value
-        }
+        return {value.decode("utf-8") for value in raw.split(b"\0") if value}
     except UnicodeDecodeError as error:
         fail(f"Git diff contains a non-UTF-8 path: {error}")
 
@@ -1967,21 +2374,39 @@ def index_diff_paths(root: Path, base_tree: str, candidate_tree: str) -> set[str
 def ensure_index_candidate(root: Path, candidate_tree: str) -> None:
     if HEX_40.fullmatch(candidate_tree) is None:
         fail("--candidate-tree must be a canonical Git tree ID")
-    object_type = run_git(
-        root,
-        ["cat-file", "-t", candidate_tree],
-    ).decode("ascii", errors="replace").strip()
+    object_type = (
+        run_git(
+            root,
+            ["cat-file", "-t", candidate_tree],
+        )
+        .decode("ascii", errors="replace")
+        .strip()
+    )
     if object_type != "tree":
         fail("--candidate-tree must name a Git tree")
     if not run_git(root, ["ls-tree", "-r", "--name-only", candidate_tree]).strip():
         fail("candidate tree is empty")
     if run_git(root, ["ls-files", "-u", "-z"]):
         fail("index contains unresolved entries")
-    index_tree = run_git(root, ["write-tree"]).decode("ascii").strip()
-    if index_tree != candidate_tree:
+    index_drift = run_git(
+        root,
+        [
+            "diff-index",
+            "--cached",
+            "--raw",
+            "-z",
+            "--no-renames",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--ignore-submodules=none",
+            candidate_tree,
+            "--",
+        ],
+    )
+    if index_drift:
         fail(
-            "index tree does not equal --candidate-tree: "
-            f"index={index_tree} candidate={candidate_tree}"
+            "index tree does not equal --candidate-tree "
+            "(observation-only diff-index mismatch)"
         )
 
 
@@ -1990,59 +2415,28 @@ def ensure_worktree_matches_candidate(
     candidate_tree: str,
     paths: list[str],
 ) -> None:
-    drift = run_git(root, ["diff", "--name-only", "-z", "--", *paths])
-    if drift:
-        names = [
-            name.decode("utf-8", errors="replace")
-            for name in drift.split(b"\0")
-            if name
-        ]
-        fail(f"unstaged governed path drift: {names!r}")
-    all_tracked_drift = run_git(
-        root,
-        ["diff", "--name-only", "--no-renames", "-z", "--"],
-    )
-    all_untracked = run_git(
-        root,
-        ["ls-files", "--others", "--exclude-standard", "-z", "--"],
-    )
-    outside_wave_production_drift: list[str] = []
-    for encoded_path in {
-        value
-        for value in (*all_tracked_drift.split(b"\0"), *all_untracked.split(b"\0"))
-        if value
-    }:
-        try:
-            relative_path = encoded_path.decode("utf-8")
-        except UnicodeDecodeError:
-            fail("worktree drift contains a non-UTF-8 path")
-        if (
-            relative_path not in paths
-            and is_normalized_path(relative_path)
-            and is_authority_diff_path(relative_path)
-        ):
-            outside_wave_production_drift.append(relative_path)
-    if outside_wave_production_drift:
-        fail(
-            "unstaged production drift outside wave path list: "
-            f"{sorted(outside_wave_production_drift)!r}"
-        )
-    for relative_path in paths:
-        path = root / relative_path
-        try:
-            metadata = path.lstat()
-        except OSError as error:
-            fail(f"governed worktree path is missing: {relative_path}: {error}")
-        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
-            fail(f"governed worktree path is not regular: {relative_path}")
-        candidate_bytes = read_tree_file(
+    governed_paths = set(paths)
+    try:
+        verify_raw_worktree_against_tree(
             root,
             candidate_tree,
-            relative_path,
-            "governed path",
+            relevant_paths=governed_paths,
+            scan_authority=True,
         )
-        if path.read_bytes() != candidate_bytes:
-            fail(f"unstaged governed path bytes differ: {relative_path}")
+    except RawWorktreeError as error:
+        if error.reason.startswith("worktree drift path is not normalized"):
+            fail(error.reason)
+        if error.path in governed_paths:
+            fail(f"unstaged governed path drift: {error.path}: {error.reason}")
+        if error.path is not None and (
+            is_authority_diff_path(error.path)
+            or is_authority_namespace_path(error.path)
+        ):
+            fail(
+                "unstaged production drift outside wave path list: "
+                f"{[error.path]!r}: {error.reason}"
+            )
+        fail(f"raw worktree snapshot is invalid: {error}")
 
 
 def validate_runtime_receipt_chain(
@@ -2072,11 +2466,10 @@ def validate_runtime_receipt_chain(
     if runtime_entry_context is None:
         fail("runtime receipt chain requires the external entry predecessor")
     entry_predecessor_raw, entry_predecessor = runtime_entry_context
-    if (
-        chain.get("entryPredecessorReceiptBlobDigest")
-        != sha256(entry_predecessor_raw)
-        or chain.get("entryPredecessorCandidateTree")
-        != entry_predecessor.get("candidateTree")
+    if chain.get("entryPredecessorReceiptBlobDigest") != sha256(
+        entry_predecessor_raw
+    ) or chain.get("entryPredecessorCandidateTree") != entry_predecessor.get(
+        "candidateTree"
     ):
         fail("runtime receipt chain entry predecessor binding mismatch")
     require_hex(
@@ -2120,7 +2513,7 @@ def validate_runtime_receipt_chain(
     previous_embedded_stored: bytes | None = None
     embedded_receipts: list[dict] = []
     for index, (entry, expected_slice) in enumerate(
-        zip(entries, RUNTIME_SLICE_IDS, strict=True),
+        zip(entries, RUNTIME_SLICE_IDS),
         start=1,
     ):
         if not isinstance(entry, dict) or set(entry) != {
@@ -2134,14 +2527,10 @@ def validate_runtime_receipt_chain(
         if not isinstance(receipt, dict):
             fail(f"runtime receipt chain entry {index} receipt is not embedded")
         if set(receipt) != RUNTIME_RECEIPT_FIELDS:
-            fail(
-                f"runtime receipt chain entry {index} receipt fields mismatch"
-            )
+            fail(f"runtime receipt chain entry {index} receipt fields mismatch")
         canonical_receipt = canonical_json_bytes(receipt)
         if entry.get("receiptDigest") != sha256(canonical_receipt):
-            fail(
-                f"runtime receipt chain entry {index} receiptDigest mismatch"
-            )
+            fail(f"runtime receipt chain entry {index} receiptDigest mismatch")
         if (
             entry.get("waveSliceID") != expected_slice
             or entry.get("sequenceOrdinal") != index
@@ -2162,11 +2551,10 @@ def validate_runtime_receipt_chain(
             (f"runtime receipt chain entry {index} receipt", receipt)
         )
         if index == 1:
-            if (
-                receipt.get("baseTree")
-                != chain.get("entryPredecessorCandidateTree")
-                or receipt.get("previousReceiptBlobDigest")
-                != chain.get("entryPredecessorReceiptBlobDigest")
+            if receipt.get("baseTree") != chain.get(
+                "entryPredecessorCandidateTree"
+            ) or receipt.get("previousReceiptBlobDigest") != chain.get(
+                "entryPredecessorReceiptBlobDigest"
             ):
                 fail("runtime receipt chain entry 01 predecessor mismatch")
         elif previous_embedded is not None and previous_embedded_stored is not None:
@@ -2175,21 +2563,18 @@ def validate_runtime_receipt_chain(
                     "runtime receipt chain predecessor candidate-tree "
                     f"continuity failed at entry {index}"
                 )
-            expected_predecessor = sha256(
-                previous_embedded_stored
-            )
-            if (
-                receipt.get("previousReceiptBlobDigest")
-                != expected_predecessor
-            ):
+            expected_predecessor = sha256(previous_embedded_stored)
+            if receipt.get("previousReceiptBlobDigest") != expected_predecessor:
                 fail(
                     "runtime receipt chain predecessor receipt continuity "
                     f"failed at entry {index}"
                 )
-        immediate_predecessor = (
-            entry_predecessor if index == 1 else previous_embedded
-        )
+        immediate_predecessor = entry_predecessor if index == 1 else previous_embedded
         assert immediate_predecessor is not None
+        validate_frozen_schema_continuity(
+            receipt.get("frozenSchemaDigests"),
+            immediate_predecessor.get("frozenSchemaDigests", []),
+        )
         validate_receipt_time_relationships(
             receipt,
             label=f"runtime receipt chain entry {index} receipt",
@@ -2236,35 +2621,32 @@ def validate_runtime_receipt_chain(
                 "runtime receipt chain entry 06 stored bytes do not exactly "
                 "equal the captured W6.7 predecessor"
             )
-        if (
-            chain["entries"][5]["receiptDigest"]
-            != sha256(canonical_json_bytes(previous_embedded))
+        if chain["entries"][5]["receiptDigest"] != sha256(
+            canonical_json_bytes(previous_embedded)
         ):
             fail("runtime receipt chain entry 06 receiptDigest mismatch")
     elif current_ordinal == 8:
-        previous_runtime_rows = previous_receipt.get(
-            "externalPrerequisites"
+        previous_runtime_rows = previous_receipt.get("externalPrerequisites")
+        matching_previous_rows = (
+            [
+                row
+                for row in previous_runtime_rows
+                if isinstance(row, dict) and row.get("name") == "runtime-receipt-chain"
+            ]
+            if isinstance(previous_runtime_rows, list)
+            else []
         )
-        matching_previous_rows = [
-            row
-            for row in previous_runtime_rows
-            if isinstance(row, dict)
-            and row.get("name") == "runtime-receipt-chain"
-        ] if isinstance(previous_runtime_rows, list) else []
         current_runtime_rows = [
             row
             for row in bundle.get("externalPrerequisites", [])
-            if isinstance(row, dict)
-            and row.get("name") == "runtime-receipt-chain"
+            if isinstance(row, dict) and row.get("name") == "runtime-receipt-chain"
         ]
         captured_chain_digest = sha256(chain_raw)
         if (
             len(matching_previous_rows) != 1
             or len(current_runtime_rows) != 1
-            or matching_previous_rows[0].get("blobDigest")
-            != captured_chain_digest
-            or current_runtime_rows[0].get("blobDigest")
-            != captured_chain_digest
+            or matching_previous_rows[0].get("blobDigest") != captured_chain_digest
+            or current_runtime_rows[0].get("blobDigest") != captured_chain_digest
             or previous_receipt.get("wave") != "W6"
             or previous_receipt.get("waveSliceID") != "w6.apple-lab"
             or previous_receipt.get("sequenceOrdinal") != 7
@@ -2315,8 +2697,7 @@ def validate_external_prerequisites(
     if not isinstance(requirements, list):
         fail("bundle externalPrerequisites must be an array")
     if any(
-        not isinstance(row, dict)
-        or set(row) != EXTERNAL_REQUIREMENT_FIELDS
+        not isinstance(row, dict) or set(row) != EXTERNAL_REQUIREMENT_FIELDS
         for row in requirements
     ):
         fail("bundle external prerequisite fields mismatch")
@@ -2354,9 +2735,7 @@ def validate_external_prerequisites(
             fail("external input paths/device-inode pairs must be distinct")
         resolved_bindings.append((path, identity))
         if requirement.get("blobDigest") != sha256(raw):
-            fail(
-                f"external prerequisite blob digest mismatch: {name}"
-            )
+            fail(f"external prerequisite blob digest mismatch: {name}")
         if name != "runtime-receipt-chain":
             fail(f"unknown external prerequisite name: {name}")
         if requirement.get("schema") != "QinaoW6RuntimeReceiptChainV1":
@@ -2365,9 +2744,7 @@ def validate_external_prerequisites(
                 "QinaoW6RuntimeReceiptChainV1"
             )
         if requirement.get("requiredOutcome") != "accepted":
-            fail(
-                "runtime receipt chain requirement outcome must be accepted"
-            )
+            fail("runtime receipt chain requirement outcome must be accepted")
         chain = load_json_bytes(raw, "runtime receipt chain")
         validate_runtime_receipt_chain(
             chain,
@@ -2412,10 +2789,7 @@ def validate_candidate_evidence_prerequisites(
             f"evidence prerequisite {requirement['name']}",
         )
         if sha256(raw) != requirement["blobDigest"]:
-            fail(
-                f"evidence prerequisite blob digest mismatch: "
-                f"{requirement['name']}"
-            )
+            fail(f"evidence prerequisite blob digest mismatch: {requirement['name']}")
         evidence = load_json_bytes(
             raw,
             f"evidence prerequisite {requirement['name']}",
@@ -2446,8 +2820,7 @@ def validate_candidate_evidence_prerequisites(
             fail("K4 evidence verifiedStatus does not equal requiredStatus")
         if evidence.get("supportedProfileDigest") != required_profile_digest:
             fail(
-                "K4 evidence verifiedProfileDigest does not equal "
-                "requiredProfileDigest"
+                "K4 evidence verifiedProfileDigest does not equal requiredProfileDigest"
             )
         verified.append(
             {
@@ -2465,9 +2838,7 @@ def derive_report(
     verification_time: datetime,
     signed_documents: list[tuple[str, dict]] | None = None,
 ) -> tuple[Path, dict, dict, list[tuple[Path, tuple[int, int]]]]:
-    operation_signed_documents = (
-        [] if signed_documents is None else signed_documents
-    )
+    operation_signed_documents = [] if signed_documents is None else signed_documents
     root = ensure_repository(args.root)
     ensure_index_candidate(root, args.candidate_tree)
 
@@ -2491,11 +2862,9 @@ def derive_report(
         (trust_path, trust_identity),
         (previous_path, previous_identity),
     ]
-    if len({path for path, _identity in input_bindings}) != len(
-        input_bindings
-    ) or len({identity for _path, identity in input_bindings}) != len(
-        input_bindings
-    ):
+    if len({path for path, _identity in input_bindings}) != len(input_bindings) or len(
+        {identity for _path, identity in input_bindings}
+    ) != len(input_bindings):
         fail("external input paths/device-inode pairs must be distinct")
 
     trust_root = load_json_bytes(trust_raw, "trust root")
@@ -2545,16 +2914,24 @@ def derive_report(
         != "commit"
     ):
         fail("bundle baseCommit must name a Git commit object")
-    resolved_base = run_git(
-        root,
-        ["rev-parse", f"{base_commit}^{{tree}}"],
-    ).decode("ascii").strip()
+    resolved_base = (
+        run_git(
+            root,
+            ["rev-parse", f"{base_commit}^{{tree}}"],
+        )
+        .decode("ascii")
+        .strip()
+    )
     if resolved_base != base_tree:
         fail("bundle baseCommit does not resolve to bundle baseTree")
-    head_tree = run_git(
-        root,
-        ["rev-parse", "HEAD^{tree}"],
-    ).decode("ascii").strip()
+    head_tree = (
+        run_git(
+            root,
+            ["rev-parse", "HEAD^{tree}"],
+        )
+        .decode("ascii")
+        .strip()
+    )
     if head_tree != base_tree:
         fail("current HEAD tree does not equal bundle base tree")
     if bundle["requiredPredecessorCandidateTree"] != base_tree:
@@ -2562,10 +2939,9 @@ def derive_report(
     if bundle["requiredPredecessorReceiptBlob"] != sha256(previous_raw):
         fail("bundle predecessor receipt blob digest mismatch")
     approved_design = source_selection.get("approvedDesign")
-    if (
-        not isinstance(approved_design, dict)
-        or bundle["approvedDesignBlob"] != approved_design.get("sha256")
-    ):
+    if not isinstance(approved_design, dict) or bundle[
+        "approvedDesignBlob"
+    ] != approved_design.get("sha256"):
         fail("bundle approvedDesignBlob does not match source selection")
     validate_previous_receipt(
         previous_receipt,
@@ -2581,6 +2957,10 @@ def derive_report(
         verification_time=verification_time,
     )
     operation_signed_documents.append(("previous receipt", previous_receipt))
+    validate_frozen_schema_continuity(
+        bundle["frozenSchemaDigests"],
+        previous_receipt.get("frozenSchemaDigests", []),
+    )
     (
         prior_admission_receipts,
         runtime_entry_predecessors,
@@ -2708,16 +3088,12 @@ def derive_report(
         )
         if category_signature_errors:
             fail("; ".join(category_signature_errors))
-        operation_signed_documents.append(
-            (f"{category} category", document)
-        )
+        operation_signed_documents.append((f"{category} category", document))
         reviewed_rows = document.get("reviewedRows", [])
         if not isinstance(reviewed_rows, list):
             fail(f"{category} category reviewedRows must be an array")
         expected_rows_root = sha256(
-            canonical_json_bytes(
-                sorted(reviewed_rows, key=canonical_json_bytes)
-            )
+            canonical_json_bytes(sorted(reviewed_rows, key=canonical_json_bytes))
         )
         if document.get("reviewedRowsRoot") != expected_rows_root:
             fail(f"{category} category reviewedRowsRoot mismatch")
@@ -2770,11 +3146,9 @@ def derive_report(
     pinned_runner_value = os.environ.get("QINAO_PINNED_REPOSITORY_RUNNER")
     if not pinned_runner_value:
         fail("QINAO_PINNED_REPOSITORY_RUNNER is required")
-    runner_descriptor, pinned_runner_bytes, _runner_file_binding = (
-        open_bound_checker(
-            Path(pinned_runner_value),
-            "repository runner",
-        )
+    runner_descriptor, pinned_runner_bytes, _runner_file_binding = open_bound_checker(
+        Path(pinned_runner_value),
+        "repository runner",
     )
     try:
         if pinned_runner_bytes != runner_raw:
@@ -2818,81 +3192,79 @@ def derive_report(
     )
     ensure_worktree_matches_candidate(root, args.candidate_tree, paths)
 
-    checker_descriptor, checker_bytes, checker_binding = open_bound_checker(
-        checker_executable,
-        "owner-ledger checker",
-    )
-    if checker_bytes != checker_raw:
-        os.close(checker_descriptor)
-        fail(
-            "pinned owner-ledger checker bytes do not equal the "
-            "candidate-tree checker binding"
+    with ExitStack() as checker_stack:
+        checker_descriptor, checker_bytes, checker_binding = open_bound_checker(
+            checker_executable,
+            "owner-ledger checker",
         )
-    checker_input_descriptors = {
-        "ledger": read_only_snapshot_descriptor(
-            owner_ledger_raw,
-            "owner ledger",
-        ),
-        "source": read_only_snapshot_descriptor(
-            source_raw,
-            "source selection",
-        ),
-        "trust": read_only_snapshot_descriptor(
-            trust_raw,
-            "trust root",
-        ),
-        **{
-            category: read_only_snapshot_descriptor(
-                category_raws[category],
-                f"{category} category",
+        checker_stack.callback(os.close, checker_descriptor)
+        if checker_bytes != checker_raw:
+            fail(
+                "pinned owner-ledger checker bytes do not equal the "
+                "candidate-tree checker binding"
             )
-            for category in CATEGORIES
-        },
-    }
-    checker_command = [
-        sys.executable,
-        f"/dev/fd/{checker_descriptor}",
-        "--root",
-        str(root),
-        "--ledger",
-        f"/dev/fd/{checker_input_descriptors['ledger']}",
-        "--source-selection",
-        f"/dev/fd/{checker_input_descriptors['source']}",
-        "--trust-root",
-        f"/dev/fd/{checker_input_descriptors['trust']}",
-        "--base-tree",
-        base_tree,
-        "--candidate-tree",
-        args.candidate_tree,
-        "--wave",
-        bundle["wave"],
-        "--wave-slice-id",
-        bundle["waveSliceID"],
-        "--sequence-ordinal",
-        str(bundle["sequenceOrdinal"]),
-        "--create-manifest-or-disposition",
-        f"/dev/fd/{checker_input_descriptors['create']}",
-        "--extension-manifest-or-disposition",
-        f"/dev/fd/{checker_input_descriptors['extension']}",
-        "--adapter-manifest-or-disposition",
-        f"/dev/fd/{checker_input_descriptors['adapter']}",
-        "--fixture-set-or-disposition",
-        f"/dev/fd/{checker_input_descriptors['fixture']}",
-    ]
-    try:
+        checker_input_descriptors: dict[str, int] = {}
+        snapshot_inputs = [
+            ("ledger", owner_ledger_raw, "owner ledger"),
+            ("source", source_raw, "source selection"),
+            ("trust", trust_raw, "trust root"),
+            *[
+                (category, category_raws[category], f"{category} category")
+                for category in CATEGORIES
+            ],
+        ]
+        for snapshot_name, snapshot_raw, snapshot_label in snapshot_inputs:
+            snapshot_descriptor = read_only_snapshot_descriptor(
+                snapshot_raw,
+                snapshot_label,
+            )
+            checker_stack.callback(os.close, snapshot_descriptor)
+            checker_input_descriptors[snapshot_name] = snapshot_descriptor
+        checker_command = [
+            sys.executable,
+            "-I",
+            "-S",
+            "-c",
+            CHECKER_STDIN_BOOTSTRAP,
+            str(checker_executable),
+            "--root",
+            str(root),
+            "--ledger",
+            f"/dev/fd/{checker_input_descriptors['ledger']}",
+            "--source-selection",
+            f"/dev/fd/{checker_input_descriptors['source']}",
+            "--trust-root",
+            f"/dev/fd/{checker_input_descriptors['trust']}",
+            "--base-tree",
+            base_tree,
+            "--candidate-tree",
+            args.candidate_tree,
+            "--wave",
+            bundle["wave"],
+            "--wave-slice-id",
+            bundle["waveSliceID"],
+            "--sequence-ordinal",
+            str(bundle["sequenceOrdinal"]),
+            "--create-manifest-or-disposition",
+            f"/dev/fd/{checker_input_descriptors['create']}",
+            "--extension-manifest-or-disposition",
+            f"/dev/fd/{checker_input_descriptors['extension']}",
+            "--adapter-manifest-or-disposition",
+            f"/dev/fd/{checker_input_descriptors['adapter']}",
+            "--fixture-set-or-disposition",
+            f"/dev/fd/{checker_input_descriptors['fixture']}",
+        ]
         try:
-            completed = subprocess.run(
+            completed = run_bounded_process(
                 checker_command,
                 cwd=root,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=False,
-                timeout=OWNER_LEDGER_CHECKER_TIMEOUT_SECONDS,
-                pass_fds=(
-                    checker_descriptor,
-                    *checker_input_descriptors.values(),
-                ),
+                env=None,
+                timeout_seconds=OWNER_LEDGER_CHECKER_TIMEOUT_SECONDS,
+                stdout_limit_bytes=OWNER_CHECKER_STDOUT_LIMIT_BYTES,
+                stderr_limit_bytes=PROCESS_STDERR_LIMIT_BYTES,
+                text=False,
+                input_bytes=checker_bytes,
+                pass_fds=tuple(checker_input_descriptors.values()),
             )
         except (OSError, subprocess.TimeoutExpired):
             fail("owner-ledger subgate was unavailable or timed out")
@@ -2907,12 +3279,11 @@ def derive_report(
             after_checker.st_ctime_ns,
         ):
             fail("owner-ledger checker changed while its bound descriptor executed")
-    finally:
-        os.close(checker_descriptor)
-        for input_descriptor in checker_input_descriptors.values():
-            os.close(input_descriptor)
     if completed.returncode != 0:
-        diagnostic = completed.stderr.strip() or completed.stdout.strip()
+        diagnostic = (
+            completed.stderr.decode("utf-8", errors="replace").strip()
+            or completed.stdout.decode("utf-8", errors="replace").strip()
+        )
         fail(
             "owner-ledger subgate failed "
             f"with exit {completed.returncode}: {diagnostic}"
@@ -2948,11 +3319,16 @@ def derive_report(
         "admissionStatus": "unadmitted",
     }
     validate_operation_nonce_collisions(operation_signed_documents)
-    return root, report, trust_root, [
-        *input_bindings,
-        *prior_receipt_bindings,
-        *external_paths,
-    ]
+    return (
+        root,
+        report,
+        trust_root,
+        [
+            *input_bindings,
+            *prior_receipt_bindings,
+            *external_paths,
+        ],
+    )
 
 
 def validate_output_path(path_argument: Path, root: Path) -> Path:
@@ -2987,6 +3363,14 @@ def write_exclusive_report(path: Path, document: dict) -> None:
             0o600,
         )
         created = True
+        os.fchmod(descriptor, 0o600)
+        created_metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(created_metadata.st_mode)
+            or stat.S_IMODE(created_metadata.st_mode) != 0o600
+            or created_metadata.st_nlink != 1
+        ):
+            raise OSError("created unsigned report failed exact mode/type/link binding")
         offset = 0
         while offset < len(raw):
             written = os.write(descriptor, raw[offset:])
@@ -3024,9 +3408,7 @@ def verify_receipt(
     verification_time: datetime,
     signed_documents: list[tuple[str, dict]] | None = None,
 ) -> None:
-    operation_signed_documents = (
-        [] if signed_documents is None else signed_documents
-    )
+    operation_signed_documents = [] if signed_documents is None else signed_documents
     receipt_path, receipt_raw, receipt_identity = external_file_bytes(
         args.receipt,
         root,
@@ -3057,21 +3439,18 @@ def verify_receipt(
     )
     if errors:
         fail("; ".join(errors))
-    binding_fields = (
-        RUNTIME_RECEIPT_FIELDS
-        - {
-            "expiresAt",
-            "issuedAt",
-            "nonce",
-            "outcome",
-            "role",
-            "schema",
-            "signature",
-            "signatureAlgorithm",
-            "signer",
-            "verifiedAt",
-        }
-    )
+    binding_fields = RUNTIME_RECEIPT_FIELDS - {
+        "expiresAt",
+        "issuedAt",
+        "nonce",
+        "outcome",
+        "role",
+        "schema",
+        "signature",
+        "signatureAlgorithm",
+        "signer",
+        "verifiedAt",
+    }
     for field in sorted(binding_fields):
         if receipt.get(field) != report.get(field):
             fail(f"receipt binding {field} does not match derived candidate")
@@ -3089,27 +3468,28 @@ def main() -> int:
     args = parse_args()
     verification_time = datetime.now(timezone.utc)
     try:
-        signed_documents: list[tuple[str, dict]] = []
-        root, report, trust_root, reserved_paths = derive_report(
-            args,
-            verification_time=verification_time,
-            signed_documents=signed_documents,
-        )
-        if args.mode == "report":
-            output = validate_output_path(args.unsigned_report, root)
-            write_exclusive_report(output, report)
-            message = "qinao wave candidate report: PASS (unsigned, unadmitted)"
-        else:
-            verify_receipt(
+        with bind_git_executable(args.git_executable):
+            signed_documents: list[tuple[str, dict]] = []
+            root, report, trust_root, reserved_paths = derive_report(
                 args,
-                root=root,
-                report=report,
-                trust_root=trust_root,
-                reserved_paths=reserved_paths,
                 verification_time=verification_time,
                 signed_documents=signed_documents,
             )
-            message = "qinao wave admission receipt: PASS (verified only)"
+            if args.mode == "report":
+                output = validate_output_path(args.unsigned_report, root)
+                write_exclusive_report(output, report)
+                message = "qinao wave candidate report: PASS (unsigned, unadmitted)"
+            else:
+                verify_receipt(
+                    args,
+                    root=root,
+                    report=report,
+                    trust_root=trust_root,
+                    reserved_paths=reserved_paths,
+                    verification_time=verification_time,
+                    signed_documents=signed_documents,
+                )
+                message = "qinao wave admission receipt: PASS (verified only)"
     except GateError as error:
         print(f"qinao wave admission gate failed: {error}", file=sys.stderr)
         return 1
