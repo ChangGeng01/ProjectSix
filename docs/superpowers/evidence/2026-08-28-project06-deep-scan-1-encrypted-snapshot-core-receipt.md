@@ -50,8 +50,12 @@ restore official Codex Security artifact availability; it does not prove the
    HMAC-SHA-256. Only those keyed commitments and ciphertext fixity digests
    leave encrypted custody.
 6. Publication used owner-only repository-external storage, exclusive
-   no-replace creation, durability sync, regular-file and single-link checks.
-   The ciphertext and receipts were then set to `0400` and `uchg`.
+   no-replace creation, mandatory file `fsync`, regular-file and single-link
+   checks. In this capture-generation implementation, parent-directory open
+   and `fsync` were best-effort and their errors were not made fatal. The
+   ciphertext and receipts were then set to `0400` and `uchg`. Later hardened
+   publication makes descriptor-relative directory `fsync` mandatory, but
+   that improvement is not attributed retroactively to this capture.
 
 ## Frozen cardinality and integrity result
 
@@ -128,13 +132,24 @@ Three new-process reopen passes succeeded:
    `2026-08-28T12:00:19.269Z`.
 
 Every pass authenticated AES-GCM before parsing, decrypted only in memory,
-recomputed the private manifest, schema, six ordered query sets and roots,
-re-established all frozen counts, reran `quick_check` and foreign-key checks,
-re-probed all four dead locators plus their common root, and reproduced the
-public receipt byte-for-byte. Each pass reported that it created no plaintext
-file.
+authenticated the private manifest, checked its scan binding, recomputed the
+schema plus six ordered query sets and roots, re-established all frozen counts,
+reran `quick_check` and foreign-key checks, and re-probed all four dead locators
+plus their common root. The capture-generation verifier compared the rebuilt
+public receipt as a canonical JSON object; it did not compare the original raw
+receipt bytes. Each pass reported that it created no plaintext file.
 
-## Exporter and test identity
+The immutable external reopen receipts used two labels that were broader than
+the implementation: `privateManifestRecomputed=true` and
+`publicReceiptByteEquivalent=true`. For this capture generation, read those as
+`privateManifestAuthenticated + privateManifestScanBindingChecked +
+auditEvidenceAndPublicCommitmentsRecomputed` and
+`canonicalReceiptObjectEquivalent`, respectively. The old verifier did not
+semantically compare the private manifest's stored audit fragment with a newly
+constructed fragment. The receipts remain immutable; this Git erratum narrows
+their meaning rather than rewriting historical evidence.
+
+## Capture-generation v1 identity at `640f45ff2b5b02390ef23ba940f7aa351c7716cb`
 
 - exporter source:
   `scripts/qinao_ds1_evidence_vault.swift`
@@ -148,6 +163,12 @@ file.
 - test source SHA-256:
   `dedeae4e64ed4882fde31e6917f0aa04b0e935d0b1a5bf3e3ca7b5de331a0a64`
 - black-box test result: `4/4 PASS`
+
+The capture tool accepted the source SHA-256 through its CLI after validating
+the digest shape; it did not derive that value from its running image. The Git
+object reopen and postcommit review independently recomputed the source path,
+blob, byte length, and SHA-256 and found the supplied value exact. The running
+binary identity is separately bound by its preserved binary SHA-256.
 
 The tests cover the production CLI secret-input boundary, production/test
 surface separation, WAL-only committed-row inclusion, Backup API and
@@ -166,16 +187,19 @@ redaction, and no plaintext snapshot-file creation.
    epoch before a new generation independently reopens.
 2. `ThisDeviceOnly` deliberately prevents cloud synchronization but also means
    device or Keychain loss is not recoverable from ciphertext alone. This
-   generation satisfies same-device interruption recovery and the minimum
-   retention gate, not cross-device disaster recovery. Any offline recovery
-   envelope must be a separately reviewed generation and must not expose raw
-   key material.
+   generation supports same-device interruption recovery and is configured for
+   the declared minimum-retention policy; present custody evidence cannot prove
+   that no future separately authorized deletion will occur. It does not
+   provide cross-device disaster recovery. Any offline recovery envelope must
+   be a separately reviewed generation and must not expose raw key material.
 3. `uchg` and owner-only modes are operational hardening, not a cryptographic
    substitute for AEAD or an append-only external anchor.
 4. The live workbench later advanced from the captured source state (its main
    file size and mtime changed after capture). The accepted evidence source is
    the frozen ciphertext, never a later live re-query.
-5. This closes the time-sensitive encrypted snapshot and independent-reopen
-   portion of R0 / Acceptance condition 6. It does not yet close the required
-   versioned 111-row non-canonical forensic inventory, R1 validation, R2
-   remediation, or R3 closure.
+5. This provides evidence supporting independent closure of the time-sensitive
+   encrypted snapshot and same-device independent-reopen portion of R0 /
+   Acceptance condition 6. The independent final external review makes the
+   closure decision. This receipt does not close the required versioned
+   111-row non-canonical forensic inventory, R1 validation, R2 remediation, or
+   R3 closure.
