@@ -31,6 +31,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 MAX_JSON_BYTES = 16 * 1024 * 1024
 MAX_SAFE_INTEGER = (1 << 53) - 1
 ERRATUM_DIGEST = "ad01e833fef13bb68e2d536d9774a005d9bf30b6987b0215caad954527ba737b"
+REPAIR_ERRATUM_DIGEST = "71cf7f9ed83f8106cf75040d8d6592dd3437fd3fd9f61cbaa9c8f7c5120fc55f"
 EXACT_PROBES = ("probe.gV8vVx", "probe.9erZU8", "probe.U4rXSq")
 N34_NAME = "tree-prediction.N34crC"
 RULE_SET_VERSION = "qinao.secret-scan.v1"
@@ -46,6 +47,17 @@ FROZEN_RAW_CONFIG_DIGEST = "0a3325514a9ecbcf15f02aa3e0a7c03ffdaa0598b78799abc3e1
 FROZEN_CONFIG_KEYS_DIGEST = "860dc0a57590606408d92f84407ce8101c229b731fa9bfca73425aef70cebb37"
 FROZEN_MERGE_MANIFEST_DIGEST = "c66d5150df01c632c23f34ebc5069bfda427853ae121a9764e35e8f913ebe59b"
 BOOTSTRAP_COMMIT_MESSAGE = b"feat: add durable Qinao run ledger\n"
+BOOTSTRAP_IMPLEMENTATION_COMMIT = "1e18da38a498549687dd646a43d34d0637b23aed"
+BOOTSTRAP_IMPLEMENTATION_TREE = "b170bd6b2f45d4d5fb7c5759d3bab6698ebf37b0"
+BOOTSTRAP_IMPLEMENTATION_RAW_SHA256 = "fd9073cdf2bd643ed11ffa35288ade4f03db2fcf08844921cf9dd330f1896810"
+BOOTSTRAP_REPAIR_MESSAGE = b"fix: admit frozen Qinao bootstrap terminals\n"
+HISTORICAL_SCANNER_NAME = "capture.task3-secret.ee573e0d5235"
+HISTORICAL_SCANNER_RECORD_SHA256 = "6b9096da064d2d16d1518a5efd6ca573fa0cc3db13bbc48b62185c0e16a78316"
+HISTORICAL_SCANNER_RECORD_DIGEST = "fe924341b5bf1c12fb0ebf293196ababdc885e4396791285c1e3ef07ced662c5"
+SCANNER_TERMINAL_SHA256 = "37a40f08d8548dba289b9b0bb35bcf63b359f6d37ee86044ebc6b6da080b9ec1"
+PRESERVED_TRANSITION_NAME = "capture.sterile-python.f24d9641fa44"
+PRESERVED_TRANSITION_SHA256 = "87a6e1139bb25853d01b9cb33b57c084294c2b33e7d557dbe51776bb04923ea4"
+PRESERVED_TRANSITION_INVOCATION_SHA256 = "9175bb32393d58b131e67be03ebf40a1be05f8265d29c146ff1cbb9c813bafff"
 TASK3_TRACKED_PATHS = (
     b"scripts/qinao_convergence_audit.py",
     b"scripts/test_qinao_convergence_audit.py",
@@ -201,27 +213,29 @@ def parse_canonical_json(payload: bytes) -> Any:
     return value
 
 
-def parse_bootstrap_commit_metadata(
+def _parse_exact_commit_metadata(
     payload: bytes,
     *,
     expected_tree: str,
     expected_parent: str,
+    expected_message: bytes,
+    label: str,
 ) -> Dict[str, Any]:
     if not isinstance(payload, bytes) or not payload or len(payload) > MAX_JSON_BYTES:
-        raise AuditError("bootstrap commit byte count")
+        raise AuditError(label + " commit byte count")
     if b"\x00" in payload or payload.count(b"\n\n") != 1:
-        raise AuditError("bootstrap commit separator")
+        raise AuditError(label + " commit separator")
     header_block, message = payload.split(b"\n\n", 1)
     headers = header_block.split(b"\n")
     if len(headers) != 4:
-        raise AuditError("bootstrap commit header count")
+        raise AuditError(label + " commit header count")
     expected_prefixes = (b"tree ", b"parent ", b"author ", b"committer ")
     if tuple(line.split(b" ", 1)[0] + b" " for line in headers) != expected_prefixes:
-        raise AuditError("bootstrap commit header order or optional header")
+        raise AuditError(label + " commit header order or optional header")
     if headers[0] != b"tree " + expected_tree.encode("ascii"):
-        raise AuditError("bootstrap commit tree")
+        raise AuditError(label + " commit tree")
     if headers[1] != b"parent " + expected_parent.encode("ascii"):
-        raise AuditError("bootstrap commit parent")
+        raise AuditError(label + " commit parent")
     identity_pattern = re.compile(
         rb"\A(?:author|committer) Qinao development "
         rb"<qinao-development@invalid\.local> ([1-9][0-9]*) ([+-])([0-9]{2})([0-9]{2})\Z"
@@ -230,16 +244,16 @@ def parse_bootstrap_commit_metadata(
     for line in headers[2:]:
         match = identity_pattern.fullmatch(line)
         if match is None:
-            raise AuditError("bootstrap commit identity drift")
+            raise AuditError(label + " commit identity drift")
         hours = int(match.group(3))
         minutes = int(match.group(4))
         if hours > 14 or minutes > 59 or (hours == 14 and minutes != 0):
-            raise AuditError("bootstrap commit identity timezone")
+            raise AuditError(label + " commit identity timezone")
         identities.append(line.decode("ascii"))
-    if message != BOOTSTRAP_COMMIT_MESSAGE:
-        raise AuditError("bootstrap commit message")
+    if message != expected_message:
+        raise AuditError(label + " commit message")
     return {
-        "schemaVersion": "qinao.bootstrap-commit.v1",
+        "schemaVersion": "qinao.exact-commit.v1",
         "tree": expected_tree,
         "parent": expected_parent,
         "author": identities[0],
@@ -247,6 +261,77 @@ def parse_bootstrap_commit_metadata(
         "message": message.decode("ascii"),
         "rawCommitSize": len(payload),
         "rawCommitSha256": _sha256(payload),
+    }
+
+
+def parse_bootstrap_commit_metadata(
+    payload: bytes,
+    *,
+    expected_tree: str,
+    expected_parent: str,
+) -> Dict[str, Any]:
+    result = _parse_exact_commit_metadata(
+        payload,
+        expected_tree=expected_tree,
+        expected_parent=expected_parent,
+        expected_message=BOOTSTRAP_COMMIT_MESSAGE,
+        label="bootstrap",
+    )
+    result["schemaVersion"] = "qinao.bootstrap-commit.v1"
+    return result
+
+
+def validate_preledger_commit_chain(
+    *,
+    b0_oid: str,
+    b0_payload: bytes,
+    b1_oid: str,
+    b1_payload: bytes,
+    b0_changed_paths: Sequence[bytes],
+    b1_changed_paths: Sequence[bytes],
+) -> Dict[str, Any]:
+    if b0_oid != BOOTSTRAP_IMPLEMENTATION_COMMIT:
+        raise AuditError("bootstrap implementation commit drift")
+    if not re.fullmatch(r"[0-9a-f]{40}", b1_oid) or b1_oid in (
+        FROZEN_C,
+        BOOTSTRAP_IMPLEMENTATION_COMMIT,
+    ):
+        raise AuditError("bootstrap repair commit identity drift")
+    if _sha256(b0_payload) != BOOTSTRAP_IMPLEMENTATION_RAW_SHA256:
+        raise AuditError("bootstrap implementation raw commit drift")
+    b0_metadata = parse_bootstrap_commit_metadata(
+        b0_payload,
+        expected_tree=BOOTSTRAP_IMPLEMENTATION_TREE,
+        expected_parent=FROZEN_C,
+    )
+    if not b1_payload.startswith(b"tree ") or b"\n" not in b1_payload:
+        raise AuditError("bootstrap repair tree header")
+    try:
+        b1_tree = b1_payload.split(b"\n", 1)[0][5:].decode("ascii", "strict")
+    except UnicodeDecodeError as exc:
+        raise AuditError("bootstrap repair tree ASCII") from exc
+    if not re.fullmatch(r"[0-9a-f]{40}", b1_tree):
+        raise AuditError("bootstrap repair tree")
+    b1_metadata = _parse_exact_commit_metadata(
+        b1_payload,
+        expected_tree=b1_tree,
+        expected_parent=BOOTSTRAP_IMPLEMENTATION_COMMIT,
+        expected_message=BOOTSTRAP_REPAIR_MESSAGE,
+        label="bootstrap repair",
+    )
+    for label, paths in (
+        ("implementation", tuple(b0_changed_paths)),
+        ("repair", tuple(b1_changed_paths)),
+    ):
+        if paths != TASK3_TRACKED_PATHS:
+            raise AuditError("bootstrap " + label + " path delta drift")
+    ordered = [BOOTSTRAP_IMPLEMENTATION_COMMIT, b1_oid]
+    return {
+        "schemaVersion": "qinao.preledger-commit-chain.v1",
+        "orderedCommitChain": ordered,
+        "orderedCommitChainDigest": _sha256(canonical_json_bytes(ordered)),
+        "implementationCommitMetadata": b0_metadata,
+        "repairCommitMetadata": b1_metadata,
     }
 
 
@@ -1299,6 +1384,221 @@ def classify_tree_prediction_generations(
     return rows
 
 
+def _parse_exact_ordered_rows(
+    payload: bytes,
+    *,
+    delimiter: bytes,
+    expected: Sequence[Tuple[bytes, bytes]],
+    label: str,
+) -> Dict[str, str]:
+    if delimiter not in (b"=", b"\t"):
+        raise AuditError("unsupported terminal delimiter")
+    if not payload.endswith(b"\n") or b"\x00" in payload:
+        raise AuditError(label + " terminal framing")
+    lines = payload[:-1].split(b"\n")
+    if len(lines) != len(expected):
+        raise AuditError(label + " terminal row count")
+    parsed: Dict[str, str] = {}
+    for line, (expected_key, expected_value) in zip(lines, expected):
+        if line.count(delimiter) != 1:
+            raise AuditError(label + " terminal delimiter")
+        key, value = line.split(delimiter, 1)
+        if key != expected_key or value != expected_value:
+            raise AuditError(label + " terminal key, order, or value")
+        try:
+            parsed[key.decode("ascii")] = value.decode("ascii")
+        except UnicodeDecodeError as exc:
+            raise AuditError(label + " terminal ASCII") from exc
+    return parsed
+
+
+def parse_task2_merge_terminal(payload: bytes) -> Dict[str, str]:
+    return _parse_exact_ordered_rows(
+        payload,
+        delimiter=b"=",
+        label="task2 merge",
+        expected=(
+            (b"state", b"complete"),
+            (b"C", FROZEN_C.encode("ascii")),
+            (b"C_TREE", FROZEN_C_TREE.encode("ascii")),
+            (b"predicted_tree", FROZEN_C_TREE.encode("ascii")),
+            (b"parents", (FROZEN_S + "," + FROZEN_D).encode("ascii")),
+            (b"commit_raw_sha256", FROZEN_C_RAW_SHA256.encode("ascii")),
+            (b"config_canonical_sha256", FROZEN_CONFIG_DIGEST.encode("ascii")),
+        ),
+    )
+
+
+def parse_task2_resume_terminal(payload: bytes) -> Dict[str, str]:
+    return _parse_exact_ordered_rows(
+        payload,
+        delimiter=b"=",
+        label="task2 resume",
+        expected=(
+            (b"state", b"complete"),
+            (b"classification", b"exact-live-clean-4a-no-sequencer"),
+            (b"config_raw_sha256", FROZEN_RAW_CONFIG_DIGEST.encode("ascii")),
+            (b"config_canonical_sha256", FROZEN_CONFIG_DIGEST.encode("ascii")),
+            (b"config_keys_sha256", FROZEN_CONFIG_KEYS_DIGEST.encode("ascii")),
+        ),
+    )
+
+
+def parse_tool_projection_terminal(payload: bytes) -> Dict[str, str]:
+    return _parse_exact_ordered_rows(
+        payload,
+        delimiter=b"\t",
+        label="tool projection",
+        expected=(
+            (b"schema", b"qinao.bootstrap-tool-projection-terminal.v1"),
+            (b"state", b"complete"),
+            (
+                b"projectionSha256",
+                b"226b58580f76b8712af08fd5ca845dfdf26d1c404718d7bcd1837dde551fc4ea",
+            ),
+            (
+                b"manifestSha256",
+                b"1f9f517389e2c0de314915e8313a2a8097b86a4406fa1bf763167a3dd02373c4",
+            ),
+        ),
+    )
+
+
+HISTORICAL_TERMINAL_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "capture.task2-merge.tL6p8x": {
+        "parser": parse_task2_merge_terminal,
+        "files": {
+            "terminal.complete": (424, "807355b71ce44d0305ec51105871c944e25f875fdd12652e11620709600d615d"),
+            "replacement-refs.tsv": (0, _sha256(b"")),
+            "source-object-closure.txt": (4973795, "4b7fa97d55960b78c386ce21dd7f9678d6650ffae154652150dd3c09eb94e633"),
+            "local-config-keys.txt": (4830, FROZEN_CONFIG_KEYS_DIGEST),
+            "local-config.canonical": (7465, FROZEN_CONFIG_DIGEST),
+            "local-config.raw": (13913, FROZEN_RAW_CONFIG_DIGEST),
+            "commit.raw": (359, FROZEN_C_RAW_SHA256),
+        },
+    },
+    "capture.task2-resume.ZbWFBk": {
+        "parser": parse_task2_resume_terminal,
+        "files": {
+            "terminal.complete": (319, "8f276e6d14677ffc98a4096c944554a59a21b28ebf512002d754f835929a3c65"),
+            "replacement-refs.tsv": (0, _sha256(b"")),
+            "source-object-closure.txt": (4973795, "4b7fa97d55960b78c386ce21dd7f9678d6650ffae154652150dd3c09eb94e633"),
+            "local-config-keys.txt": (4830, FROZEN_CONFIG_KEYS_DIGEST),
+            "local-config.canonical": (7465, FROZEN_CONFIG_DIGEST),
+            "local-config.raw": (13913, FROZEN_RAW_CONFIG_DIGEST),
+        },
+    },
+    "capture.tool-projection.JRp96i": {
+        "parser": parse_tool_projection_terminal,
+        "files": {
+            "terminal.complete": (228, "9a8cf44ce7c68f2cf07a9c8ec53a0711f3e72e056879b73fd600ef36950e6e4b"),
+            "projection.sha256": (83, "5c07c953791a83dce476aa95f8b90155582ef494172a8a1d706f3b33232920d2"),
+            "projection.before": (8242, "226b58580f76b8712af08fd5ca845dfdf26d1c404718d7bcd1837dde551fc4ea"),
+            "projection.after": (8242, "226b58580f76b8712af08fd5ca845dfdf26d1c404718d7bcd1837dde551fc4ea"),
+            "manifest.tsv": (443, "1f9f517389e2c0de314915e8313a2a8097b86a4406fa1bf763167a3dd02373c4"),
+        },
+    },
+}
+
+
+def validate_historical_terminal_generation(generation: Path) -> Dict[str, Any]:
+    generation = Path(generation)
+    _ordinary_directory(generation, 0o700)
+    registry = HISTORICAL_TERMINAL_REGISTRY.get(generation.name)
+    if registry is None:
+        raise AuditError("structured terminal generation name drift")
+    expected_files = registry["files"]
+    children = {child.name: child for child in generation.iterdir()}
+    if set(children) != set(expected_files):
+        raise AuditError("structured terminal sibling set drift")
+    manifest = []
+    payloads: Dict[str, bytes] = {}
+    for name in sorted(expected_files, key=os.fsencode):
+        child = children[name]
+        observed = _ordinary_file(child, expected_mode=0o600)
+        payload = _read_ordinary(child)
+        expected_size, expected_digest = expected_files[name]
+        digest = _sha256(payload)
+        if observed.st_size != expected_size or len(payload) != expected_size:
+            raise AuditError("structured terminal sibling size drift")
+        if digest != expected_digest:
+            raise AuditError("structured terminal sibling digest drift")
+        payloads[name] = payload
+        manifest.append(
+            {
+                "pathB64": base64.b64encode(os.fsencode(name)).decode("ascii"),
+                "size": len(payload),
+                "sha256": digest,
+            }
+        )
+    parsed = registry["parser"](payloads["terminal.complete"])
+    if generation.name == "capture.task2-merge.tL6p8x":
+        if (
+            _sha256(payloads["commit.raw"]) != parsed["commit_raw_sha256"]
+            or _sha256(payloads["local-config.canonical"])
+            != parsed["config_canonical_sha256"]
+        ):
+            raise AuditError("task2 merge terminal cross-digest drift")
+    elif generation.name == "capture.task2-resume.ZbWFBk":
+        cross = {
+            "config_raw_sha256": _sha256(payloads["local-config.raw"]),
+            "config_canonical_sha256": _sha256(payloads["local-config.canonical"]),
+            "config_keys_sha256": _sha256(payloads["local-config-keys.txt"]),
+        }
+        if any(parsed[key] != value for key, value in cross.items()):
+            raise AuditError("task2 resume terminal cross-digest drift")
+    else:
+        projection_digest = parsed["projectionSha256"]
+        if (
+            payloads["projection.before"] != payloads["projection.after"]
+            or _sha256(payloads["projection.before"]) != projection_digest
+            or _sha256(payloads["manifest.tsv"]) != parsed["manifestSha256"]
+        ):
+            raise AuditError("tool projection terminal cross-digest drift")
+        projection_rows = _parse_exact_ordered_rows(
+            payloads["projection.sha256"],
+            delimiter=b"\t",
+            label="projection digest",
+            expected=(
+                (b"sha256", projection_digest.encode("ascii")),
+                (b"bytes", b"8242"),
+            ),
+        )
+        if projection_rows["bytes"] != str(len(payloads["projection.before"])):
+            raise AuditError("tool projection byte cross-digest drift")
+        expected_manifest = (
+            b"schemaVersion\tname\tclassification\tbyteLength\tsha256\n"
+            b"1\tprojection.before\tcontent\t8242\t226b58580f76b8712af08fd5ca845dfdf26d1c404718d7bcd1837dde551fc4ea\n"
+            b"1\tprojection.after\tcontent\t8242\t226b58580f76b8712af08fd5ca845dfdf26d1c404718d7bcd1837dde551fc4ea\n"
+            b"1\tprojection.sha256\tcontent\t83\t5c07c953791a83dce476aa95f8b90155582ef494172a8a1d706f3b33232920d2\n"
+            b"1\tmanifest.tsv\tself-including\tSELF\tSELF\n"
+            b"1\tterminal.complete\tlast-written-terminal\tDECLARED\tDECLARED\n"
+        )
+        if payloads["manifest.tsv"] != expected_manifest:
+            raise AuditError("tool projection manifest grammar drift")
+    return {
+        "classification": "forensic-complete-structured",
+        "producer": generation.name,
+        "terminal": parsed,
+        "manifest": manifest,
+        "registryDigest": _sha256(
+            canonical_json_bytes(
+                {
+                    "generation": generation.name,
+                    "files": [
+                        {
+                            "name": name,
+                            "size": expected_files[name][0],
+                            "sha256": expected_files[name][1],
+                        }
+                        for name in sorted(expected_files, key=os.fsencode)
+                    ],
+                }
+            )
+        ),
+    }
+
+
 def collect_bootstrap_imports(
     root: Path,
     *,
@@ -1306,12 +1606,23 @@ def collect_bootstrap_imports(
     expected_tree: str,
     expected_c: str,
     erratum_digest: str,
+    repair_erratum_digest: Optional[str] = None,
+    selected_entry_map_digest: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     root = Path(root).resolve()
     bootstrap = root / "bootstrap"
     _ordinary_directory(bootstrap, 0o700)
     if erratum_digest != ERRATUM_DIGEST:
         raise AuditError("controller erratum digest mismatch")
+    repair_mode = (
+        repair_erratum_digest is not None or selected_entry_map_digest is not None
+    )
+    if repair_mode and (
+        repair_erratum_digest != REPAIR_ERRATUM_DIGEST
+        or not isinstance(selected_entry_map_digest, str)
+        or re.fullmatch(r"[0-9a-f]{64}", selected_entry_map_digest) is None
+    ):
+        raise AuditError("controller repair erratum or entry map digest mismatch")
 
     probes = validate_controller_erratum_probes(bootstrap)
     predictions = classify_tree_prediction_generations(
@@ -1343,6 +1654,7 @@ def collect_bootstrap_imports(
         raise AuditError("bootstrap scanner path is outside one capture generation")
     scanner = _read_canonical_file(scanner_record)
     _verify_self_digest(scanner)
+    scanner_entries = scanner.get("entries")
     if (
         scanner.get("schemaVersion") != "qinao.secret-scan-worktree.v1"
         or scanner.get("ruleSetVersion") != RULE_SET_VERSION
@@ -1354,11 +1666,53 @@ def collect_bootstrap_imports(
         or scanner.get("scannedByteCount", 0) <= 0
         or scanner.get("findingCount") != 0
         or scanner.get("findings") != []
+        or not isinstance(scanner_entries, list)
+        or scanner.get("scannedFileCount") != len(scanner_entries)
     ):
         raise AuditError("bootstrap scanner record is not a successful frozen scan")
+    entry_paths = set()
+    scanned_bytes = 0
+    for entry in scanner_entries:
+        if not isinstance(entry, dict) or set(entry) != {
+            "pathB64",
+            "source",
+            "size",
+            "sha256",
+        }:
+            raise AuditError("bootstrap scanner entry shape drift")
+        try:
+            path_bytes = base64.b64decode(entry["pathB64"], validate=True)
+        except (TypeError, ValueError) as exc:
+            raise AuditError("bootstrap scanner path encoding drift") from exc
+        _safe_relative_bytes(path_bytes)
+        if (
+            path_bytes in entry_paths
+            or entry["source"] not in ("index", "worktree")
+            or not isinstance(entry["size"], int)
+            or entry["size"] < 0
+            or not isinstance(entry["sha256"], str)
+            or re.fullmatch(r"[0-9a-f]{64}", entry["sha256"]) is None
+        ):
+            raise AuditError("bootstrap scanner entry value drift")
+        entry_paths.add(path_bytes)
+        scanned_bytes += entry["size"]
+    if scanned_bytes != scanner["scannedByteCount"]:
+        raise AuditError("bootstrap scanner byte count drift")
+    selected_entries_digest = _sha256(canonical_json_bytes(scanner_entries))
+    if repair_mode:
+        if scanner_parent.name == HISTORICAL_SCANNER_NAME:
+            raise AuditError("historical scanner cannot be selected for repair")
+        if re.fullmatch(r"capture\.task3-secret\.[0-9a-f]{12}", scanner_parent.name) is None:
+            raise AuditError("selected repair scanner generation name drift")
+        if selected_entries_digest != selected_entry_map_digest:
+            raise AuditError("selected repair scanner entry map drift")
+        if any(entry["source"] != "index" for entry in scanner_entries):
+            raise AuditError("selected repair scanner is not a staged clean scan")
 
     admitted_names = set(EXACT_PROBES)
     admitted_names.update(row["name"] for row in predictions)
+    structured_seen = set()
+    literal_scanner_roles = set()
     for generation in sorted(bootstrap.glob("capture.*"), key=lambda path: path.name):
         _ordinary_directory(generation, 0o700)
         admitted_names.add(generation.name)
@@ -1373,10 +1727,82 @@ def collect_bootstrap_imports(
         if len(terminal_names) > 1:
             raise AuditError("bootstrap diagnostic has multiple terminal records")
         classification = "forensic-partial"
+        selected = False
+        extra_fields: Dict[str, Any] = {}
         if terminal_names == {"terminal.complete"}:
-            if _read_ordinary(generation / "terminal.complete") != b"complete\n":
+            terminal_payload = _read_ordinary(generation / "terminal.complete")
+            if generation.name in HISTORICAL_TERMINAL_REGISTRY:
+                structured = validate_historical_terminal_generation(generation)
+                structured_seen.add(generation.name)
+                classification = structured["classification"]
+                extra_fields.update(
+                    {
+                        "producerTerminal": structured["terminal"],
+                        "producerRegistryDigest": structured["registryDigest"],
+                    }
+                )
+            elif terminal_payload == b"complete\n":
+                if repair_mode and generation.name == HISTORICAL_SCANNER_NAME:
+                    if set(names) != {"secret-scan.json", "terminal.complete"}:
+                        raise AuditError("historical scanner sibling set drift")
+                    historical_terminal = generation / "terminal.complete"
+                    historical_record_path = generation / "secret-scan.json"
+                    if (
+                        _ordinary_file(historical_terminal, expected_mode=0o600).st_size != 9
+                        or _sha256(terminal_payload) != SCANNER_TERMINAL_SHA256
+                        or _ordinary_file(historical_record_path, expected_mode=0o600).st_size
+                        != 2453270
+                        or _sha256(_read_ordinary(historical_record_path))
+                        != HISTORICAL_SCANNER_RECORD_SHA256
+                    ):
+                        raise AuditError("historical scanner generation drift")
+                    historical_scanner = _read_canonical_file(historical_record_path)
+                    _verify_self_digest(historical_scanner)
+                    if (
+                        historical_scanner.get("recordDigest")
+                        != HISTORICAL_SCANNER_RECORD_DIGEST
+                        or historical_scanner.get("ruleSetDigest") != RULE_SET_DIGEST
+                        or historical_scanner.get("ruleCount") != len(SECRET_RULES)
+                        or historical_scanner.get("scannedFileCount") != 10436
+                        or historical_scanner.get("scannedByteCount") != 290972359
+                        or historical_scanner.get("findingCount") != 0
+                        or historical_scanner.get("findings") != []
+                    ):
+                        raise AuditError("historical scanner record drift")
+                    classification = "bootstrap-secret-scan-prior-complete"
+                    literal_scanner_roles.add("historical")
+                    extra_fields.update(
+                        {
+                            "selected": False,
+                            "scannerRecordDigest": historical_scanner["recordDigest"],
+                            "scannerRecordSha256": HISTORICAL_SCANNER_RECORD_SHA256,
+                            "scannerEntryMapDigest": _sha256(
+                                canonical_json_bytes(historical_scanner["entries"])
+                            ),
+                            "ruleSetDigest": historical_scanner["ruleSetDigest"],
+                            "scannedFileCount": historical_scanner["scannedFileCount"],
+                            "scannedByteCount": historical_scanner["scannedByteCount"],
+                        }
+                    )
+                elif generation == scanner_parent:
+                    classification = "bootstrap-secret-scan-complete"
+                    selected = True
+                    literal_scanner_roles.add("selected")
+                    extra_fields.update(
+                        {
+                            "selected": True,
+                            "scannerRecordDigest": scanner["recordDigest"],
+                            "scannerRecordSha256": _sha256(_read_ordinary(scanner_record)),
+                            "scannerEntryMapDigest": selected_entries_digest,
+                            "ruleSetDigest": scanner["ruleSetDigest"],
+                            "scannedFileCount": scanner["scannedFileCount"],
+                            "scannedByteCount": scanner["scannedByteCount"],
+                        }
+                    )
+                else:
+                    raise AuditError("literal complete marker outside scanner role")
+            else:
                 raise AuditError("bootstrap complete terminal drift")
-            classification = "forensic-complete"
         elif terminal_names == {"terminal.failed"}:
             if _read_ordinary(generation / "terminal.failed") != b"failed\n":
                 raise AuditError("bootstrap failed terminal drift")
@@ -1384,8 +1810,23 @@ def collect_bootstrap_imports(
         elif terminal_names == {"terminal.transition"}:
             transition = _read_canonical_file(generation / "terminal.transition")
             _verify_self_digest(transition)
-            if transition.get("schemaVersion") != "qinao.bootstrap-init-transition.v1":
+            invocation_path = generation / "invocation.json"
+            invocation_record = _read_canonical_file(invocation_path)
+            _verify_self_digest(invocation_record)
+            if (
+                set(names) != {"invocation.json", "terminal.transition"}
+                or transition.get("schemaVersion") != "qinao.bootstrap-init-transition.v1"
+                or transition.get("invocationDigest") != invocation_record.get("recordDigest")
+                or invocation_record.get("schemaVersion") != "qinao.sterile-invocation.v1"
+            ):
                 raise AuditError("bootstrap init transition drift")
+            if generation.name == PRESERVED_TRANSITION_NAME and (
+                _sha256(_read_ordinary(generation / "terminal.transition"))
+                != PRESERVED_TRANSITION_SHA256
+                or _sha256(_read_ordinary(invocation_path))
+                != PRESERVED_TRANSITION_INVOCATION_SHA256
+            ):
+                raise AuditError("preserved bootstrap init transition drift")
             classification = "forensic-init-transition"
         elif terminal_names == {"terminal.json"}:
             terminal = _read_canonical_file(generation / "terminal.json")
@@ -1402,25 +1843,26 @@ def collect_bootstrap_imports(
                 else "forensic-complete-failed"
             )
 
-        if generation == scanner_parent:
-            if terminal_names != {"terminal.complete"}:
-                raise AuditError("selected bootstrap scanner is not terminal")
-            classification = "bootstrap-secret-scan-complete"
+        if generation == scanner_parent and not selected:
+            raise AuditError("selected bootstrap scanner is not the selected terminal role")
         row = {
             "schemaVersion": "qinao.bootstrap-import.v1",
             "kind": "bootstrap-diagnostic",
             "name": generation.name,
             "classification": classification,
             "evidentiary": classification
-            in ("forensic-complete", "bootstrap-secret-scan-complete"),
+            in (
+                "forensic-complete",
+                "forensic-complete-structured",
+                "bootstrap-secret-scan-prior-complete",
+                "bootstrap-secret-scan-complete",
+            ),
             "manifest": manifest,
             "erratumDigest": erratum_digest,
         }
-        if generation == scanner_parent:
-            row["scannerRecordDigest"] = scanner["recordDigest"]
-            row["ruleSetDigest"] = scanner["ruleSetDigest"]
-            row["scannedFileCount"] = scanner["scannedFileCount"]
-            row["scannedByteCount"] = scanner["scannedByteCount"]
+        if repair_mode:
+            row["repairErratumDigest"] = repair_erratum_digest
+        row.update(extra_fields)
         rows.append(_self_digest_record(row, field="bootstrapImportDigest"))
 
     observed_names = {child.name for child in bootstrap.iterdir()}
@@ -1431,6 +1873,13 @@ def collect_bootstrap_imports(
         )
     if scanner_parent.name not in admitted_names:
         raise AuditError("selected bootstrap scanner was not imported")
+    if repair_mode:
+        if structured_seen != set(HISTORICAL_TERMINAL_REGISTRY):
+            raise AuditError("historical structured terminal registry incomplete")
+        if literal_scanner_roles != {"historical", "selected"}:
+            raise AuditError("scanner role set drift")
+        if PRESERVED_TRANSITION_NAME not in admitted_names:
+            raise AuditError("preserved bootstrap transition absent")
     rows.sort(key=lambda row: row["name"])
     return rows
 
@@ -2066,7 +2515,7 @@ def _ascii_git_line(repository: Path, arguments: Sequence[str], label: str) -> s
 
 def _build_convergence_bootstrap_context(
     repository: Path,
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     repository = Path(repository).resolve()
     if str(repository) != FROZEN_WT:
         raise AuditError("convergence repository path drift")
@@ -2074,23 +2523,29 @@ def _build_convergence_bootstrap_context(
     if branch != FROZEN_BRANCH:
         raise AuditError("convergence branch drift")
     head = _ascii_git_line(repository, ["rev-parse", "HEAD"], "HEAD")
-    if head == FROZEN_C or not re.fullmatch(r"[0-9a-f]{40}", head):
-        raise AuditError("bootstrap commit absent")
+    if not re.fullmatch(r"[0-9a-f]{40}", head) or head in (
+        FROZEN_C,
+        BOOTSTRAP_IMPLEMENTATION_COMMIT,
+    ):
+        raise AuditError("bootstrap repair commit absent")
     parents = _ascii_git_line(
         repository,
         ["rev-list", "--parents", "-n", "1", head],
-        "bootstrap parents",
+        "bootstrap repair parents",
     ).split(" ")
-    if parents != [head, FROZEN_C]:
-        raise AuditError("bootstrap commit parent drift")
-    tree = _ascii_git_line(repository, ["rev-parse", head + "^{tree}"], "bootstrap tree")
-    raw_commit = _run_git(repository, ["cat-file", "commit", head])
-    commit_metadata = parse_bootstrap_commit_metadata(
-        raw_commit,
-        expected_tree=tree,
-        expected_parent=FROZEN_C,
+    if parents != [head, BOOTSTRAP_IMPLEMENTATION_COMMIT]:
+        raise AuditError("bootstrap repair commit parent drift")
+    b1_tree = _ascii_git_line(
+        repository,
+        ["rev-parse", head + "^{tree}"],
+        "bootstrap repair tree",
     )
-    changed = [
+    b0_raw = _run_git(
+        repository,
+        ["cat-file", "commit", BOOTSTRAP_IMPLEMENTATION_COMMIT],
+    )
+    b1_raw = _run_git(repository, ["cat-file", "commit", head])
+    b0_changed = [
         item
         for item in _run_git(
             repository,
@@ -2101,13 +2556,43 @@ def _build_convergence_bootstrap_context(
                 "-z",
                 "-r",
                 FROZEN_C,
+                BOOTSTRAP_IMPLEMENTATION_COMMIT,
+            ],
+        ).split(b"\x00")
+        if item
+    ]
+    b1_changed = [
+        item
+        for item in _run_git(
+            repository,
+            [
+                "diff-tree",
+                "--no-commit-id",
+                "--name-only",
+                "-z",
+                "-r",
+                BOOTSTRAP_IMPLEMENTATION_COMMIT,
                 head,
             ],
         ).split(b"\x00")
         if item
     ]
-    if tuple(changed) != TASK3_TRACKED_PATHS:
-        raise AuditError("bootstrap commit path delta drift")
+    chain = validate_preledger_commit_chain(
+        b0_oid=BOOTSTRAP_IMPLEMENTATION_COMMIT,
+        b0_payload=b0_raw,
+        b1_oid=head,
+        b1_payload=b1_raw,
+        b0_changed_paths=b0_changed,
+        b1_changed_paths=b1_changed,
+    )
+    for path in TASK3_TRACKED_PATHS:
+        before = _run_git(
+            repository,
+            ["ls-tree", "-z", BOOTSTRAP_IMPLEMENTATION_COMMIT, "--", os.fsdecode(path)],
+        )
+        after = _run_git(repository, ["ls-tree", "-z", head, "--", os.fsdecode(path)])
+        if not before or not after or before.split(b" ", 1)[0] != after.split(b" ", 1)[0]:
+            raise AuditError("bootstrap repair path deletion, rename, or mode drift")
     if _run_git(
         repository,
         ["status", "--porcelain=v2", "-z", "--untracked-files=all"],
@@ -2155,6 +2640,7 @@ def _build_convergence_bootstrap_context(
             FROZEN_S,
             FROZEN_D,
             FROZEN_C,
+            BOOTSTRAP_IMPLEMENTATION_COMMIT,
             head,
         ],
     )
@@ -2194,6 +2680,7 @@ def _build_convergence_bootstrap_context(
     common_stat = _ordinary_directory(common_git)
     module_path = repository / "scripts" / "qinao_convergence_audit.py"
     module_payload = _read_ordinary(module_path, maximum=8 * 1024 * 1024)
+    selected_entry_map_digest = _git_index_entry_map_digest(repository)
     invocation = _CURRENT_STERILE_INVOCATION
     if (
         invocation is None
@@ -2204,22 +2691,25 @@ def _build_convergence_bootstrap_context(
     ):
         raise AuditError("init lacks exact sterile bootstrap invocation")
     protected_digest = _sha256(canonical_json_bytes(PROTECTED_WITNESS))
-    facts = _self_digest_record(
+    b0_metadata = chain["implementationCommitMetadata"]
+    b1_metadata = chain["repairCommitMetadata"]
+    implementation_facts = _self_digest_record(
         {
-            "schemaVersion": "qinao.bootstrap-facts.v1",
+            "schemaVersion": "qinao.bootstrap-commit-facts.v2",
+            "role": "bootstrap-implementation",
             "S": FROZEN_S,
             "D": FROZEN_D,
             "C": FROZEN_C,
             "C_TREE": FROZEN_C_TREE,
             "cRawCommitSha256": FROZEN_C_RAW_SHA256,
             "mergeManifestSha256": FROZEN_MERGE_MANIFEST_DIGEST,
-            "bootstrapCommit": head,
-            "bootstrapCommitMetadata": commit_metadata,
-            "bootstrapTree": tree,
+            "bootstrapCommit": BOOTSTRAP_IMPLEMENTATION_COMMIT,
+            "bootstrapImplementationCommit": BOOTSTRAP_IMPLEMENTATION_COMMIT,
+            "bootstrapCommitMetadata": b0_metadata,
+            "bootstrapTree": BOOTSTRAP_IMPLEMENTATION_TREE,
             "bootstrapChangedPathB64": [
-                base64.b64encode(path).decode("ascii") for path in changed
+                base64.b64encode(path).decode("ascii") for path in b0_changed
             ],
-            "cleanStatusSha256": _sha256(b""),
             "configDigest": FROZEN_CONFIG_DIGEST,
             "rawConfigDigest": FROZEN_RAW_CONFIG_DIGEST,
             "configKeysDigest": FROZEN_CONFIG_KEYS_DIGEST,
@@ -2227,7 +2717,28 @@ def _build_convergence_bootstrap_context(
             "protectedWitnessDigest": protected_digest,
             "objectFormat": "sha1",
             "erratumDigest": ERRATUM_DIGEST,
+        },
+        field="bootstrapImportDigest",
+    )
+    repair_facts = _self_digest_record(
+        {
+            "schemaVersion": "qinao.bootstrap-commit-facts.v2",
+            "role": "bootstrap-repair",
+            "bootstrapRepairCommit": head,
+            "bootstrapRepairCommitMetadata": b1_metadata,
+            "bootstrapRepairTree": b1_tree,
+            "bootstrapRepairChangedPathB64": [
+                base64.b64encode(path).decode("ascii") for path in b1_changed
+            ],
+            "cleanStatusSha256": _sha256(b""),
+            "orderedPreLedgerCommitChain": chain["orderedCommitChain"],
+            "orderedPreLedgerCommitChainDigest": chain[
+                "orderedCommitChainDigest"
+            ],
+            "erratumDigest": ERRATUM_DIGEST,
+            "repairErratumDigest": REPAIR_ERRATUM_DIGEST,
             "sterileInvocationDigest": invocation["recordDigest"],
+            "repairedModuleSha256": _sha256(module_payload),
         },
         field="bootstrapImportDigest",
     )
@@ -2243,24 +2754,37 @@ def _build_convergence_bootstrap_context(
         "D": FROZEN_D,
         "C": FROZEN_C,
         "C_TREE": FROZEN_C_TREE,
-        "bootstrapCommit": head,
-        "bootstrapTree": tree,
-        "bootstrapRawCommitSha256": commit_metadata["rawCommitSha256"],
+        "bootstrapCommit": BOOTSTRAP_IMPLEMENTATION_COMMIT,
+        "bootstrapTree": BOOTSTRAP_IMPLEMENTATION_TREE,
+        "bootstrapRawCommitSha256": BOOTSTRAP_IMPLEMENTATION_RAW_SHA256,
+        "bootstrapImplementationCommit": BOOTSTRAP_IMPLEMENTATION_COMMIT,
+        "bootstrapImplementationTree": BOOTSTRAP_IMPLEMENTATION_TREE,
+        "bootstrapImplementationRawCommitSha256": BOOTSTRAP_IMPLEMENTATION_RAW_SHA256,
+        "bootstrapImplementationCommitMetadata": b0_metadata,
+        "bootstrapRepairCommit": head,
+        "bootstrapRepairTree": b1_tree,
+        "bootstrapRepairRawCommitSha256": b1_metadata["rawCommitSha256"],
+        "bootstrapRepairCommitMetadata": b1_metadata,
+        "preLedgerCommitChain": chain["orderedCommitChain"],
+        "preLedgerCommitChainDigest": chain["orderedCommitChainDigest"],
         "configDigest": FROZEN_CONFIG_DIGEST,
         "rawConfigDigest": FROZEN_RAW_CONFIG_DIGEST,
         "configKeysDigest": FROZEN_CONFIG_KEYS_DIGEST,
         "protectedWitnessDigest": protected_digest,
         "mergeManifestSha256": FROZEN_MERGE_MANIFEST_DIGEST,
         "erratumDigest": ERRATUM_DIGEST,
+        "repairErratumDigest": REPAIR_ERRATUM_DIGEST,
         "objectFormat": "sha1",
         "ruleSetVersion": RULE_SET_VERSION,
         "ruleSetDigest": RULE_SET_DIGEST,
+        "selectedRepairEntryMapDigest": selected_entry_map_digest,
         "moduleSha256": _sha256(module_payload),
+        "repairedModuleSha256": _sha256(module_payload),
         "launcherSha256": _sha256(LOCAL_PYTHON_LAUNCHER),
         "sterileInvocationDigest": invocation["recordDigest"],
         "sterileRuntime": invocation["runtime"],
     }
-    return identity_fields, facts
+    return identity_fields, [implementation_facts, repair_facts]
 
 
 def _git_index_entries(repository: Path) -> Dict[bytes, bytes]:
@@ -2280,6 +2804,22 @@ def _git_index_entries(repository: Path) -> Dict[bytes, bytes]:
             raise AuditError("duplicate index path")
         entries[path] = _run_git(repository, ["cat-file", "blob", oid.decode("ascii")])
     return entries
+
+
+def _git_index_entry_map_digest(repository: Path) -> str:
+    index_entries = _git_index_entries(repository)
+    rows = [
+        {
+            "pathB64": base64.b64encode(path).decode("ascii"),
+            "source": "index",
+            "size": len(index_entries[path]),
+            "sha256": _sha256(index_entries[path]),
+        }
+        for path in sorted(index_entries)
+    ]
+    if not rows:
+        raise AuditError("bootstrap repair index entry map is empty")
+    return _sha256(canonical_json_bytes(rows))
 
 
 def _git_dirty_paths(repository: Path) -> List[bytes]:
@@ -2347,16 +2887,51 @@ def _command_init_run_state(argv: Sequence[str]) -> int:
     options = parser.parse_args(list(argv))
     root = Path(options.root).resolve()
     repository = Path(options.repository).resolve()
-    identity_fields, facts = _build_convergence_bootstrap_context(repository)
+    identity_fields, commit_facts = _build_convergence_bootstrap_context(repository)
+    if not isinstance(commit_facts, list) or len(commit_facts) != 2:
+        raise AuditError("pre-ledger commit fact set drift")
     imported = collect_bootstrap_imports(
         root,
         scanner_record=Path(options.bootstrap_import),
         expected_tree=FROZEN_C_TREE,
         expected_c=FROZEN_C,
         erratum_digest=ERRATUM_DIGEST,
+        repair_erratum_digest=REPAIR_ERRATUM_DIGEST,
+        selected_entry_map_digest=identity_fields[
+            "selectedRepairEntryMapDigest"
+        ],
     )
-    bootstrap_imports = [facts] + imported
     identity_fields = dict(identity_fields)
+    historical_rows = [
+        row
+        for row in imported
+        if row.get("classification") == "bootstrap-secret-scan-prior-complete"
+    ]
+    selected_rows = [
+        row
+        for row in imported
+        if row.get("classification") == "bootstrap-secret-scan-complete"
+        and row.get("selected") is True
+    ]
+    if len(historical_rows) != 1 or len(selected_rows) != 1:
+        raise AuditError("bootstrap scanner identity set drift")
+    historical = historical_rows[0]
+    selected = selected_rows[0]
+    identity_fields["historicalBootstrapScanner"] = {
+        "generation": historical["name"],
+        "recordDigest": historical["scannerRecordDigest"],
+        "recordSha256": historical["scannerRecordSha256"],
+        "entryMapDigest": historical["scannerEntryMapDigest"],
+        "selected": False,
+    }
+    identity_fields["selectedRepairScanner"] = {
+        "generation": selected["name"],
+        "recordDigest": selected["scannerRecordDigest"],
+        "recordSha256": selected["scannerRecordSha256"],
+        "entryMapDigest": selected["scannerEntryMapDigest"],
+        "selected": True,
+    }
+    bootstrap_imports = list(commit_facts) + imported
     identity_fields["bootstrapImportCount"] = len(bootstrap_imports)
     identity_fields["bootstrapImportsDigest"] = _sha256(
         canonical_json_bytes(bootstrap_imports)

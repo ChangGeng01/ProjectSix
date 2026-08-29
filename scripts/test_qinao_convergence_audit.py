@@ -27,8 +27,23 @@ from unittest import mock
 
 AUDIT_PATH = Path(__file__).with_name("qinao_convergence_audit.py")
 ERRATUM_DIGEST = "ad01e833fef13bb68e2d536d9774a005d9bf30b6987b0215caad954527ba737b"
+ERRATUM2_DIGEST = "71cf7f9ed83f8106cf75040d8d6592dd3437fd3fd9f61cbaa9c8f7c5120fc55f"
 EXPECTED_TREE = "3a1674651a95e91b321b637b801db66d71e6fafb"
+B0 = "1e18da38a498549687dd646a43d34d0637b23aed"
+B0_TREE = "b170bd6b2f45d4d5fb7c5759d3bab6698ebf37b0"
+B0_RAW = (
+    b"tree b170bd6b2f45d4d5fb7c5759d3bab6698ebf37b0\n"
+    b"parent 91bfb4c851279235ccde2ec21902c6a4c83555ee\n"
+    b"author Qinao development <qinao-development@invalid.local> 1788003229 +1000\n"
+    b"committer Qinao development <qinao-development@invalid.local> 1788003229 +1000\n"
+    b"\n"
+    b"feat: add durable Qinao run ledger\n"
+)
 EXACT_PROBES = ("probe.gV8vVx", "probe.9erZU8", "probe.U4rXSq")
+FROZEN_BOOTSTRAP_ROOT = Path(
+    "/Users/changgeng/Project/Project06/Project06/.git/"
+    "qinao-runs/git-only-convergence/bootstrap"
+)
 
 
 def _load_audit_module():
@@ -82,6 +97,7 @@ def _identity_fields(repository: Path) -> dict:
         "C_TREE": EXPECTED_TREE,
         "configDigest": "4" * 64,
         "erratumDigest": ERRATUM_DIGEST,
+        "selectedRepairEntryMapDigest": "5" * 64,
         "schemaVersion": "qinao.run-identity.v1",
     }
 
@@ -118,6 +134,83 @@ def _write_n34_generation(bootstrap: Path, *, erratum_digest: str = ERRATUM_DIGE
     for path in generation.iterdir():
         if path.is_file():
             os.chmod(path, 0o600)
+
+
+def _write_synthetic_success_scanner(bootstrap: Path, name: str) -> Path:
+    generation = bootstrap / name
+    _mkdir(generation)
+    entries = [
+        {
+            "pathB64": base64.b64encode(b"safe.txt").decode("ascii"),
+            "source": "index",
+            "size": 4,
+            "sha256": hashlib.sha256(b"safe").hexdigest(),
+        }
+    ]
+    record = module._self_digest_record(
+        {
+            "schemaVersion": "qinao.secret-scan-worktree.v1",
+            "ruleSetVersion": module.RULE_SET_VERSION,
+            "ruleSetDigest": module.RULE_SET_DIGEST,
+            "ruleCount": len(module.SECRET_RULES),
+            "scannedFileCount": 1,
+            "scannedByteCount": 4,
+            "findingCount": 0,
+            "entries": entries,
+            "findings": [],
+        }
+    )
+    module.write_canonical_exclusive(generation / "secret-scan.json", record)
+    (generation / "terminal.complete").write_bytes(b"complete\n")
+    os.chmod(generation / "terminal.complete", 0o600)
+    return generation / "secret-scan.json"
+
+
+def _structured_terminal_fixture(parent: Path, generation_name: str):
+    root = _new_run_root(parent)
+    bootstrap = root / "bootstrap"
+    for name in EXACT_PROBES:
+        _write_exact_probe(bootstrap, name)
+    _write_n34_generation(bootstrap)
+    shutil.copytree(
+        FROZEN_BOOTSTRAP_ROOT / generation_name,
+        bootstrap / generation_name,
+        copy_function=shutil.copy2,
+    )
+    selected = _write_synthetic_success_scanner(
+        bootstrap,
+        "capture.task3-secret.abcdef123456",
+    )
+    return root, selected
+
+
+def _full_repair_bootstrap_fixture(parent: Path):
+    root = _new_run_root(parent)
+    bootstrap = root / "bootstrap"
+    for name in EXACT_PROBES:
+        _write_exact_probe(bootstrap, name)
+    _write_n34_generation(bootstrap)
+    for name in (
+        "capture.task2-merge.tL6p8x",
+        "capture.task2-resume.ZbWFBk",
+        "capture.tool-projection.JRp96i",
+        "capture.task3-secret.ee573e0d5235",
+        "capture.sterile-python.f24d9641fa44",
+    ):
+        shutil.copytree(
+            FROZEN_BOOTSTRAP_ROOT / name,
+            bootstrap / name,
+            copy_function=shutil.copy2,
+        )
+    selected = _write_synthetic_success_scanner(
+        bootstrap,
+        "capture.task3-secret.abcdef123456",
+    )
+    selected_record = module.parse_canonical_json(selected.read_bytes())
+    entry_digest = module._sha256(
+        module.canonical_json_bytes(selected_record["entries"])
+    )
+    return root, selected, entry_digest
 
 
 class SterilePythonLauncherTests(_ModuleRequired):
@@ -594,7 +687,20 @@ class LedgerTests(_ModuleRequired):
                     "scannedFileCount": 2,
                     "scannedByteCount": 17,
                     "findingCount": 0,
-                    "entries": [],
+                    "entries": [
+                        {
+                            "pathB64": base64.b64encode(b"a").decode("ascii"),
+                            "source": "index",
+                            "size": 8,
+                            "sha256": "1" * 64,
+                        },
+                        {
+                            "pathB64": base64.b64encode(b"b").decode("ascii"),
+                            "source": "index",
+                            "size": 9,
+                            "sha256": "2" * 64,
+                        },
+                    ],
                     "findings": [],
                 }
             )
@@ -643,6 +749,231 @@ class LedgerTests(_ModuleRequired):
                     )
                 ) for row in rows)
             )
+
+    def test_exact_structured_bootstrap_terminals_are_admitted_by_generation_registry(self):
+        generations = (
+            "capture.task2-merge.tL6p8x",
+            "capture.task2-resume.ZbWFBk",
+            "capture.tool-projection.JRp96i",
+        )
+        for generation_name in generations:
+            with self.subTest(generation_name=generation_name), tempfile.TemporaryDirectory() as temporary:
+                root, scanner = _structured_terminal_fixture(
+                    Path(temporary),
+                    generation_name,
+                )
+                rows = module.collect_bootstrap_imports(
+                    root,
+                    scanner_record=scanner,
+                    expected_tree=EXPECTED_TREE,
+                    expected_c="c" * 40,
+                    erratum_digest=ERRATUM_DIGEST,
+                )
+                by_name = {row["name"]: row for row in rows}
+                self.assertEqual(
+                    by_name[generation_name]["classification"],
+                    "forensic-complete-structured",
+                )
+
+    def test_structured_terminal_parsers_reject_row_and_delimiter_drift(self):
+        cases = (
+            (
+                module.parse_task2_merge_terminal,
+                FROZEN_BOOTSTRAP_ROOT / "capture.task2-merge.tL6p8x" / "terminal.complete",
+                b"=",
+            ),
+            (
+                module.parse_task2_resume_terminal,
+                FROZEN_BOOTSTRAP_ROOT / "capture.task2-resume.ZbWFBk" / "terminal.complete",
+                b"=",
+            ),
+            (
+                module.parse_tool_projection_terminal,
+                FROZEN_BOOTSTRAP_ROOT / "capture.tool-projection.JRp96i" / "terminal.complete",
+                b"\t",
+            ),
+        )
+        for parser, path, delimiter in cases:
+            payload = path.read_bytes()
+            with self.subTest(path=path.name):
+                parsed = parser(payload)
+                self.assertEqual(parsed["state"], "complete")
+                lines = payload[:-1].split(b"\n")
+                variants = (
+                    payload.replace(b"complete", b"completE", 1),
+                    payload.replace(delimiter, b":" if delimiter == b"=" else b"=", 1),
+                    b"\n".join([lines[1], lines[0]] + lines[2:]) + b"\n",
+                    lines[0] + b"\n" + payload,
+                    payload + b"extra=value\n",
+                    b"\n".join(lines[:-1]) + b"\n",
+                )
+                for drift in variants:
+                    with self.assertRaises(module.AuditError):
+                        parser(drift)
+
+    def test_historical_registry_rejects_name_manifest_mode_and_sibling_drift(self):
+        cases = (
+            ("capture.task2-merge.tL6p8x", "commit.raw"),
+            ("capture.task2-resume.ZbWFBk", "local-config.canonical"),
+            ("capture.tool-projection.JRp96i", "projection.sha256"),
+        )
+        for generation_name, sibling_name in cases:
+            source = FROZEN_BOOTSTRAP_ROOT / generation_name
+            with self.subTest(generation=generation_name), tempfile.TemporaryDirectory() as temporary:
+                exact = Path(temporary) / generation_name
+                shutil.copytree(source, exact, copy_function=shutil.copy2)
+                result = module.validate_historical_terminal_generation(exact)
+                self.assertEqual(result["classification"], "forensic-complete-structured")
+
+                extra = Path(temporary) / "extra-copy"
+                shutil.copytree(source, extra, copy_function=shutil.copy2)
+                (extra / "unexpected").write_bytes(b"x")
+                os.chmod(extra / "unexpected", 0o600)
+                with self.assertRaises(module.AuditError):
+                    module.validate_historical_terminal_generation(extra)
+
+                wrong_name = Path(temporary) / (generation_name + ".drift")
+                shutil.copytree(source, wrong_name, copy_function=shutil.copy2)
+                with self.assertRaises(module.AuditError):
+                    module.validate_historical_terminal_generation(wrong_name)
+
+                wrong_mode = Path(temporary) / "mode-copy"
+                shutil.copytree(source, wrong_mode, copy_function=shutil.copy2)
+                os.chmod(wrong_mode / "terminal.complete", 0o640)
+                with self.assertRaises(module.AuditError):
+                    module.validate_historical_terminal_generation(wrong_mode)
+
+                sibling_drift = Path(temporary) / "sibling-copy"
+                shutil.copytree(source, sibling_drift, copy_function=shutil.copy2)
+                sibling = sibling_drift / sibling_name
+                sibling.write_bytes(sibling.read_bytes() + b"x")
+                os.chmod(sibling, 0o600)
+                with self.assertRaises(module.AuditError):
+                    module.validate_historical_terminal_generation(sibling_drift)
+
+    def test_scanner_roles_are_closed_unique_and_bound_to_selected_entry_map(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, selected, entry_digest = _full_repair_bootstrap_fixture(Path(temporary))
+            rows = module.collect_bootstrap_imports(
+                root,
+                scanner_record=selected,
+                expected_tree=EXPECTED_TREE,
+                expected_c="c" * 40,
+                erratum_digest=ERRATUM_DIGEST,
+                repair_erratum_digest=ERRATUM2_DIGEST,
+                selected_entry_map_digest=entry_digest,
+            )
+            by_name = {row["name"]: row for row in rows}
+            self.assertEqual(
+                by_name["capture.task3-secret.ee573e0d5235"]["classification"],
+                "bootstrap-secret-scan-prior-complete",
+            )
+            self.assertFalse(
+                by_name["capture.task3-secret.ee573e0d5235"]["selected"]
+            )
+            self.assertEqual(
+                by_name["capture.task3-secret.abcdef123456"]["classification"],
+                "bootstrap-secret-scan-complete",
+            )
+            self.assertTrue(
+                by_name["capture.task3-secret.abcdef123456"]["selected"]
+            )
+            with self.assertRaises(module.AuditError):
+                module.collect_bootstrap_imports(
+                    root,
+                    scanner_record=(
+                        root
+                        / "bootstrap"
+                        / "capture.task3-secret.ee573e0d5235"
+                        / "secret-scan.json"
+                    ),
+                    expected_tree=EXPECTED_TREE,
+                    expected_c="c" * 40,
+                    erratum_digest=ERRATUM_DIGEST,
+                    repair_erratum_digest=ERRATUM2_DIGEST,
+                    selected_entry_map_digest=entry_digest,
+                )
+            with self.assertRaises(module.AuditError):
+                module.collect_bootstrap_imports(
+                    root,
+                    scanner_record=selected,
+                    expected_tree=EXPECTED_TREE,
+                    expected_c="c" * 40,
+                    erratum_digest=ERRATUM_DIGEST,
+                    repair_erratum_digest=ERRATUM2_DIGEST,
+                    selected_entry_map_digest="0" * 64,
+                )
+
+        for mutation in ("second-scanner", "non-scanner-marker"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
+                root, selected, entry_digest = _full_repair_bootstrap_fixture(Path(temporary))
+                bootstrap = root / "bootstrap"
+                if mutation == "second-scanner":
+                    _write_synthetic_success_scanner(
+                        bootstrap,
+                        "capture.task3-secret.111111111111",
+                    )
+                else:
+                    marker = bootstrap / "capture.unregistered-marker"
+                    _mkdir(marker)
+                    (marker / "terminal.complete").write_bytes(b"complete\n")
+                    os.chmod(marker / "terminal.complete", 0o600)
+                with self.assertRaises(module.AuditError):
+                    module.collect_bootstrap_imports(
+                        root,
+                        scanner_record=selected,
+                        expected_tree=EXPECTED_TREE,
+                        expected_c="c" * 40,
+                        erratum_digest=ERRATUM_DIGEST,
+                        repair_erratum_digest=ERRATUM2_DIGEST,
+                        selected_entry_map_digest=entry_digest,
+                    )
+
+    def test_preledger_commit_chain_accepts_only_c_b0_b1_and_two_path_deltas(self):
+        b1_oid = "a" * 40
+        b1_tree = "b" * 40
+        b1_raw = (
+            ("tree " + b1_tree + "\n").encode("ascii")
+            + ("parent " + B0 + "\n").encode("ascii")
+            + b"author Qinao development <qinao-development@invalid.local> 1788004000 +1000\n"
+            + b"committer Qinao development <qinao-development@invalid.local> 1788004001 +1000\n"
+            + b"\nfix: admit frozen Qinao bootstrap terminals\n"
+        )
+        paths = (
+            b"scripts/qinao_convergence_audit.py",
+            b"scripts/test_qinao_convergence_audit.py",
+        )
+        result = module.validate_preledger_commit_chain(
+            b0_oid=B0,
+            b0_payload=B0_RAW,
+            b1_oid=b1_oid,
+            b1_payload=b1_raw,
+            b0_changed_paths=paths,
+            b1_changed_paths=paths,
+        )
+        self.assertEqual(result["orderedCommitChain"], [B0, b1_oid])
+        self.assertRegex(result["orderedCommitChainDigest"], r"\A[0-9a-f]{64}\Z")
+        mutations = (
+            {"b1_payload": b1_raw.replace(B0.encode(), ("9" * 40).encode(), 1)},
+            {"b1_payload": b1_raw.replace(B0.encode(), module.FROZEN_C.encode(), 1)},
+            {"b1_payload": b1_raw.replace(b"fix: admit", b"fix: reject", 1)},
+            {"b1_payload": b1_raw.replace(b"Qinao development", b"Other identity", 1)},
+            {"b1_payload": b1_raw.replace(b"\n\n", b"\nencoding UTF-8\n\n", 1)},
+            {"b1_changed_paths": paths + (b"outside",)},
+            {"b0_changed_paths": paths[:1]},
+        )
+        for changed in mutations:
+            arguments = {
+                "b0_oid": B0,
+                "b0_payload": B0_RAW,
+                "b1_oid": b1_oid,
+                "b1_payload": b1_raw,
+                "b0_changed_paths": paths,
+                "b1_changed_paths": paths,
+            }
+            arguments.update(changed)
+            with self.assertRaises(module.AuditError):
+                module.validate_preledger_commit_chain(**arguments)
 
     def test_init_transition_manifest_is_terminal_before_dispatch_and_never_finished(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -703,15 +1034,44 @@ class LedgerTests(_ModuleRequired):
                 },
                 field="bootstrapImportDigest",
             )
+            repair_facts = module._self_digest_record(
+                {
+                    "schemaVersion": "qinao.bootstrap-facts.v2",
+                    "bootstrapRepairCommit": "b" * 40,
+                },
+                field="bootstrapImportDigest",
+            )
+            historical = module._self_digest_record(
+                {
+                    "name": module.HISTORICAL_SCANNER_NAME,
+                    "classification": "bootstrap-secret-scan-prior-complete",
+                    "selected": False,
+                    "scannerRecordDigest": "1" * 64,
+                    "scannerRecordSha256": "2" * 64,
+                    "scannerEntryMapDigest": "3" * 64,
+                },
+                field="bootstrapImportDigest",
+            )
+            selected = module._self_digest_record(
+                {
+                    "name": "capture.task3-secret.abcdef123456",
+                    "classification": "bootstrap-secret-scan-complete",
+                    "selected": True,
+                    "scannerRecordDigest": "4" * 64,
+                    "scannerRecordSha256": "5" * 64,
+                    "scannerEntryMapDigest": "6" * 64,
+                },
+                field="bootstrapImportDigest",
+            )
             stream = BinaryStdout()
             with mock.patch.object(
                 module,
                 "_build_convergence_bootstrap_context",
-                return_value=(_identity_fields(repository), facts),
+                return_value=(_identity_fields(repository), [facts, repair_facts]),
             ), mock.patch.object(
                 module,
                 "collect_bootstrap_imports",
-                return_value=[],
+                return_value=[historical, selected],
             ), mock.patch.object(module.sys, "stdout", stream):
                 self.assertEqual(
                     module._dispatch_command(
