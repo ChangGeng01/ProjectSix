@@ -1,0 +1,70 @@
+{
+  "schema": "qinao-a02-provisional-review-projection-v1-erratum-v1",
+  "classification": "appendOnlyHistoricalSemanticErratum",
+  "appliesTo": {
+    "commit": "bef9cea290d161da7510c6624bc676fd181cfd10",
+    "tree": "26495bad43991149264c177fbb01212da952f464",
+    "sourceSha256": "9229f962f9581f7f942b5f08838f0f9199810dc366e62b03cc0206fe68f09f0d",
+    "frozenProjectionBytes": 4250,
+    "frozenProjectionSha256": "cab70d307dd1e289850fe741b67ad64c9a252913ddccd9ba00c13d1b065f6f2b",
+    "projectionDigest": "cf8290927c19deddc37938f7ded85a985a286923ab1501d5401879149fcb8298"
+  },
+  "supersededClaim": {
+    "jsonPointer": "/deterministicProjection/sharedObjectDatabaseWrites",
+    "historicalValue": 0,
+    "disposition": "invalidatedAsOverbroad",
+    "reason": "The alternate-backed write-tree path can refresh packed-object filesystem metadata in the source object database. That metadata write alone invalidates the unqualified zero-writes claim; this counterexample does not need or establish byte-content equality.",
+    "acceptedSemanticScopeAfterErratum": "none"
+  },
+  "counterexample": {
+    "observation": "sourcePackMtimeChangedDuringA02BackedA03Invocation",
+    "discoveredBy": "postcommitIndependentBundleReopen",
+    "a03CommitUnderTest": "df88d7015532057c2f91db5e382d4f5e10306057",
+    "a03TreeUnderTest": "2cfa5ee8f6ea4efd7b5b5aef606ad1dd82224881",
+    "a03CapsuleSha256": "646f8ad69e89c9a8797a58730b43b8c49056fa3ad0be507e0d54d2b9cce3319a",
+    "packRelativePath": "pack/pack-083393fc6fbdaf44baaeba720ea0b4f6155e8159.pack",
+    "byteLengthBeforeAndAfter": 327731909,
+    "mtimeNsBefore": 1787933439701397000,
+    "mtimeNsAfter": 1787933448606299000,
+    "contentMutationObserved": false,
+    "contentEqualityProvenByThisObservation": false,
+    "metadataMutationObserved": true,
+    "likelyMechanism": {
+      "status": "inferredNotAuthorityFact",
+      "description": "Git freshened an already-existing packed object reached through GIT_ALTERNATE_OBJECT_DIRECTORIES during a write-capable tree operation."
+    }
+  },
+  "preservedHistoricalFacts": {
+    "frozenBytesIdentityStillExact": true,
+    "fixedCommitTreeBlobAndSourceTupleChecksStillValid": true,
+    "projectedTreeIdentitiesStillValid": true,
+    "onePathDeltaProofStillValid": true,
+    "semanticAuthorityRemainsNone": true,
+    "installableRemainsFalse": true,
+    "authorityEffectsRemainZero": true,
+    "sourceObjectSnapshotIsolation": false,
+    "sourceObjectEpochBinding": "notProven"
+  },
+  "remediationBoundary": {
+    "historicalA02BytesRewritten": false,
+    "historicalClaimMayBeInheritedByA03": false,
+    "writeCapableGitInputRequired": "ephemeralPrivateBareRepositoryMaterializedByGitBundleUnbundleFromHeldVerifiedDescriptor",
+    "liveSourceObjectDatabaseAlternatePermitted": false,
+    "privateEphemeralObjectMetadataMayChange": true,
+    "sourceRepositoryObjectDatabaseMutationRequirement": "boundedSelectedMetadataEndpointInventoryEqualBeforeAfter",
+    "continuousNoMutationProven": false,
+    "bundleSourcePathReopenPermitted": false,
+    "copyHardlinkOrLiveObjectDatabaseFallbackPermitted": false,
+    "independentFailureDomainsProven": false,
+    "controllerPrivateSourceEpochProven": false,
+    "sameUidCapabilityIsolationProven": false
+  },
+  "authority": {
+    "semanticAuthority": "none",
+    "nonAuthoritative": true,
+    "installable": false,
+    "a03Complete": false,
+    "opensA04": false,
+    "deepScan3": "notStartedAndNotAuthorized"
+  }
+}

@@ -1,0 +1,69 @@
+ordinal	rule_id	title	severity	confidence	recovery_state	provenance
+1	insecure-file-permissions	Journal SQLite databases are created without explicit owner-only filesystem permissions	low	high	requires_revalidation	dedup-0009
+2	incomplete-secure-deletion	Trial-index purge can leave forgotten decision text in the SQLite WAL	low	high	requires_revalidation	dedup-0009
+3	sample-ledger-secret-file-protection	Sample sovereign ledger secret is persisted without explicit filesystem or platform at-rest protection	medium	high	requires_revalidation	dedup-0009
+4	resource-bounds-not-enforced	Remote chat adapter does not enforce request and response bounds before buffering or parsing	medium	high	known_overlap_prior_scan_w5_open	dedup-0009
+5	http-bearer-transport	Remote chat-completions endpoints accept cleartext HTTP for bearer or other sensitive headers	medium	high	requires_revalidation	dedup-0009
+6	runtime-bundle-replay-after-restart	Consumed runtime bundles can be replayed after runtime recreation or across processes	medium	high	requires_revalidation	dedup-0009
+7	keychain-update-accessibility	Existing signing-keychain items are not repaired to ThisDeviceOnly accessibility	medium	high	requires_revalidation	dedup-0009
+8	cli-api-key-argv	Sample host accepts bearer credentials through process arguments	medium	high	requires_revalidation	dedup-0009
+9	statelake-header-bounds	Malformed StateLake tensor metadata can crash the reader	medium	high	requires_revalidation	dedup-0009
+10	statelake-checksum-authenticity	StateLake artifact integrity checks use an unkeyed, header-controlled checksum	medium	high	requires_revalidation	dedup-0009
+11	persistent-ledger-stale-head-race	Concurrent persistent ledger writers can fork the hash chain	medium	high	requires_revalidation	dedup-0009
+12	build.sql-schema-codegen-injection	SQL schema contents are emitted into compilable Swift without literal escaping	high	high	requires_revalidation	dedup-0009
+13	tool.dispatch-missing-authorization	Tool dispatch authorizes by registered name only and has no mandatory per-request permit or positive allowlist	high	high	requires_revalidation	dedup-0009
+14	tool.batch-resource-exhaustion	Tool batches create one task per invocation and deadlines cannot stop uncooperative handlers	medium	high	requires_revalidation	dedup-0009
+15	cache.summary-unbounded	Distinct summary inputs are retained indefinitely in a process-global C++ cache	medium	high	requires_revalidation	dedup-0009
+16	history.summary-usage-unbounded	Default all-pilot brain retains every summary usage record without a bound	medium	high	requires_revalidation	dedup-0009
+17	evaluation.generated-code-unsandboxed	Paired HumanEval evaluator executes model-generated Python outside an OS sandbox	high	high	closed_on_p0_branch_29d953a8a_not_in_target	dedup-0009
+18	evaluation.sandbox-overbroad	HumanEval sandbox permits broad host reads/process operations and unbounded captured output	medium	high	requires_revalidation	dedup-0009
+19	input.raw-input-precondition-trap	Public raw-input initializer traps on empty caller-controlled fields	low	high	requires_revalidation	dedup-0009
+20	authorization.public-control-plane-minting	Public control-plane references allow self-service side-effect authorization	high	medium	requires_revalidation	dedup-0009
+21	authorization.halt-clear-without-recovery-capability	Public halt clearing has no recovery authorization	medium	high	requires_revalidation	dedup-0009
+22	authorization.replay.processed-turn-eviction	Bounded processed-turn FIFO permits old turn reprocessing	medium	high	requires_revalidation	dedup-0009
+23	integrity.release-gate-forgeable-artifacts	Release gate trusts forgeable local metrics, verdicts, and supplied logs	high	high	requires_revalidation	dedup-0009
+24	supply-chain.unsafe-checkpoint-deserialization	Conversion scripts unrestrictedly deserialize PyTorch checkpoints	high	high	requires_revalidation	dedup-0009
+25	authorization.statelake-hot-cache-bypass	StateLake hot cache bypasses ACL, binding-key, and expiry validation	medium	high	requires_revalidation	dedup-0009
+26	data-protection.vector-index-storage	Active durable vector index omits the repository SQLite data-protection step	low	high	requires_revalidation	dedup-0009
+27	filesystem.predictable-evaluator-temp-paths	Sample evaluator uses predictable shared /tmp chunk files	medium	high	requires_revalidation	dedup-0009
+28	filesystem.evaluator-tag-path-traversal	Evaluator tags control shared filesystem paths	medium	high	requires_revalidation	dedup-0009
+29	integrity.constitution-vault-unverified	SQLite constitution vault loads policy without verifying its available seal	high	high	requires_revalidation	dedup-0009
+30	integrity.ledger-key-regeneration	Sample ledger silently replaces an invalid existing signing key	low	medium	requires_revalidation	dedup-0009
+31	integrity.audit-reload-lazy-verification	Persisted audit history is exposed before reload verification runs	low	medium	requires_revalidation	dedup-0009
+32	resource-exhaustion.cognitive-graph-batch	Cognitive graph extraction has no effective batch or retention bound	medium	high	requires_revalidation	dedup-0009
+33	model-path-traversal	Public local model directory is not visibly confined to Documents	low	high	requires_revalidation	dedup-0009
+34	mcp-permit-self-assertion	Base MCP gateway accepts a self-asserted permit and scope	medium	high	requires_revalidation	dedup-0009
+35	a2a-attestation-self-assertion	External-agent privilege tier is granted by a non-empty caller token	medium	high	requires_revalidation	dedup-0009
+36	audit-payload-manual-json-interpolation	AFM tool-drop audit payload is manually interpolated without JSON escaping	low	high	requires_revalidation	dedup-0009
+37	snapshot-proof-anchor-version-not-bound	Snapshot continuity proof accepts a registered anchor unrelated to the intent host version	medium	high	requires_revalidation	dedup-0009
+38	evaluation-integrity.generated-code-early-exit	HumanEval accepts a zero exit status without proving that the benchmark check ran	medium	high	requires_revalidation	dedup-0009
+39	supply-chain.evaluation-fixture-integrity	HumanEval executes externally loaded fixture code without revision or digest pinning	medium	high	requires_revalidation	dedup-0009
+40	ffi.resource-exhaustion.untrusted-wire-count	Red-team batch FFI allocates from an attacker-controlled count before validating the buffer	medium	high	requires_revalidation	dedup-0009
+41	supply-chain.critical-evaluation-dataset-unpinned	Critical benchmark gates consume mutable external datasets without immutable integrity pins	medium	high	requires_revalidation	dedup-0009
+42	ffi.resource-exhaustion.tokenizer-unbounded-count	Tokenizer FFI allocates from attacker-controlled vocab or merge counts before validating the wire buffer	medium	high	requires_revalidation	dedup-0009
+43	ffi.resource-exhaustion.integrity-sentinel-unbounded-count	Integrity-sentinel C ABI reserves attacker-controlled claim capacity before validating the wire buffer	medium	high	requires_revalidation	dedup-0009
+44	ffi.resource-exhaustion.importance-unbounded-count	Importance-scoring FFI reserves attacker-controlled record and tier counts before validating wire buffers	medium	high	requires_revalidation	dedup-0009
+45	ffi.resource-exhaustion.ledger-unbounded-count	Ledger and forget-cascade FFI trust caller record counts before validating length-prefixed buffers	medium	high	requires_revalidation	dedup-0009
+46	legacy-audit-canonicalization-collision	Default 1.0.0 audit canonicalization permits signed reference-array substitution	medium	high	requires_revalidation	dedup-0009
+47	exportable-cli-signing-seed	CLI Ed25519 signing seed is stored as a raw filesystem file	low	high	requires_revalidation	dedup-0009
+48	exportable-mirror-hmac-key	CLI mirror HMAC key is exportable beside the identity data	low	high	requires_revalidation	dedup-0009
+49	unbounded-braincli-stdin	BASBrainCLI accumulates unbounded stdin before processing	low	high	requires_revalidation	dedup-0009
+50	unbounded-mirror-input-buffering	BASJournalCLI mirror ingestion buffers the complete file or stdin before validation	low	high	requires_revalidation	dedup-0009
+51	rust-wire-count-allocation-before-validation	Rust wire parsers allocate from untrusted count fields before structural validation	medium	high	requires_revalidation	dedup-0009
+52	pq-and-int8-shape-allocation-bounds	PQ and INT8 shape inputs are not bounded before multiplication or allocation	medium	high	requires_revalidation	dedup-0009
+53	unauthenticated-update-ticket-promotion	Update-ticket promotion trusts caller-supplied trial outcomes and verdict references	medium	high	requires_revalidation	dedup-0009
+54	unauthenticated-optin-commit-token-origin	The opt-in commit gate re-signs caller-supplied token identity without authenticating its origin	medium	high	requires_revalidation	dedup-0009
+55	nan-risk-clamp-bypass	NaN risk-context values bypass persona floor and ceiling comparisons	low	high	requires_revalidation	dedup-0009
+56	unbounded-mlx-session-kv-history	MLX multi-turn sessions default to unbounded live KV/history growth	medium	medium	requires_revalidation	dedup-0009
+57	authorization.mcp-permit-binding	Live MCP permit validation is not bound to invocation identity or lifetime	medium	high	requires_revalidation	dedup-0009-retained-worker-3
+58	memory-safety.decode-negative-position	CoreAI decode-session step accepts negative positions	low	high	requires_revalidation	dedup-0009-retained-worker-8
+59	integrity.summary-cache-nul-collision	C-string summary-cache keys collapse distinct inputs at embedded NULs	low	high	requires_revalidation	dedup-0009-retained-worker-10
+60	authorization.summary-cache-context-confusion	Process-global summary cache ignores safety and host context	medium	high	requires_revalidation	dedup-0009-retained-worker-11
+61	resource-exhaustion.organ-input-amplification	MLX organ inputs bypass the advertised input-token ceiling	low	high	requires_revalidation	dedup-0009-retained-worker-13
+62	authorization.host-approval-bearer	Host constitution approval is an unauthenticated fast-track that ignores candidate readiness	medium	high	requires_revalidation	dedup-0009-retained-worker-19
+63	authorization.shadow-trial-cross-session	Shadow-trial mutations do not bind a trial to its opening session	medium	high	requires_revalidation	dedup-0009-retained-worker-21
+64	integrity.shadow-trial-self-attested-pass	Shadow-trial callers can self-attest a passed seal without evidence	medium	high	requires_revalidation	dedup-0009-retained-worker-22
+65	authorization.memory-constitution-substitution	Memory admission authorizes against an arbitrary caller-supplied constitution	medium	high	requires_revalidation	dedup-0009-retained-worker-23
+66	authorization.memory-destructive-bearer	QinaoMemory exposes destructive cascades without an authorization gate	low	high	requires_revalidation	dedup-0009-retained-worker-24
+67	integrity.distillation-safety-flags	Distillation-bank safety flags are caller assertions rather than authenticated provenance	low	high	requires_revalidation	dedup-0009-retained-worker-25
+68	authorization.halt-effect-toctou	A session halt can race the final check before a tool effect	medium	high	requires_revalidation	dedup-0009-retained-worker-26

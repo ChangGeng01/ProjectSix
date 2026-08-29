@@ -1,0 +1,224 @@
+{
+  "schema": "qinao.a03-v1-predecessor-repository-observation.v1",
+  "observedAtDate": "2026-08-29",
+  "semanticAuthority": "none",
+  "globalNonexistenceClaimed": false,
+  "scope": {
+    "repositoryRoot": "/Users/changgeng/Project/Project06/Project06",
+    "readOnly": true,
+    "observationTimeGranularity": "dateOnly",
+    "negativeFieldInterpretation": "Every false *Found field is limited to includedSurfaces; it is not a global nonexistence claim.",
+    "refCount": 124,
+    "refClasses": {
+      "localHeads": 57,
+      "remoteTracking": 52,
+      "tags": 12,
+      "codexInternal": 3
+    },
+    "reachableCommitCount": 4183,
+    "registeredWorktreeCount": 9,
+    "includedSurfaces": [
+      "visible Git refs",
+      "reachable commit history",
+      "registered worktree tracked and untracked files",
+      "ignored SDD records",
+      "Git reflogs"
+    ],
+    "excludedSurfaces": [
+      "unknown repository-external custody locations",
+      "unknown external controller databases",
+      "unknown external signer or approval services"
+    ],
+    "historySearch": {
+      "exactSchema": "QinaoDesignEdgeAdmissionReceiptV1",
+      "matchingReachableCommits": [
+        "7e4aa2d626e2c94b1b1f3405fb8454e73448514f",
+        "cc1744cf3550d28404e99660df5b080e4aac750b",
+        "4a9298db261bcfda97ea1748baad65649156ba66"
+      ],
+      "matchingContentClasses": [
+        "plan/schema prose",
+        "repository verifier",
+        "test builder",
+        "test-only canonical fixture",
+        "forensic preservation copy"
+      ],
+      "authoritativeReceiptInstanceFound": false
+    }
+  },
+  "requiredPredecessor": {
+    "logicalRegistryOrdinal": 2,
+    "requiredKind": "directAndImmediateV1Transition02PredecessorReceipt",
+    "requiredBindings": [
+      "canonical original predecessor receipt bytes",
+      "complete external trust chain",
+      "08-02 exact design tuple",
+      "exact V1 base and candidate trees",
+      "controller and tool identities",
+      "protected ref",
+      "protected-policy predecessor"
+    ],
+    "satisfiedWithinObservedScope": false
+  },
+  "gitIdentities": {
+    "developmentBootstrap": {
+      "commit": "7e4aa2d626e2c94b1b1f3405fb8454e73448514f",
+      "tree": "47304602b7d1c1eba8eed571dbc65ee36c3a5f21",
+      "containsDesign20260729": true,
+      "containsDesign20260802": false
+    },
+    "design20260729": {
+      "path": "docs/superpowers/specs/2026-07-29-qinao-dual-space-automation-apple-ecosystem-design.md",
+      "commit": "c4e6cf23fd28d01abea3b9c5d8b282ba9dd9f271",
+      "tree": "deef57197db409d6e4b33d5bfe9f7521eacefa12",
+      "blob": "bbc586cb5787d872f8980f95a766f8afa90f9221",
+      "byteLength": 113470,
+      "sha256": "50338e28492cd8dc7a81f28a07a871d70f02020af56549cb1384b9431bd5fcf6"
+    },
+    "design20260802ReviewSource": {
+      "path": "docs/superpowers/specs/2026-08-02-qinao-biomimetic-sovereign-agent-system-design.md",
+      "commit": "c8f80486895e12e26d567e610c35a6e2141b3489",
+      "tree": "2f484874b8b6d49b8bcd595bf3a3ff6c835fb509",
+      "blob": "f3d4186769fd0119a418097fea8821d597770189",
+      "byteLength": 81128,
+      "sha256": "40d322f052425a7e56f03b826922181047c30ac908c35c922a5481e4ddf29aa6",
+      "developmentCommitIsAdmittedReceiptSubstitute": false,
+      "changedPathCountFromBootstrap": 31
+    },
+    "predictedV1DesignEdgeTree": {
+      "tree": "4fd48205c1716f9ce23efd8885c94afdcdf70311",
+      "reachableCommitWithTreeFound": false,
+      "reachableObjectFound": false,
+      "authority": "none"
+    },
+    "design20260810PreservationSource": {
+      "path": "docs/superpowers/specs/2026-08-10-qinao-global-invariant-firewall-and-recovery-design.md",
+      "preservationCommit": "4a9298db261bcfda97ea1748baad65649156ba66",
+      "preservationTree": "22382c1de6680a263ec4a2f4a6c989c0f0e6e220",
+      "blob": "887c23a28fb9098d86d252aa8b6dc9153380738b",
+      "byteLength": 233726,
+      "sha256": "4eb06cde16e0cf5985c7272147ced9274dd83648a098772c8b5a06f7b3ebeab6",
+      "admissionState": "unadmitted"
+    },
+    "predictedV2CandidateTree": {
+      "tree": "0fa81fb9d1c3498fd8bb75d4c46a048f3b64260e",
+      "reachableCommitWithTreeFound": false,
+      "authority": "none"
+    },
+    "a02Projection": {
+      "commit": "bef9cea290d161da7510c6624bc676fd181cfd10",
+      "tree": "26495bad43991149264c177fbb01212da952f464",
+      "projectionBlob": "c90606b10d522ca5c718c8ff6bc31b94e5e41bb1",
+      "receiptBlob": "849760fba4354cd5aed9e85313041988ed1ae1a7",
+      "semanticAuthority": "none",
+      "blocker": "BLOCKED_V1_TRANSITION02_PREDECESSOR_EVIDENCE_UNAVAILABLE_TO_PROVISIONAL_CAPABILITY"
+    }
+  },
+  "fixtureDisposition": {
+    "path": "scripts/fixtures/qinao_admission_canonical_vectors_v1.json",
+    "introducingCommit": "cc1744cf3550d28404e99660df5b080e4aac750b",
+    "introducingTree": "21208b81f3fe5cd4f0e873f24699c69de57c6768",
+    "blob": "092d66334086efde675e1b91ef8a532075377f38",
+    "schema": "QinaoDesignEdgeAdmissionReceiptV1",
+    "repositoryIdentity": "test-only/qinao-canonical-vectors",
+    "designPath": "README.md",
+    "signer": "test-only-design-key",
+    "toolBlobs": {
+      "externalVerifier": "2222222222222222222222222222222222222222222222222222222222222222",
+      "signingProvider": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "classification": "testOnlyCanonicalVector",
+    "independentAuthorityInputEligible": false
+  },
+  "expectedRefObservation": {
+    "expectedProtectedRef": "refs/heads/codex/qinao-admitted-controlled-convergence",
+    "visibleRefFound": false,
+    "matchingReflogEntryFound": false,
+    "installedV1Transition02StateProven": false
+  },
+  "v1TerminalAmbiguity": {
+    "registryDefinition": {
+      "path": "docs/superpowers/plans/2026-07-29-qinao-dual-space-automation-controlled-convergence.md",
+      "preservationCommit": "4a9298db261bcfda97ea1748baad65649156ba66",
+      "blob": "3c32def5329705fa193150f3bbb74332d759ba2c",
+      "ordinal02": "optional design edge or exact alreadyPresent terminal"
+    },
+    "alreadyPresentVariant": {
+      "emitsDesignReceipt": false,
+      "predecessorRemains": "QinaoRootAdmissionReceiptV1",
+      "bootstrapAlreadyContainsSourceSelectionApprovedDesign20260729": true
+    },
+    "candidatePreparedVariant": {
+      "requiredReceiptSchema": "QinaoDesignEdgeAdmissionReceiptV1",
+      "receiptFound": false
+    },
+    "implementationBinding": {
+      "path": "scripts/run_qinao_wave_admission.py",
+      "blob": "080359f7945aefe671ca3c9287d31fa9e35f3782",
+      "receiptApprovedDesignMustEqualSourceSelectionApprovedDesign": true,
+      "sourceSelectionApprovedDesignIs20260729": true,
+      "unambiguous20260802ReceiptEncodingAvailable": false
+    },
+    "ambiguity": "Under the fixed bootstrap and source-selection state, the inspected V1 verifier requires the root predecessor and forbids a design-edge receipt because the 2026-07-29 approvedDesign is already present; the later A0 design instead requires a direct V1 ordinal-02 receipt for the 2026-08-02 supplemental edge.",
+    "resolutionState": "blockedPendingExternalNormativeAndAuthorityEvidence"
+  },
+  "controllerToolObservation": {
+    "repositoryVerifier": {
+      "path": "scripts/run_qinao_wave_admission.py",
+      "blob": "080359f7945aefe671ca3c9287d31fa9e35f3782",
+      "capability": "verificationOnly",
+      "signingOperationAvailable": false,
+      "mayRepresentCandidateAsAdmitted": false
+    },
+    "requiredExternalIdentities": {
+      "externalAdmissionVerifier": {
+        "concretePathBlobDigestFound": false
+      },
+      "designEdgeAdmissionSigningProvider": {
+        "concretePathBlobDigestFound": false
+      },
+      "bootstrapCasBroker": {
+        "concretePathBlobDigestFound": false
+      }
+    },
+    "realSourceSelectionFound": false,
+    "realRootAdmissionReceiptFound": false,
+    "realTrustRootFound": false,
+    "realDesignEdgeReceiptFound": false
+  },
+  "protectedPolicyAmbiguity": {
+    "v1Ledger": {
+      "path": "docs/superpowers/specs/qinao-owner-ledger-v1.json",
+      "blob": "64834006f035a21300d64d0fc41b945f75b10c52",
+      "schemaVersion": 1,
+      "ledgerID": "qinao-owner-ledger-v1",
+      "protectedCommandPolicyMemberPresent": false,
+      "authorityEntityInventoryMemberPresent": false
+    },
+    "planStatement": "No protected policy exists in the V1 Ledger; the first QinaoProtectedCommandPolicyV1 is planned for transition 04 V2 Ledger migration.",
+    "protectedCommandPolicyArtifactFound": false,
+    "unresolvedInterpretations": [
+      "authenticated explicit-absence predecessor",
+      "repository-external protected-policy authority predecessor"
+    ],
+    "implementationMayInferOrSynthesize": false,
+    "resolutionState": "blockedPendingExternalAmendmentDefinition"
+  },
+  "capabilityScopedConclusion": {
+    "state": "blocked",
+    "code": "BLOCKED_V1_TRANSITION02_PREDECESSOR_EVIDENCE_UNAVAILABLE_TO_PROVISIONAL_CAPABILITY",
+    "statement": "Within the inspected Project06 repository, visible refs and reachable history, reflogs, registered worktrees, and ignored SDD records, no independently authoritative V1 transition-02 direct predecessor receipt was discovered that binds the exact 08-02 candidate tree, external controller/tool identities, protected ref, and protected-policy predecessor.",
+    "externalEvidenceMayExistOutsideObservedScope": true,
+    "waivableByLocalInference": false
+  },
+  "mutationEffects": {
+    "operationScope": "predecessorEvidenceSearchOnly",
+    "filesCreated": 0,
+    "filesModified": 0,
+    "refsCreated": 0,
+    "refsModified": 0,
+    "receiptsCreated": 0,
+    "receiptsSigned": 0,
+    "authorityClaimsCreated": 0
+  }
+}
