@@ -323,6 +323,7 @@ PUBLIC_COMMAND_ROUTE_SPEC = MappingProxyType(
         "snapshot-git-state": ("_command_snapshot_git_state", "plain", ""),
         "frontier-start": ("_command_frontier_start", "plain", ""),
         "task3-resume": ("_command_task3_resume", "context", ""),
+        "task3-correct": ("_command_task3_correct", "context", ""),
         "frontier-complete": ("_command_frontier_complete", "plain", ""),
         "recover-captures": ("_command_recover_captures", "plain", ""),
         "protected": ("_command_protected", "plain", ""),
@@ -5157,6 +5158,7 @@ class LedgerTransaction:
             expected = _ordinary_task_completion(
                 starts[0], recovered, supplied.get("resultCommitOid"),
                 completion_sequence=sequence, live=True,
+                task_correction_record_digest=supplied.get("taskCorrectionRecordDigest"),
             )
             if supplied != expected:
                 raise AuditError("fresh task completion proof drift")
@@ -5395,7 +5397,7 @@ class LedgerTransaction:
             renameatx_np.restype = ctypes.c_int
             if _pre_rename_validator is not None:
                 _pre_rename_validator(publication_record)
-            if operation_kind == "task-resumption":
+            if operation_kind in ("task-resumption", "task-correction"):
                 _validate_current_task_publication(self, publication_record)
             if publication_payload != payload:
                 raise AuditError(
@@ -5590,8 +5592,8 @@ class LedgerTransaction:
             raise AuditError("ledger record publication shape drift")
         _validate_current_task_publication(self, record)
         _validate_policy_capture_publication(self, record, _policy_capture_authority)
-        if record.get("operationKind") == "task-resumption":
-            raise AuditError("task resumption requires atomic publication")
+        if record.get("operationKind") in ("task-resumption", "task-correction"):
+            raise AuditError("task continuation requires atomic publication")
         _validate_cleanup_publication(self, record)
         operation_kind = record.get("operationKind")
         if _task_test_execution_authority_record_reserved(
@@ -6299,6 +6301,9 @@ _LEDGER_BASE_FIELDS = frozenset(
 )
 
 _LEDGER_OPERATION_FIELDS: Dict[str, Tuple[frozenset, frozenset, frozenset]] = {
+    "task-correction": (
+        frozenset({"frontierId", "correction"}), frozenset(), frozenset({"correction-published"})
+    ),
     "task-resumption": (
         frozenset({"frontierId", "resumption"}), frozenset(), frozenset({"resumed"})
     ),
@@ -6439,6 +6444,7 @@ _LEDGER_OPERATION_FIELDS: Dict[str, Tuple[frozenset, frozenset, frozenset]] = {
         frozenset({
             "captureContractVersion", "captureContractDigest",
             "executionLeaseAcquiredRecordDigest",
+            "outputContractVersion", "outputContractDigest",
         }),
         frozenset({"task-tests-running"}),
     ),
@@ -6457,6 +6463,8 @@ _LEDGER_OPERATION_FIELDS: Dict[str, Tuple[frozenset, frozenset, frozenset]] = {
             "captureContractVersion", "captureContractDigest",
             "captureEvidence", "captureEvidenceDigest",
             "terminalAuthority", "executionLeaseAcquiredRecordDigest",
+            "outputContractVersion", "outputContractDigest",
+            "outputEvidence", "outputEvidenceDigest",
         }),
         frozenset(
             {
@@ -6851,10 +6859,16 @@ def _validate_secret_scan_reservation_shape(
         "ruleSetVersion", "ruleSetDigest", "ruleProjection", "outputName",
         "bindingDigest",
     }
+    corrected = binding.get("schemaVersion") == "qinao.secret-scan-capture-binding.v3"
+    if corrected:
+        expected_binding_fields.add("taskCorrectionRecordDigest")
+        _require_lower_hex(binding.get("taskCorrectionRecordDigest"), 64, "scan correction record")
+        if binding.get("phase") != "task3-correction-scan-1":
+            raise AuditError("secret scan correction phase drift")
     if (
         set(binding) != expected_binding_fields
         or binding.get("schemaVersion")
-        != "qinao.secret-scan-capture-binding.v2"
+        not in ("qinao.secret-scan-capture-binding.v2", "qinao.secret-scan-capture-binding.v3")
         or binding.get("outputName") != "secret-scan.json"
     ):
         raise AuditError("secret scan reservation binding shape drift")
@@ -7044,6 +7058,17 @@ def _validate_secret_scan_invocation_start_shape(
         "--frontier-id",
         execution["frontierId"],
     ]
+    # Execution.v2 keeps its closed fields; only binding.v3 may authorize this
+    # exact suffix in cold projection. Shape validation grants no generation.
+    if isinstance(argv, list) and len(argv) == len(expected_argv) + 2:
+        selector = argv[-1]
+        if (argv[-2] != "--task-correction-record" or phase != "task3-correction-scan-1"
+            or not isinstance(selector, str)
+            or str(Path(selector)) != selector
+            or Path(selector).parent != Path(execution["runRoot"]) / "ledger/records"
+            or re.fullmatch(r"[0-9]{16}\.json", Path(selector).name) is None):
+            raise AuditError("secret scan correction execution argv shape drift")
+        expected_argv += ["--task-correction-record", selector]
     if (
         argv != expected_argv
         or execution.get("argvDigest")
@@ -7303,6 +7328,7 @@ def _task_test_proof_key(subject: Mapping[str, Any]) -> str:
         "qinao.task-test-subject.v2",
         "qinao.task-test-subject.v3",
         "qinao.task-test-subject.v4",
+        "qinao.task-test-subject.v5",
     ):
         values["captureContractVersion"] = subject.get(
             "captureContractVersion"
@@ -7310,13 +7336,22 @@ def _task_test_proof_key(subject: Mapping[str, Any]) -> str:
         values["captureContractDigest"] = subject.get(
             "captureContractDigest"
         )
-    if version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4"):
+    if version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4", "qinao.task-test-subject.v5"):
         values["executionContractVersion"] = subject.get(
             "executionContractVersion"
         )
         values["executionContractDigest"] = subject.get(
             "executionContractDigest"
         )
+        if version == "qinao.task-test-subject.v5":
+            values.update({
+                "scanResultRelationDigest": subject.get("scanResultRelationDigest"),
+                "outputContractVersion": subject.get("outputContractVersion"),
+                "outputContractDigest": subject.get("outputContractDigest"),
+            })
+            return _sha256(
+                b"qinao.task-test-proof-key.v5\x00" + canonical_json_bytes(values)
+            )
         if version == "qinao.task-test-subject.v4":
             values["scanResultRelationDigest"] = subject.get("scanResultRelationDigest")
             return _sha256(
@@ -7585,22 +7620,26 @@ def _validate_task_test_subject(subject: Any) -> Dict[str, Any]:
         "qinao.task-test-subject.v2",
         "qinao.task-test-subject.v3",
         "qinao.task-test-subject.v4",
+        "qinao.task-test-subject.v5",
     ):
         expected_fields.update({
             "captureContractVersion", "captureContractDigest"
         })
-    if version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4"):
+    if version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4", "qinao.task-test-subject.v5"):
         expected_fields.update({
             "executionContractVersion", "executionContractDigest"
         })
-    if version == "qinao.task-test-subject.v4":
+    if version in ("qinao.task-test-subject.v4", "qinao.task-test-subject.v5"):
         expected_fields.update({"scanResultRelation", "scanResultRelationDigest"})
+    if version == "qinao.task-test-subject.v5":
+        expected_fields.update({"outputContractVersion", "outputContractDigest"})
     if (
         version not in (
             "qinao.task-test-subject.v1",
             "qinao.task-test-subject.v2",
             "qinao.task-test-subject.v3",
             "qinao.task-test-subject.v4",
+            "qinao.task-test-subject.v5",
         )
         or set(value) != expected_fields
         or not isinstance(value.get("repository"), str)
@@ -7614,17 +7653,29 @@ def _validate_task_test_subject(subject: Any) -> Dict[str, Any]:
         "qinao.task-test-subject.v2",
         "qinao.task-test-subject.v3",
         "qinao.task-test-subject.v4",
+        "qinao.task-test-subject.v5",
     ) and (
         value.get("captureContractVersion") != 1
         or value.get("captureContractDigest")
         != _STRICT_PROCESS_FD_CAPTURE_CONTRACT_DIGEST
     ):
         raise AuditError("task test capture contract drift")
-    if version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4") and (
-        value.get("executionContractVersion") != (2 if version.endswith(".v4") else 1)
+    if version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4", "qinao.task-test-subject.v5") and (
+        value.get("executionContractVersion") != {
+            "qinao.task-test-subject.v3": 1,
+            "qinao.task-test-subject.v4": 2,
+            "qinao.task-test-subject.v5": 3,
+        }[version]
         or not _task_execution_contract_matches(value)
     ):
         raise AuditError("task test execution contract drift")
+    if version == "qinao.task-test-subject.v5" and (
+        type(value.get("captureContractVersion")) is not int
+        or type(value.get("outputContractVersion")) is not int
+        or value["outputContractVersion"] != 1
+        or value.get("outputContractDigest") != _TASK_TEST_OUTPUT_CONTRACT_DIGEST
+    ):
+        raise AuditError("task test subject output contract drift")
     _require_lower_hex(value.get("runId"), 32, "task test run ID")
     _require_lower_hex(value.get("frontierId"), 32, "task test frontier")
     for field in (
@@ -7662,10 +7713,16 @@ def _validate_task_test_subject(subject: Any) -> Dict[str, Any]:
     )
     if value.get("testPlanDigest") != plan["planDigest"]:
         raise AuditError("task test subject plan digest drift")
-    if version == "qinao.task-test-subject.v4":
+    if version in ("qinao.task-test-subject.v4", "qinao.task-test-subject.v5"):
         relation = _validate_task_scan_result_relation_shape(value.get("scanResultRelation"))
+        allowed_relations = (
+            ("qinao.task-scan-result-relation.v3",)
+            if version == "qinao.task-test-subject.v5"
+            else ("qinao.task-scan-result-relation.v1", "qinao.task-scan-result-relation.v2")
+        )
         if (
-            value.get("scanResultRelationDigest") != relation["relationDigest"]
+            relation["schemaVersion"] not in allowed_relations
+            or value.get("scanResultRelationDigest") != relation["relationDigest"]
             or relation["resultCommitOid"] != value["resultHeadOid"]
             or relation["resultTreeOid"] != value["resultTreeOid"]
             or relation["scannedIndexTreeOid"] != value["indexTreeOid"]
@@ -7823,23 +7880,30 @@ def _validate_task_test_terminal_result(value: Any) -> Dict[str, Any]:
         "qinao.task-test-result.v2",
         "qinao.task-test-result.v3",
         "qinao.task-test-result.v4",
+        "qinao.task-test-result.v5",
     ):
         expected_fields.update({
             "captureContractVersion", "captureContractDigest",
             "captureEvidence", "captureEvidenceDigest",
         })
-    if version in ("qinao.task-test-result.v3", "qinao.task-test-result.v4"):
+    if version in ("qinao.task-test-result.v3", "qinao.task-test-result.v4", "qinao.task-test-result.v5"):
         expected_fields.update({
             "executionContractVersion", "executionContractDigest",
             "terminalAuthority", "executionLeaseAcquiredRecordDigest",
         })
-    if version == "qinao.task-test-result.v4":
+    if version in ("qinao.task-test-result.v4", "qinao.task-test-result.v5"):
         expected_fields.add("scanResultRelationDigest")
         _require_lower_hex(result.get("scanResultRelationDigest"), 64, "result relation")
+    if version == "qinao.task-test-result.v5":
+        expected_fields.update({
+            "outputContractVersion", "outputContractDigest",
+            "outputEvidence", "outputEvidenceDigest",
+        })
     if set(result) != expected_fields or version not in (
         "qinao.task-test-result.v1", "qinao.task-test-result.v2",
         "qinao.task-test-result.v3",
         "qinao.task-test-result.v4",
+        "qinao.task-test-result.v5",
     ):
         raise AuditError("task test terminal result field drift")
     _require_lower_hex(result.get("attemptId"), 32, "task test attempt")
@@ -7857,6 +7921,7 @@ def _validate_task_test_terminal_result(value: Any) -> Dict[str, Any]:
             "qinao.task-test-result.v2",
             "qinao.task-test-result.v3",
             "qinao.task-test-result.v4",
+            "qinao.task-test-result.v5",
         ) else "qinao.task-test-target-result.v1"
     )
     if any(row.get("schemaVersion") != expected_row_version for row in validated):
@@ -7878,6 +7943,7 @@ def _validate_task_test_terminal_result(value: Any) -> Dict[str, Any]:
         "qinao.task-test-result.v2",
         "qinao.task-test-result.v3",
         "qinao.task-test-result.v4",
+        "qinao.task-test-result.v5",
     ):
         evidence = _validate_task_test_capture_evidence(
             result.get("captureEvidence")
@@ -7896,9 +7962,13 @@ def _validate_task_test_terminal_result(value: Any) -> Dict[str, Any]:
             for row in validated
         ):
             raise AuditError("task test row/capture evidence drift")
-    if version in ("qinao.task-test-result.v3", "qinao.task-test-result.v4"):
+    if version in ("qinao.task-test-result.v3", "qinao.task-test-result.v4", "qinao.task-test-result.v5"):
         if (
-            result.get("executionContractVersion") != (2 if version.endswith(".v4") else 1)
+            result.get("executionContractVersion") != {
+                "qinao.task-test-result.v3": 1,
+                "qinao.task-test-result.v4": 2,
+                "qinao.task-test-result.v5": 3,
+            }[version]
             or not _task_execution_contract_matches(result)
             or result.get("terminalAuthority") not in (
                 "incumbent", "closedLeaseRecovery"
@@ -7930,9 +8000,15 @@ def _validate_task_test_terminal_result(value: Any) -> Dict[str, Any]:
             "qinao.task-test-result.v2",
             "qinao.task-test-result.v3",
             "qinao.task-test-result.v4",
+            "qinao.task-test-result.v5",
         ):
             allowed_reasons += ("capture-incomplete",)
-        if validated or total or reason not in allowed_reasons:
+        retained_rows = (version == "qinao.task-test-result.v5"
+                         and reason == "output-retention-incomplete")
+        if retained_rows:
+            if not validated or not total:
+                raise AuditError("task test retention failure lacks observed rows")
+        elif validated or total or reason not in allowed_reasons:
             raise AuditError("task test indeterminate result drift")
     else:
         raise AuditError("task test result status drift")
@@ -7941,6 +8017,7 @@ def _validate_task_test_terminal_result(value: Any) -> Dict[str, Any]:
             "qinao.task-test-result.v2",
             "qinao.task-test-result.v3",
             "qinao.task-test-result.v4",
+            "qinao.task-test-result.v5",
         )
         and status in ("task-tests-success", "task-tests-failed")
         and result["captureEvidence"]["state"] != "SEALED"
@@ -7950,6 +8027,7 @@ def _validate_task_test_terminal_result(value: Any) -> Dict[str, Any]:
         "qinao.task-test-result.v2",
         "qinao.task-test-result.v3",
         "qinao.task-test-result.v4",
+        "qinao.task-test-result.v5",
     ):
         expected_evidence_state = {
             "task-tests-success": "SEALED",
@@ -7958,11 +8036,64 @@ def _validate_task_test_terminal_result(value: Any) -> Dict[str, Any]:
             "durable-start-no-terminal": "UNAVAILABLE",
             "runner-indeterminate": "SEALED",
             "subject-drift": "SEALED",
+            "output-retention-incomplete": "SEALED",
         }.get(reason if status == "task-tests-indeterminate-no-replay" else status)
         if evidence["state"] != expected_evidence_state:
             raise AuditError("task test reason/evidence state drift")
+    if version == "qinao.task-test-result.v5":
+        _validate_task_test_result_output(result)
     _verify_self_digest(result, "resultDigest")
     return result
+
+
+def _validate_task_test_result_output(result: Mapping[str, Any]) -> None:
+    """Check v5 retention metadata without substituting it for observation."""
+    output = _validate_task_test_output_evidence(result.get("outputEvidence"))
+    if (
+        type(result.get("captureContractVersion")) is not int
+        or type(result.get("outputContractVersion")) is not int
+        or result["outputContractVersion"] != 1
+        or result.get("outputContractDigest") != _TASK_TEST_OUTPUT_CONTRACT_DIGEST
+        or output["outputContractDigest"] != result["outputContractDigest"]
+        or result.get("outputEvidenceDigest") != output["outputEvidenceDigest"]
+        or output["leaseAcquiredRecordDigest"]
+        != result["executionLeaseAcquiredRecordDigest"]
+        or output["captureEvidenceDigest"] != result["captureEvidenceDigest"]
+    ):
+        raise AuditError("task test result output contract drift")
+    attempt = output["attempt"]
+    if attempt is not None and any(
+        attempt.get(field) != result.get(field)
+        for field in ("attemptId", "subjectDigest", "proofKeyDigest")
+    ):
+        raise AuditError("task test result output attempt drift")
+    complete = output["state"] == "SEALED_COMPLETE"
+    if result["status"] in ("task-tests-success", "task-tests-failed") and not complete:
+        raise AuditError("task test result lacks complete retained output")
+    if result["reasonCode"] == "output-retention-incomplete" and complete:
+        raise AuditError("task test retention failure has complete output")
+    if complete:
+        capture = result["captureEvidence"]
+        if capture["state"] != "SEALED" or any(
+            output["channels"][channel][field] != capture[channel][field]
+            for channel in ("stdout", "stderr")
+            for field in ("byteCount", "sha256")
+        ):
+            raise AuditError("task test retained/observed output drift")
+    if result["terminalAuthority"] == "closedLeaseRecovery":
+        if (
+            result["status"] != "task-tests-indeterminate-no-replay"
+            or result["reasonCode"] != "durable-start-no-terminal"
+            or output["state"] != "UNAVAILABLE"
+            or output["reasonCodes"] != ["capture-unavailable"]
+            or output["ownerDigest"] is not None
+            or output["attempt"] is not None
+            or output["channels"] != {"stdout": None, "stderr": None}
+            or output["sealedDigest"] is not None
+        ):
+            raise AuditError("closed lease recovery cannot adopt local output")
+    elif result["reasonCode"] == "durable-start-no-terminal":
+        raise AuditError("task test unavailable recovery lacks closed lease")
 
 
 def _validate_task_test_attempt_start_shape(
@@ -7974,6 +8105,7 @@ def _validate_task_test_attempt_start_shape(
         "qinao.task-test-subject.v2",
         "qinao.task-test-subject.v3",
         "qinao.task-test-subject.v4",
+        "qinao.task-test-subject.v5",
     )
     for field, size in (
         ("attemptId", 32), ("frontierId", 32),
@@ -8012,13 +8144,23 @@ def _validate_task_test_attempt_start_shape(
         "captureContractVersion", "captureContractDigest"
     )):
         raise AuditError("task test v1 start has v2 capture fields")
-    if version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4"):
+    if version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4", "qinao.task-test-subject.v5"):
         _require_lower_hex(
             record.get("executionLeaseAcquiredRecordDigest"), 64,
             "task test start acquired lease",
         )
     elif "executionLeaseAcquiredRecordDigest" in record:
         raise AuditError("legacy task test start has lease authority")
+    output_fields = ("outputContractVersion", "outputContractDigest")
+    if version == "qinao.task-test-subject.v5":
+        if (
+            type(record.get("captureContractVersion")) is not int
+            or type(record.get("outputContractVersion")) is not int
+            or any(record.get(field) != subject[field] for field in output_fields)
+        ):
+            raise AuditError("task test start output contract drift")
+    elif any(field in record for field in output_fields):
+        raise AuditError("legacy task test start has output contract")
 
 
 def _validate_task_test_attempt_terminal_shape(
@@ -8030,6 +8172,7 @@ def _validate_task_test_attempt_terminal_shape(
         "qinao.task-test-result.v2",
         "qinao.task-test-result.v3",
         "qinao.task-test-result.v4",
+        "qinao.task-test-result.v5",
     )
     for field, size in (
         ("attemptId", 32), ("invocationStartRecordDigest", 64),
@@ -8076,7 +8219,7 @@ def _validate_task_test_attempt_terminal_shape(
         "captureEvidence", "captureEvidenceDigest",
     )):
         raise AuditError("task test v1 terminal has v2 capture fields")
-    if version in ("qinao.task-test-result.v3", "qinao.task-test-result.v4"):
+    if version in ("qinao.task-test-result.v3", "qinao.task-test-result.v4", "qinao.task-test-result.v5"):
         if (
             record.get("terminalAuthority")
             != result.get("terminalAuthority")
@@ -8088,6 +8231,19 @@ def _validate_task_test_attempt_terminal_shape(
         "terminalAuthority", "executionLeaseAcquiredRecordDigest",
     )):
         raise AuditError("legacy task test terminal has lease authority")
+    output_fields = (
+        "outputContractVersion", "outputContractDigest",
+        "outputEvidence", "outputEvidenceDigest",
+    )
+    if version == "qinao.task-test-result.v5":
+        if (
+            type(record.get("captureContractVersion")) is not int
+            or type(record.get("outputContractVersion")) is not int
+            or any(record.get(field) != result[field] for field in output_fields)
+        ):
+            raise AuditError("task test terminal output binding drift")
+    elif any(field in record for field in output_fields):
+        raise AuditError("legacy task test terminal has retained output")
 
 
 _TASK_TEST_EXECUTION_LEASE_ACQUIRED_FIELDS = (
@@ -8780,11 +8936,12 @@ def _validate_ledger_record_shape(record: Mapping[str, Any]) -> None:
     if kind in ("capture-sealed", "content-observation-sealed"):
         if not declared:
             raise AuditError("capture seal declared filename drift")
-    elif kind not in ("frontier-start", "frontier-complete", "task-resumption") and declared:
+    elif kind not in ("frontier-start", "frontier-complete", "task-resumption", "task-correction") and declared:
         raise AuditError("unexpected ledger declared filenames")
 
 
 _KNOWN_CHAIN_TERMINALS = frozenset({
+    "task-correction",
     "task-resumption",
     "policy-capture-prepared", "policy-capture-started",
     "policy-capture-completed", "policy-capture-failed",
@@ -9009,6 +9166,14 @@ def _validate_current_task_publication(
     transaction: LedgerTransaction, record: Mapping[str, Any]
 ) -> None:
     """Raw publication is a new write, never historical read/adoption."""
+    if record.get("operationKind") == "task-correction":
+        _validate_ledger_record_shape(record)
+        state = transaction.recover()
+        if (record.get("sequence") != state["nextSequence"]
+            or record.get("previousRecordDigest") != state["records"][-1]["recordDigest"]):
+            raise AuditError("task correction publication lineage drift")
+        _validate_task3_correction(transaction, state, record, live=True)
+        return
     if record.get("operationKind") == "task-resumption":
         _validate_ledger_record_shape(record)
         state = transaction.recover()
@@ -9056,6 +9221,7 @@ def _validate_current_task_publication(
         if proof != _ordinary_task_completion(
             starts[0], state, proof.get("resultCommitOid"),
             completion_sequence=record["sequence"], live=True,
+            task_correction_record_digest=proof.get("taskCorrectionRecordDigest"),
         ):
             raise AuditError("current task raw completion proof drift")
 
@@ -9321,7 +9487,341 @@ def _validate_task3_resumption(transaction: LedgerTransaction, state: Mapping[st
     return {"original": original, "record": dict(record), "state": "published-unsettled"}
 
 
-def _task_completion_basis(start: Mapping[str, Any], state: Mapping[str, Any]) -> Dict[str, Any]:
+_TASK3_CORRECTION_RECORD_ROLES = (
+    "original-start.json", "prior-resumption.json",
+    "prior-resumption-outer-start.json", "prior-resumption-outer-complete.json",
+    "prior-scan-reservation.json", "prior-scan-terminal.json",
+    "prior-scan-outer-start.json", "prior-scan-outer-complete.json",
+    "prior-attempt-start.json", "prior-attempt-terminal.json",
+    "prior-lease-acquired.json", "prior-lease-terminal.json",
+    "prior-test-outer-start.json", "prior-test-outer-complete.json",
+)
+_TASK3_CORRECTION_SOURCE_MEMBERS = frozenset({"source-audit.py", "source-tests.py"})
+_TASK3_CORRECTION_BASELINE_MEMBERS = frozenset(_TASK3_CORRECTION_RECORD_ROLES) | {
+    "original-index.bin", "status-v2.bin", "index-stage.bin", "index-flags.bin",
+    "local-config.bin", "replace-refs.bin",
+} | _TASK3_CORRECTION_SOURCE_MEMBERS
+_TASK3_CORRECTION_FIELDS = frozenset({
+    "schemaVersion", "taskNumber", "generation", "runId", "identityDigest", "repository",
+    "branch", "objectFormat", "originalStartRecordDigest", "taskResumptionRecordDigest",
+    "priorResultCommitOid", "priorResultTreeOid", "priorScanResultRelationDigest",
+    "priorTaskAttemptStartRecordDigest", "priorTaskTerminalRecordDigest",
+    "baselineCaptureId", "baselineSealRecordPath", "baselineSealRecordDigest",
+    "sourceCaptureId", "sourceSealRecordPath", "sourceSealRecordDigest",
+    "outerInvocationStartRecordDigest", "localConfigDigest", "originalDeclaredPathsDigest",
+    "expectedTestsDigest", "changedPaths", "changedPathsDigest", "repairedFiles", "correctionDigest",
+})
+
+
+def _task3_correction_argv(root: Path, frontier_id: str, original: str,
+                           baseline_seal: str, source_seal: str) -> List[str]:
+    return ["task3-correct", "--root", str(root), "--frontier-id", frontier_id,
+            "--original-start-record", original, "--baseline-seal-record", baseline_seal,
+            "--source-seal-record", source_seal]
+
+
+def _task3_correction_members(transaction: LedgerTransaction, state: Mapping[str, Any],
+                              seal_path: str, frontier_id: str, *, source: bool
+                              ) -> Tuple[Dict[str, Any], Dict[str, bytes]]:
+    seal = _recovered_record_at_path(transaction.root, state, seal_path, "task correction seal")
+    capture = state["captures"].get(seal.get("captureId"))
+    phase = "task3-correction-source" if source else "task3-correction-baseline"
+    names = _TASK3_CORRECTION_SOURCE_MEMBERS if source else _TASK3_CORRECTION_BASELINE_MEMBERS
+    if (not isinstance(capture, Mapping) or capture.get("state") != "sealed"
+        or capture.get("seal") != seal):
+        raise AuditError("task correction capture is not sealed")
+    allocation = capture["allocation"]
+    directory = Path(allocation["absolutePath"])
+    if (allocation.get("phase") != phase or allocation.get("frontierId") != frontier_id
+        or directory != transaction.root / "ledger/captures" / phase / directory.name):
+        raise AuditError("task correction capture lineage drift")
+    phase_fd = transaction.open_directory_at(transaction.directory_fd("captures"), phase)
+    capture_fd = transaction.open_directory_at(phase_fd, directory.name)
+    _validate_capture_manifest_fd(transaction, capture_fd, allocation["captureId"], capture)
+    if set(transaction.list_directory(capture_fd)) != names | {"manifest.json"}:
+        raise AuditError("task correction closed member set drift")
+    payloads = {name: transaction.read_bytes_at(capture_fd, name, maximum=64 * 1024 * 1024,
+        expected_mode=(0o644 if name in _TASK3_CORRECTION_SOURCE_MEMBERS or name == "original-index.bin"
+                       else 0o600))[0] for name in names}
+    return seal, payloads
+
+
+def _task3_correction_index_map(payload: bytes, width: int) -> Dict[bytes, Tuple[str, str, str]]:
+    if not payload or not payload.endswith(b"\x00"):
+        raise AuditError("task correction baseline index stream drift")
+    result = {}
+    for token in payload[:-1].split(b"\x00"):
+        try:
+            header, path = token.split(b"\t", 1)
+            mode, oid, stage = header.decode("ascii").split(" ")
+        except (ValueError, UnicodeError) as error:
+            raise AuditError("task correction index entry drift") from error
+        _safe_relative_bytes(path)
+        _require_lower_hex(oid, width, "task correction index blob")
+        if path in result or stage != "0" or mode not in ("100644", "100755"):
+            raise AuditError("task correction index stage/mode drift")
+        result[path] = (mode, "blob", oid)
+    return result
+
+
+def _task3_correction_prior(transaction: LedgerTransaction, state: Mapping[str, Any],
+                             original: Mapping[str, Any], payloads: Mapping[str, bytes]
+                             ) -> Dict[str, Any]:
+    by_digest = {row["recordDigest"]: row for row in state["records"]}
+    roles = {}
+    for name in _TASK3_CORRECTION_RECORD_ROLES:
+        row = parse_canonical_json(payloads[name])
+        if (not isinstance(row, Mapping) or by_digest.get(row.get("recordDigest")) != row
+            or canonical_json_bytes(row) != payloads[name]):
+            raise AuditError("task correction raw envelope drift")
+        roles[name] = row
+    frontier = original["frontierId"]
+    resumed = state.get("taskResumptions", {}).get(frontier)
+    if (roles["original-start.json"] != original or state.get("openFrontiers") != [original]
+        or not isinstance(resumed, Mapping) or resumed.get("state") != "settled"
+        or resumed.get("original") != original or resumed.get("record") != roles["prior-resumption.json"]
+        or frontier in state.get("taskCorrections", {})):
+        raise AuditError("task correction original or resumption eligibility drift")
+    start, terminal = roles["prior-attempt-start.json"], roles["prior-attempt-terminal.json"]
+    attempts = [value for value in state["taskTestAttempts"].values()
+                if value.get("start", {}).get("frontierId") == frontier]
+    if not attempts:
+        raise AuditError("task correction prior attempt absent")
+    attempt = max(attempts, key=lambda value: value["start"]["sequence"])
+    subject = start.get("subject", {})
+    result = terminal.get("result", {})
+    if (attempt.get("start") != start or attempt.get("terminal") != terminal
+        or attempt.get("state") != "task-tests-failed"
+        or subject.get("schemaVersion") != "qinao.task-test-subject.v4"
+        or result.get("schemaVersion") != "qinao.task-test-result.v4"
+        or result.get("reasonCode") != "test-failure" or terminal.get("exitCode") != 1
+        or result.get("captureEvidence", {}).get("state") != "SEALED"
+        or subject.get("expectedTests") != original["expectedTests"]
+        or not terminal.get("totalTestsRun")
+        or [row["target"] for row in terminal.get("targetResults", [])] != original["expectedTests"]
+        or any(not row["testsRun"] for row in terminal["targetResults"])
+        or all(row["successful"] for row in terminal["targetResults"])):
+        raise AuditError("task correction requires latest genuine failed v4 result")
+    _validate_task_test_subject(subject)
+    _validate_task_test_terminal_result(result)
+    scan = state["captures"].get(roles["prior-scan-reservation.json"].get("captureId"))
+    leases = [value for value in state["taskTestExecutionLeases"].values()
+              if value.get("acquired", {}).get("recordDigest") == start.get("executionLeaseAcquiredRecordDigest")]
+    if (not isinstance(scan, Mapping) or scan.get("reservation") != roles["prior-scan-reservation.json"]
+        or scan.get("terminal") != roles["prior-scan-terminal.json"] or len(leases) != 1
+        or leases[0].get("acquired") != roles["prior-lease-acquired.json"]
+        or leases[0].get("terminal") != roles["prior-lease-terminal.json"]
+        or leases[0].get("state") != "completed"
+        or roles["prior-lease-terminal.json"].get("taskTestTerminalRecordDigest") != terminal["recordDigest"]):
+        raise AuditError("task correction prior scan/lease binding drift")
+    for label, owner_digest, exit_code in (
+        ("resumption", resumed["record"]["resumption"]["outerInvocationStartRecordDigest"], 0),
+        ("scan", scan["terminal"]["outerInvocationStartRecordDigest"], 0),
+        ("test", start["outerInvocationStartRecordDigest"], 1),
+    ):
+        owner = state["sterileInvocations"].get(owner_digest)
+        if (not isinstance(owner, Mapping) or owner.get("startKind") != "linked"
+            or owner.get("start") != roles["prior-" + label + "-outer-start.json"]
+            or owner.get("completion") != roles["prior-" + label + "-outer-complete.json"]
+            or owner.get("state") != ("complete" if exit_code == 0 else "failed")
+            or owner["completion"].get("exitCode") != exit_code):
+            raise AuditError("task correction prior outer binding drift")
+    ordered = [roles[name]["sequence"] for name in (
+        "prior-test-outer-start.json", "prior-lease-acquired.json", "prior-attempt-start.json",
+        "prior-attempt-terminal.json", "prior-lease-terminal.json", "prior-test-outer-complete.json")]
+    if ordered != sorted(set(ordered)):
+        raise AuditError("task correction prior attempt settlement order drift")
+    baseline = _task_completion_basis(original, state)
+    relation = _task_scan_result_relation(original, baseline, scan,
+        state["sterileInvocations"][scan["terminal"]["outerInvocationStartRecordDigest"]],
+        subject["resultHeadOid"], subject["resultTreeOid"])
+    if (relation != subject.get("scanResultRelation")
+        or relation.get("schemaVersion") != "qinao.task-scan-result-relation.v2"
+        or relation["scanOuterCompletionRecordDigest"] != roles["prior-scan-outer-complete.json"]["recordDigest"]
+        or roles["prior-scan-outer-complete.json"]["sequence"] >= start["sequence"]):
+        raise AuditError("task correction prior result relation drift")
+    prior_end = roles["prior-test-outer-complete.json"]["sequence"]
+    if (any(row.get("reservation", {}).get("frontierId") == frontier
+            and row.get("reservation") != scan["reservation"] for row in state["captures"].values())
+        or any(row.get("acquired", {}).get("frontierId") == frontier
+               and (row.get("state") == "active" or row["acquired"]["sequence"] > prior_end)
+               for row in state["taskTestExecutionLeases"].values())):
+        raise AuditError("task correction has competing typed activity")
+    return {"resumption": resumed, "subject": subject, "relation": relation,
+            "start": start, "terminal": terminal, "priorEnd": prior_end}
+
+
+def _task3_correction_data(transaction: LedgerTransaction, state: Mapping[str, Any],
+                            original: Mapping[str, Any], baseline_path: str, source_path: str,
+                            outer_digest: str) -> Tuple[Dict[str, Any], Dict[str, bytes], Dict[str, bytes]]:
+    identity, frontier = state["identity"], original["frontierId"]
+    baseline_seal, baseline = _task3_correction_members(transaction, state, baseline_path, frontier, source=False)
+    source_seal, source = _task3_correction_members(transaction, state, source_path, frontier, source=True)
+    prior = _task3_correction_prior(transaction, state, original, baseline)
+    subject = prior["subject"]
+    resumption = prior["resumption"]["record"]["resumption"]
+    repository = Path(identity["repository"])
+    width = OBJECT_HEX_LENGTH[resumption["objectFormat"]]
+    tree = _complete_tree_map(repository, subject["resultTreeOid"])
+    index = _task3_correction_index_map(baseline["index-stage.bin"], width)
+    raw_index = baseline["original-index.bin"]
+    hash_constructor = hashlib.sha1 if width == 40 else hashlib.sha256
+    checksum_size = width // 2
+    if (index != tree or baseline["status-v2.bin"] or baseline["replace-refs.bin"]
+        or baseline["index-flags.bin"] != b"".join(b"H " + row + b"\x00"
+            for row in baseline["index-stage.bin"][:-1].split(b"\x00"))
+        or _sha256(baseline["local-config.bin"]) != subject["localConfigDigest"]
+        or len(raw_index) < 12 + checksum_size or raw_index[:4] != b"DIRC"
+        or int.from_bytes(raw_index[4:8], "big") not in (2, 3, 4)
+        or int.from_bytes(raw_index[8:12], "big") != len(index)
+        or hash_constructor(raw_index[:-checksum_size]).digest() != raw_index[-checksum_size:]
+        or not prior["priorEnd"] < baseline_seal["sequence"] < source_seal["sequence"]):
+        raise AuditError("task correction clean retained baseline drift")
+    rows, changed = [], []
+    for label, relative in zip(("audit", "tests"), _TASK3_RESUMPTION_PATHS):
+        entry = tree.get(os.fsencode(relative))
+        before, after = baseline["source-" + label + ".py"], source["source-" + label + ".py"]
+        if (not entry or entry[:2] != ("100644", "blob")
+            or _git_object_id("blob", before, width) != entry[2]
+            or _run_git(repository, ["cat-file", "blob", entry[2]]) != before):
+            raise AuditError("task correction baseline source object drift")
+        repaired_oid = _git_object_id("blob", after, width)
+        rows.append({"path": relative, "baselineBlobOid": entry[2], "repairedBlobOid": repaired_oid,
+            "gitMode": "100644", "worktreeMode": "0644", "size": len(after), "sha256": _sha256(after)})
+        if before != after:
+            changed.append(relative)
+    if not changed:
+        raise AuditError("task correction has no genuine source repair")
+    data = _self_digest_record({
+        "schemaVersion": "qinao.task3-correction.v1", "taskNumber": 3, "generation": 1,
+        **{key: identity[key] for key in ("runId", "identityDigest", "repository", "branch")},
+        "objectFormat": resumption["objectFormat"], "originalStartRecordDigest": original["recordDigest"],
+        "taskResumptionRecordDigest": prior["resumption"]["record"]["recordDigest"],
+        "priorResultCommitOid": subject["resultHeadOid"], "priorResultTreeOid": subject["resultTreeOid"],
+        "priorScanResultRelationDigest": prior["relation"]["relationDigest"],
+        "priorTaskAttemptStartRecordDigest": prior["start"]["recordDigest"],
+        "priorTaskTerminalRecordDigest": prior["terminal"]["recordDigest"],
+        "baselineCaptureId": baseline_seal["captureId"], "baselineSealRecordPath": baseline_path,
+        "baselineSealRecordDigest": baseline_seal["recordDigest"],
+        "sourceCaptureId": source_seal["captureId"], "sourceSealRecordPath": source_path,
+        "sourceSealRecordDigest": source_seal["recordDigest"],
+        "outerInvocationStartRecordDigest": outer_digest, "localConfigDigest": subject["localConfigDigest"],
+        "originalDeclaredPathsDigest": _task_declared_paths_digest(original["declaredPaths"]),
+        "expectedTestsDigest": _task_test_expected_tests_digest(original["expectedTests"]),
+        "changedPaths": changed, "changedPathsDigest": _task_declared_paths_digest(changed),
+        "repairedFiles": rows,
+    }, "correctionDigest")
+    return data, baseline, source
+
+
+def _task3_correction_live_snapshot(identity: Mapping[str, Any]) -> Dict[str, bytes]:
+    repository = Path(identity["repository"])
+    if Path(__file__) != repository / _TASK3_RESUMPTION_PATHS[0]:
+        raise AuditError("task correction executing source path drift")
+    commands = {
+        "head": ["rev-parse", "--verify", "HEAD^{commit}"],
+        "branch": ["symbolic-ref", "-q", "HEAD"],
+        "status-v2.bin": ["status", "--porcelain=v2", "-z", "--untracked-files=all"],
+        "index-stage.bin": ["ls-files", "--stage", "-z"],
+        "index-flags.bin": ["ls-files", "-v", "--stage", "-z"],
+        "local-config.bin": ["config", "--local", "--no-includes", "--null", "--show-origin", "--list"],
+        "replace-refs.bin": ["for-each-ref", "--format=%(refname)", "refs/replace/"],
+    }
+    snapshot = {name: _run_git(repository, argv) for name, argv in commands.items()}
+    index_path = Path(_ascii_git_line(repository,
+        ["rev-parse", "--path-format=absolute", "--git-path", "index"], "correction index path"))
+    snapshot["original-index.bin"] = _read_ordinary_snapshot(index_path, maximum=64 * 1024 * 1024)[0]
+    for label, relative in zip(("audit", "tests"), _TASK3_RESUMPTION_PATHS):
+        payload, observed = _read_ordinary_snapshot(repository / relative, maximum=8 * 1024 * 1024)
+        if stat.S_IMODE(observed.st_mode) != 0o644:
+            raise AuditError("task correction source mode drift")
+        snapshot["source-" + label + ".py"] = payload
+    return snapshot
+
+
+def _validate_task3_correction(transaction: LedgerTransaction, state: Mapping[str, Any],
+                               record: Mapping[str, Any], *, live: bool) -> Dict[str, Any]:
+    value = record.get("correction")
+    if (not isinstance(value, Mapping) or set(value) != _TASK3_CORRECTION_FIELDS
+        or value.get("schemaVersion") != "qinao.task3-correction.v1"
+        or type(value.get("taskNumber")) is not int or value["taskNumber"] != 3
+        or type(value.get("generation")) is not int or value["generation"] != 1):
+        raise AuditError("task correction closed schema drift")
+    _verify_self_digest(value, "correctionDigest")
+    originals = [row for row in state["openFrontiers"]
+                 if row.get("recordDigest") == value["originalStartRecordDigest"]]
+    if len(originals) != 1:
+        raise AuditError("task correction original is not open")
+    original = originals[0]
+    expected, baseline, source = _task3_correction_data(transaction, state, original,
+        value["baselineSealRecordPath"], value["sourceSealRecordPath"], value["outerInvocationStartRecordDigest"])
+    if (dict(value) != expected or record.get("frontierId") != original["frontierId"]
+        or record.get("runId") != state["identity"]["runId"]
+        or record.get("inputDigest") != original["inputDigest"]
+        or record.get("declaredFilenames") != expected["changedPaths"]):
+        raise AuditError("task correction derived authority drift")
+    outer = state["sterileInvocations"].get(value["outerInvocationStartRecordDigest"])
+    original_path = str(transaction.root / "ledger/records" / ("%016d.json" % original["sequence"]))
+    if (not isinstance(outer, Mapping) or outer.get("state") != "open" or outer.get("startKind") != "linked"
+        or outer["start"]["invocation"].get("profile") != "ledger"
+        or outer["start"]["invocation"].get("repository") != state["identity"]["repository"]
+        or outer["start"]["invocation"].get("argv") != _task3_correction_argv(transaction.root,
+            original["frontierId"], original_path, value["baselineSealRecordPath"], value["sourceSealRecordPath"])
+        or not state["captures"][value["sourceCaptureId"]]["seal"]["sequence"]
+               < outer["start"]["sequence"] < record["sequence"]):
+        raise AuditError("task correction owning outer/order drift")
+    if live:
+        first = _task3_correction_live_snapshot(state["identity"])
+        second = _task3_correction_live_snapshot(state["identity"])
+        if (first != second or first["head"] != (value["priorResultCommitOid"] + "\n").encode("ascii")
+            or first["branch"] != (value["branch"] + "\n").encode()
+            or any(first[name] != baseline[name] for name in (
+                "original-index.bin", "index-stage.bin", "index-flags.bin", "local-config.bin", "replace-refs.bin"))
+            or any(first[name] != source[name] for name in _TASK3_CORRECTION_SOURCE_MEMBERS)):
+            raise AuditError("task correction live source/index observation drift")
+        paths = []
+        for token in first["status-v2.bin"].split(b"\x00"):
+            if not token:
+                continue
+            fields = token.split(b" ", 8)
+            if (len(fields) != 9 or fields[:3] != [b"1", b".M", b"N..."]
+                or fields[3:6] != [b"100644"] * 3):
+                raise AuditError("task correction live status is not unstaged repair")
+            paths.append(os.fsdecode(fields[8]))
+        if paths != value["changedPaths"]:
+            raise AuditError("task correction live changed path set drift")
+    return {"original": dict(original), "record": dict(record), "state": "published-unsettled",
+            "recordPath": str(transaction.root / "ledger/records" / ("%016d.json" % record["sequence"]))}
+
+
+def _task_correction_selector(root: Path, state: Mapping[str, Any], record_path: Any) -> Optional[str]:
+    if record_path is None:
+        return None
+    record = _recovered_record_at_path(root, state, str(record_path), "task correction selector")
+    projected = state.get("taskCorrections", {}).get(record.get("frontierId"))
+    if (record.get("operationKind") != "task-correction" or not isinstance(projected, Mapping)
+        or projected.get("record") != record or projected.get("recordPath") != str(record_path)):
+        raise AuditError("task correction selector is not the persisted generation")
+    return record["recordDigest"]
+
+
+def _task_completion_basis(start: Mapping[str, Any], state: Mapping[str, Any], *,
+                           task_correction_record_digest: Optional[str] = None,
+                           live: bool = False) -> Dict[str, Any]:
+    corrected = state.get("taskCorrections", {}).get(start.get("frontierId"))
+    if task_correction_record_digest is not None:
+        if (not isinstance(corrected, Mapping) or corrected.get("state") != "settled"
+            or corrected.get("original") != start
+            or corrected["record"]["recordDigest"] != task_correction_record_digest):
+            raise AuditError("task correction is not settled completion authority")
+        original = _task_completion_basis(start, state)
+        value = corrected["record"]["correction"]
+        return {**original, "schemaVersion": "qinao.task3-correction-basis.v1",
+            "taskCorrectionRecordDigest": task_correction_record_digest, "correction": corrected,
+            "startingHeadOid": value["priorResultCommitOid"], "startingTreeOid": value["priorResultTreeOid"],
+            "localConfigDigest": value["localConfigDigest"], "changedPaths": value["changedPaths"]}
+    if live and corrected is not None:
+        raise AuditError("current task correction requires explicit generation selection")
     resumed = state.get("taskResumptions", {}).get(start.get("frontierId"))
     if resumed is None:
         return _validate_task_start(start, state["identity"])
@@ -9337,6 +9837,81 @@ def _task_completion_basis(start: Mapping[str, Any], state: Mapping[str, Any]) -
         "taskResumptionRecordDigest": resumed["record"]["recordDigest"],
         "resumptionOuterCompletionSequence": resumed["outerCompletion"]["sequence"],
         "observedFiles": value["observedFiles"], "resumption": resumed}
+
+
+def _task_generation_scans(start: Mapping[str, Any], state: Mapping[str, Any],
+                            basis: Mapping[str, Any]) -> List[Mapping[str, Any]]:
+    correction = state.get("taskCorrections", {}).get(start.get("frontierId"))
+    selected = basis.get("taskCorrectionRecordDigest")
+    if selected is not None and (not isinstance(correction, Mapping)
+            or correction["record"]["recordDigest"] != selected):
+        raise AuditError("task scan generation selector drift")
+    result = []
+    for scan in state["captures"].values():
+        reservation = scan.get("reservation", {})
+        if reservation.get("frontierId") != start["frontierId"]:
+            continue
+        binding = reservation["binding"]
+        after = correction is not None and reservation["sequence"] > correction["record"]["sequence"]
+        if after:
+            if (binding.get("schemaVersion") != "qinao.secret-scan-capture-binding.v3"
+                or binding.get("taskCorrectionRecordDigest") != correction["record"]["recordDigest"]):
+                raise AuditError("task scan correction generation drift")
+        elif binding.get("schemaVersion") != "qinao.secret-scan-capture-binding.v2":
+            raise AuditError("task scan original generation drift")
+        if after == (selected is not None):
+            result.append(scan)
+    return result
+
+
+def _validate_corrected_scan(corrected: Mapping[str, Any], binding: Mapping[str, Any],
+                              sequence: int, *, live: bool) -> None:
+    value = corrected["record"]["correction"]
+    if (corrected.get("state") != "settled"
+        or corrected.get("outerCompletion", {}).get("sequence", sequence) >= sequence
+        or binding.get("schemaVersion") != "qinao.secret-scan-capture-binding.v3"
+        or binding.get("taskCorrectionRecordDigest") != corrected["record"]["recordDigest"]
+        or binding.get("phase") != "task3-correction-scan-1"
+        or binding.get("headOid") != value["priorResultCommitOid"]
+        or binding.get("headTreeOid") != value["priorResultTreeOid"]):
+        raise AuditError("task correction scan baseline or settlement drift")
+    repository = Path(value["repository"])
+    expected = _complete_tree_map(repository, value["priorResultTreeOid"])
+    for row in value["repairedFiles"]:
+        expected[os.fsencode(row["path"])] = (row["gitMode"], "blob", row["repairedBlobOid"])
+    if _complete_tree_map(repository, binding["indexTreeOid"]) != expected:
+        raise AuditError("task correction scan full candidate tree drift")
+    audit = value["repairedFiles"][0]
+    if (binding.get("scannerModulePath") != str(repository / audit["path"])
+        or binding.get("scannerModuleMode") != audit["worktreeMode"]
+        or binding.get("scannerModuleSize") != audit["size"]
+        or binding.get("scannerModuleSha256") != audit["sha256"]):
+        raise AuditError("task correction scan executing source drift")
+    if live and (
+        _git_dirty_paths(repository)
+        or _ascii_git_line(repository, ["symbolic-ref", "-q", "HEAD"], "corrected scan branch") != value["branch"]
+        or _run_git(repository, ["for-each-ref", "--format=%(refname)", "refs/replace/"])
+        or _sha256(_run_git(repository, ["config", "--local", "--no-includes", "--null", "--show-origin", "--list"]))
+           != value["localConfigDigest"]
+    ):
+        raise AuditError("task correction scan working/config drift")
+
+
+def _secret_scan_generation_argv(root: Path, reservation: Mapping[str, Any],
+                                 corrections: Mapping[str, Any]) -> List[str]:
+    argv = ["secret-scan-worktree", "--root", str(root), "--repository", reservation["repository"],
+            "--phase", reservation["phase"], "--frontier-id", reservation["frontierId"]]
+    binding = reservation["binding"]
+    if binding.get("schemaVersion") == "qinao.secret-scan-capture-binding.v3":
+        corrected = corrections.get(reservation["frontierId"])
+        if (not isinstance(corrected, Mapping) or corrected.get("state") != "settled"
+            or corrected["record"]["recordDigest"] != binding.get("taskCorrectionRecordDigest")
+            or reservation["phase"] != "task3-correction-scan-1"):
+            raise AuditError("secret scan exact correction argv authority drift")
+        argv += ["--task-correction-record", corrected["recordPath"]]
+    elif binding.get("schemaVersion") != "qinao.secret-scan-capture-binding.v2":
+        raise AuditError("secret scan argv binding version drift")
+    return argv
 
 
 def _validate_resumed_scan(resumed: Mapping[str, Any], binding: Mapping[str, Any],
@@ -9489,14 +10064,22 @@ def _validate_task_scan_result_relation_shape(value: Any) -> Dict[str, Any]:
         "scannedIndexTreeOid", "resultCommitOid", "resultTreeOid", "parentOid",
         "rawDeltaSha256", "pathSetDigest", "relationDigest",
     }
-    resumed = isinstance(value, Mapping) and value.get("schemaVersion") == "qinao.task-scan-result-relation.v2"
+    corrected = isinstance(value, Mapping) and value.get("schemaVersion") == "qinao.task-scan-result-relation.v3"
+    resumed = isinstance(value, Mapping) and value.get("schemaVersion") in (
+        "qinao.task-scan-result-relation.v2", "qinao.task-scan-result-relation.v3")
     if resumed:
         fields = (fields - {"taskStartDigest", "startingHeadOid", "startingTreeOid"}) | {
             "taskResumptionRecordDigest", "observedHeadOid", "observedTreeOid"}
-    head_key = "observedHeadOid" if resumed else "startingHeadOid"
+    if corrected:
+        fields = (fields - {"observedHeadOid", "observedTreeOid"}) | {
+            "correctionParentOid", "correctionParentTreeOid", "taskCorrectionRecordDigest",
+            "originalObservedHeadOid", "originalObservedTreeOid", "priorResultRelationDigest",
+            "cumulativeRawDeltaSha256", "cumulativePathSetDigest"}
+    head_key = "correctionParentOid" if corrected else ("observedHeadOid" if resumed else "startingHeadOid")
     if (
         not isinstance(value, Mapping) or set(value) != fields
-        or value.get("schemaVersion") not in ("qinao.task-scan-result-relation.v1", "qinao.task-scan-result-relation.v2")
+        or value.get("schemaVersion") not in ("qinao.task-scan-result-relation.v1",
+            "qinao.task-scan-result-relation.v2", "qinao.task-scan-result-relation.v3")
         or value.get("mode") not in ("unchanged-validation-only", "precommit-index-to-result")
         or type(value.get("taskNumber")) is not int
         or not 1 <= value["taskNumber"] <= 15
@@ -9526,7 +10109,11 @@ def _task_scan_result_relation(
     terminal = scan["terminal"]
     completion = scan_outer.get("completion")
     resumed = "taskResumptionRecordDigest" in baseline
-    if resumed:
+    corrected = "taskCorrectionRecordDigest" in baseline
+    if corrected:
+        _validate_corrected_scan(baseline["correction"], binding,
+                                 scan["reservation"]["sequence"], live=False)
+    elif resumed:
         _validate_resumed_scan(baseline["resumption"], binding,
                                scan["reservation"]["sequence"], live=False)
     if (
@@ -9568,18 +10155,42 @@ def _task_scan_result_relation(
     paths = sorted(base64.b64decode(entry.new_path_b64, validate=True)
                    for entry in entries)
     if (unchanged and entries) or (not unchanged and (
-        not entries or paths != sorted(os.fsencode(path) for path in start["declaredPaths"])
+        not entries or paths != sorted(os.fsencode(path) for path in
+            (baseline["changedPaths"] if corrected else start["declaredPaths"]))
     )):
         raise AuditError("task result complete raw delta or declared path set drift")
+    correction_fields = {}
+    if corrected:
+        if unchanged:
+            raise AuditError("task correction requires a forward result child")
+        original = baseline["resumption"]["record"]["resumption"]
+        cumulative_raw = _run_git(repository, [
+            "diff", "--raw", "-z", "--full-index", "--no-abbrev", "--no-renames",
+            original["observedTreeOid"], result_tree, "--"])
+        cumulative_paths = sorted(base64.b64decode(entry.new_path_b64, validate=True)
+                                 for entry in parse_raw_diff_z(cumulative_raw, baseline["objectFormat"]))
+        if not set(cumulative_paths).issubset({os.fsencode(path) for path in start["declaredPaths"]}):
+            raise AuditError("task correction cumulative scope drift")
+        correction_fields = {
+            "taskCorrectionRecordDigest": baseline["taskCorrectionRecordDigest"],
+            "originalObservedHeadOid": original["observedHeadOid"],
+            "originalObservedTreeOid": original["observedTreeOid"],
+            "priorResultRelationDigest": baseline["correction"]["record"]["correction"]["priorScanResultRelationDigest"],
+            "cumulativeRawDeltaSha256": _sha256(cumulative_raw),
+            "cumulativePathSetDigest": _sha256(canonical_json_bytes([
+                base64.b64encode(path).decode("ascii") for path in cumulative_paths])),
+        }
     return _self_digest_record({
-        "schemaVersion": "qinao.task-scan-result-relation.v2" if resumed else "qinao.task-scan-result-relation.v1",
+        "schemaVersion": ("qinao.task-scan-result-relation.v3" if corrected else
+                          "qinao.task-scan-result-relation.v2" if resumed else "qinao.task-scan-result-relation.v1"),
+        **correction_fields,
         "mode": "unchanged-validation-only" if unchanged else "precommit-index-to-result",
         **({"taskResumptionRecordDigest": baseline["taskResumptionRecordDigest"]} if resumed
            else {"taskStartDigest": baseline["taskStartDigest"]}),
         "taskNumber": baseline["taskNumber"],
         "frontierStartRecordDigest": start["recordDigest"],
-        ("observedHeadOid" if resumed else "startingHeadOid"): baseline["startingHeadOid"],
-        ("observedTreeOid" if resumed else "startingTreeOid"): baseline["startingTreeOid"],
+        ("correctionParentOid" if corrected else "observedHeadOid" if resumed else "startingHeadOid"): baseline["startingHeadOid"],
+        ("correctionParentTreeOid" if corrected else "observedTreeOid" if resumed else "startingTreeOid"): baseline["startingTreeOid"],
         "scanReservationRecordDigest": scan["reservation"]["recordDigest"],
         "scanSubjectDigest": terminal["subjectDigest"],
         "scanTerminalRecordDigest": terminal["recordDigest"],
@@ -9597,14 +10208,22 @@ def _task_scan_result_relation(
 def _ordinary_task_completion(
     start: Mapping[str, Any], state: Mapping[str, Any], result_commit: Any,
     *, completion_sequence: int, live: bool,
+    task_correction_record_digest: Optional[str] = None,
 ) -> Dict[str, Any]:
-    baseline = _task_completion_basis(start, state)
+    baseline = _task_completion_basis(start, state,
+        task_correction_record_digest=task_correction_record_digest, live=live)
+    corrected = task_correction_record_digest is not None
+    correction = state.get("taskCorrections", {}).get(start["frontierId"])
+    if correction is not None and not corrected:
+        raise AuditError("task completion requires explicit correction generation")
     repository = Path(baseline["repository"])
     _require_lower_hex(result_commit, OBJECT_HEX_LENGTH[baseline["objectFormat"]],
                        "ordinary result commit")
     attempts = [
         value for value in state.get("taskTestAttempts", {}).values()
         if value.get("start", {}).get("frontierId") == start["frontierId"]
+        and (correction is None or
+             (value["start"]["sequence"] > correction["record"]["sequence"]) == corrected)
     ]
     if not attempts:
         raise AuditError("ordinary task has no typed test result")
@@ -9615,8 +10234,8 @@ def _ordinary_task_completion(
     if (
         attempt.get("state") != "task-tests-success"
         or not isinstance(terminal, Mapping)
-        or subject.get("schemaVersion") != "qinao.task-test-subject.v4"
-        or terminal.get("result", {}).get("schemaVersion") != "qinao.task-test-result.v4"
+        or subject.get("schemaVersion") != ("qinao.task-test-subject.v5" if corrected else "qinao.task-test-subject.v4")
+        or terminal.get("result", {}).get("schemaVersion") != ("qinao.task-test-result.v5" if corrected else "qinao.task-test-result.v4")
         or subject.get("resultHeadOid") != result_commit
         or subject.get("frontierStartRecordDigest") != start["recordDigest"]
         or subject.get("expectedTests") != start["expectedTests"]
@@ -9628,6 +10247,12 @@ def _ordinary_task_completion(
         raise AuditError("ordinary task typed result is stale, failed or historical")
     _validate_task_test_subject(subject)
     _validate_task_test_terminal_result(terminal["result"])
+    if corrected and (
+        subject["scanResultRelation"].get("taskCorrectionRecordDigest") != task_correction_record_digest
+        or terminal["result"].get("outputEvidence", {}).get("state") != "SEALED_COMPLETE"
+        or terminal["result"].get("captureEvidence", {}).get("state") != "SEALED"
+    ):
+        raise AuditError("corrected completion lacks exact retained output or generation")
     if terminal["result"]["proofKeyDigest"] != _task_test_proof_key(subject):
         raise AuditError("ordinary task test proof identity drift")
     rows = terminal["targetResults"]
@@ -9638,8 +10263,7 @@ def _ordinary_task_completion(
         ) for row in rows)
     ):
         raise AuditError("ordinary task required tests were not all passed")
-    scans = [value for value in state["captures"].values()
-             if value.get("reservation", {}).get("frontierId") == start["frontierId"]]
+    scans = _task_generation_scans(start, state, baseline)
     if len(scans) != 1:
         raise AuditError("ordinary task scan lineage is ambiguous")
     scan = scans[0]
@@ -9700,7 +10324,13 @@ def _ordinary_task_completion(
         ):
             raise AuditError("ordinary completion current result drift")
     return _self_digest_record({
-        "schemaVersion": "qinao.task-completion.v2" if "taskResumptionRecordDigest" in baseline else "qinao.task-completion.v1",
+        "schemaVersion": ("qinao.task-completion.v3" if corrected else
+                          "qinao.task-completion.v2" if "taskResumptionRecordDigest" in baseline else "qinao.task-completion.v1"),
+        **({"taskCorrectionRecordDigest": task_correction_record_digest,
+            "priorResultCommitOid": baseline["startingHeadOid"],
+            "priorResultRelationDigest": relation["priorResultRelationDigest"],
+            "cumulativeRawDeltaSha256": relation["cumulativeRawDeltaSha256"],
+            "cumulativePathSetDigest": relation["cumulativePathSetDigest"]} if corrected else {}),
         "frontierStartRecordDigest": start["recordDigest"],
         **({"taskResumptionRecordDigest": baseline["taskResumptionRecordDigest"]}
            if "taskResumptionRecordDigest" in baseline else {"taskStartDigest": baseline["taskStartDigest"]}),
@@ -9727,6 +10357,8 @@ def _validate_frontier_completion_authority(
     sterile_invocations: Mapping[str, Mapping[str, Any]],
     *,
     completion_sequence: Any,
+    task_corrections: Optional[Mapping[str, Any]] = None,
+    task_correction_record_digest: Optional[str] = None,
 ) -> None:
     frontier_kind = _validate_frontier_kind(start.get("frontierKind"))
     if frontier_kind != "task":
@@ -9742,6 +10374,10 @@ def _validate_frontier_completion_authority(
         if value.get("reservation", {}).get("frontierId")
         == start.get("frontierId")
     ]
+    if task_corrections or task_correction_record_digest is not None:
+        scanner_lineage = _task_generation_scans(start,
+            {"captures": captures, "taskCorrections": task_corrections or {}},
+            {"taskCorrectionRecordDigest": task_correction_record_digest})
     if (
         len(scanner_lineage) != 1
         or scanner_lineage[0].get("state") != "secret-scan-clean"
@@ -9794,6 +10430,7 @@ def _project_state(
     task_test_attempts: Dict[str, Dict[str, Any]] = {}
     task_test_execution_leases: Dict[str, Dict[str, Any]] = {}
     task_resumptions: Dict[str, Dict[str, Any]] = {}
+    task_corrections: Dict[str, Dict[str, Any]] = {}
     task_test_lease_frontiers: Dict[str, List[Dict[str, Any]]] = {}
     task_test_lease_holders = set()
     capsule_preparation_tips: Dict[str, str] = {}
@@ -9801,6 +10438,15 @@ def _project_state(
         kind = record["operationKind"]
         if kind in _CLEANUP_KINDS:
             _project_cleanup_record(record, resources, network_attempts)
+        elif kind == "task-correction":
+            task_corrections[record["frontierId"]] = _validate_task3_correction(transaction, {
+                "identity": transaction.read_canonical_at(transaction._fds["ledger"], "identity.json"),
+                "records": list(records[:record["sequence"] - 1]),
+                "openFrontiers": list(open_frontiers.values()), "captures": captures,
+                "sterileInvocations": sterile_invocations, "taskResumptions": task_resumptions,
+                "taskCorrections": task_corrections, "taskTestAttempts": task_test_attempts,
+                "taskTestExecutionLeases": task_test_execution_leases,
+            }, record, live=False)
         elif kind == "task-resumption":
             task_resumptions[record["frontierId"]] = _validate_task3_resumption(transaction, {
                 "identity": transaction.read_canonical_at(transaction._fds["ledger"], "identity.json"),
@@ -9823,11 +10469,16 @@ def _project_state(
             frontier_id = record["frontierId"]
             if frontier_id not in open_frontiers:
                 raise AuditError("orphan frontier completion")
+            supplied = record.get("taskCompletion")
+            correction_digest = (supplied.get("taskCorrectionRecordDigest")
+                                 if isinstance(supplied, Mapping) else None)
             _validate_frontier_completion_authority(
                 open_frontiers[frontier_id],
                 captures,
                 sterile_invocations,
                 completion_sequence=record.get("sequence"),
+                task_corrections=task_corrections,
+                task_correction_record_digest=correction_digest,
             )
             start = open_frontiers[frontier_id]
             if "taskStart" in start or "taskCompletion" in record or frontier_id in task_resumptions:
@@ -9851,8 +10502,10 @@ def _project_state(
                     "taskTestAttempts": task_test_attempts,
                     "taskTestExecutionLeases": task_test_execution_leases,
                     "taskResumptions": task_resumptions,
+                    "taskCorrections": task_corrections,
                 }, supplied.get("resultCommitOid"),
-                    completion_sequence=record["sequence"], live=False)
+                    completion_sequence=record["sequence"], live=False,
+                    task_correction_record_digest=correction_digest)
                 if supplied != proof:
                     raise AuditError("cold ordinary task completion proof drift")
             completed_frontiers[frontier_id] = dict(record)
@@ -9870,7 +10523,12 @@ def _project_state(
             frontier = open_frontiers.get(record["frontierId"])
             binding = record["binding"]
             resumed = task_resumptions.get(record["frontierId"])
-            if resumed is not None:
+            corrected = task_corrections.get(record["frontierId"])
+            if corrected is not None:
+                _validate_corrected_scan(corrected, binding, record["sequence"], live=False)
+            elif binding.get("schemaVersion") == "qinao.secret-scan-capture-binding.v3":
+                raise AuditError("secret scan correction generation is absent")
+            elif resumed is not None:
                 _validate_resumed_scan(resumed, binding, record["sequence"], live=False)
             declared_path_digest = _sha256(canonical_json_bytes([
                 base64.b64encode(os.fsencode(path)).decode("ascii")
@@ -9932,6 +10590,7 @@ def _project_state(
             outer_digest = record["outerInvocationStartRecordDigest"]
             outer = sterile_invocations.get(outer_digest)
             binding = reservation["binding"]
+            expected_argv = _secret_scan_generation_argv(root, reservation, task_corrections)
             if (
                 outer is None
                 or outer.get("startKind") != "linked"
@@ -9941,6 +10600,7 @@ def _project_state(
                 or outer["start"].get("runId") != record.get("runId")
                 or record.get("runId") != reservation.get("runId")
                 or reservation.get("frontierId") not in open_frontiers
+                or outer["start"]["invocation"].get("argv") != expected_argv
                 or any(
                     execution.get(field) != binding.get(field)
                     for field in (
@@ -10116,12 +10776,7 @@ def _project_state(
                     "orphan or duplicate secret scan terminal selection"
                 )
             invocation = outer["start"].get("invocation")
-            expected_argv = [
-                "secret-scan-worktree", "--root", str(root),
-                "--repository", reservation["repository"],
-                "--phase", reservation["phase"], "--frontier-id",
-                reservation["frontierId"],
-            ]
+            expected_argv = _secret_scan_generation_argv(root, reservation, task_corrections)
             expected = _secret_scan_terminal_selection_payload(
                 outer["start"], reservation, invocation_start, terminal
             )
@@ -10252,6 +10907,9 @@ def _project_state(
                     )
                 )
             else:
+                reuse_versions = (("qinao.task-test-subject.v5",)
+                    if acquired.get("executionContractVersion") == 3 else
+                    ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4"))
                 reused = [
                     attempt for attempt in task_test_attempts.values()
                     if attempt.get("start", {}).get("recordDigest")
@@ -10261,9 +10919,24 @@ def _project_state(
                     and attempt.get("state") == "task-tests-success"
                     and attempt.get("start", {}).get("subject", {}).get(
                         "schemaVersion"
-                    ) in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4")
+                    ) in reuse_versions
                 ]
                 binding_valid = len(reused) == 1 and not matching
+                if acquired.get("executionContractVersion") == 3:
+                    correction = task_corrections.get(acquired["frontierId"])
+                    if not isinstance(correction, Mapping) or correction.get("state") != "settled":
+                        raise AuditError("task test reuse correction authority absent")
+                    latest = max((attempt for attempt in task_test_attempts.values()
+                        if attempt["start"]["frontierId"] == acquired["frontierId"]
+                        and attempt["start"]["sequence"] > correction["record"]["sequence"]),
+                        key=lambda attempt: attempt["start"]["sequence"], default=None)
+                    binding_valid = binding_valid and latest is reused[0]
+                    if binding_valid:
+                        _verify_task_test_output_evidence_from_recovered(root,
+                            latest["terminal"]["outputEvidence"], {
+                                "identity": transaction.read_canonical_at(transaction._fds["ledger"], "identity.json"),
+                                "records": list(records[:record["sequence"]]),
+                            })
             if not binding_valid:
                 raise AuditError(
                     "task test execution lease attempt projection drift"
@@ -10281,10 +10954,27 @@ def _project_state(
                 outer.get("start", {}).get("invocation")
                 if isinstance(outer, Mapping) else None
             )
+            corrected = subject.get("schemaVersion") == "qinao.task-test-subject.v5"
+            prefix = {
+                "identity": transaction.read_canonical_at(transaction._fds["ledger"], "identity.json"),
+                "records": list(records[:record["sequence"] - 1]),
+                "taskResumptions": task_resumptions, "taskCorrections": task_corrections,
+                "captures": captures, "sterileInvocations": sterile_invocations,
+                "taskTestAttempts": task_test_attempts,
+                "taskTestExecutionLeases": task_test_execution_leases,
+            }
+            if record["frontierId"] in task_corrections and not corrected:
+                raise AuditError("new task attempt cannot omit its correction generation")
+            correction_path = None
+            if corrected:
+                if not isinstance(frontier, Mapping):
+                    raise AuditError("corrected task subject has no frontier")
+                baseline = _task_completion_basis(frontier, prefix,
+                    task_correction_record_digest=subject["scanResultRelation"]["taskCorrectionRecordDigest"])
+                correction_path = Path(baseline["correction"]["recordPath"])
             expected_argv = _task_test_route_argv(
-                Path(root),
-                Path(subject["repository"]),
-                subject["expectedTests"],
+                Path(root), Path(subject["repository"]), subject["expectedTests"],
+                task_correction_record=correction_path,
             )
             running_on_frontier = [
                 value for value in task_test_attempts.values()
@@ -10296,16 +10986,17 @@ def _project_state(
                 raise AuditError(
                     "multiple running task test attempts for frontier"
                 )
-            if subject.get("schemaVersion") == "qinao.task-test-subject.v4":
+            if subject.get("schemaVersion") in ("qinao.task-test-subject.v4", "qinao.task-test-subject.v5"):
                 if not isinstance(frontier, Mapping):
                     raise AuditError("current task subject has no frontier")
                 identity = transaction.read_canonical_at(
                     transaction._fds["ledger"], "identity.json"
                 )
-                baseline = _task_completion_basis(frontier, {
-                    "identity": identity, "taskResumptions": task_resumptions,
-                })
-                selected_scans = [
+                if not corrected:
+                    baseline = _task_completion_basis(frontier, {
+                        "identity": identity, "taskResumptions": task_resumptions,
+                    })
+                selected_scans = _task_generation_scans(frontier, prefix, baseline) if corrected else [
                     scan for scan in captures.values()
                     if scan.get("reservation", {}).get("frontierId") == frontier["frontierId"]
                 ]
@@ -10329,7 +11020,7 @@ def _project_state(
                 ):
                     raise AuditError("current task subject historical lineage drift")
             subject_v3 = subject.get("schemaVersion") in (
-                "qinao.task-test-subject.v3", "qinao.task-test-subject.v4"
+                "qinao.task-test-subject.v3", "qinao.task-test-subject.v4", "qinao.task-test-subject.v5"
             )
             matching_leases = [
                 value for value in task_test_execution_leases.values()
@@ -10442,7 +11133,7 @@ def _project_state(
             terminal_version = record.get("result", {}).get(
                 "schemaVersion"
             )
-            if start_version == "qinao.task-test-subject.v4" and (
+            if start_version in ("qinao.task-test-subject.v4", "qinao.task-test-subject.v5") and (
                 record.get("result", {}).get("scanResultRelationDigest")
                 != start["subject"].get("scanResultRelationDigest")
             ):
@@ -10456,11 +11147,14 @@ def _project_state(
                     "qinao.task-test-result.v3",
                 "qinao.task-test-subject.v4":
                     "qinao.task-test-result.v4",
+                "qinao.task-test-subject.v5":
+                    "qinao.task-test-result.v5",
             }.get(start_version)
             if start_version in (
                 "qinao.task-test-subject.v2",
                 "qinao.task-test-subject.v3",
                 "qinao.task-test-subject.v4",
+                "qinao.task-test-subject.v5",
             ):
                 mirrors.update({
                     "captureContractVersion": start[
@@ -10472,7 +11166,7 @@ def _project_state(
                 })
             lease = None
             lease_authority_valid = True
-            if start_version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4"):
+            if start_version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4", "qinao.task-test-subject.v5"):
                 mirrors.update({
                     "terminalAuthority": record.get(
                         "terminalAuthority"
@@ -10508,9 +11202,26 @@ def _project_state(
                     )
                 )
             target_results = record["targetResults"]
+            if start_version == "qinao.task-test-subject.v5":
+                for field in ("outputContractVersion", "outputContractDigest"):
+                    mirrors[field] = start["subject"][field]
+                output = record["outputEvidence"]
+                if output["attempt"] is not None and output["attempt"]["attemptStartRecordDigest"] != start["recordDigest"]:
+                    raise AuditError("task test output points at a different durable start")
+                _verify_task_test_output_evidence_from_recovered(root, output, {
+                    "identity": transaction.read_canonical_at(transaction._fds["ledger"], "identity.json"),
+                    "records": list(records[:record["sequence"]]),
+                    "taskTestExecutionLeases": task_test_execution_leases,
+                    "sterileInvocations": sterile_invocations,
+                })
             success = record["completionState"] == "task-tests-success"
             completed = record["completionState"] in (
                 "task-tests-success", "task-tests-failed",
+            )
+            plan_complete = completed or (
+                start_version == "qinao.task-test-subject.v5"
+                and record["completionState"] == "task-tests-indeterminate-no-replay"
+                and record["result"]["reasonCode"] == "output-retention-incomplete"
             )
             frozen_groups = start["subject"]["testPlan"]["groups"]
             exact_plan_rows = (
@@ -10535,8 +11246,8 @@ def _project_state(
                 or terminal_version != expected_terminal_version
                 or not lease_authority_valid
                 or record.get("sequence", 0) <= start.get("sequence", 0)
-                or (completed and not exact_plan_rows)
-                or (not completed and target_results)
+                or (plan_complete and not exact_plan_rows)
+                or (not plan_complete and target_results)
                 or (
                     success
                     and any(
@@ -10863,6 +11574,13 @@ def _project_state(
                     if record.get("exitCode") == 0 and value["state"] == "complete":
                         resumed["state"] = "settled"
                         resumed["outerCompletion"] = dict(record)
+            for corrected in task_corrections.values():
+                if corrected["record"]["correction"]["outerInvocationStartRecordDigest"] == start_digest:
+                    if record["sequence"] <= corrected["record"]["sequence"]:
+                        raise AuditError("task correction outer settlement order drift")
+                    if record.get("exitCode") == 0 and value["state"] == "complete":
+                        corrected["state"] = "settled"
+                        corrected["outerCompletion"] = dict(record)
         elif kind == "sterile-invocation-completed":
             candidates = [
                 value
@@ -11175,6 +11893,7 @@ def _project_state(
         root,
         captures,
         resources,
+        task_test_execution_leases=task_test_execution_leases,
         allow_resource_drift_id=allow_resource_drift_id,
     )
     projected = _finalize_projected_state(
@@ -11189,6 +11908,7 @@ def _project_state(
     )
     projected["taskTestAttempts"] = task_test_attempts
     projected["taskResumptions"] = task_resumptions
+    projected["taskCorrections"] = task_corrections
     projected["taskTestExecutionLeases"] = task_test_execution_leases
     return projected
 
@@ -11481,6 +12201,7 @@ def _validate_projected_storage_fd(
     captures: Mapping[str, Mapping[str, Any]],
     resources: Mapping[str, Mapping[str, Any]],
     *,
+    task_test_execution_leases: Mapping[str, Mapping[str, Any]],
     allow_resource_drift_id: Optional[str],
 ) -> None:
     root = _absolute_path_without_symlink_resolution(Path(root))
@@ -11488,6 +12209,7 @@ def _validate_projected_storage_fd(
         transaction._fds["ledger"], "identity.json"
     )
     _verify_self_digest(ledger_identity, "identityDigest")
+    _validate_task_test_output_namespace_fd(transaction, task_test_execution_leases)
     capture_expected: Dict[Tuple[str, str], Mapping[str, Any]] = {}
     for value in captures.values():
         allocation = value["allocation"]
@@ -11834,6 +12556,7 @@ def _recover_complete_state_fd(
         "sterileInvocations": projected["sterileInvocations"],
         "taskTestAttempts": projected["taskTestAttempts"],
         "taskResumptions": projected["taskResumptions"],
+        "taskCorrections": projected["taskCorrections"],
         "taskTestExecutionLeases": projected[
             "taskTestExecutionLeases"
         ],
@@ -11943,6 +12666,7 @@ def _append_record_with_execution_capability(
         _pre_rename_validator,
     )
     linked_kinds = {
+        "task-correction",
         "task-resumption",
         "sterile-invocation-started-linked",
         "sterile-invocation-completed-linked",
@@ -12620,11 +13344,13 @@ def frontier_complete(
     terminal_context: Optional[Mapping[str, Any]] = None,
     result_commit: Optional[str] = None,
     recover_exact: bool = False,
+    task_correction_record: Optional[Path] = None,
 ) -> Dict[str, Any]:
     if recover_exact:
         recovered = recover_run_state(root)
         if recovered["classification"] != "complete":
             raise AuditError("ledger is indeterminate")
+        correction_digest = _task_correction_selector(Path(root), recovered, task_correction_record)
         matches = [
             row
             for row in recovered["records"]
@@ -12644,7 +13370,9 @@ def frontier_complete(
                 row.get("frontierKind") != "task"
                 or isinstance(row.get("taskCompletion"), Mapping)
                 and row["taskCompletion"].get("resultCommitOid") == result_commit
+                and row["taskCompletion"].get("taskCorrectionRecordDigest") == correction_digest
             )
+            and (row.get("frontierKind") == "task" or task_correction_record is None)
         ]
         if len(matches) != 1:
             raise AuditError("recover-exact frontier completion is absent or ambiguous")
@@ -12667,11 +13395,16 @@ def frontier_complete(
             raise AuditError("frontier declared path mismatch")
         if any(row.get("parentFrontierId") == frontier_id for row in recovered["openFrontiers"]):
             raise AuditError("frontier child is open")
+        correction_digest = _task_correction_selector(Path(root), recovered, task_correction_record)
+        if start.get("frontierKind") != "task" and correction_digest is not None:
+            raise AuditError("task correction supplied for non-task frontier")
         _validate_frontier_completion_authority(
             start,
             recovered["captures"],
             recovered["sterileInvocations"],
             completion_sequence=recovered["nextSequence"],
+            task_corrections=recovered.get("taskCorrections", {}),
+            task_correction_record_digest=correction_digest,
         )
         if start.get("frontierKind") == "task":
             if outcome != "completed":
@@ -12679,6 +13412,7 @@ def frontier_complete(
             proof = _ordinary_task_completion(
                 start, recovered, result_commit,
                 completion_sequence=recovered["nextSequence"], live=True,
+                task_correction_record_digest=correction_digest,
             )
             selected_task_completion.clear()
             selected_task_completion.update(proof)
@@ -13941,12 +14675,21 @@ def _secret_scan_allocation_result(
     return result
 
 
+def _secret_scan_binding_version_fields(correction_digest: Optional[str]) -> Dict[str, Any]:
+    if correction_digest is None:
+        return {"schemaVersion": "qinao.secret-scan-capture-binding.v2"}
+    _require_lower_hex(correction_digest, 64, "secret scan correction digest")
+    return {"schemaVersion": "qinao.secret-scan-capture-binding.v3",
+            "taskCorrectionRecordDigest": correction_digest}
+
+
 def allocate_secret_scan_capture(
     root: Path,
     *,
     repository: Path,
     phase: str,
     frontier_id: str,
+    task_correction_record: Optional[Path] = None,
     _faults: Optional[DurabilityFaults] = None,
     _transaction: Optional[LedgerTransaction] = None,
 ) -> Dict[str, Any]:
@@ -13988,6 +14731,11 @@ def allocate_secret_scan_capture(
         )
         if frontier is None:
             raise AuditError("secret scan task frontier is not exactly open")
+        correction_digest = _task_correction_selector(root, recovered, task_correction_record)
+        corrected = recovered.get("taskCorrections", {}).get(frontier_id)
+        if corrected is not None or correction_digest is not None:
+            _task_completion_basis(frontier, recovered,
+                task_correction_record_digest=correction_digest, live=True)
         resumed = recovered.get("taskResumptions", {}).get(frontier_id)
         if resumed is not None and resumed.get("state") != "settled":
             raise AuditError("task resumption scan precedes successful outer settlement")
@@ -14008,7 +14756,7 @@ def allocate_secret_scan_capture(
         subject = _secret_scan_subject_projection(
             repository, frontier["declaredPaths"]
         )
-        if resumed is not None:
+        if resumed is not None and corrected is None:
             _validate_resumed_scan(resumed, subject, recovered["nextSequence"], live=True)
         transaction.faults.hit(
             "secret-scan-subject-prepublish",
@@ -14023,7 +14771,7 @@ def allocate_secret_scan_capture(
             )
         binding = _self_digest_record(
             {
-                "schemaVersion": "qinao.secret-scan-capture-binding.v2",
+                **_secret_scan_binding_version_fields(correction_digest),
                 "runId": identity["runId"],
                 "identityDigest": identity["identityDigest"],
                 "runRoot": str(root),
@@ -14038,6 +14786,8 @@ def allocate_secret_scan_capture(
             },
             field="bindingDigest",
         )
+        if corrected is not None:
+            _validate_corrected_scan(corrected, binding, recovered["nextSequence"], live=True)
         recovery_key = _sha256(canonical_json_bytes(binding))
         capture_id = _sha256(
             b"qinao-secret-scan-capture\x00"
@@ -14091,8 +14841,7 @@ def allocate_secret_scan_capture(
                 )
                 current_binding = _self_digest_record(
                     {
-                        "schemaVersion":
-                        "qinao.secret-scan-capture-binding.v2",
+                        **_secret_scan_binding_version_fields(correction_digest),
                         "runId": identity["runId"],
                         "identityDigest": identity["identityDigest"],
                         "runRoot": str(root),
@@ -14141,7 +14890,9 @@ def allocate_secret_scan_capture(
                     raise AuditError(
                         "secret scan reservation pre-rename binding drift"
                     )
-                if resumed is not None:
+                if corrected is not None:
+                    _validate_corrected_scan(corrected, current_binding, staged_record["sequence"], live=True)
+                elif resumed is not None:
                     _validate_resumed_scan(resumed, current_subject,
                                            staged_record["sequence"], live=True)
                 _verify_self_digest(staged_record)
@@ -14292,17 +15043,7 @@ def start_secret_scan_invocation(
             ),
             None,
         )
-        expected_argv = [
-            "secret-scan-worktree",
-            "--root",
-            str(root),
-            "--repository",
-            reservation["repository"],
-            "--phase",
-            reservation["phase"],
-            "--frontier-id",
-            reservation["frontierId"],
-        ]
+        expected_argv = _secret_scan_generation_argv(root, reservation, recovered.get("taskCorrections", {}))
         if (
             projected_outer is None
             or projected_outer.get("startKind") != "linked"
@@ -14332,7 +15073,7 @@ def start_secret_scan_invocation(
         )
         current_binding = _self_digest_record(
             {
-                "schemaVersion": "qinao.secret-scan-capture-binding.v2",
+                **_secret_scan_binding_version_fields(binding.get("taskCorrectionRecordDigest")),
                 "runId": identity["runId"],
                 "identityDigest": identity["identityDigest"],
                 "runRoot": str(root),
@@ -14349,6 +15090,9 @@ def start_secret_scan_invocation(
         )
         if current_binding != binding:
             raise AuditError("secret scan start current subject binding drift")
+        corrected = recovered.get("taskCorrections", {}).get(reservation["frontierId"])
+        if corrected is not None:
+            _validate_corrected_scan(corrected, binding, reservation["sequence"], live=True)
         attempt_id = _sha256(
             b"qinao-secret-scan-attempt\x00"
             + capture_id.encode("ascii")
@@ -14469,6 +15213,7 @@ def start_secret_scan_invocation(
                 != materialization
                 or current_outer != projected_outer
                 or current_frontier != frontier
+                or current.get("taskCorrections", {}).get(reservation["frontierId"]) != corrected
             ):
                 raise AuditError(
                     "secret scan start authority changed before publication"
@@ -14479,8 +15224,7 @@ def start_secret_scan_invocation(
             )
             current_binding = _self_digest_record(
                 {
-                    "schemaVersion":
-                    "qinao.secret-scan-capture-binding.v2",
+                    **_secret_scan_binding_version_fields(binding.get("taskCorrectionRecordDigest")),
                     "runId": current_identity["runId"],
                     "identityDigest": current_identity[
                         "identityDigest"
@@ -14519,6 +15263,8 @@ def start_secret_scan_invocation(
                 raise AuditError(
                     "secret scan start pre-rename binding drift"
                 )
+            if corrected is not None:
+                _validate_corrected_scan(corrected, current_binding, reservation["sequence"], live=True)
             _verify_self_digest(staged_record)
             _validate_ledger_record_shape(staged_record)
 
@@ -15010,6 +15756,9 @@ def _revalidate_secret_scan_running_authority(
         for field in current_subject
     ):
         raise AuditError("secret scan running subject drift")
+    corrected = recovered.get("taskCorrections", {}).get(reservation["frontierId"])
+    if corrected is not None:
+        _validate_corrected_scan(corrected, reservation["binding"], reservation["sequence"], live=True)
     return value
 
 
@@ -15112,6 +15861,7 @@ def execute_secret_scan_worktree(
     phase: str,
     frontier_id: str,
     context: CommandContext,
+    task_correction_record: Optional[Path] = None,
     _transaction: Optional[LedgerTransaction] = None,
     _faults: Optional[DurabilityFaults] = None,
 ) -> Dict[str, Any]:
@@ -15129,6 +15879,7 @@ def execute_secret_scan_worktree(
                 phase=phase,
                 frontier_id=frontier_id,
                 context=context,
+                task_correction_record=task_correction_record,
                 _transaction=transaction,
             ),
             faults=_faults,
@@ -15141,12 +15892,18 @@ def execute_secret_scan_worktree(
     recovered = _transaction.recover()
     if recovered.get("classification") != "complete":
         raise AuditError("secret scan ledger recovery is indeterminate")
-    existing = [
-        value for value in recovered["captures"].values()
-        if value.get("reservation", {}).get("frontierId") == frontier_id
-        and value.get("reservation", {}).get("repository")
-        == str(repository)
-    ]
+    frontier = next((row for row in recovered["openFrontiers"]
+        if row.get("frontierId") == frontier_id and row.get("frontierKind") == "task"), None)
+    if frontier is None:
+        raise AuditError("secret scan task frontier is not open")
+    correction_digest = _task_correction_selector(root, recovered, task_correction_record)
+    corrected = recovered.get("taskCorrections", {}).get(frontier_id)
+    basis = (_task_completion_basis(frontier, recovered,
+        task_correction_record_digest=correction_digest, live=True)
+        if corrected is not None or correction_digest is not None else {})
+    existing = _task_generation_scans(frontier, recovered, basis)
+    if any(value["reservation"]["repository"] != str(repository) for value in existing):
+        raise AuditError("secret scan generation repository drift")
     if len(existing) > 1:
         raise AuditError("secret scan ledger lineage is ambiguous")
     if (
@@ -15161,6 +15918,7 @@ def execute_secret_scan_worktree(
                 repository=repository,
                 phase=phase,
                 frontier_id=frontier_id,
+                task_correction_record=task_correction_record,
                 _transaction=_transaction,
             )
             recovered = _transaction.recover()
@@ -15172,6 +15930,7 @@ def execute_secret_scan_worktree(
             repository=repository,
             phase=phase,
             frontier_id=frontier_id,
+            task_correction_record=task_correction_record,
             _transaction=_transaction,
         )
         recovered = _transaction.recover()
@@ -15192,11 +15951,8 @@ def execute_secret_scan_worktree(
             _verify_self_digest(outer_start)
             _validate_ledger_record_shape(outer_start)
             invocation = outer_start.get("invocation")
-            expected_argv = [
-                "secret-scan-worktree", "--root", str(root),
-                "--repository", str(repository), "--phase", phase,
-                "--frontier-id", frontier_id,
-            ]
+            expected_argv = _secret_scan_generation_argv(root, value["reservation"],
+                                                         recovered.get("taskCorrections", {}))
             projected_current = recovered["sterileInvocations"].get(
                 current_digest
             )
@@ -15237,11 +15993,8 @@ def execute_secret_scan_worktree(
             _verify_self_digest(outer_start)
             _validate_ledger_record_shape(outer_start)
             invocation = outer_start.get("invocation")
-            expected_argv = [
-                "secret-scan-worktree", "--root", str(root),
-                "--repository", str(repository), "--phase", phase,
-                "--frontier-id", frontier_id,
-            ]
+            expected_argv = _secret_scan_generation_argv(root, value["reservation"],
+                                                         recovered.get("taskCorrections", {}))
             projected = recovered["sterileInvocations"].get(
                 outer_start.get("recordDigest")
             )
@@ -38427,12 +39180,15 @@ def _git_dirty_paths(repository: Path) -> List[bytes]:
 
 
 def _task_test_route_argv(
-    root: Path, repository: Path, targets: Sequence[str]
+    root: Path, repository: Path, targets: Sequence[str], *,
+    task_correction_record: Optional[Path] = None,
 ) -> List[str]:
     values = [
         "task-test-run", "--root", str(Path(root).resolve()),
         "--repository", str(Path(repository).resolve()),
     ]
+    if task_correction_record is not None:
+        values.extend(["--task-correction-record", str(task_correction_record)])
     for target in targets:
         values.extend(["--target", target])
     return values
@@ -38462,15 +39218,26 @@ _TASK_TEST_EXECUTION_CONTRACT_V2 = {
 _TASK_TEST_EXECUTION_CONTRACT_V2_DIGEST = _sha256(
     canonical_json_bytes(_TASK_TEST_EXECUTION_CONTRACT_V2)
 )
+_TASK_TEST_EXECUTION_CONTRACT_V3 = {
+    **_TASK_TEST_EXECUTION_CONTRACT_V2,
+    "schemaVersion": "qinao.task-test-execution-contract.v3",
+    "version": 3,
+    "subjectSchemaVersion": "qinao.task-test-subject.v5",
+    "resultSchemaVersion": "qinao.task-test-result.v5",
+}
+_TASK_TEST_EXECUTION_CONTRACT_V3_DIGEST = _sha256(
+    canonical_json_bytes(_TASK_TEST_EXECUTION_CONTRACT_V3)
+)
 
 
 def _task_execution_contract_matches(value: Mapping[str, Any]) -> bool:
     version = value.get("executionContractVersion")
-    return type(version) is int and version in (1, 2) and value.get(
+    return type(version) is int and version in (1, 2, 3) and value.get(
         "executionContractDigest"
     ) == {
         1: _TASK_TEST_EXECUTION_CONTRACT_DIGEST,
         2: _TASK_TEST_EXECUTION_CONTRACT_V2_DIGEST,
+        3: _TASK_TEST_EXECUTION_CONTRACT_V3_DIGEST,
     }[version]
 
 
@@ -39023,6 +39790,11 @@ class _TaskTestExecutionLeaseGuard:
                     "terminalAuthority",
                     "executionLeaseAcquiredRecordDigest",
                 )
+                if durable_start.get("subject", {}).get("schemaVersion") == "qinao.task-test-subject.v5":
+                    projection_fields += (
+                        "outputContractVersion", "outputContractDigest",
+                        "outputEvidence", "outputEvidenceDigest",
+                    )
                 recovery_projection = {
                     field: terminal_payload.get(field)
                     for field in projection_fields
@@ -39090,7 +39862,7 @@ class _TaskTestExecutionLeaseGuard:
                     != "task-test-attempt-started"
                     or durable_start.get("subject", {}).get(
                         "schemaVersion"
-                    ) not in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4")
+                    ) not in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4", "qinao.task-test-subject.v5")
                     or durable_start.get(
                         "executionLeaseAcquiredRecordDigest"
                     ) != durable_acquired.get("recordDigest")
@@ -39127,7 +39899,7 @@ class _TaskTestExecutionLeaseGuard:
                     )
                     or not isinstance(result, Mapping)
                     or result.get("schemaVersion")
-                    not in ("qinao.task-test-result.v3", "qinao.task-test-result.v4")
+                    not in ("qinao.task-test-result.v3", "qinao.task-test-result.v4", "qinao.task-test-result.v5")
                     or result.get("status")
                     != "task-tests-indeterminate-no-replay"
                     or result.get("reasonCode")
@@ -39626,6 +40398,11 @@ class _TaskTestExecutionLeaseGuard:
                     "executionLeaseAcquiredRecordDigest",
                 )
             }
+            if isinstance(result, Mapping) and result.get("schemaVersion") == "qinao.task-test-result.v5":
+                recovery_projection.update({field: payload.get(field) for field in (
+                    "outputContractVersion", "outputContractDigest",
+                    "outputEvidence", "outputEvidenceDigest",
+                )})
             valid = (
                 isinstance(recovery_authority, Mapping)
                 and recovery_authority.get("state")
@@ -39654,7 +40431,7 @@ class _TaskTestExecutionLeaseGuard:
                 and payload.get("terminalAuthority")
                 == "closedLeaseRecovery"
                 and result.get("schemaVersion")
-                in ("qinao.task-test-result.v3", "qinao.task-test-result.v4")
+                in ("qinao.task-test-result.v3", "qinao.task-test-result.v4", "qinao.task-test-result.v5")
                 and result.get("status")
                 == "task-tests-indeterminate-no-replay"
                 and result.get("reasonCode")
@@ -40052,6 +40829,7 @@ def _task_test_subject_snapshot(
     targets: Sequence[str],
     *,
     recovered: Optional[Mapping[str, Any]] = None,
+    task_correction_record_digest: Optional[str] = None,
 ) -> Dict[str, Any]:
     root = _absolute_path_without_symlink_resolution(Path(root))
     repository = _absolute_path_without_symlink_resolution(
@@ -40059,6 +40837,10 @@ def _task_test_subject_snapshot(
     )
     state = recovered if recovered is not None else recover_run_state(root)
     identity = _require_mapping(state.get("identity"), "task test identity")
+    baseline = _task_completion_basis(frontier, state,
+        task_correction_record_digest=task_correction_record_digest, live=True)
+    corrected = task_correction_record_digest is not None
+    correction_path = Path(baseline["correction"]["recordPath"]) if corrected else None
     invocation = _require_mapping(
         outer_start.get("invocation"), "task test outer invocation"
     )
@@ -40070,7 +40852,8 @@ def _task_test_subject_snapshot(
         or invocation.get("profile") != "ledger"
         or invocation.get("repository") != str(repository)
         or invocation.get("argv")
-        != _task_test_route_argv(root, repository, targets)
+        != _task_test_route_argv(root, repository, targets,
+                                 task_correction_record=correction_path)
     ):
         raise AuditError("task test subject authority drift")
     parsed = [_parse_task_test_target(target) for target in targets]
@@ -40144,8 +40927,10 @@ def _task_test_subject_snapshot(
             result_tree_oid=result_tree,
         ),
     ]
+    scan_candidates = (_task_generation_scans(frontier, state, baseline) if corrected
+                       else state.get("captures", {}).values())
     clean_scans = [
-        value for value in state.get("captures", {}).values()
+        value for value in scan_candidates
         if value.get("reservation", {}).get("frontierId")
         == frontier.get("frontierId")
         and value.get("state") == "secret-scan-clean"
@@ -40172,7 +40957,6 @@ def _task_test_subject_snapshot(
         or binding.get("indexTreeOid") != index_tree
     ):
         raise AuditError("task test clean scan binding drift")
-    baseline = _task_completion_basis(frontier, state)
     if baseline["branch"] != branch or baseline["localConfigDigest"] != _sha256(local_config):
         raise AuditError("task result branch/config differs from its start")
     relation = _task_scan_result_relation(
@@ -40218,6 +41002,14 @@ def _task_test_subject_snapshot(
         "moduleManifest": manifest,
         "moduleManifestDigest": _sha256(canonical_json_bytes(manifest)),
     }
+    if corrected:
+        subject.update({
+            "schemaVersion": "qinao.task-test-subject.v5",
+            "executionContractVersion": 3,
+            "executionContractDigest": _TASK_TEST_EXECUTION_CONTRACT_V3_DIGEST,
+            "outputContractVersion": 1,
+            "outputContractDigest": _TASK_TEST_OUTPUT_CONTRACT_DIGEST,
+        })
     return _self_digest_record(subject, field="subjectDigest")
 
 
@@ -41633,10 +42425,944 @@ class _StrictProcessFDTextProxy:
         raise io.UnsupportedOperation("fd capture proxy cannot detach")
 
 
+_TASK_TEST_OUTPUT_REASONS = (
+    "attempt-binding-unavailable", "capture-incomplete", "capture-unavailable",
+    "checkpoint-fsync-failed", "checkpoint-torn-tail", "checkpoint-write-failed",
+    "directory-fsync-failed", "metadata-fsync-failed", "metadata-write-failed",
+    "output-close-unproven", "output-content-drift", "output-identity-drift",
+    "output-limit-exceeded", "output-reader-unproven", "output-reopen-failed",
+    "owner-interrupted", "preparation-incomplete", "raw-fsync-failed",
+    "raw-uncommitted-tail", "raw-write-failed", "seal-publication-unconfirmed",
+    "seal-unavailable",
+)
+_TASK_TEST_OUTPUT_CONTRACT = {
+    "schemaVersion": "qinao.task-test-output-contract.v1",
+    "namespace": "ledger/task-test-output/<leaseAcquiredRecordDigest>",
+    "metadata": "closed-owner-attempt-sealed-evidence-v1",
+    "channels": ["stdout", "stderr"], "raw": "unchanged-bytes-no-merged-order",
+    "chunkBytes": 65536, "maxByteCount": 9007199254740991,
+    "checkpointBytes": 112,
+    "checkpointDomain": "qinao.task-test-output-checkpoint.v1",
+    "genesisDomain": "qinao.task-test-output-genesis.v1",
+    "durability": "raw-fsync-before-checkpoint-append-then-checkpoint-fsync",
+    "seal": "capture-sealed-restored-plus-reopened-exact-raw",
+    "reasonCodes": list(_TASK_TEST_OUTPUT_REASONS),
+}
+_TASK_TEST_OUTPUT_CONTRACT_DIGEST = _sha256(canonical_json_bytes(_TASK_TEST_OUTPUT_CONTRACT))
+_OUTPUT_OPEN, _OUTPUT_FSYNC, _OUTPUT_STAT = os.open, os.fsync, os.stat
+_OUTPUT_GETEUID = os.geteuid
+_OUTPUT_FRAME_DOMAIN = b"qinao.task-test-output-checkpoint.v1\x00"
+_OUTPUT_GENESIS_DOMAIN = b"qinao.task-test-output-genesis.v1\x00"
+
+
+def _task_test_output_identity(observed: os.stat_result, *, directory: bool = False) -> Dict[str, Any]:
+    mode = 0o700 if directory else 0o600
+    if (
+        not (stat.S_ISDIR(observed.st_mode) if directory else stat.S_ISREG(observed.st_mode))
+        or stat.S_IMODE(observed.st_mode) != mode
+        or observed.st_uid != _OUTPUT_GETEUID()
+        or (not directory and observed.st_nlink != 1)
+    ):
+        raise AuditError("task test output private identity drift")
+    value = {"device": str(observed.st_dev), "inode": str(observed.st_ino),
+             "uid": str(observed.st_uid), "mode": "%04o" % mode}
+    if not directory:
+        value["linkCount"] = 1
+    return value
+
+
+def _task_test_output_genesis(owner_digest: str, channel: str) -> str:
+    return _sha256(_OUTPUT_GENESIS_DOMAIN + bytes.fromhex(owner_digest) + channel.encode("ascii"))
+
+
+def _validate_task_test_output_evidence(value: Any) -> Dict[str, Any]:
+    keys = {"schemaVersion", "outputContractDigest", "leaseAcquiredRecordDigest", "ownerDigest",
+            "attempt", "captureEvidenceDigest", "state", "reasonCodes", "channels",
+            "sealedDigest", "outputEvidenceDigest"}
+    if (not isinstance(value, Mapping) or set(value) != keys
+            or value.get("schemaVersion") != "qinao.task-test-output-evidence.v1"
+            or value.get("outputContractDigest") != _TASK_TEST_OUTPUT_CONTRACT_DIGEST):
+        raise AuditError("task test output evidence shape drift")
+    value = dict(value)
+    for field in ("leaseAcquiredRecordDigest", "outputEvidenceDigest"):
+        _require_lower_hex(value[field], 64, "task test output " + field)
+    for field in ("ownerDigest", "captureEvidenceDigest", "sealedDigest"):
+        if value[field] is not None:
+            _require_lower_hex(value[field], 64, "task test output " + field)
+    attempt = value["attempt"]
+    if attempt is not None:
+        _validate_task_test_output_attempt_projection(attempt)
+        if value["ownerDigest"] is None:
+            raise AuditError("task test output attempt owner absent")
+    reasons, channels = value["reasonCodes"], value["channels"]
+    if (not isinstance(reasons, list) or any(type(code) is not str or code not in _TASK_TEST_OUTPUT_REASONS for code in reasons)
+            or reasons != sorted(set(reasons)) or not isinstance(channels, Mapping)
+            or set(channels) != {"stdout", "stderr"}):
+        raise AuditError("task test output channel/reason shape drift")
+    for channel, prefix in channels.items():
+        if prefix is None:
+            continue
+        if value["ownerDigest"] is None:
+            raise AuditError("task test output prefix owner absent")
+        _validate_task_test_output_prefix_shape(prefix, value["ownerDigest"], channel)
+    state = value["state"]
+    if state == "UNAVAILABLE":
+        valid = bool(reasons) and all(row is None for row in channels.values()) and value["sealedDigest"] is None
+    elif state == "DURABLE_PREFIX":
+        valid = (bool(reasons) and value["ownerDigest"] is not None
+                 and any(row is not None for row in channels.values()) and value["sealedDigest"] is None)
+        for row in channels.values():
+            if row is not None:
+                if row["availableByteCount"] > row["byteCount"] and "raw-uncommitted-tail" not in reasons:
+                    valid = False
+                if row["journalTailBytes"] and "checkpoint-torn-tail" not in reasons:
+                    valid = False
+    elif state == "SEALED_COMPLETE":
+        valid = (not reasons and all(value[key] is not None for key in (
+            "ownerDigest", "attempt", "captureEvidenceDigest", "sealedDigest"))
+            and all(row is not None and row["byteCount"] == row["availableByteCount"]
+                    and row["journalTailBytes"] == 0 for row in channels.values()))
+    else:
+        valid = False
+    if not valid:
+        raise AuditError("task test output evidence state drift")
+    _verify_self_digest(value, "outputEvidenceDigest")
+    return value
+
+
+def _validate_task_test_output_attempt_projection(value: Any) -> None:
+    if (not isinstance(value, Mapping) or set(value) != {
+            "attemptId", "attemptStartRecordDigest", "subjectDigest", "proofKeyDigest", "attemptBindingDigest"}
+            or type(value["attemptId"]) is not str or not value["attemptId"]):
+        raise AuditError("task test output attempt projection drift")
+    for field in ("attemptStartRecordDigest", "subjectDigest", "proofKeyDigest", "attemptBindingDigest"):
+        _require_lower_hex(value[field], 64, "task test output " + field)
+
+
+def _validate_task_test_output_prefix_shape(value: Any, owner_digest: str, channel: str) -> None:
+    if not isinstance(value, Mapping) or set(value) != {
+        "byteCount", "sha256", "checkpointSequence", "checkpointDigest", "availableByteCount", "journalTailBytes"
+    }:
+        raise AuditError("task test output prefix shape drift")
+    for field in ("byteCount", "checkpointSequence", "availableByteCount", "journalTailBytes"):
+        if type(value[field]) is not int or not 0 <= value[field] <= MAX_SAFE_INTEGER:
+            raise AuditError("task test output prefix integer drift")
+    for field in ("sha256", "checkpointDigest"):
+        _require_lower_hex(value[field], 64, "task test output " + field)
+    count, sequence = value["byteCount"], value["checkpointSequence"]
+    if (value["availableByteCount"] < count or value["journalTailBytes"] > 111
+            or not sequence <= count <= sequence * 65536
+            or (sequence == 0 and (value["sha256"] != _sha256(b"")
+                                   or value["checkpointDigest"] != _task_test_output_genesis(owner_digest, channel)))):
+        raise AuditError("task test output prefix bounds drift")
+
+
+def _validate_task_test_output_namespace_fd(
+    transaction: LedgerTransaction,
+    task_test_execution_leases: Mapping[str, Mapping[str, Any]],
+) -> None:
+    ledger = transaction.ledger_fd()
+    if "task-test-output" not in transaction.list_directory(ledger):
+        return
+    namespace = transaction.open_directory_at(ledger, "task-test-output")
+    _task_test_output_identity(_fd_call(namespace, os.fstat), directory=True)
+    expected = {value["acquired"]["recordDigest"] for value in task_test_execution_leases.values()}
+    names = transaction.list_directory(namespace)
+    if not set(names).issubset(expected):
+        raise AuditError("orphan task test output lease")
+    for name in names:
+        child = transaction.open_directory_at(namespace, name)
+        _task_test_output_identity(_fd_call(child, os.fstat), directory=True)
+    if transaction.list_directory(namespace) != names:
+        raise AuditError("task test output namespace changed")
+    transaction.revalidate()
+
+
+def _task_test_output_stable_stat(observed: os.stat_result) -> Tuple[Any, ...]:
+    return (_stat_identity(observed), observed.st_uid, observed.st_size,
+            observed.st_mtime_ns, observed.st_ctime_ns)
+
+
+def _task_test_output_members(path: Path) -> Tuple[Any, Any, Dict[str, os.stat_result]]:
+    """Snapshot only the fixed output leaves, including genuine absence."""
+    namespace = directory = None
+    primary = None
+    try:
+        try:
+            namespace, _absolute, parent_before = _open_directory_fd(path.parent)
+        except FileNotFoundError as error:
+            if getattr(error, "cleanup_errors", ()):
+                raise
+            return None, None, {}
+        _task_test_output_identity(parent_before, directory=True)
+        try:
+            directory = _open_owned_at(namespace, path.name, _DIRECTORY_OPEN_FLAGS)
+        except FileNotFoundError as error:
+            if getattr(error, "cleanup_errors", ()):
+                raise
+            return parent_before, None, {}
+        before = _fd_call(directory, os.fstat)
+        _task_test_output_identity(before, directory=True)
+        visible = _fd_at(namespace, _OUTPUT_STAT, path.name, follow_symlinks=False)
+        if _task_test_output_identity(visible, directory=True) != _task_test_output_identity(before, directory=True):
+            raise AuditError("task test output directory changed")
+        allowed = {"owner.json", "attempt.json", "sealed.json", "stdout.raw", "stderr.raw",
+                   "stdout.checkpoints", "stderr.checkpoints"}
+        names = _fd_call(directory, os.listdir)
+        if len(names) > len(allowed) or not set(names).issubset(allowed):
+            raise AuditError("task test output unexpected member")
+        members = {}
+        for name in names:
+            observed = _fd_at(directory, _OUTPUT_STAT, name, follow_symlinks=False)
+            _task_test_output_identity(observed)
+            members[name] = observed
+        return parent_before, before, members
+    except OSError as error:
+        primary = AuditError("task test output private snapshot rejected")
+        raise primary from error
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        _close_fd_slots([directory, namespace], primary)
+
+
+def _task_test_output_revalidate_members(path: Path, before: Tuple[Any, ...],
+                                        metadata: Mapping[str, bytes]) -> None:
+    for name, expected in metadata.items():
+        payload, observed = _read_ordinary_snapshot(path / name)
+        _task_test_output_identity(observed)
+        if payload != expected:
+            raise AuditError("task test output metadata changed during read")
+    after = _task_test_output_members(path)
+    for first, last in zip(before[:2], after[:2]):
+        if ((first is None) != (last is None)
+                or first is not None and _task_test_output_identity(first, directory=True)
+                != _task_test_output_identity(last, directory=True)):
+            raise AuditError("task test output directory changed during read")
+    if set(before[2]) != set(after[2]) or any(
+            _task_test_output_stable_stat(value) != _task_test_output_stable_stat(after[2][name])
+            for name, value in before[2].items()):
+        raise AuditError("task test output member changed during combined read")
+
+
+def _task_test_output_read_metadata(path: Path, *, allow_unconfirmed: bool = False,
+                                    snapshots: Optional[Dict[str, bytes]] = None) -> Optional[Dict[str, Any]]:
+    payload, observed = _read_ordinary_snapshot(path)
+    _task_test_output_identity(observed)
+    if snapshots is not None:
+        snapshots[path.name] = payload
+    try:
+        value = parse_canonical_json(payload)
+    except AuditError:
+        # A private, stable but unfinished exclusive publication is not a
+        # completed record. This does not excuse links, read/close faults,
+        # changed referenced bytes, or claim that interruption was the cause.
+        if allow_unconfirmed:
+            return None
+        raise
+    if not isinstance(value, dict):
+        raise AuditError("task test output metadata shape drift")
+    return value
+
+
+def _task_test_output_context(recovered: Mapping[str, Any], lease_digest: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    _require_lower_hex(lease_digest, 64, "task test output lease")
+    rows = [row for row in recovered["records"] if row.get("recordDigest") == lease_digest]
+    if len(rows) != 1 or rows[0].get("operationKind") != "task-test-execution-lease-acquired":
+        raise AuditError("task test output actual lease absent")
+    acquired = dict(rows[0])
+    owners = [row for row in recovered["records"]
+              if row.get("recordDigest") == acquired["outerInvocationStartRecordDigest"]]
+    if len(owners) != 1 or owners[0].get("operationKind") != "sterile-invocation-started-linked":
+        raise AuditError("task test output actual outer absent")
+    if owners[0]["invocation"]["recordDigest"] != acquired["invocationDigest"]:
+        raise AuditError("task test output invocation drift")
+    return acquired, dict(owners[0])
+
+
+def _task_test_output_owner_fields(identity: Mapping[str, Any], acquired: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "schemaVersion": "qinao.task-test-output-owner.v1",
+        "outputContractDigest": _TASK_TEST_OUTPUT_CONTRACT_DIGEST,
+        "runId": identity["runId"], "identityDigest": identity["identityDigest"],
+        "frontierId": acquired["frontierId"],
+        "frontierStartRecordDigest": acquired["frontierStartRecordDigest"],
+        "outerInvocationStartRecordDigest": acquired["outerInvocationStartRecordDigest"],
+        "invocationDigest": acquired["invocationDigest"],
+        "leaseAcquiredRecordDigest": acquired["recordDigest"],
+        "holderId": acquired["holderId"], "lockIdentityDigest": acquired["lockIdentityDigest"],
+    }
+
+
+def _task_test_output_evidence(lease_digest: str, *, owner: Optional[Mapping[str, Any]] = None,
+                              channels: Optional[Mapping[str, Any]] = None,
+                              capture_evidence: Optional[Mapping[str, Any]] = None,
+                              reason_codes: Sequence[str] = (), attempt: Optional[Mapping[str, Any]] = None,
+                              sealed_digest: Optional[str] = None) -> Dict[str, Any]:
+    _require_lower_hex(lease_digest, 64, "task test output lease")
+    reasons = sorted(set(reason_codes))
+    if any(code not in _TASK_TEST_OUTPUT_REASONS for code in reasons):
+        raise AuditError("task test output reason drift")
+    return _validate_task_test_output_evidence(_self_digest_record({
+        "schemaVersion": "qinao.task-test-output-evidence.v1",
+        "outputContractDigest": _TASK_TEST_OUTPUT_CONTRACT_DIGEST,
+        "leaseAcquiredRecordDigest": lease_digest,
+        "ownerDigest": owner["ownerDigest"] if owner is not None else None,
+        "attempt": dict(attempt) if attempt is not None else None,
+        "captureEvidenceDigest": (capture_evidence["captureEvidenceDigest"]
+                                  if capture_evidence is not None else None),
+        "state": "SEALED_COMPLETE" if sealed_digest is not None else ("DURABLE_PREFIX" if channels is not None else "UNAVAILABLE"),
+        "reasonCodes": reasons,
+        "channels": dict(channels) if channels is not None else {"stdout": None, "stderr": None},
+        "sealedDigest": sealed_digest,
+    }, field="outputEvidenceDigest"))
+
+
+def _task_test_output_unavailable(lease_digest: str, capture_evidence: Optional[Mapping[str, Any]],
+                                reason_codes: Sequence[str]) -> Dict[str, Any]:
+    if capture_evidence is not None:
+        capture_evidence = _validate_task_test_capture_evidence(capture_evidence)
+    return _task_test_output_evidence(lease_digest, capture_evidence=capture_evidence,
+                                     reason_codes=reason_codes)
+
+
+class _TaskTestOutputReadEIO(AuditError):
+    def __init__(self, origin: OSError) -> None:
+        super().__init__("task test output checkpoint/raw read EIO")
+        self.read_error = origin
+        self.read_slots_closed = False
+        self.integrity_checked = False
+
+
+def _task_test_output_read_chunk(slot: _ChildFdOwnerSlot, count: int) -> bytes:
+    def read(fd: int) -> bytes:
+        try:
+            return _FD_READ(fd, count)
+        except OSError as error:
+            if error.errno == errno.EIO:
+                raise _TaskTestOutputReadEIO(error) from error
+            raise
+    # Identity/ownership validation occurs outside the sole classified syscall.
+    return _fd_call(slot, read)
+
+
+def _task_test_output_prefix(path: Path, owner: Mapping[str, Any], channel: str,
+                           expected_prefix: Optional[Mapping[str, Any]] = None, *,
+                           guard: Optional[_TaskTestExecutionLeaseGuard] = None) -> Dict[str, Any]:
+    raw = journal = raw_parent = journal_parent = None
+    primary = None
+    try:
+        raw, raw_parent, raw_name, _rp, _rs, raw_before = _open_ordinary_file(path / (channel + ".raw"))
+        journal, journal_parent, journal_name, _jp, _js, journal_before = _open_ordinary_file(path / (channel + ".checkpoints"))
+        expected = owner["channels"][channel]
+        if (_task_test_output_identity(raw_before) != expected["rawIdentity"]
+                or _task_test_output_identity(journal_before) != expected["checkpointIdentity"]
+                or raw_before.st_size > MAX_SAFE_INTEGER):
+            raise AuditError("task test output file identity drift")
+        sequence, count = 0, 0
+        digest = _FD_SHA256()
+        previous = _task_test_output_genesis(owner["ownerDigest"], channel)
+        pending = b""
+        matched = expected_prefix is None or expected_prefix["checkpointSequence"] == 0
+        while True:
+            chunk = _task_test_output_read_chunk(journal, 112 - len(pending))
+            if not chunk:
+                break
+            pending += chunk
+            if len(pending) < 112:
+                continue
+            frame, pending = pending, b""
+            next_sequence, next_count = int.from_bytes(frame[:8], "big"), int.from_bytes(frame[8:16], "big")
+            if (next_sequence != sequence + 1 or next_sequence > MAX_SAFE_INTEGER
+                    or not 1 <= next_count - count <= 65536 or next_count > MAX_SAFE_INTEGER
+                    or frame[48:80].hex() != previous
+                    or _sha256(_OUTPUT_FRAME_DOMAIN + frame[:80]) != frame[80:].hex()):
+                raise AuditError("task test output checkpoint drift")
+            remaining = next_count - count
+            while remaining:
+                payload = _task_test_output_read_chunk(raw, min(65536, remaining))
+                if not payload:
+                    raise AuditError("task test output prefix absent")
+                digest.update(payload)
+                remaining -= len(payload)
+            if digest.hexdigest() != frame[16:48].hex():
+                raise AuditError("task test output prefix hash drift")
+            sequence, count, previous = next_sequence, next_count, frame[80:].hex()
+            if expected_prefix is not None and sequence == expected_prefix["checkpointSequence"]:
+                matched = (count == expected_prefix["byteCount"] and digest.hexdigest() == expected_prefix["sha256"]
+                           and previous == expected_prefix["checkpointDigest"])
+        for slot, parent, name, before in ((raw, raw_parent, raw_name, raw_before),
+                                            (journal, journal_parent, journal_name, journal_before)):
+            after, visible = _fd_call(slot, _FD_FSTAT), _fd_at(parent, _OUTPUT_STAT, name, follow_symlinks=False)
+            stable = lambda value: (_stat_identity(value), value.st_uid, value.st_size, value.st_mtime_ns)
+            if stable(before) != stable(after) or stable(before) != stable(visible):
+                raise AuditError("task test output concurrent file change")
+        if not matched:
+            raise AuditError("task test output attested checkpoint absent")
+        return {"byteCount": count, "sha256": digest.hexdigest(), "checkpointSequence": sequence,
+                "checkpointDigest": previous, "availableByteCount": raw_before.st_size,
+                "journalTailBytes": len(pending)}
+    except OSError as exc:
+        primary = AuditError("task test output private read rejected")
+        raise primary from exc
+    except BaseException as exc:
+        primary = exc
+        raise
+    finally:
+        slots = [raw, raw_parent, journal, journal_parent]
+        try:
+            _close_fd_slots(slots, primary)
+        except BaseException:
+            if guard is not None:
+                with guard._lifecycle_lock:
+                    if not guard._quarantined:
+                        guard.quarantine()
+            raise
+        closed = all(slot is None or slot.phase == "closed" for slot in slots)
+        if isinstance(primary, _TaskTestOutputReadEIO):
+            primary.read_slots_closed = closed
+        if not closed and primary is not None:
+            if guard is not None:
+                with guard._lifecycle_lock:
+                    if not guard._quarantined:
+                        guard.quarantine()
+            cleanup = getattr(primary, "cleanup_errors", ())
+            if cleanup:
+                if isinstance(primary, _TaskTestOutputReadEIO):
+                    # The cleanup becomes the direct cause; preserve the
+                    # originating read syscall in the same visible chain.
+                    cleanup[-1].__context__ = primary.read_error
+                raise primary from cleanup[-1]
+            raise primary
+
+
+def _task_test_output_attempt_fields(owner: Mapping[str, Any], start: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "schemaVersion": "qinao.task-test-output-attempt.v1",
+        "outputContractDigest": _TASK_TEST_OUTPUT_CONTRACT_DIGEST,
+        "ownerDigest": owner["ownerDigest"], "leaseAcquiredRecordDigest": owner["leaseAcquiredRecordDigest"],
+        "attemptId": start["attemptId"], "attemptStartRecordDigest": start["recordDigest"],
+        "subjectDigest": start["subjectDigest"], "proofKeyDigest": start["proofKeyDigest"],
+    }
+
+
+def _task_test_output_attempt(owner: Mapping[str, Any], value: Mapping[str, Any],
+                             recovered: Mapping[str, Any]) -> Dict[str, Any]:
+    starts = [row for row in recovered["records"] if row.get("recordDigest") == value.get("attemptStartRecordDigest")]
+    if (len(starts) != 1 or starts[0].get("operationKind") != "task-test-attempt-started"
+            or starts[0].get("executionLeaseAcquiredRecordDigest") != owner["leaseAcquiredRecordDigest"]
+            or any(starts[0].get(key) != owner[key] for key in (
+                "frontierId", "frontierStartRecordDigest", "outerInvocationStartRecordDigest", "invocationDigest"))):
+        raise AuditError("task test output actual attempt absent")
+    fields = _task_test_output_attempt_fields(owner, starts[0])
+    if set(value) != set(fields) | {"attemptBindingDigest"} or any(value.get(key) != item for key, item in fields.items()):
+        raise AuditError("task test output attempt binding drift")
+    _verify_self_digest(value, "attemptBindingDigest")
+    return {key: value[key] for key in (
+        "attemptId", "attemptStartRecordDigest", "subjectDigest", "proofKeyDigest", "attemptBindingDigest")}
+
+
+def _task_test_output_load(root: Path, lease_digest: str, recovered: Mapping[str, Any],
+                           *, guard: Optional[_TaskTestExecutionLeaseGuard] = None,
+                           expected: Optional[Mapping[str, Any]] = None,
+                           acknowledged_prefixes: Optional[Mapping[str, Any]] = None,
+                           require_unsealed: bool = False) -> Tuple[Any, ...]:
+    acquired, _outer = _task_test_output_context(recovered, lease_digest)
+    root = _absolute_path_without_symlink_resolution(root)
+    if guard is not None:
+        if type(guard) is not _TaskTestExecutionLeaseGuard or guard.root != root:
+            raise AuditError("task test output read guard drift")
+        guard.revalidate()
+        if guard.identity != recovered["identity"]:
+            raise AuditError("task test output guard identity drift")
+    if _read_canonical_file(root / "ledger" / "identity.json") != recovered["identity"]:
+        raise AuditError("task test output root identity drift")
+    path = root / "ledger" / "task-test-output" / lease_digest
+    snapshot = _task_test_output_members(path)
+    names = set(snapshot[2])
+    metadata: Dict[str, bytes] = {}
+    references = [row.get("outputEvidence", {}) for row in recovered["records"]
+                  if row.get("operationKind") == "task-test-attempt-terminal"
+                  and row.get("executionLeaseAcquiredRecordDigest") == lease_digest]
+    if expected is not None:
+        references.append(expected)
+    seal_required = any(value.get("sealedDigest") is not None for value in references)
+    attempt_required = any(value.get("attempt") is not None for value in references)
+    owner_required = (bool(names & {"attempt.json", "sealed.json"})
+                      or any(value.get("ownerDigest") is not None for value in references)
+                      or any(row.get("operationKind") == "task-test-attempt-started"
+                             and row.get("executionLeaseAcquiredRecordDigest") == lease_digest
+                             for row in recovered["records"]))
+    owner = (_task_test_output_read_metadata(path / "owner.json", allow_unconfirmed=not owner_required,
+                                             snapshots=metadata)
+             if "owner.json" in names else None)
+    if owner is None:
+        if (owner_required or seal_required or attempt_required
+                or any(value.st_size for name, value in snapshot[2].items() if name != "owner.json")):
+            raise AuditError("task test output required owner absent or unfinished")
+        _task_test_output_revalidate_members(path, snapshot, metadata)
+        if guard is not None:
+            guard.revalidate()
+        return path, None, None, None, None, ["preparation-incomplete"]
+    fields = _task_test_output_owner_fields(recovered["identity"], acquired)
+    if (not isinstance(owner, dict) or set(owner) != set(fields) | {"directoryIdentity", "channels", "ownerDigest"}
+            or any(owner.get(key) != value for key, value in fields.items())
+            or not isinstance(owner["channels"], Mapping)
+            or set(owner["channels"]) != {"stdout", "stderr"}
+            or any(not isinstance(row, Mapping) or set(row) != {"rawIdentity", "checkpointIdentity"}
+                   for row in owner["channels"].values())):
+        raise AuditError("task test output owner drift")
+    _verify_self_digest(owner, "ownerDigest")
+    before = snapshot[1]
+    if _task_test_output_identity(before, directory=True) != owner["directoryIdentity"]:
+        raise AuditError("task test output directory identity drift")
+    for channel in ("stdout", "stderr"):
+        for suffix, key in (("raw", "rawIdentity"), ("checkpoints", "checkpointIdentity")):
+            observed = snapshot[2].get(channel + "." + suffix)
+            if (observed is None or _task_test_output_identity(observed) != owner["channels"][channel][key]
+                    or suffix == "raw" and observed.st_size > MAX_SAFE_INTEGER):
+                raise AuditError("task test output file identity drift")
+    metadata_reasons = []
+    sealed = None
+    if "sealed.json" in names:
+        sealed = _task_test_output_read_metadata(path / "sealed.json", allow_unconfirmed=not seal_required,
+                                                snapshots=metadata)
+        if sealed is None:
+            metadata_reasons.append("seal-publication-unconfirmed")
+        else:
+            _verify_self_digest(sealed, "sealedDigest")
+            attempt_required = True
+    elif seal_required:
+        raise AuditError("task test output referenced seal absent")
+    attempt = None
+    if "attempt.json" in names:
+        binding = _task_test_output_read_metadata(path / "attempt.json", allow_unconfirmed=not attempt_required,
+                                                 snapshots=metadata)
+        if binding is None:
+            metadata_reasons.append("attempt-binding-unavailable")
+        else:
+            attempt = _task_test_output_attempt(owner, binding, recovered)
+    elif attempt_required:
+        raise AuditError("task test output referenced attempt absent")
+    if sealed is not None:
+        if (set(sealed) != {"schemaVersion", "outputContractDigest", "ownerDigest", "leaseAcquiredRecordDigest",
+                           "attempt", "captureEvidence", "captureEvidenceDigest", "channels", "sealedDigest"}
+                or sealed["schemaVersion"] != "qinao.task-test-output-sealed.v1"
+                or sealed["outputContractDigest"] != _TASK_TEST_OUTPUT_CONTRACT_DIGEST
+                or sealed["ownerDigest"] != owner["ownerDigest"]
+                or sealed["leaseAcquiredRecordDigest"] != lease_digest
+                or attempt is None or sealed["attempt"] != attempt
+                or not isinstance(sealed["channels"], Mapping) or set(sealed["channels"]) != {"stdout", "stderr"}):
+            raise AuditError("task test output seal binding drift")
+        _verify_self_digest(sealed, "sealedDigest")
+        capture = _validate_task_test_capture_evidence(sealed["captureEvidence"])
+        if capture["state"] != "SEALED" or capture["captureEvidenceDigest"] != sealed["captureEvidenceDigest"]:
+            raise AuditError("task test output sealed capture drift")
+        for channel, row in sealed["channels"].items():
+            _validate_task_test_output_prefix_shape(row, owner["ownerDigest"], channel)
+            if (row["availableByteCount"] != row["byteCount"] or row["journalTailBytes"]
+                    or row["byteCount"] != snapshot[2][channel + ".raw"].st_size
+                    or row["checkpointSequence"] * 112 != snapshot[2][channel + ".checkpoints"].st_size
+                    or capture[channel] != {"byteCount": row["byteCount"], "sha256": row["sha256"]}):
+                raise AuditError("task test output sealed bytes differ from observation")
+    if require_unsealed and sealed is not None:
+        raise AuditError("task test output seal already published")
+    if expected is not None:
+        if (owner["ownerDigest"] != expected["ownerDigest"]
+                or expected["attempt"] is not None and expected["attempt"] != attempt):
+            raise AuditError("task test output attested owner/attempt drift")
+        if expected["state"] == "SEALED_COMPLETE" and (
+                sealed is None or sealed["sealedDigest"] != expected["sealedDigest"]
+                or sealed["captureEvidenceDigest"] != expected["captureEvidenceDigest"]
+                or sealed["channels"] != expected["channels"] or sealed["attempt"] != expected["attempt"]):
+            raise AuditError("task test output complete attestation drift")
+    prefixes = expected["channels"] if expected is not None else acknowledged_prefixes
+    if acknowledged_prefixes is not None and expected is not None:
+        raise AuditError("task test output prefix sources conflict")
+    if prefixes is not None:
+        if not isinstance(prefixes, Mapping) or set(prefixes) != {"stdout", "stderr"}:
+            raise AuditError("task test output acknowledged channel shape drift")
+        for channel, row in prefixes.items():
+            if row is not None:
+                _validate_task_test_output_prefix_shape(row, owner["ownerDigest"], channel)
+    try:
+        channels = {channel: _task_test_output_prefix(
+            path, owner, channel, prefixes[channel] if prefixes is not None else None, guard=guard)
+            for channel in ("stdout", "stderr")}
+    except _TaskTestOutputReadEIO as error:
+        if not error.read_slots_closed or getattr(error, "cleanup_errors", ()):
+            raise
+        # No unavailable-output conversion can skip already knowable binding,
+        # file-identity or combined-read integrity checks. This is not a retry
+        # of the failed channel read and cannot produce a complete result.
+        _task_test_output_revalidate_members(path, snapshot, metadata)
+        if guard is not None:
+            guard.revalidate()
+        error.integrity_checked = True
+        raise
+    if sealed is not None and sealed["channels"] != channels:
+        raise AuditError("task test output seal binding drift")
+    _task_test_output_revalidate_members(path, snapshot, metadata)
+    if guard is not None:
+        guard.revalidate()
+    return path, owner, attempt, channels, sealed, metadata_reasons
+
+
+def _reopen_task_test_output_from_recovered(root: Path, lease_digest: str, recovered: Mapping[str, Any],
+                                           *, guard: Optional[_TaskTestExecutionLeaseGuard] = None) -> Dict[str, Any]:
+    _task_test_output_context(recovered, lease_digest)
+    referenced = any(row.get("operationKind") == "task-test-attempt-terminal"
+                     and row.get("executionLeaseAcquiredRecordDigest") == lease_digest
+                     and row.get("outputEvidence", {}).get("state") == "SEALED_COMPLETE"
+                     for row in recovered["records"])
+    if guard is None and not referenced:
+        return _task_test_output_unavailable(lease_digest, None, ["output-reopen-failed"])
+    _path, owner, attempt, channels, sealed, metadata_reasons = _task_test_output_load(root, lease_digest, recovered, guard=guard)
+    if owner is None:
+        return _task_test_output_unavailable(lease_digest, None, metadata_reasons)
+    if sealed is not None:
+        return _task_test_output_evidence(lease_digest, owner=owner, channels=channels, attempt=attempt,
+                                         capture_evidence=sealed["captureEvidence"], sealed_digest=sealed["sealedDigest"])
+    reasons = ["seal-unavailable", *metadata_reasons]
+    if attempt is None:
+        reasons.append("attempt-binding-unavailable")
+    if any(row["availableByteCount"] > row["byteCount"] for row in channels.values()):
+        reasons.append("raw-uncommitted-tail")
+    if any(row["journalTailBytes"] for row in channels.values()):
+        reasons.append("checkpoint-torn-tail")
+    return _task_test_output_evidence(lease_digest, owner=owner, channels=channels, attempt=attempt, reason_codes=reasons)
+
+
+def _verify_task_test_output_evidence_from_recovered(root: Path, evidence: Mapping[str, Any],
+                                                    recovered: Mapping[str, Any], *,
+                                                    guard: Optional[_TaskTestExecutionLeaseGuard] = None) -> Dict[str, Any]:
+    evidence = _validate_task_test_output_evidence(evidence)
+    lease_digest = evidence["leaseAcquiredRecordDigest"]
+    _task_test_output_context(recovered, lease_digest)
+    if evidence["state"] == "UNAVAILABLE" and evidence["ownerDigest"] is None:
+        return evidence
+    if guard is None and not any(row.get("operationKind") == "task-test-attempt-terminal"
+                                 and row.get("outputEvidenceDigest") == evidence["outputEvidenceDigest"]
+                                 and row.get("executionLeaseAcquiredRecordDigest") == lease_digest
+                                 for row in recovered["records"]):
+        raise AuditError("task test output prefix has no quiescent authority")
+    _path, owner, attempt, channels, sealed, _metadata_reasons = _task_test_output_load(
+        root, lease_digest, recovered, guard=guard, expected=evidence)
+    if owner is None or owner["ownerDigest"] != evidence["ownerDigest"] or (evidence["attempt"] is not None and attempt != evidence["attempt"]):
+        raise AuditError("task test output attested owner/attempt drift")
+    if evidence["state"] == "SEALED_COMPLETE":
+        if (sealed is None or evidence["sealedDigest"] != sealed["sealedDigest"]
+                or evidence["captureEvidenceDigest"] != sealed["captureEvidenceDigest"]
+                or evidence["channels"] != channels or evidence["attempt"] != attempt):
+            raise AuditError("task test output complete attestation drift")
+    return evidence
+
+
+def reopen_task_test_output(root: Path, lease_digest: str) -> Dict[str, Any]:
+    guard = _TaskTestExecutionLeaseGuard.acquire_nonblocking(root)
+    try:
+        return _reopen_task_test_output_from_recovered(root, lease_digest, recover_run_state(root), guard=guard)
+    finally:
+        with guard._lifecycle_lock:
+            if not guard._quarantined:
+                guard.release_unbound()
+
+
+class _TaskTestOutputSpool:
+    """One lease-owned private spool; capture's existing readers own writes."""
+
+    @classmethod
+    def prepare(cls, guard: _TaskTestExecutionLeaseGuard, lease_acquired: Mapping[str, Any],
+                outer_start: Mapping[str, Any]) -> "_TaskTestOutputSpool":
+        if cls is not _TaskTestOutputSpool or type(guard) is not _TaskTestExecutionLeaseGuard:
+            raise AuditError("task test output concrete guard absent")
+        guard._require_bound_acquired(lease_acquired, authority="output preparation")
+        recovered = recover_run_state(guard.root)
+        acquired, outer = _task_test_output_context(recovered, lease_acquired["recordDigest"])
+        if acquired != dict(lease_acquired) or outer != dict(outer_start):
+            raise AuditError("task test output owner mismatch")
+        self = cls()
+        self.guard, self.acquired = guard, acquired
+        self.path = guard.root / "ledger" / "task-test-output" / acquired["recordDigest"]
+        self._directory = None
+        self._ownership: Dict[_StrictFDOwnershipToken, str] = {}
+        self._tokens: Dict[str, Dict[str, _StrictFDOwnershipToken]] = {}
+        self._capture = None
+        self._generation = 0
+        self._reasons: set[str] = set()
+        self._stopped = False
+        self._evidence = None
+        try:
+            _ensure_private_directory(self.path.parent)
+            _mkdir_exclusive(self.path)
+            for channel in ("stdout", "stderr"):
+                for suffix in ("raw", "checkpoints"):
+                    _write_bytes_exclusive(self.path / (channel + "." + suffix), b"")
+            self._directory, _absolute, observed = _open_directory_fd(self.path)
+            channels = {}
+            flags = os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW | os.O_CLOEXEC
+            for channel in ("stdout", "stderr"):
+                tokens = self._tokens[channel] = {}
+                identities = {}
+                for suffix, key in (("raw", "rawIdentity"), ("checkpoints", "checkpointIdentity")):
+                    fd = _fd_at(self._directory, _OUTPUT_OPEN, channel + "." + suffix, flags)
+                    self._generation += 1
+                    token = _StrictFDOwnershipToken(self._generation, "output-" + suffix,
+                                                    1 if channel == "stdout" else 2, fd)
+                    self._ownership[token] = "owned"
+                    tokens[suffix] = token
+                    identities[key] = _task_test_output_identity(_FD_FSTAT(fd))
+                channels[channel] = identities
+            self.owner = _self_digest_record({
+                **_task_test_output_owner_fields(guard.identity, acquired),
+                "directoryIdentity": _task_test_output_identity(observed, directory=True),
+                "channels": channels,
+            }, field="ownerDigest")
+            write_canonical_exclusive(self.path / "owner.json", self.owner)
+            self._prefixes = {channel: {"sequence": 0, "count": 0, "hash": _FD_SHA256(),
+                                       "digest": _task_test_output_genesis(self.owner["ownerDigest"], channel),
+                                       "failed": False} for channel in ("stdout", "stderr")}
+            return self
+        except BaseException as primary:
+            try:
+                self._close_stopped()
+            except BaseException as cleanup:
+                _retain_git_cleanup_error(primary, cleanup)
+                raise primary from cleanup
+            raise
+
+    def _attach(self, capture: Any) -> None:
+        if self._capture is not None or self._stopped:
+            raise AuditError("task test output spool already consumed")
+        self.guard._require_bound_acquired(self.acquired, authority="output attachment")
+        capture._ownership.update(self._ownership)
+        capture._generation = max(capture._generation, self._generation)
+        self._ownership = capture._ownership
+        self._capture = capture
+
+    def bind_attempt(self, start: Mapping[str, Any]) -> None:
+        if self._stopped:
+            raise AuditError("task test output binding after stop")
+        self.guard._require_bound_acquired(self.acquired, authority="output attempt binding")
+        if self.path != self.guard.root / "ledger" / "task-test-output" / self.acquired["recordDigest"]:
+            raise AuditError("task test output cached destination drift")
+        recovered = recover_run_state(self.guard.root)
+        actual = [row for row in recovered["records"] if row.get("recordDigest") == start.get("recordDigest")]
+        if len(actual) != 1 or actual[0] != dict(start):
+            raise AuditError("task test output actual start drift")
+        binding = _self_digest_record(_task_test_output_attempt_fields(self.owner, start), field="attemptBindingDigest")
+        _task_test_output_attempt(self.owner, binding, recovered)
+        try:
+            write_canonical_exclusive(self.path / "attempt.json", binding)
+        except OSError as error:
+            self._reasons.add("metadata-write-failed")
+            if getattr(error, "cleanup_errors", ()):
+                self.guard.quarantine()
+            raise
+
+    def _write_channel(self, fd: int, payload: bytes) -> None:
+        channel = "stdout" if fd == 1 else "stderr"
+        prefix = self._prefixes[channel]
+        if prefix["failed"]:
+            return
+        reason = "raw-write-failed"
+        try:
+            count = prefix["count"] + len(payload)
+            if not 0 < len(payload) <= 65536 or count > MAX_SAFE_INTEGER:
+                reason = "output-limit-exceeded"
+                raise AuditError("task test output byte bound")
+            raw, journal = self._tokens[channel]["raw"], self._tokens[channel]["checkpoints"]
+            self._write_all(raw, payload)
+            reason = "raw-fsync-failed"
+            _OUTPUT_FSYNC(raw.fd)
+            reason = "output-identity-drift"
+            for suffix, token, key in (("raw", raw, "rawIdentity"), ("checkpoints", journal, "checkpointIdentity")):
+                visible = _fd_at(self._directory, _OUTPUT_STAT, channel + "." + suffix, follow_symlinks=False)
+                if (_task_test_output_identity(_FD_FSTAT(token.fd)) != self.owner["channels"][channel][key]
+                        or _task_test_output_identity(visible) != self.owner["channels"][channel][key]):
+                    raise AuditError("task test output writer identity drift")
+            if _FD_FSTAT(raw.fd).st_size != count:
+                raise AuditError("task test output writer size drift")
+            candidate_hash = prefix["hash"].copy()
+            candidate_hash.update(payload)
+            sequence = prefix["sequence"] + 1
+            frame = (sequence.to_bytes(8, "big") + count.to_bytes(8, "big")
+                     + candidate_hash.digest() + bytes.fromhex(prefix["digest"]))
+            digest = _sha256(_OUTPUT_FRAME_DOMAIN + frame)
+            reason = "checkpoint-write-failed"
+            self._write_all(journal, frame + bytes.fromhex(digest))
+            reason = "checkpoint-fsync-failed"
+            _OUTPUT_FSYNC(journal.fd)
+            prefix.update(sequence=sequence, count=count, hash=candidate_hash, digest=digest)
+        except (OSError, AuditError):
+            prefix["failed"] = True
+            self._reasons.add(reason)
+
+    def _write_all(self, token: _StrictFDOwnershipToken, payload: bytes) -> None:
+        if self._ownership.get(token) != "owned":
+            raise AuditError("task test output writer ownership drift")
+        offset = 0
+        while offset < len(payload):
+            try:
+                written = _FD_WRITE(token.fd, memoryview(payload)[offset:])
+            except InterruptedError:
+                continue
+            if written <= 0:
+                raise OSError("task test output write made no progress")
+            offset += written
+
+    def _close_stopped(self) -> None:
+        if self._stopped:
+            return
+        if self._capture is not None:
+            if (self._capture._fatal_quarantine or self._capture.state not in ("STOPPING", "SEALED", "INCOMPLETE")
+                    or any(self._capture._thread_state(entry) not in ("created", "joined")
+                           for entry in self._capture._thread_ownership.values())):
+                raise AuditError("task test output reader termination unproven")
+        close_errors: List[BaseException] = []
+        for tokens in self._tokens.values():
+            for token in tokens.values():
+                if self._ownership.get(token) != "owned":
+                    continue
+                if self._capture is not None:
+                    self._capture._close_owned_fd(token)
+                else:
+                    self._ownership[token] = "close-attempted"
+                    try:
+                        _FD_CLOSE(token.fd)
+                    except OSError as error:
+                        self._ownership[token] = "close-unproven"
+                        close_errors.append(error)
+                    else:
+                        self._ownership[token] = "closed"
+                if self._ownership[token] != "closed":
+                    self._reasons.add("output-close-unproven")
+        if self._directory is not None:
+            directory, self._directory = self._directory, None
+            try:
+                directory.close()
+            except BaseException as error:
+                self._reasons.add("output-close-unproven")
+                for cleanup in close_errors:
+                    _retain_git_cleanup_error(error, cleanup)
+                self.guard.quarantine()
+                raise
+        self._stopped = True
+        if "output-close-unproven" in self._reasons:
+            self.guard.quarantine()
+            error = AuditError("task test output close unproven")
+            for cleanup in close_errors[1:]:
+                _retain_git_cleanup_error(error, cleanup)
+            if close_errors:
+                raise error from close_errors[0]
+            raise error
+
+    def finish(self, capture_result: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+        try:
+            return self._finish_stopped(capture_result)
+        except _TaskTestOutputReadEIO as error:
+            if (not error.read_slots_closed or getattr(error, "cleanup_errors", ())
+                    or not self._stopped or self._directory is not None
+                    or any(self._ownership.get(token) != "closed"
+                           for tokens in self._tokens.values() for token in tokens.values())):
+                with self.guard._lifecycle_lock:
+                    if not self.guard._quarantined:
+                        self.guard.quarantine()
+                raise
+            # Only this incumbent's stopped concrete capture can turn the
+            # classified read syscall failure into unavailable retention.
+            # Public/cold reopen never performs this conversion.
+            if (not error.integrity_checked
+                    or self._capture is None or self._capture.state not in ("SEALED", "INCOMPLETE")
+                    or capture_result is not self._capture.result):
+                raise
+            self.guard._require_bound_acquired(self.acquired, authority="output read failure")
+            capture_evidence = _task_test_capture_evidence(capture_result)
+            self._evidence = _task_test_output_unavailable(
+                self.acquired["recordDigest"], capture_evidence, ["output-reopen-failed"])
+            return dict(self._evidence)
+
+    def _finish_stopped(self, capture_result: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+        if self._evidence is not None:
+            return dict(self._evidence)
+        if self._capture is not None and self._capture.state not in ("SEALED", "INCOMPLETE"):
+            raise AuditError("task test output capture has not stopped")
+        self._close_stopped()
+        capture_evidence = (_task_test_capture_evidence(capture_result)
+                            if capture_result is not None else None)
+        recovered = recover_run_state(self.guard.root)
+        _path, owner, attempt, current, prior_seal, metadata_reasons = _task_test_output_load(
+            self.guard.root, self.acquired["recordDigest"], recovered, guard=self.guard, require_unsealed=True)
+        if owner is None:
+            self._evidence = _task_test_output_unavailable(
+                self.acquired["recordDigest"], capture_evidence, metadata_reasons)
+            return dict(self._evidence)
+        channels = {}
+        reasons = set(self._reasons) | set(metadata_reasons)
+        for channel, observed in current.items():
+            acknowledged = self._prefixes[channel]
+            prefix = {
+                "byteCount": acknowledged["count"], "sha256": acknowledged["hash"].hexdigest(),
+                "checkpointSequence": acknowledged["sequence"], "checkpointDigest": acknowledged["digest"],
+                "availableByteCount": observed["availableByteCount"], "journalTailBytes": observed["journalTailBytes"],
+            }
+            _validate_task_test_output_prefix_shape(prefix, owner["ownerDigest"], channel)
+            channels[channel] = prefix
+            if prefix["availableByteCount"] != prefix["byteCount"]:
+                reasons.add("raw-uncommitted-tail")
+            if prefix["journalTailBytes"]:
+                reasons.add("checkpoint-torn-tail")
+        _task_test_output_load(
+            self.guard.root, self.acquired["recordDigest"], recovered, guard=self.guard,
+            acknowledged_prefixes=channels, require_unsealed=True)
+        if attempt is None:
+            reasons.add("attempt-binding-unavailable")
+        if capture_evidence is None:
+            reasons.add("capture-unavailable")
+        elif capture_evidence["state"] != "SEALED":
+            reasons.add("capture-incomplete")
+        else:
+            for channel, prefix in channels.items():
+                if capture_evidence[channel] != {"byteCount": prefix["byteCount"], "sha256": prefix["sha256"]}:
+                    reasons.add("output-content-drift")
+        if not reasons:
+            sealed = _self_digest_record({
+                "schemaVersion": "qinao.task-test-output-sealed.v1",
+                "outputContractDigest": _TASK_TEST_OUTPUT_CONTRACT_DIGEST,
+                "ownerDigest": owner["ownerDigest"], "leaseAcquiredRecordDigest": self.acquired["recordDigest"],
+                "attempt": attempt, "captureEvidence": capture_evidence,
+                "captureEvidenceDigest": capture_evidence["captureEvidenceDigest"], "channels": channels,
+            }, field="sealedDigest")
+            try:
+                write_canonical_exclusive(_path / "sealed.json", sealed)
+            except OSError as error:
+                if getattr(error, "cleanup_errors", ()):
+                    self.guard.quarantine()
+                    raise
+                # Classify the failed exclusive-publication operation, not
+                # exception wording or a guessed low-level fsync phase.
+                reasons.update(("metadata-write-failed", "seal-publication-unconfirmed"))
+            else:
+                self._evidence = _reopen_task_test_output_from_recovered(
+                    self.guard.root, self.acquired["recordDigest"], recovered, guard=self.guard)
+        if reasons:
+            reasons.add("seal-unavailable")
+            self._evidence = _task_test_output_evidence(
+                self.acquired["recordDigest"], owner=owner, channels=channels,
+                capture_evidence=capture_evidence, reason_codes=sorted(reasons), attempt=attempt)
+            _verify_task_test_output_evidence_from_recovered(
+                self.guard.root, self._evidence, recovered, guard=self.guard)
+        return dict(self._evidence)
+
+
 class _StrictProcessFDCapture:
     """Constant-memory cooperative observation of process fd 1 and fd 2."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, _task_test_spool: Optional[_TaskTestOutputSpool] = None) -> None:
+        if _task_test_spool is not None and type(_task_test_spool) is not _TaskTestOutputSpool:
+            raise AuditError("fd capture output spool type drift")
+        self._task_test_spool = _task_test_spool
         self.state, self.restored, self.result = "NEW", False, None
         self._failures: set[str] = set()
         self._slots = self._flags = self._witnesses = None
@@ -41790,6 +43516,8 @@ class _StrictProcessFDCapture:
                 try:
                     self._hashes[fd].update(payload)
                     self._counts[fd] = count
+                    if self._task_test_spool is not None:
+                        self._task_test_spool._write_channel(fd, payload)
                 except Exception:
                     self._fail("hash-update-failed")
                     discard = True
@@ -41812,6 +43540,8 @@ class _StrictProcessFDCapture:
             raise AuditError("fd capture is already active")
         self._locked = True
         try:
+            if self._task_test_spool is not None:
+                self._task_test_spool._attach(self)
             self._slots = (
                 sys.stdout, sys.__stdout__, sys.stderr, sys.__stderr__
             )
@@ -42045,6 +43775,8 @@ class _StrictProcessFDCapture:
             for read_fd in list(self._reads.values()):
                 self._close_owned_fd(read_fd)
             self._reads.clear()
+            if self._task_test_spool is not None:
+                self._task_test_spool._close_stopped()
             if self._slots is not None and any(
                 actual is not expected for actual, expected in zip(
                     (sys.stdout, sys.__stdout__, sys.stderr, sys.__stderr__),
@@ -42889,19 +44621,18 @@ def _task_test_result(
     capture_evidence: Optional[Mapping[str, Any]] = None,
     terminal_authority: Optional[str] = None,
     execution_lease_acquired_record_digest: Optional[str] = None,
+    output_evidence: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     rows = [dict(row) for row in target_results]
     version = start.get("subject", {}).get("schemaVersion")
     unsigned = {
-        "schemaVersion": (
-            ("qinao.task-test-result.v4" if version.endswith(".v4") else "qinao.task-test-result.v3")
-            if version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4")
-            else (
-                "qinao.task-test-result.v2"
-                if version == "qinao.task-test-subject.v2"
-                else "qinao.task-test-result.v1"
-            )
-        ),
+        "schemaVersion": {
+            "qinao.task-test-subject.v1": "qinao.task-test-result.v1",
+            "qinao.task-test-subject.v2": "qinao.task-test-result.v2",
+            "qinao.task-test-subject.v3": "qinao.task-test-result.v3",
+            "qinao.task-test-subject.v4": "qinao.task-test-result.v4",
+            "qinao.task-test-subject.v5": "qinao.task-test-result.v5",
+        }.get(version, "qinao.task-test-result.v1"),
         "attemptId": start["attemptId"],
         "proofKeyDigest": start["proofKeyDigest"],
         "subjectDigest": start["subjectDigest"],
@@ -42915,6 +44646,7 @@ def _task_test_result(
         "qinao.task-test-subject.v2",
         "qinao.task-test-subject.v3",
         "qinao.task-test-subject.v4",
+        "qinao.task-test-subject.v5",
     ):
         evidence = _validate_task_test_capture_evidence(capture_evidence)
         unsigned.update({
@@ -42925,7 +44657,7 @@ def _task_test_result(
         })
     elif capture_evidence is not None:
         raise AuditError("v1 task test result cannot carry capture evidence")
-    if version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4"):
+    if version in ("qinao.task-test-subject.v3", "qinao.task-test-subject.v4", "qinao.task-test-subject.v5"):
         if terminal_authority not in (
             "incumbent", "closedLeaseRecovery"
         ):
@@ -42941,13 +44673,24 @@ def _task_test_result(
             "executionLeaseAcquiredRecordDigest":
                 execution_lease_acquired_record_digest,
         })
-        if version == "qinao.task-test-subject.v4":
+        if version in ("qinao.task-test-subject.v4", "qinao.task-test-subject.v5"):
             unsigned["scanResultRelationDigest"] = start["subject"]["scanResultRelationDigest"]
     elif (
         terminal_authority is not None
         or execution_lease_acquired_record_digest is not None
     ):
         raise AuditError("legacy task test result has lease authority")
+    if version == "qinao.task-test-subject.v5":
+        output = _validate_task_test_output_evidence(output_evidence)
+        unsigned.update({
+            "outputContractVersion": start["subject"]["outputContractVersion"],
+            "outputContractDigest": start["subject"]["outputContractDigest"],
+            "outputEvidence": output,
+            "outputEvidenceDigest": output["outputEvidenceDigest"],
+        })
+        _validate_task_test_result_output(unsigned)
+    elif output_evidence is not None:
+        raise AuditError("legacy task test result cannot carry retained output")
     return _self_digest_record(unsigned, field="resultDigest")
 
 
@@ -42964,11 +44707,12 @@ def _append_task_test_terminal(
     lease_acquired: Optional[Mapping[str, Any]] = None,
     lease_terminal: Optional[Mapping[str, Any]] = None,
     terminal_authority: Optional[str] = None,
+    output_evidence: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     if live_validator is not None and not callable(live_validator):
         raise AuditError("task test live validator authority drift")
     start_v3 = start.get("subject", {}).get("schemaVersion") in (
-        "qinao.task-test-subject.v3", "qinao.task-test-subject.v4"
+        "qinao.task-test-subject.v3", "qinao.task-test-subject.v4", "qinao.task-test-subject.v5"
     )
     if start_v3:
         if (
@@ -43031,6 +44775,7 @@ def _append_task_test_terminal(
             lease_acquired.get("recordDigest")
             if isinstance(lease_acquired, Mapping) else None
         ),
+        output_evidence=output_evidence,
     )
     exit_code = {
         "task-tests-success": 0,
@@ -43060,6 +44805,7 @@ def _append_task_test_terminal(
         "qinao.task-test-result.v2",
         "qinao.task-test-result.v3",
         "qinao.task-test-result.v4",
+        "qinao.task-test-result.v5",
     ):
         payload.update({
             "captureContractVersion": result["captureContractVersion"],
@@ -43067,13 +44813,17 @@ def _append_task_test_terminal(
             "captureEvidence": result["captureEvidence"],
             "captureEvidenceDigest": result["captureEvidenceDigest"],
         })
-    if result["schemaVersion"] in ("qinao.task-test-result.v3", "qinao.task-test-result.v4"):
+    if result["schemaVersion"] in ("qinao.task-test-result.v3", "qinao.task-test-result.v4", "qinao.task-test-result.v5"):
         payload.update({
             "terminalAuthority": result["terminalAuthority"],
             "executionLeaseAcquiredRecordDigest": result[
                 "executionLeaseAcquiredRecordDigest"
             ],
         })
+    if result["schemaVersion"] == "qinao.task-test-result.v5":
+        payload.update({field: result[field] for field in (
+            "outputContractVersion", "outputContractDigest", "outputEvidence", "outputEvidenceDigest",
+        )})
     recovery_projection = {
         field: payload.get(field)
         for field in (
@@ -43088,6 +44838,11 @@ def _append_task_test_terminal(
             "executionLeaseAcquiredRecordDigest",
         )
     }
+    if result["schemaVersion"] == "qinao.task-test-result.v5":
+        recovery_projection.update({field: payload[field] for field in (
+            "outputContractVersion", "outputContractDigest",
+            "outputEvidence", "outputEvidenceDigest",
+        )})
     recovery_projection_digest = _sha256(
         canonical_json_bytes(recovery_projection)
     )
@@ -43179,6 +44934,10 @@ def _append_task_test_terminal(
                 )
             _verify_self_digest(staged_record)
             _validate_ledger_record_shape(staged_record)
+            if result["schemaVersion"] == "qinao.task-test-result.v5":
+                _verify_task_test_output_evidence_from_recovered(
+                    root, result["outputEvidence"], current, guard=guard,
+                )
             if live_validator is not None:
                 live_validator(transaction, current, staged_record)
             if guard is not None:
@@ -43455,6 +45214,10 @@ def _append_task_test_attempt_start(
             lease_acquired["recordDigest"],
         "subject": subject,
     }
+    if subject["schemaVersion"] == "qinao.task-test-subject.v5":
+        payload.update({field: subject[field] for field in (
+            "outputContractVersion", "outputContractDigest",
+        )})
 
     def validate_state(recovered: Mapping[str, Any]) -> None:
         guard.revalidate()
@@ -43767,7 +45530,10 @@ def _append_task_test_execution_lease_terminal(
     attempt_binding: str,
     attempt_start: Optional[Mapping[str, Any]],
     task_test_terminal: Optional[Mapping[str, Any]],
+    live_validator: Optional[Any] = None,
 ) -> Dict[str, Any]:
+    if live_validator is not None and not callable(live_validator):
+        raise AuditError("task test lease live validator is not callable")
     guard._require_bound_acquired(lease_acquired)
     payload = _task_test_execution_lease_terminal_payload(
         lease_acquired,
@@ -43814,6 +45580,8 @@ def _append_task_test_execution_lease_terminal(
                 )
             _verify_self_digest(staged)
             _validate_ledger_record_shape(staged)
+            if live_validator is not None:
+                live_validator(transaction, current, staged)
 
         lease_terminal_capability = guard._internal_append_capability(
             operation_kind="task-test-execution-lease-terminal",
@@ -43943,12 +45711,17 @@ def _recover_owner_lost_absent_invocation_completions(
     return current
 
 
+class _TaskTestLiveSubjectDrift(AuditError):
+    """An actual live subject check failed, not terminal publication itself."""
+
+
 def execute_task_test_run(
     root: Path,
     *,
     repository: Path,
     targets: Sequence[str],
     context: CommandContext,
+    task_correction_record: Optional[Path] = None,
 ) -> Dict[str, Any]:
     root = _absolute_path_without_symlink_resolution(Path(root))
     repository = _absolute_path_without_symlink_resolution(
@@ -43962,7 +45735,27 @@ def execute_task_test_run(
     try:
         recovered = recover_run_state(root)
         frontier = _task_test_exact_open_frontier(recovered, targets)
-        expected_argv = _task_test_route_argv(root, repository, targets)
+        correction_digest = _task_correction_selector(root, recovered, task_correction_record)
+        basis = _task_completion_basis(frontier, recovered,
+            task_correction_record_digest=correction_digest, live=True)
+        correction_path = Path(basis["correction"]["recordPath"]) if correction_digest is not None else None
+        expected_argv = _task_test_route_argv(root, repository, targets,
+                                             task_correction_record=correction_path)
+        corrected_attempts = [
+            value for value in recovered.get("taskTestAttempts", {}).values()
+            if correction_digest is not None
+            and value.get("start", {}).get("frontierId") == frontier["frontierId"]
+            and value["start"]["sequence"] > basis["correction"]["record"]["sequence"]
+        ]
+        latest_corrected = max(corrected_attempts,
+            key=lambda value: value["start"]["sequence"], default=None)
+        # Select the generation's latest attempt before checking its status,
+        # subject or proof. A later failure can never disappear from selection.
+        if latest_corrected is not None and latest_corrected.get("state") not in (
+                "task-tests-running", "task-tests-success"):
+            raise AuditError("corrected task attempt already exists; no implicit replay")
+        reuse_candidate = (latest_corrected if latest_corrected is not None
+                           and latest_corrected.get("state") == "task-tests-success" else None)
         invocation = _require_mapping(
             outer_start.get("invocation"), "task test invocation"
         )
@@ -44078,19 +45871,21 @@ def execute_task_test_run(
                 raise AuditError(
                     "task test execution lease recovery is indeterminate"
                 )
+            unavailable_capture = _task_test_capture_evidence(None, unavailable=True)
             recovered_terminal = _append_task_test_terminal(
                 root,
                 old_start,
                 status="task-tests-indeterminate-no-replay",
                 target_results=[],
                 reason_code="durable-start-no-terminal",
-                capture_evidence=_task_test_capture_evidence(
-                    None, unavailable=True
-                ),
+                capture_evidence=unavailable_capture,
                 guard=guard,
                 lease_acquired=old_acquired,
                 lease_terminal=old_lease_terminal,
                 terminal_authority="closedLeaseRecovery",
+                output_evidence=(_task_test_output_unavailable(
+                    old_acquired["recordDigest"], unavailable_capture, ["capture-unavailable"],
+                ) if old_version == "qinao.task-test-subject.v5" else None),
             )
             old_owner = recovered.get("sterileInvocations", {}).get(
                 old_start["outerInvocationStartRecordDigest"]
@@ -44132,6 +45927,9 @@ def execute_task_test_run(
                 recovered_terminal,
                 recovered_completion,
             )
+            if old_version == "qinao.task-test-subject.v5":
+                guard.release_unbound()
+                return recovered_terminal
             frontier = _task_test_exact_open_frontier(
                 recovered, targets
             )
@@ -44151,6 +45949,7 @@ def execute_task_test_run(
         base_subject = _task_test_subject_snapshot(
             root, repository, frontier, outer_start, targets,
             recovered=recovered,
+            task_correction_record_digest=correction_digest,
         )
     except BaseException:
         guard.release_unbound()
@@ -44164,6 +45963,8 @@ def execute_task_test_run(
         guard.release_unbound()
         raise
     capture = _StrictProcessFDCapture()
+    spool = None
+    output_evidence = None
     start = None
     subject = None
     plan = None
@@ -44171,6 +45972,9 @@ def execute_task_test_run(
     run_error = None
     reuse_terminal = None
     try:
+        if correction_digest is not None:
+            spool = _TaskTestOutputSpool.prepare(guard, lease_acquired, outer_start)
+            capture = _StrictProcessFDCapture(_task_test_spool=spool)
         with capture:
             try:
                 with _task_test_module_activation(
@@ -44180,7 +45984,7 @@ def execute_task_test_run(
                         targets, base_subject, activation
                     )
                     subject = _task_test_bind_plan(base_subject, plan)
-                    successful = [
+                    successful = [] if correction_digest is not None else [
                         value
                         for value in recovered.get(
                             "taskTestAttempts", {}
@@ -44194,6 +45998,14 @@ def execute_task_test_run(
                             "proofKeyDigest"
                         ) == _task_test_proof_key(subject)
                     ]
+                    if correction_digest is not None and reuse_candidate is not None:
+                        if (reuse_candidate["start"]["subject"]["schemaVersion"] != "qinao.task-test-subject.v5"
+                            or reuse_candidate["start"]["proofKeyDigest"] != _task_test_proof_key(subject)
+                            or reuse_candidate["terminal"]["outputEvidence"]["state"] != "SEALED_COMPLETE"):
+                            raise AuditError("latest corrected success is not an exact reusable proof")
+                        _verify_task_test_output_evidence_from_recovered(root,
+                            reuse_candidate["terminal"]["outputEvidence"], recovered, guard=guard)
+                        successful = [reuse_candidate]
                     if len(successful) > 1:
                         raise AuditError(
                             "task test successful proof is ambiguous"
@@ -44206,6 +46018,8 @@ def execute_task_test_run(
                         start = _append_task_test_attempt_start(
                             root, guard, lease_acquired, subject
                         )
+                        if spool is not None:
+                            spool.bind_attempt(start)
                         drafts = _run_task_test_targets(
                             repository,
                             targets,
@@ -44218,10 +46032,22 @@ def execute_task_test_run(
                 if start is None:
                     raise
                 run_error = error
-    except BaseException:
-        if capture.state == "QUARANTINED":
-            guard.quarantine()
-            raise
+    except BaseException as primary:
+        with guard._lifecycle_lock:
+            if guard._quarantined:
+                raise
+            if capture.state == "QUARANTINED":
+                guard.quarantine()
+                raise
+        if spool is not None:
+            try:
+                spool._close_stopped()
+            except BaseException as cleanup:
+                with guard._lifecycle_lock:
+                    if not guard._quarantined:
+                        guard.quarantine()
+                _retain_git_cleanup_error(primary, cleanup)
+                raise primary from cleanup
         lease_terminal = _append_task_test_execution_lease_terminal(
             root,
             guard,
@@ -44238,10 +46064,15 @@ def execute_task_test_run(
         raise
     try:
         evidence = _task_test_capture_evidence_for_execution(capture.result)
+        if spool is not None:
+            output_evidence = spool.finish(capture.result)
     except BaseException:
-        if capture.state == "QUARANTINED":
-            guard.quarantine()
-            raise
+        with guard._lifecycle_lock:
+            if guard._quarantined:
+                raise
+            if capture.state == "QUARANTINED":
+                guard.quarantine()
+                raise
         lease_terminal = _append_task_test_execution_lease_terminal(
             root, guard, lease_acquired,
             disposition=(
@@ -44266,12 +46097,67 @@ def execute_task_test_run(
         prior_start = recovered["taskTestAttempts"][
             reuse_terminal["attemptId"]
         ]["start"]
-        lease_terminal = _append_task_test_execution_lease_terminal(
-            root, guard, lease_acquired,
-            disposition="reused-success", attempt_binding="reused",
-            attempt_start=prior_start,
-            task_test_terminal=reuse_terminal,
-        )
+
+        def validate_reuse(
+            _transaction: Optional[LedgerTransaction],
+            current: Mapping[str, Any],
+            _staged: Mapping[str, Any],
+        ) -> None:
+            current_frontier = _task_test_exact_open_frontier(current, targets)
+            current_basis = _task_completion_basis(current_frontier, current,
+                task_correction_record_digest=correction_digest, live=True)
+            latest = max((value for value in current.get("taskTestAttempts", {}).values()
+                if value["start"]["frontierId"] == current_frontier["frontierId"]
+                and value["start"]["sequence"] > current_basis["correction"]["record"]["sequence"]),
+                key=lambda value: value["start"]["sequence"], default=None)
+            if latest is None or latest.get("terminal") != reuse_terminal:
+                raise AuditError("task test reuse latest attempt drift")
+            current_base = _task_test_subject_snapshot(
+                root, repository, current_frontier, outer_start, targets,
+                recovered=current, task_correction_record_digest=correction_digest)
+            if _task_test_bind_plan(current_base, plan) != subject:
+                raise AuditError("task test reuse subject drift")
+            _verify_task_test_output_evidence_from_recovered(root,
+                reuse_terminal["outputEvidence"], current, guard=guard)
+
+        try:
+            if correction_digest is not None:
+                validate_reuse(None, recover_run_state(root), {})
+            lease_terminal = _append_task_test_execution_lease_terminal(
+                root, guard, lease_acquired,
+                disposition="reused-success", attempt_binding="reused",
+                attempt_start=prior_start,
+                task_test_terminal=reuse_terminal,
+                live_validator=(validate_reuse if correction_digest is not None else None),
+            )
+        except AuditError:
+            if correction_digest is None:
+                raise
+            current = recover_run_state(root)
+            if current.get("classification") != "complete":
+                raise
+            lease = current.get("taskTestExecutionLeases", {}).get(lease_acquired["leaseId"])
+            if not isinstance(lease, Mapping) or lease.get("acquired") != lease_acquired:
+                raise
+            if lease.get("state") == "reused-success":
+                terminal = lease.get("terminal")
+                expected = _task_test_execution_lease_terminal_payload(lease_acquired,
+                    disposition="reused-success", attempt_binding="reused",
+                    attempt_start=prior_start, task_test_terminal=reuse_terminal)
+                if not isinstance(terminal, Mapping) or any(
+                    terminal.get(key) != value for key, value in expected.items()
+                ):
+                    raise
+                guard.release_after_terminal(terminal)
+                return reuse_terminal
+            if lease.get("state") != "active":
+                raise
+            failed_lease = _append_task_test_execution_lease_terminal(
+                root, guard, lease_acquired,
+                disposition="preactivation-failed", attempt_binding="absent",
+                attempt_start=None, task_test_terminal=None)
+            guard.release_after_terminal(failed_lease)
+            raise
         guard.release_after_terminal(lease_terminal)
         return reuse_terminal
     if start is None or subject is None or plan is None:
@@ -44296,6 +46182,7 @@ def execute_task_test_run(
             live_validator=live_validator, guard=guard,
             lease_acquired=lease_acquired,
             terminal_authority="incumbent",
+            output_evidence=output_evidence,
         )
         lease_terminal = _append_task_test_execution_lease_terminal(
             root, guard, lease_acquired, disposition="completed",
@@ -44331,25 +46218,35 @@ def execute_task_test_run(
             target_results=[], reason_code="runner-indeterminate",
         )
 
+    if output_evidence is not None and output_evidence["state"] != "SEALED_COMPLETE":
+        status = "task-tests-indeterminate-no-replay"
+        reason = "output-retention-incomplete"
+
     def validate_live(
         _transaction: LedgerTransaction,
         current: Mapping[str, Any],
         _staged_record: Mapping[str, Any],
     ) -> None:
-        current_frontier = _task_test_exact_open_frontier(current, targets)
-        current_base = _task_test_subject_snapshot(
-            root, repository, current_frontier, outer_start, targets,
-            recovered=current,
-        )
-        if _task_test_bind_plan(current_base, plan) != subject:
-            raise AuditError("task test terminal subject drift")
+        try:
+            current_frontier = _task_test_exact_open_frontier(current, targets)
+            current_base = _task_test_subject_snapshot(
+                root, repository, current_frontier, outer_start, targets,
+                recovered=current,
+                task_correction_record_digest=correction_digest,
+            )
+            if _task_test_bind_plan(current_base, plan) != subject:
+                raise AuditError("task test terminal subject drift")
+        except AuditError as error:
+            if correction_digest is not None:
+                raise _TaskTestLiveSubjectDrift("task test terminal subject drift") from error
+            raise
 
     try:
         return finish(
             status=status, target_results=target_results,
             reason_code=reason, live_validator=validate_live,
         )
-    except AuditError:
+    except AuditError as error:
         current = recover_run_state(root)
         projected = current.get("taskTestAttempts", {}).get(
             start["attemptId"]
@@ -44365,6 +46262,21 @@ def execute_task_test_run(
             )
             guard.release_after_terminal(lease_terminal)
             return terminal
+        if correction_digest is not None:
+            if isinstance(error, _TaskTestLiveSubjectDrift):
+                return finish(
+                    status="task-tests-indeterminate-no-replay",
+                    target_results=[], reason_code="subject-drift",
+                )
+            # A publication/integrity failure is not evidence of subject drift.
+            # Preserve the real running start for explicit closed recovery.
+            lease_terminal = _append_task_test_execution_lease_terminal(
+                root, guard, lease_acquired, disposition="owner-unwound",
+                attempt_binding="running", attempt_start=start,
+                task_test_terminal=None,
+            )
+            guard.release_after_terminal(lease_terminal)
+            raise
         return finish(
             status="task-tests-indeterminate-no-replay",
             target_results=[], reason_code="subject-drift",
@@ -44377,6 +46289,7 @@ def _command_task_test_run(
     parser = argparse.ArgumentParser(prog="task-test-run")
     parser.add_argument("--root", required=True)
     parser.add_argument("--repository", required=True)
+    parser.add_argument("--task-correction-record")
     parser.add_argument("--target", action="append", default=[])
     options = parser.parse_args(list(argv))
     if context is None or context.sterile_invocation_start is None:
@@ -44388,6 +46301,8 @@ def _command_task_test_run(
         repository=Path(options.repository),
         targets=options.target,
         context=context,
+        task_correction_record=(Path(options.task_correction_record)
+                                if options.task_correction_record is not None else None),
     )
     return terminal["exitCode"]
 
@@ -44403,6 +46318,7 @@ def _command_secret_scan_worktree(
     parser.add_argument("--output")
     parser.add_argument("--declared-path", action="append", default=[])
     parser.add_argument("--bootstrap-diagnostic-root")
+    parser.add_argument("--task-correction-record")
     options = parser.parse_args(list(argv))
     repository = Path(options.repository).resolve()
     ledger_mode = (
@@ -44425,6 +46341,8 @@ def _command_secret_scan_worktree(
             phase=options.phase,
             frontier_id=options.frontier_id,
             context=context,
+            task_correction_record=(Path(options.task_correction_record)
+                                    if options.task_correction_record is not None else None),
         )
         selection = _select_secret_scan_terminal_for_outer(
             Path(options.root), terminal, context
@@ -44433,7 +46351,7 @@ def _command_secret_scan_worktree(
         return selection["terminalExitCode"]
     if any(
         value is not None
-        for value in (options.root, options.phase, options.frontier_id)
+        for value in (options.root, options.phase, options.frontier_id, options.task_correction_record)
     ):
         raise AuditError("secret scan bootstrap route option drift")
     try:
@@ -44628,6 +46546,43 @@ def _sealed_operation_context(
     )
 
 
+def _command_task3_correct(argv: Sequence[str], context: CommandContext) -> int:
+    parser = argparse.ArgumentParser(prog="task3-correct")
+    parser.add_argument("--root", required=True)
+    parser.add_argument("--frontier-id", required=True)
+    parser.add_argument("--original-start-record", required=True)
+    parser.add_argument("--baseline-seal-record", required=True)
+    parser.add_argument("--source-seal-record", required=True)
+    parser.add_argument("--recover-exact", action="store_true")
+    options = parser.parse_args(list(argv))
+    root = _absolute_path_without_symlink_resolution(Path(options.root))
+    with LedgerTransaction(root, operation_kind="task-correction") as transaction:
+        state = transaction.recover()
+        original = _recovered_record_at_path(root, state, options.original_start_record,
+                                            "task correction original start")
+        if original.get("frontierId") != options.frontier_id:
+            raise AuditError("task correction original frontier drift")
+        existing = state.get("taskCorrections", {}).get(options.frontier_id)
+        if options.recover_exact:
+            if (not isinstance(existing, Mapping) or existing.get("state") != "settled"
+                or existing.get("original") != original
+                or existing["record"]["correction"]["baselineSealRecordPath"] != options.baseline_seal_record
+                or existing["record"]["correction"]["sourceSealRecordPath"] != options.source_seal_record):
+                raise AuditError("exact task correction is absent, unsettled or drifted")
+            return _emit_canonical(existing["record"])
+        if existing is not None:
+            raise AuditError("task correction already published; exact reopen only")
+        outer = context.sterile_invocation_start
+        if not isinstance(outer, Mapping):
+            raise AuditError("task correction requires linked outer invocation")
+        value, _baseline, _source = _task3_correction_data(transaction, state, original,
+            options.baseline_seal_record, options.source_seal_record, outer["recordDigest"])
+        record = transaction.append_record(state, "task-correction", original["inputDigest"],
+            value["changedPaths"], "correction-published",
+            {"frontierId": options.frontier_id, "correction": value}, atomic_publication=True)
+        return _emit_canonical(record)
+
+
 def _command_task3_resume(argv: Sequence[str], context: CommandContext) -> int:
     parser = argparse.ArgumentParser(prog="task3-resume")
     parser.add_argument("--root", required=True)
@@ -44742,6 +46697,7 @@ def _command_frontier_complete(argv: Sequence[str]) -> int:
     parser.add_argument("--outcome")
     parser.add_argument("--resource-snapshot-digest")
     parser.add_argument("--result-commit")
+    parser.add_argument("--task-correction-record")
     parser.add_argument("--classify-merge-recovery-from-observation")
     parser.add_argument("--observation-seal-record")
     parser.add_argument("--recover-exact", action="store_true")
@@ -44752,6 +46708,7 @@ def _command_frontier_complete(argv: Sequence[str]) -> int:
             or options.declared_path
             or options.resource_snapshot_digest is not None
             or options.result_commit is not None
+            or options.task_correction_record is not None
             or options.observation_seal_record is None
         ):
             raise AuditError("merge recovery completion option drift")
@@ -44781,6 +46738,8 @@ def _command_frontier_complete(argv: Sequence[str]) -> int:
             resource_snapshot_digest=options.resource_snapshot_digest,
             result_commit=options.result_commit,
             recover_exact=options.recover_exact,
+            task_correction_record=(Path(options.task_correction_record)
+                                    if options.task_correction_record is not None else None),
         )
     )
 
@@ -44803,7 +46762,24 @@ def _command_allocate_capture(argv: Sequence[str]) -> int:
     parser.add_argument("--typed-destination-ref")
     parser.add_argument("--typed-candidate")
     parser.add_argument("--supersede-tainted-outcome")
+    parser.add_argument("--task-correction-record")
     options = parser.parse_args(list(argv))
+    if options.task_correction_record is not None or options.phase == "task3-correction-scan-1":
+        if (options.task_correction_record is None or options.phase != "task3-correction-scan-1"
+            or options.frontier_id is None or options.parent_capture or options.read_only_recovery
+            or any(value is not None for value in (
+                options.parent_attempt, options.blocked_frontier, options.replace_incomplete_capture,
+                options.typed_ref, options.typed_advertised_oid, options.request_manifest,
+                options.typed_expected_ref, options.typed_expected_oid, options.typed_destination_ref,
+                options.typed_candidate, options.supersede_tainted_outcome))):
+            raise AuditError("task correction typed allocation option drift")
+        root = _absolute_path_without_symlink_resolution(Path(options.root))
+        with LedgerTransaction(root, operation_kind="secret-scan-capture-allocation") as transaction:
+            state = transaction.recover()
+            return _emit_canonical(allocate_secret_scan_capture(root,
+                repository=Path(state["identity"]["repository"]), phase=options.phase,
+                frontier_id=options.frontier_id,
+                task_correction_record=Path(options.task_correction_record), _transaction=transaction))
     quarantine_arguments = (
         options.request_manifest,
         options.typed_expected_ref,

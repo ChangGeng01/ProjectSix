@@ -5090,14 +5090,25 @@ def _external_sterile_surface(base, command):
                 copy_function=shutil.copy2,
             )
         repository = AUDIT_PATH.resolve().parents[1]
-        # This is an explicitly simulated clean-index bootstrap fixture.
-        # The real MM overlay must still fail undeclared dirty selection.
-        actual_dirty = module._git_dirty_paths(repository)
-        if not actual_dirty:
-            raise AssertionError("external init dirty negative fixture absent")
+        # Dirty-selection coverage owns real fixture dirt; it never depends on
+        # the developer's current worktree having an incidental MM overlay.
+        dirty_repository = base / "init-dirty-selection-repository"
+        _mkdir(dirty_repository)
+        module._run_git(dirty_repository, ["init", "--quiet"])
+        dirty_tracked = dirty_repository / "tracked.txt"
+        dirty_tracked.write_bytes(b"original tracked fixture\n")
+        module._run_git(dirty_repository, ["add", "tracked.txt"])
+        if module._git_dirty_paths(dirty_repository):
+            raise AssertionError("external init clean selection fixture drift")
+        dirty_tracked.write_bytes(b"changed tracked fixture\n")
+        (dirty_repository / "untracked.txt").write_bytes(b"untracked fixture\n")
+        actual_dirty = module._git_dirty_paths(dirty_repository)
+        if set(actual_dirty) != {b"tracked.txt", b"untracked.txt"}:
+            raise AssertionError("external init owned dirty fixture drift")
         try:
             module.secret_scan_worktree_selection(
-                module._git_index_entries(repository), repository, [], actual_dirty
+                module._git_index_entries(dirty_repository),
+                dirty_repository, [], actual_dirty,
             )
         except module.AuditError as exc:
             if str(exc) != "undeclared dirty path":
@@ -5168,16 +5179,51 @@ def _external_sterile_surface(base, command):
         "PATH": "/usr/bin:/bin",
     }
     if command == "init-run-state":
+        # This positive case simulates the historical B1 HEAD observation, not
+        # bootstrap admission of today's result commit. All immutable object
+        # queries still execute against the real historical B0/B1 objects.
+        historical_b1 = "234df516b14bdfd0b353e5eb39630943f0f19fce"
+        if module._run_git(
+            repository, ["rev-list", "--parents", "-n", "1", historical_b1]
+        ).decode("ascii").strip().split(" ") != [
+            historical_b1, module.BOOTSTRAP_IMPLEMENTATION_COMMIT,
+        ]:
+            raise AssertionError("external init historical B1 parent drift")
+        try:
+            module._build_convergence_bootstrap_context(
+                repository, module.CommandContext()
+            )
+        except module.AuditError as exc:
+            if str(exc) != "bootstrap repair commit parent drift":
+                raise
+        else:
+            raise AssertionError("external init current result HEAD admitted")
         exact_status = (
             "status", "--porcelain=v2", "-z", "--untracked-files=all",
         )
         negative_calls = []
+        negative_head_calls = []
         original_child = module._run_bounded_child
 
         def exact_dirty_status(command_argv, **request):
             normalized = tuple(command_argv)
+            if normalized[-2:] == ("rev-parse", "HEAD"):
+                if (
+                    negative_head_calls
+                    or negative_calls
+                    or normalized.count("-C") != 1
+                    or normalized[normalized.index("-C") + 1] != str(repository)
+                ):
+                    raise AssertionError("external init historical dirty HEAD seam drift")
+                negative_head_calls.append(normalized)
+                return 0, (historical_b1 + "\n").encode("ascii"), b""
             if normalized[-4:] == exact_status:
-                if negative_calls:
+                if (
+                    negative_calls
+                    or len(negative_head_calls) != 1
+                    or normalized.count("-C") != 1
+                    or normalized[normalized.index("-C") + 1] != str(repository)
+                ):
                     raise AssertionError(
                         "external init dirty status seam repeated"
                     )
@@ -5199,17 +5245,29 @@ def _external_sterile_surface(base, command):
                 raise AssertionError(
                     "external init dirty worktree was admitted"
                 )
-        if len(negative_calls) != 1:
+        if len(negative_calls) != 1 or len(negative_head_calls) != 1:
             raise AssertionError("external init dirty status seam missing")
         status_calls = []
+        positive_head_calls = []
 
         def exact_clean_status(command_argv, **request):
             normalized = tuple(command_argv)
+            if normalized[-2:] == ("rev-parse", "HEAD"):
+                if (
+                    positive_head_calls
+                    or status_calls
+                    or normalized.count("-C") != 1
+                    or normalized[normalized.index("-C") + 1] != str(repository)
+                ):
+                    raise AssertionError("external init historical clean HEAD seam drift")
+                positive_head_calls.append(normalized)
+                return 0, (historical_b1 + "\n").encode("ascii"), b""
             if normalized[-4:] == exact_status:
                 if (
                     status_calls
-                    or "-C" not in normalized
-                    or str(repository) not in normalized
+                    or len(positive_head_calls) != 1
+                    or normalized.count("-C") != 1
+                    or normalized[normalized.index("-C") + 1] != str(repository)
                 ):
                     raise AssertionError(
                         "external init exact status seam drift"
@@ -5230,7 +5288,7 @@ def _external_sterile_surface(base, command):
                 "--profile", profile,
                 "--",
             ] + target)
-        if status != 0 or len(status_calls) != 1:
+        if status != 0 or len(status_calls) != 1 or len(positive_head_calls) != 1:
             raise AssertionError("external init exact status seam failed")
         recovered = module.recover_run_state(root)
         if (
@@ -25821,6 +25879,7 @@ class ArchitectureHardeningTests(_ModuleRequired):
             "snapshot-git-state": ("_command_snapshot_git_state", "plain", ""),
             "frontier-start": ("_command_frontier_start", "plain", ""),
             "task3-resume": ("_command_task3_resume", "context", ""),
+            "task3-correct": ("_command_task3_correct", "context", ""),
             "frontier-complete": ("_command_frontier_complete", "plain", ""),
             "recover-captures": ("_command_recover_captures", "plain", ""),
             "protected": ("_command_protected", "plain", ""),
@@ -25893,7 +25952,7 @@ class ArchitectureHardeningTests(_ModuleRequired):
             frozenset(expected_inner_routes),
         )
         expected_surfaces = frozenset(expected_routes)
-        self.assertEqual(len(expected_surfaces), 37)
+        self.assertEqual(len(expected_surfaces), 38)
         self.assertEqual(module.PUBLIC_CLI_SURFACES, expected_surfaces)
         for handler_name, _style, auxiliary_name in expected_routes.values():
             self.assertTrue(callable(getattr(module, handler_name)))
@@ -26362,6 +26421,861 @@ class ArchitectureHardeningTests(_ModuleRequired):
                     "sterile-invocation-completed-linked",
                 ],
             )
+
+
+class TaskTestOutputSpoolTests(_ModuleRequired):
+    """Real private-disk output retention, independently of v5 routing."""
+
+    @contextlib.contextmanager
+    def _unprepared_output_case(self):
+        helper = TaskTestEvidencePhase1Tests()
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = helper._fixture(Path(temporary))
+            outer, _context = helper._append_outer(
+                fixture["root"], fixture["repository"], fixture["argv"])
+            subject = module._task_test_subject_snapshot(
+                fixture["root"], fixture["repository"], fixture["task"], outer, fixture["targets"])
+            guard = module._TaskTestExecutionLeaseGuard.acquire_nonblocking(fixture["root"])
+            try:
+                acquired = module._append_task_test_execution_lease_acquired(
+                    fixture["root"], guard, fixture["task"], outer, outer["invocation"], subject)
+                yield {"fixture": fixture, "helper": helper, "outer": outer,
+                       "guard": guard, "acquired": acquired,
+                       "path": fixture["root"] / "ledger" / "task-test-output" / acquired["recordDigest"]}
+            finally:
+                helper._cleanup_prepared_execution_guard(fixture, guard)
+                helper.doCleanups()
+
+    def test_optional_output_namespace_census_requires_actual_acquired_lease(self):
+        """Break caught: ordinary recovery silently accepts an orphan output lease."""
+        with self._unprepared_output_case() as case:
+            root, path = case["fixture"]["root"], case["path"]
+            self.assertFalse(path.parent.exists())
+            self.assertEqual(module.recover_run_state(root)["classification"], "complete")
+            module._ensure_private_directory(path.parent)
+            module._mkdir_exclusive(path)
+            self.assertEqual(module.recover_run_state(root)["classification"], "complete")
+            orphan_digest = "0" * 64
+            self.assertNotIn(orphan_digest, {
+                row["recordDigest"] for row in module.recover_run_state(root)["records"]})
+            orphan = path.parent / orphan_digest
+            module._mkdir_exclusive(orphan)
+            try:
+                rejected = module.recover_run_state(root)
+                self.assertEqual(rejected["classification"], "indeterminate")
+                self.assertEqual(rejected["reason"], "orphan task test output lease")
+                self.assertIsNone(rejected["nextSequence"])
+                self.assertEqual(rejected["records"], [])
+                self.assertEqual(rejected["openFrontiers"], [])
+                for key in ("captures", "resources", "taskTestExecutionLeases", "taskTestAttempts"):
+                    self.assertEqual(rejected[key], {})
+            finally:
+                orphan.rmdir()
+
+    def test_dependency_free_unfinished_owner_reopens_unavailable(self):
+        """Break caught: dependency-free interrupted preparation cannot be diagnosed."""
+        for variant in ("absent", "empty-directory", "interrupted-owner"):
+            with self.subTest(variant=variant), self._unprepared_output_case() as case:
+                root, path = case["fixture"]["root"], case["path"]
+                if variant == "empty-directory":
+                    module._ensure_private_directory(path.parent)
+                    module._mkdir_exclusive(path)
+                elif variant == "interrupted-owner":
+                    publish = module.write_canonical_exclusive
+                    publication_error = OSError(errno.EIO, "owner publication interrupted")
+
+                    def interrupt_owner(destination, value, **kwargs):
+                        if Path(destination) == path / "owner.json":
+                            module._write_bytes_exclusive(Path(destination), b"{")
+                            raise publication_error
+                        return publish(destination, value, **kwargs)
+
+                    with mock.patch.object(module, "write_canonical_exclusive", side_effect=interrupt_owner):
+                        with self.assertRaises(OSError) as raised:
+                            module._TaskTestOutputSpool.prepare(case["guard"], case["acquired"], case["outer"])
+                    self.assertIs(raised.exception, publication_error)
+                    self.assertEqual((path / "owner.json").read_bytes(), b"{")
+                    for channel in ("stdout", "stderr"):
+                        for suffix in ("raw", "checkpoints"):
+                            self.assertEqual((path / (channel + "." + suffix)).read_bytes(), b"")
+                before = ({entry.name: entry.read_bytes() for entry in path.iterdir()}
+                          if path.exists() else None)
+                case["helper"]._cleanup_prepared_execution_guard(case["fixture"], case["guard"])
+                try:
+                    result = module.reopen_task_test_output(root, case["acquired"]["recordDigest"])
+                except (OSError, module.AuditError) as error:
+                    self.fail("unfinished preparation rejected instead of UNAVAILABLE: " + str(error))
+                self.assertEqual({key: result[key] for key in (
+                    "state", "reasonCodes", "leaseAcquiredRecordDigest", "ownerDigest", "attempt",
+                    "captureEvidenceDigest", "channels", "sealedDigest")}, {
+                        "state": "UNAVAILABLE", "reasonCodes": ["preparation-incomplete"],
+                        "leaseAcquiredRecordDigest": case["acquired"]["recordDigest"],
+                        "ownerDigest": None, "attempt": None, "captureEvidenceDigest": None,
+                        "channels": {"stdout": None, "stderr": None}, "sealedDigest": None,
+                    })
+                digest_fields = {key: value for key, value in result.items() if key != "outputEvidenceDigest"}
+                encoded = (json.dumps(digest_fields, ensure_ascii=False, sort_keys=True,
+                                      separators=(",", ":")) + "\n").encode("utf-8")
+                self.assertEqual(result["outputEvidenceDigest"], hashlib.sha256(encoded).hexdigest())
+                after = ({entry.name: entry.read_bytes() for entry in path.iterdir()}
+                         if path.exists() else None)
+                self.assertEqual(after, before, "diagnostic reopen must not repair preparation")
+
+    def test_owner_absence_with_data_or_dependencies_is_rejected(self):
+        """Break caught: missing owner excuses actual bytes or a sealed attempt dependency."""
+        for suffix in ("raw", "checkpoints"):
+            with self.subTest(data=suffix), self._unprepared_output_case() as case:
+                path = case["path"]
+                module._ensure_private_directory(path.parent)
+                module._mkdir_exclusive(path)
+                module._write_bytes_exclusive(path / ("stdout." + suffix), b"x")
+                case["helper"]._cleanup_prepared_execution_guard(case["fixture"], case["guard"])
+                with self.assertRaises(module.AuditError):
+                    module.reopen_task_test_output(case["fixture"]["root"], case["acquired"]["recordDigest"])
+        with self.subTest(dependency="actual-sealed-attempt"), self._prepared_spool() as case:
+            self._bind_actual_attempt(case)
+            capture = module._StrictProcessFDCapture(_task_test_spool=case["spool"])
+            with capture:
+                pass
+            evidence = case["spool"].finish(capture.result)
+            self.assertEqual(evidence["state"], "SEALED_COMPLETE")
+            path = case["spool"].path
+            self.assertEqual((path / "stdout.raw").read_bytes(), b"")
+            self.assertEqual((path / "stderr.raw").read_bytes(), b"")
+            owner = (path / "owner.json").read_bytes()
+            (path / "owner.json").unlink()
+            try:
+                with self.assertRaises(module.AuditError):
+                    module._reopen_task_test_output_from_recovered(
+                        case["fixture"]["root"], case["acquired"]["recordDigest"],
+                        module.recover_run_state(case["fixture"]["root"]), guard=case["guard"])
+            finally:
+                module._write_bytes_exclusive(path / "owner.json", owner)
+
+    def test_partial_prepare_cleanup_refusal_preserves_primary_and_active_lease(self):
+        """Break caught: unreturned preparation loses its primary and falsely settles ownership."""
+        self.maxDiff = None
+        with tempfile.TemporaryDirectory() as temporary:
+            helper = TaskTestCorrectedV5Tests(methodName="runTest")
+            self.addCleanup(helper.doCleanups)
+            fixture = helper._sentinel_corrected_fixture(Path(temporary))
+            report_path = Path(temporary) / "partial-prepare-refusal.json"
+
+            def child_case():
+                root, repository = fixture["root"], fixture["repository"]
+                argv = helper._corrected_fixture_argv(fixture)
+                outer, context = fixture["helper"]._append_outer(root, repository, argv)
+                guards, writers, prepared, close_faults = [], [], [], []
+                prepare = module._TaskTestOutputSpool.prepare
+                output_open, close = module._OUTPUT_OPEN, module._FD_CLOSE
+                publish = module.write_canonical_exclusive
+                publication_error = OSError(errno.EIO, "owner publication interrupted")
+                close_error = OSError(errno.EIO, "partial preparation writer close refusal")
+
+                def observe_prepare(*args, **kwargs):
+                    guards.append(args[0])
+                    result = prepare(*args, **kwargs)
+                    prepared.append(result)
+                    return result
+
+                def observe_open(name, flags, **kwargs):
+                    fd = output_open(name, flags, **kwargs)
+                    if name == "stdout.raw" and flags & os.O_APPEND:
+                        writers.append(fd)
+                    return fd
+
+                def interrupt_owner(path, value, **kwargs):
+                    if Path(path).name == "owner.json" and Path(path).parent.parent.name == "task-test-output":
+                        module._write_bytes_exclusive(Path(path), b"{")
+                        raise publication_error
+                    return publish(path, value, **kwargs)
+
+                def refuse_close(fd):
+                    if writers and fd == writers[0]:
+                        close_faults.append(fd)
+                        raise close_error
+                    return close(fd)
+
+                primary = None
+                with mock.patch.object(module._TaskTestOutputSpool, "prepare", side_effect=observe_prepare), \
+                        mock.patch.object(module, "_OUTPUT_OPEN", side_effect=observe_open), \
+                        mock.patch.object(module, "write_canonical_exclusive", side_effect=interrupt_owner), \
+                        mock.patch.object(module, "_FD_CLOSE", side_effect=refuse_close):
+                    try:
+                        module._dispatch_command(argv, context=context)
+                    except BaseException as error:
+                        primary = error
+                self.assertEqual(len(guards), 1)
+                cleanup = getattr(primary, "cleanup_errors", [])
+                pending, seen = list(cleanup), set()
+                while pending:
+                    error = pending.pop()
+                    if error is None or id(error) in seen:
+                        continue
+                    seen.add(id(error))
+                    pending.extend([error.__cause__, error.__context__, *getattr(error, "cleanup_errors", [])])
+                state = module.recover_run_state(root)
+                leases = [value for value in state["taskTestExecutionLeases"].values()
+                          if value["acquired"]["outerInvocationStartRecordDigest"] == outer["recordDigest"]]
+                self.assertEqual(len(leases), 1)
+                report = {
+                    "primaryIsPublication": primary is publication_error,
+                    "primary": str(primary), "prepareReturned": bool(prepared),
+                    "writerCount": len(writers), "closeFaultCount": len(close_faults),
+                    "cleanup": [str(error) for error in cleanup],
+                    "cleanupRetainsClose": id(close_error) in seen,
+                    "causeIsCleanup": len(cleanup) == 1 and primary.__cause__ is cleanup[0],
+                    "quarantined": guards[0]._quarantined, "guardClosed": guards[0]._closed,
+                    "leaseState": leases[0]["state"], "hasLeaseTerminal": "terminal" in leases[0],
+                    "newAttemptCount": sum(value["start"]["outerInvocationStartRecordDigest"] == outer["recordDigest"]
+                                           for value in state["taskTestAttempts"].values()),
+                    "outerStillOpen": state["sterileInvocations"][outer["recordDigest"]]["state"] == "open",
+                }
+                payload = json.dumps(report, sort_keys=True).encode("utf-8")
+                self.assertLessEqual(len(payload), 4096)
+                module._write_bytes_exclusive(report_path, payload)
+
+            DirectorySlotHandoffTests._isolated_worker(self, child_case)
+            with report_path.open("rb") as stream:
+                payload = stream.read(4097)
+            self.assertLessEqual(len(payload), 4096)
+            report = json.loads(payload)
+            self.assertEqual(report, {
+                "primaryIsPublication": True, "primary": "[Errno 5] owner publication interrupted",
+                "prepareReturned": False, "writerCount": 1, "closeFaultCount": 1,
+                "cleanup": ["task test output close unproven"], "causeIsCleanup": True,
+                "cleanupRetainsClose": True,
+                "quarantined": True, "guardClosed": False, "leaseState": "active",
+                "hasLeaseTerminal": False, "newAttemptCount": 0, "outerStillOpen": True,
+            })
+
+    def _assert_combined_output_read_rejects_mutation(self, leaf):
+        with self._prepared_spool() as case:
+            self._bind_actual_attempt(case)
+            capture = module._StrictProcessFDCapture(_task_test_spool=case["spool"])
+            with capture:
+                os.write(1, b"original stdout\n")
+                os.write(2, b"original stderr\n")
+            evidence = case["spool"].finish(capture.result)
+            root = case["fixture"]["root"]
+            recovered = module.recover_run_state(root)
+            self.assertEqual(module._reopen_task_test_output_from_recovered(
+                root, case["acquired"]["recordDigest"], recovered, guard=case["guard"]), evidence)
+            target = case["spool"].path / leaf
+            original = target.read_bytes()
+            prefix, mutations = module._task_test_output_prefix, []
+
+            def mutate_after_stdout(path, owner, channel, *args, **kwargs):
+                result = prefix(path, owner, channel, *args, **kwargs)
+                if channel == "stdout" and not mutations:
+                    with target.open("r+b") as stream:
+                        stream.write(bytes([original[0] ^ 1]))
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    mutations.append(leaf)
+                return result
+
+            try:
+                with mock.patch.object(module, "_task_test_output_prefix", side_effect=mutate_after_stdout):
+                    with self.assertRaises(module.AuditError):
+                        module._verify_task_test_output_evidence_from_recovered(
+                            root, evidence, recovered, guard=case["guard"])
+            finally:
+                with target.open("r+b") as stream:
+                    stream.write(original)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                self.assertEqual(mutations, [leaf])
+
+    def test_seal_mutation_during_channel_read_rejects_cached_metadata(self):
+        """Break caught: a cached seal hides actual metadata corruption during combined read."""
+        self._assert_combined_output_read_rejects_mutation("sealed.json")
+
+    def test_stdout_drift_during_stderr_read_rejects_combined_snapshot(self):
+        """Break caught: a completed stdout read hides drift before stderr finishes."""
+        self._assert_combined_output_read_rejects_mutation("stdout.raw")
+
+    def test_stopped_spool_read_eio_with_reader_close_refusal_quarantines(self):
+        """Break caught: failed reader cleanup becomes safe unavailable output or loses its primary."""
+        self.maxDiff = None
+        with tempfile.TemporaryDirectory() as temporary:
+            helper = TaskTestEvidencePhase1Tests()
+            self.addCleanup(helper.doCleanups)
+            fixture = helper._fixture(Path(temporary))
+            report_path = Path(temporary) / "read-close-refusal.json"
+
+            def child_case():
+                root = fixture["root"]
+                outer, _context = helper._append_outer(root, fixture["repository"], fixture["argv"])
+                subject = module._task_test_subject_snapshot(
+                    root, fixture["repository"], fixture["task"], outer, fixture["targets"])
+                guard = module._TaskTestExecutionLeaseGuard.acquire_nonblocking(root)
+                acquired = module._append_task_test_execution_lease_acquired(
+                    root, guard, fixture["task"], outer, outer["invocation"], subject)
+                spool = module._TaskTestOutputSpool.prepare(guard, acquired, outer)
+                case = {"fixture": fixture, "outer": outer, "subject": subject,
+                        "guard": guard, "acquired": acquired, "spool": spool}
+                self._bind_actual_attempt(case)
+                capture = module._StrictProcessFDCapture(_task_test_spool=spool)
+                with capture:
+                    os.write(1, b"checkpoint before read failure\n")
+                self.assertTrue(spool._stopped)
+                self.assertEqual(capture.result["state"], "SEALED")
+                checkpoint = spool.path / "stdout.checkpoints"
+                checkpoint_identity = (checkpoint.stat().st_dev, checkpoint.stat().st_ino)
+                open_file, read, close = module._open_ordinary_file, module._FD_READ, os.close
+                slots, read_faults, close_faults = [], [], []
+                read_error = OSError(errno.EIO, "checkpoint reader EIO")
+                close_error = OSError(errno.EIO, "checkpoint reader close refusal")
+
+                def observe_open(path, **kwargs):
+                    opened = open_file(path, **kwargs)
+                    if Path(path) == checkpoint:
+                        slot, observed = opened[0], opened[-1]
+                        self.assertEqual((observed.st_dev, observed.st_ino), checkpoint_identity)
+                        flags = module._fd_call(slot, module.fcntl.fcntl, module.fcntl.F_GETFL)
+                        self.assertEqual(flags & os.O_ACCMODE, os.O_RDONLY)
+                        slots.append(slot)
+                    return opened
+
+                def fail_read(fd, count):
+                    if slots and fd == slots[0].generation_descriptor and not read_faults:
+                        read_faults.append(fd)
+                        raise read_error
+                    return read(fd, count)
+
+                def refuse_close(fd):
+                    if read_faults and fd == slots[0].generation_descriptor:
+                        close_faults.append(fd)
+                        raise close_error
+                    return close(fd)
+
+                primary, result = None, None
+                with mock.patch.object(module, "_open_ordinary_file", side_effect=observe_open), \
+                        mock.patch.object(module, "_FD_READ", side_effect=fail_read), \
+                        mock.patch.object(os, "close", side_effect=refuse_close):
+                    try:
+                        result = spool.finish(capture.result)
+                    except BaseException as error:
+                        primary = error
+                cleanup = getattr(primary, "cleanup_errors", [])
+                pending, seen = [primary], set()
+                while pending:
+                    error = pending.pop()
+                    if error is None or id(error) in seen:
+                        continue
+                    seen.add(id(error))
+                    pending.extend([error.__cause__, error.__context__, *getattr(error, "cleanup_errors", [])])
+                state = module.recover_run_state(root)
+                leases = [value for value in state["taskTestExecutionLeases"].values()
+                          if value["acquired"]["recordDigest"] == acquired["recordDigest"]]
+                self.assertEqual(len(leases), 1)
+                report = {
+                    "returnedEvidence": result is not None, "readFaultCount": len(read_faults),
+                    "closeFaultCount": len(close_faults), "readErrorRetained": id(read_error) in seen,
+                    "cleanupCount": len(cleanup),
+                    "cleanupRetainsClose": any(error.__cause__ is close_error for error in cleanup),
+                    "causeIsCleanup": len(cleanup) == 1 and primary.__cause__ is cleanup[0],
+                    "readerPhase": slots[0].phase if slots else None,
+                    "quarantined": guard._quarantined, "guardClosed": guard._closed,
+                    "leaseState": leases[0]["state"], "hasLeaseTerminal": "terminal" in leases[0],
+                }
+                payload = json.dumps(report, sort_keys=True).encode("utf-8")
+                self.assertLessEqual(len(payload), 4096)
+                module._write_bytes_exclusive(report_path, payload)
+                # No context manager releases the guard: kernel exit owns
+                # the uncertain read slot and the quarantined lease here.
+
+            DirectorySlotHandoffTests._isolated_worker(self, child_case)
+            with report_path.open("rb") as stream:
+                payload = stream.read(4097)
+            self.assertLessEqual(len(payload), 4096)
+            self.assertEqual(json.loads(payload), {
+                "returnedEvidence": False, "readFaultCount": 1, "closeFaultCount": 1,
+                "readErrorRetained": True, "cleanupCount": 1, "cleanupRetainsClose": True,
+                "causeIsCleanup": True, "readerPhase": "uncertain", "quarantined": True,
+                "guardClosed": False, "leaseState": "active", "hasLeaseTerminal": False,
+            })
+
+    def test_checkpoint_read_eio_does_not_mask_owner_change_during_reopen(self):
+        """Break caught: retention EIO skips the combined read's integrity boundary."""
+        with self._prepared_spool() as case:
+            self._bind_actual_attempt(case)
+            spool = case["spool"]
+            capture = module._StrictProcessFDCapture(_task_test_spool=spool)
+            with capture:
+                os.write(1, b"real output before concurrent metadata change\n")
+            checkpoint = os.stat(spool.path / "stderr.checkpoints", follow_symlinks=False)
+            owner_path = spool.path / "owner.json"
+            original = owner_path.read_bytes()
+            actual_read, mutations = module._FD_READ, []
+
+            def change_owner_and_fail_read(fd, count):
+                observed = os.fstat(fd)
+                if (not mutations and (observed.st_dev, observed.st_ino)
+                        == (checkpoint.st_dev, checkpoint.st_ino)):
+                    self.assertTrue(spool._stopped)
+                    self.assertEqual(capture.state, "SEALED")
+                    with owner_path.open("r+b") as stream:
+                        stream.write(bytes([original[0] ^ 1]))
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    mutations.append(True)
+                    raise OSError(errno.EIO, "checkpoint EIO after actual owner mutation")
+                return actual_read(fd, count)
+
+            try:
+                with mock.patch.object(module, "_FD_READ", side_effect=change_owner_and_fail_read):
+                    with self.assertRaises(module.AuditError):
+                        spool.finish(capture.result)
+            finally:
+                with owner_path.open("r+b") as stream:
+                    stream.write(original)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                self.assertEqual(mutations, [True], "the actual read/mutation boundary was not reached")
+
+    def test_preattachment_cleanup_refusal_quarantines_without_safe_lease_terminal(self):
+        """Break caught: uncertain prepared-writer cleanup releases the actual lease."""
+        with tempfile.TemporaryDirectory() as temporary:
+            helper = TaskTestCorrectedV5Tests(methodName="runTest")
+            self.addCleanup(helper.doCleanups)
+            fixture = helper._sentinel_corrected_fixture(Path(temporary))
+            report_path = Path(temporary) / "cleanup-refusal-report.json"
+
+            def child_case():
+                root, repository = fixture["root"], fixture["repository"]
+                argv = helper._corrected_fixture_argv(fixture)
+                outer, context = fixture["helper"]._append_outer(root, repository, argv)
+                prepared, close_faults = [], []
+                real_prepare = module._TaskTestOutputSpool.prepare
+                real_close = module._FD_CLOSE
+
+                def observe_prepare(*args, **kwargs):
+                    spool = real_prepare(*args, **kwargs)
+                    prepared.append(spool)
+                    return spool
+
+                def fail_owned_close(fd):
+                    if prepared and fd == prepared[0]._tokens["stdout"]["raw"].fd:
+                        close_faults.append(fd)
+                        raise OSError(errno.EIO, "owned raw close refusal")
+                    return real_close(fd)
+
+                primary = None
+                with module._StrictProcessFDCapture():
+                    with mock.patch.object(module._TaskTestOutputSpool, "prepare", side_effect=observe_prepare), \
+                            mock.patch.object(module, "_FD_CLOSE", side_effect=fail_owned_close):
+                        try:
+                            module._dispatch_command(argv, context=context)
+                        except module.AuditError as error:
+                            primary = error
+                self.assertIsNotNone(primary, "actual nested capture rejection was swallowed")
+                self.assertEqual(len(prepared), 1)
+                spool = prepared[0]
+                cleanup = getattr(primary, "cleanup_errors", [])
+                state = module.recover_run_state(root)
+                leases = [value for value in state["taskTestExecutionLeases"].values()
+                          if value["acquired"]["outerInvocationStartRecordDigest"] == outer["recordDigest"]]
+                self.assertEqual(len(leases), 1)
+                token = spool._tokens["stdout"]["raw"]
+                report = {
+                    "primary": str(primary), "closeFaultCount": len(close_faults),
+                    "cleanup": [str(error) for error in cleanup],
+                    "causeIsCleanup": len(cleanup) == 1 and primary.__cause__ is cleanup[0],
+                    "quarantined": spool.guard._quarantined,
+                    "unattached": spool._capture is None,
+                    "writerState": spool._ownership[token],
+                    "classification": state["classification"],
+                    "leaseState": leases[0]["state"], "hasLeaseTerminal": "terminal" in leases[0],
+                    "newAttemptCount": sum(value["start"]["outerInvocationStartRecordDigest"] == outer["recordDigest"]
+                                           for value in state["taskTestAttempts"].values()),
+                }
+                payload = json.dumps(report, sort_keys=True).encode("utf-8")
+                self.assertLessEqual(len(payload), 4096)
+                module._write_bytes_exclusive(report_path, payload)
+                # No release/forced close of quarantined ownership: the
+                # existing isolated worker exits and the kernel closes it.
+
+            DirectorySlotHandoffTests._isolated_worker(self, child_case)
+            with report_path.open("rb") as report_file:
+                payload = report_file.read(4097)
+            self.assertLessEqual(len(payload), 4096)
+            self.assertEqual(json.loads(payload), {
+                "primary": "fd capture is already active", "closeFaultCount": 1,
+                "cleanup": ["task test output close unproven"], "causeIsCleanup": True,
+                "quarantined": True, "unattached": True, "writerState": "close-unproven",
+                "classification": "complete", "leaseState": "active", "hasLeaseTerminal": False,
+                "newAttemptCount": 0,
+            })
+
+    @contextlib.contextmanager
+    def _prepared_spool(self):
+        helper = TaskTestEvidencePhase1Tests()
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = helper._fixture(Path(temporary))
+            outer, _context = helper._append_outer(
+                fixture["root"], fixture["repository"], fixture["argv"]
+            )
+            subject = module._task_test_subject_snapshot(
+                fixture["root"], fixture["repository"], fixture["task"],
+                outer, fixture["targets"],
+            )
+            guard = module._TaskTestExecutionLeaseGuard.acquire_nonblocking(fixture["root"])
+            state = {"start": None}
+            try:
+                acquired = module._append_task_test_execution_lease_acquired(
+                    fixture["root"], guard, fixture["task"], outer,
+                    outer["invocation"], subject,
+                )
+                spool = module._TaskTestOutputSpool.prepare(guard, acquired, outer)
+                state.update(fixture=fixture, outer=outer, subject=subject,
+                             guard=guard, acquired=acquired, spool=spool)
+                yield state
+            finally:
+                if state.get("start") is not None:
+                    terminal = module._append_task_test_execution_lease_terminal(
+                        fixture["root"], guard, acquired,
+                        disposition="owner-unwound", attempt_binding="running",
+                        attempt_start=state["start"], task_test_terminal=None,
+                    )
+                    guard.release_after_terminal(terminal)
+                else:
+                    helper._cleanup_prepared_execution_guard(fixture, guard)
+                helper.doCleanups()
+
+    def _bind_actual_attempt(self, case):
+        with module._task_test_module_activation(case["subject"]) as activation:
+            plan, _suite = module._task_test_discover_plan(
+                case["fixture"]["targets"], case["subject"], activation,
+            )
+            subject = module._task_test_bind_plan(case["subject"], plan)
+        case["start"] = module._append_task_test_attempt_start(
+            case["fixture"]["root"], case["guard"], case["acquired"], subject,
+        )
+        case["spool"].bind_attempt(case["start"])
+
+    def test_actual_attempt_seals_exact_bytes_with_zero_stderr(self):
+        """Break caught: a real bound attempt cannot retain a complete seal."""
+        with self._prepared_spool() as case:
+            self._bind_actual_attempt(case)
+            capture = module._StrictProcessFDCapture(_task_test_spool=case["spool"])
+            with capture:
+                os.write(1, b"durable\x00bound\xff\n")
+            evidence = case["spool"].finish(capture.result)
+            self.assertEqual(evidence["state"], "SEALED_COMPLETE")
+            self.assertEqual(evidence["attempt"]["attemptStartRecordDigest"], case["start"]["recordDigest"])
+            sealed = json.loads((case["spool"].path / "sealed.json").read_bytes())
+            self.assertEqual(sealed["captureEvidence"]["stdout"], capture.result["stdout"])
+            self.assertEqual(sealed["channels"]["stderr"]["byteCount"], 0)
+            self.assertEqual(sealed["channels"]["stderr"]["checkpointSequence"], 0)
+            self.assertEqual(sealed["channels"]["stderr"]["sha256"], hashlib.sha256(b"").hexdigest())
+            self.assertEqual((case["spool"].path / "stderr.checkpoints").read_bytes(), b"")
+            reopened = module._reopen_task_test_output_from_recovered(
+                case["fixture"]["root"], case["acquired"]["recordDigest"],
+                module.recover_run_state(case["fixture"]["root"]), guard=case["guard"],
+            )
+            self.assertEqual(reopened, evidence)
+
+    def test_partial_write_and_fsync_faults_preserve_only_committed_bytes(self):
+        """Break caught: short writes lose bytes or I/O faults fabricate a prefix."""
+        for variant in ("short", "zero", "raw-fsync", "checkpoint-partial"):
+            with self.subTest(variant=variant), self._prepared_spool() as case:
+                spool = case["spool"]
+                raw_fd = spool._tokens["stdout"]["raw"].fd
+                journal_fd = spool._tokens["stdout"]["checkpoints"].fd
+                write, fsync = module._FD_WRITE, module._OUTPUT_FSYNC
+                progress = [0]
+
+                def write_fault(fd, payload):
+                    if fd == raw_fd and variant in ("short", "zero"):
+                        progress[0] += 1
+                        if variant == "zero" and progress[0] > 1:
+                            return 0
+                        return write(fd, payload[:2])
+                    if fd == journal_fd and variant == "checkpoint-partial":
+                        progress[0] += 1
+                        if progress[0] == 1:
+                            return write(fd, payload[:13])
+                        raise OSError("injected partial checkpoint write")
+                    return write(fd, payload)
+
+                def fsync_fault(fd):
+                    if fd == raw_fd and variant == "raw-fsync":
+                        raise OSError("injected raw fsync failure")
+                    return fsync(fd)
+
+                capture = module._StrictProcessFDCapture(_task_test_spool=spool)
+                with mock.patch.object(module, "_FD_WRITE", side_effect=write_fault), \
+                        mock.patch.object(module, "_OUTPUT_FSYNC", side_effect=fsync_fault):
+                    with capture:
+                        os.write(1, b"payload\n")
+                evidence = spool.finish(capture.result)
+                prefix = evidence["channels"]["stdout"]
+                self.assertEqual(capture.result["stdout"]["byteCount"], 8)
+                self.assertEqual((spool.path / "stdout.raw").read_bytes(), b"pa" if variant == "zero" else b"payload\n")
+                self.assertEqual(prefix["byteCount"], 8 if variant == "short" else 0)
+                self.assertEqual(prefix["sha256"], hashlib.sha256(b"payload\n" if variant == "short" else b"").hexdigest())
+                if variant == "checkpoint-partial":
+                    self.assertEqual(prefix["journalTailBytes"], 13)
+                    self.assertIn("checkpoint-torn-tail", evidence["reasonCodes"])
+                if variant != "short":
+                    self.assertIn({"zero": "raw-write-failed", "raw-fsync": "raw-fsync-failed",
+                                   "checkpoint-partial": "checkpoint-write-failed"}[variant], evidence["reasonCodes"])
+
+    def test_complete_frame_corruption_is_not_treated_as_torn_tail(self):
+        """Break caught: a corrupt full checkpoint is silently skipped."""
+        with self._prepared_spool() as case:
+            capture = module._StrictProcessFDCapture(_task_test_spool=case["spool"])
+            with capture:
+                os.write(1, b"checkpoint\n")
+            evidence = case["spool"].finish(capture.result)
+            journal = case["spool"].path / "stdout.checkpoints"
+            frame = bytearray(journal.read_bytes())
+            frame[-1] ^= 1
+            journal.write_bytes(frame)
+            with self.assertRaises(module.AuditError):
+                module._verify_task_test_output_evidence_from_recovered(
+                    case["fixture"]["root"], evidence,
+                    module.recover_run_state(case["fixture"]["root"]), guard=case["guard"],
+                )
+
+    def test_raw_observation_mismatch_cannot_publish_seal(self):
+        """Break caught: a complete seal binds raw bytes to a different observation."""
+        with self._prepared_spool() as case:
+            self._bind_actual_attempt(case)
+            capture = module._StrictProcessFDCapture(_task_test_spool=case["spool"])
+            with capture:
+                os.write(1, b"actual\n")
+            changed = dict(capture.result)
+            changed["stdout"] = {"byteCount": 7, "sha256": hashlib.sha256(b"forged\n").hexdigest()}
+            evidence = case["spool"].finish(changed)
+            self.assertEqual(evidence["state"], "DURABLE_PREFIX")
+            self.assertIn("output-content-drift", evidence["reasonCodes"])
+            self.assertFalse((case["spool"].path / "sealed.json").exists())
+            self.assertEqual((case["spool"].path / "stdout.raw").read_bytes(), b"actual\n")
+
+    def test_interrupted_unreferenced_metadata_preserves_prefix_diagnostics(self):
+        """Break caught: a torn metadata publication makes intact prefixes unreadable."""
+        for leaf in ("attempt.json", "sealed.json"):
+            with self.subTest(leaf=leaf), self._prepared_spool() as case:
+                publish = module.write_canonical_exclusive
+
+                def partial_metadata(path, value, **kwargs):
+                    if Path(path).name == leaf:
+                        module._write_bytes_exclusive(Path(path), b"{")
+                        raise OSError("injected interrupted metadata publication")
+                    return publish(path, value, **kwargs)
+
+                capture = module._StrictProcessFDCapture(_task_test_spool=case["spool"])
+                publication_error = None
+                with mock.patch.object(module, "write_canonical_exclusive", side_effect=partial_metadata):
+                    try:
+                        with capture:
+                            os.write(1, b"preserved-before-interruption\n")
+                            self._bind_actual_attempt(case)
+                        result = case["spool"].finish(capture.result)
+                    except (OSError, module.AuditError) as error:
+                        publication_error = error
+                        result = None
+                if leaf == "sealed.json":
+                    self.assertIsNone(publication_error, "safe seal publication failure must return partial evidence")
+                    self.assertEqual(result["state"], "DURABLE_PREFIX")
+                    self.assertIn("metadata-write-failed", result["reasonCodes"])
+                try:
+                    reopened = module._reopen_task_test_output_from_recovered(
+                        case["fixture"]["root"], case["acquired"]["recordDigest"],
+                        module.recover_run_state(case["fixture"]["root"]), guard=case["guard"],
+                    )
+                except module.AuditError:
+                    reopened = {"state": "REJECTED"}
+                self.assertEqual(reopened["state"], "DURABLE_PREFIX")
+                self.assertEqual(reopened["channels"]["stdout"]["byteCount"], 30)
+                if leaf == "attempt.json":
+                    self.assertIsNone(reopened["attempt"])
+                    self.assertIn("attempt-binding-unavailable", reopened["reasonCodes"])
+                else:
+                    self.assertIn("seal-publication-unconfirmed", reopened["reasonCodes"])
+
+    def test_seal_referenced_attempt_metadata_corruption_is_rejected(self):
+        """Break caught: a seal's broken binding is excused as incomplete creation."""
+        with self._prepared_spool() as case:
+            self._bind_actual_attempt(case)
+            capture = module._StrictProcessFDCapture(_task_test_spool=case["spool"])
+            with capture:
+                os.write(1, b"sealed\n")
+            evidence = case["spool"].finish(capture.result)
+            binding = case["spool"].path / "attempt.json"
+            binding.write_bytes(b"{")
+            with self.assertRaises(module.AuditError):
+                module._verify_task_test_output_evidence_from_recovered(
+                    case["fixture"]["root"], evidence,
+                    module.recover_run_state(case["fixture"]["root"]), guard=case["guard"],
+                )
+
+    def test_cached_path_drift_cannot_redirect_attempt_metadata(self):
+        """Break caught: internal cached-path drift changes a lease's destination."""
+        with self._prepared_spool() as case:
+            self._bind_actual_attempt(case)
+            original = case["spool"].path
+            alternate = case["fixture"]["root"].parent / "alternate-output"
+            alternate.mkdir(mode=0o700)
+            capture = module._StrictProcessFDCapture(_task_test_spool=case["spool"])
+            with capture:
+                try:
+                    case["spool"].path = alternate
+                    with self.assertRaises(module.AuditError):
+                        case["spool"].bind_attempt(case["start"])
+                finally:
+                    case["spool"].path = original
+            self.assertFalse((alternate / "attempt.json").exists())
+
+    def test_checkpoint_fsync_failure_does_not_upgrade_acknowledged_prefix(self):
+        """Break caught: a visible but unacknowledged frame is attested as durable."""
+        with self._prepared_spool() as case:
+            spool = case["spool"]
+            checkpoint_fd = spool._tokens["stdout"]["checkpoints"].fd
+            fsync = module._OUTPUT_FSYNC
+
+            def fail_checkpoint(fd):
+                if fd == checkpoint_fd:
+                    raise OSError("injected checkpoint fsync failure")
+                return fsync(fd)
+
+            capture = module._StrictProcessFDCapture(_task_test_spool=spool)
+            with mock.patch.object(module, "_OUTPUT_FSYNC", side_effect=fail_checkpoint):
+                with capture:
+                    os.write(1, b"not-acknowledged\n")
+            evidence = spool.finish(capture.result)
+            self.assertEqual(evidence["state"], "DURABLE_PREFIX")
+            self.assertEqual(evidence["channels"]["stdout"]["byteCount"], 0)
+            self.assertEqual(evidence["channels"]["stdout"]["sha256"], hashlib.sha256(b"").hexdigest())
+            self.assertEqual(evidence["channels"]["stdout"]["availableByteCount"], 17)
+            self.assertIn("checkpoint-fsync-failed", evidence["reasonCodes"])
+            self.assertEqual((spool.path / "stdout.raw").read_bytes(), b"not-acknowledged\n")
+            self.assertEqual((spool.path / "stdout.checkpoints").stat().st_size, 112)
+            verified = module._verify_task_test_output_evidence_from_recovered(
+                case["fixture"]["root"], evidence,
+                module.recover_run_state(case["fixture"]["root"]), guard=case["guard"],
+            )
+            self.assertEqual(verified, evidence)
+
+    def test_output_shape_rejects_extension_and_false_sealed_prefix(self):
+        """Break caught: malformed evidence can be promoted without sealed bytes."""
+        value = module._task_test_output_unavailable("b" * 64, None, ["preparation-incomplete"])
+        validate = getattr(module, "_validate_task_test_output_evidence", lambda row: row)
+        for delta in ({"extra": None}, {"state": "SEALED_COMPLETE", "reasonCodes": []},
+                      {"reasonCodes": ["made-up-reason"]}, {"ownerDigest": True}):
+            changed = {key: item for key, item in value.items() if key != "outputEvidenceDigest"}
+            changed.update(delta)
+            changed["outputEvidenceDigest"] = hashlib.sha256(module.canonical_json_bytes(changed)).hexdigest()
+            with self.subTest(delta=delta), self.assertRaises(module.AuditError):
+                validate(changed)
+        self.assertEqual(validate(value), value)
+
+    def test_spool_close_refuses_active_capture_readers(self):
+        """Break caught: a lifecycle caller closes owned output fds under readers."""
+        with self._prepared_spool() as case:
+            capture = module._StrictProcessFDCapture(_task_test_spool=case["spool"])
+            with capture:
+                with self.assertRaises(module.AuditError):
+                    case["spool"]._close_stopped()
+
+    def test_private_reopen_rejects_replaced_or_linked_raw_file(self):
+        """Break caught: readback follows a substituted inode or another hard link."""
+        with self._prepared_spool() as case:
+            capture = module._StrictProcessFDCapture(_task_test_spool=case["spool"])
+            with capture:
+                os.write(1, b"identity-bound\n")
+            case["spool"].finish(capture.result)
+            raw = case["spool"].path / "stdout.raw"
+            held = case["fixture"]["root"].parent / "held-output-original"
+            raw.rename(held)
+            for kind in ("symlink", "hardlink", "replacement"):
+                if kind == "symlink":
+                    raw.symlink_to(held)
+                elif kind == "hardlink":
+                    os.link(held, raw)
+                else:
+                    raw.write_bytes(b"identity-bound\n")
+                    os.chmod(raw, 0o600)
+                try:
+                    with self.subTest(kind=kind), self.assertRaises(module.AuditError):
+                        module._reopen_task_test_output_from_recovered(
+                            case["fixture"]["root"], case["acquired"]["recordDigest"],
+                            module.recover_run_state(case["fixture"]["root"]), guard=case["guard"],
+                        )
+                finally:
+                    raw.unlink()
+            held.rename(raw)
+
+    def test_reader_bytes_survive_cold_reopen_under_actual_lease(self):
+        """Break caught: capture hashes bytes but never persists their prefix."""
+        helper = TaskTestEvidencePhase1Tests()
+        self.addCleanup(helper.doCleanups)
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = helper._fixture(Path(temporary))
+            outer, _context = helper._append_outer(
+                fixture["root"], fixture["repository"], fixture["argv"]
+            )
+            subject = module._task_test_subject_snapshot(
+                fixture["root"], fixture["repository"], fixture["task"],
+                outer, fixture["targets"],
+            )
+            guard = module._TaskTestExecutionLeaseGuard.acquire_nonblocking(
+                fixture["root"]
+            )
+            try:
+                acquired = module._append_task_test_execution_lease_acquired(
+                    fixture["root"], guard, fixture["task"], outer,
+                    outer["invocation"], subject,
+                )
+                spool_type = getattr(module, "_TaskTestOutputSpool", None)
+                spool = (
+                    spool_type.prepare(guard, acquired, outer)
+                    if spool_type is not None else None
+                )
+                capture = (
+                    module._StrictProcessFDCapture(_task_test_spool=spool)
+                    if spool is not None else module._StrictProcessFDCapture()
+                )
+                stdout = b"spool\x00stdout\xff\n"
+                stderr = b"spool:original traceback\n"
+                with capture:
+                    os.write(1, stdout)
+                    os.write(2, stderr)
+                if spool is not None:
+                    spool.finish(capture.result)
+                path = (
+                    fixture["root"] / "ledger" / "task-test-output"
+                    / acquired["recordDigest"]
+                )
+                self.assertTrue(
+                    (path / "stdout.raw").is_file(),
+                    "captured stdout bytes must survive on private disk",
+                )
+                self.assertEqual((path / "stdout.raw").read_bytes(), stdout)
+                self.assertEqual((path / "stderr.raw").read_bytes(), stderr)
+                self.assertEqual(_mode(path), 0o700)
+                for channel in ("stdout", "stderr"):
+                    self.assertEqual(_mode(path / (channel + ".raw")), 0o600)
+                    self.assertEqual(
+                        (path / (channel + ".checkpoints")).stat().st_size,
+                        112,
+                    )
+            finally:
+                helper._cleanup_prepared_execution_guard(fixture, guard)
+            evidence = module.reopen_task_test_output(
+                fixture["root"], acquired["recordDigest"]
+            )
+            self.assertEqual(evidence["state"], "DURABLE_PREFIX")
+            self.assertIsNone(evidence["attempt"])
+            for channel, expected in (("stdout", stdout), ("stderr", stderr)):
+                self.assertEqual(evidence["channels"][channel]["byteCount"], len(expected))
+                self.assertEqual(
+                    evidence["channels"][channel]["sha256"],
+                    hashlib.sha256(expected).hexdigest(),
+                )
 
 
 class FullRecoveryTests(_ModuleRequired):
@@ -33168,6 +34082,897 @@ class SterileInvocationProducerSliceTests(_ModuleRequired):
                     )
 
 
+class TaskTestCorrectedV5Tests(_ModuleRequired):
+    """Versioned corrected-test contracts; no historical proof conversion."""
+
+    def _sentinel_corrected_fixture(self, base):
+        helper = Task3PostResultCorrectionTests(methodName="runTest")
+        self.addCleanup(helper.doCleanups)
+
+        def add_owned_assertion(fixture, source):
+            sentinel = fixture["root"] / "tmp" / "v5-owned-assertion-failure"
+            sentinel.parent.mkdir(parents=True, exist_ok=True)
+            fixture["failureSentinel"] = sentinel
+            marker = b"    def test_ci_identity(self):\n"
+            self.assertEqual(source.count(marker), 1)
+            assertion = ("        self.assertFalse(pathlib.Path(" + repr(str(sentinel))
+                         + ").exists(), 'owned assertion failure sentinel')\n").encode("utf-8")
+            return source.replace(marker, marker + assertion)
+
+        helper._correction_source_transform = add_owned_assertion
+        return helper._corrected_result_fixture(base)
+
+    def _assert_corrected_terminal_cold(self, fixture, attempt):
+        root = fixture["root"]
+        start = attempt["start"]
+        state = module.recover_run_state(root)
+        self.assertEqual(state["classification"], "complete", state.get("reason"))
+        leases = [value for value in state["taskTestExecutionLeases"].values()
+                  if value["acquired"]["recordDigest"] == start["executionLeaseAcquiredRecordDigest"]]
+        self.assertEqual(len(leases), 1)
+        self.assertEqual(leases[0]["state"], "completed")
+        self.assertEqual(leases[0]["terminal"]["taskTestTerminalRecordDigest"], attempt["terminal"]["recordDigest"])
+        child, cold = fixture["helper"]._cold(fixture)
+        self.assertEqual(child.returncode, 0, child.stderr.decode(errors="replace"))
+        self.assertEqual(cold["classification"], "complete", cold.get("reason"))
+        self.assertEqual(cold["taskTestAttempts"][start["attemptId"]], attempt)
+        self.assertEqual(cold["taskTestAttempts"][fixture["priorAttempt"]["start"]["attemptId"]],
+                         fixture["priorAttempt"])
+
+    @contextlib.contextmanager
+    def _checkpoint_retention_fault(self):
+        real_prepare = module._TaskTestOutputSpool.prepare
+        real_fsync = module._OUTPUT_FSYNC
+        checkpoint_fds = set()
+        failures = []
+
+        def observe_prepare(*args, **kwargs):
+            spool = real_prepare(*args, **kwargs)
+            checkpoint_fds.add(spool._tokens["stderr"]["checkpoints"].fd)
+            return spool
+
+        def fail_checkpoint_fsync(fd):
+            if fd in checkpoint_fds:
+                failures.append(fd)
+                raise OSError(errno.EIO, "owned checkpoint fsync fault")
+            return real_fsync(fd)
+
+        with mock.patch.object(module._TaskTestOutputSpool, "prepare", side_effect=observe_prepare):
+            with mock.patch.object(module, "_OUTPUT_FSYNC", side_effect=fail_checkpoint_fsync):
+                yield failures
+
+    def test_retention_fault_preserves_real_success_and_failure_rows(self):
+        """Break caught: retention failure drops real rows or mislabels assertion failures."""
+        for assertion_fails in (False, True):
+            with self.subTest(assertion_fails=assertion_fails), tempfile.TemporaryDirectory() as temporary:
+                fixture = self._sentinel_corrected_fixture(Path(temporary))
+                if assertion_fails:
+                    fixture["failureSentinel"].write_bytes(b"actual failing condition\n")
+                with self._checkpoint_retention_fault() as failures:
+                    attempt = self._run_corrected_fixture(fixture, expected_exit=2)
+                result = attempt["terminal"]["result"]
+                self.assertTrue(failures, "the actual checkpoint fsync fault was not reached")
+                self.assertEqual(result["status"], "task-tests-indeterminate-no-replay")
+                self.assertEqual(result["reasonCode"], "output-retention-incomplete")
+                self.assertEqual(result["totalTestsRun"], 7)
+                self.assertEqual(len(result["targetResults"]), 7)
+                failed = [row["target"] for row in result["targetResults"] if not row["successful"]]
+                self.assertEqual(failed, ["CIIdentityTests"] if assertion_fails else [])
+                self.assertTrue(all(row["testsRun"] == 1 and len(row["outcomes"]) == 1
+                                    for row in result["targetResults"]))
+                self.assertEqual(result["captureEvidence"]["state"], "SEALED")
+                self.assertEqual(result["outputEvidence"]["state"], "DURABLE_PREFIX")
+                self.assertIn("checkpoint-fsync-failed", result["outputEvidence"]["reasonCodes"])
+                self.assertEqual(result["outputEvidence"]["captureEvidenceDigest"], result["captureEvidenceDigest"])
+                self._assert_corrected_terminal_cold(fixture, attempt)
+
+    def test_corrected_safe_checkpoint_read_eio_preserves_failed_rows(self):
+        """Break caught: safe retention read EIO discards completed real assertion rows."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._sentinel_corrected_fixture(Path(temporary))
+            fixture["failureSentinel"].write_bytes(b"actual failing condition\n")
+            actual_finish = module._TaskTestOutputSpool.finish
+            actual_read = module._FD_READ
+            injections = []
+            spools = []
+
+            def finish_with_checkpoint_eio(spool, capture_result):
+                spools.append(spool)
+                checkpoint = os.stat(spool.path / "stderr.checkpoints", follow_symlinks=False)
+                checkpoint_identity = (checkpoint.st_dev, checkpoint.st_ino)
+
+                def read_checkpoint(fd, count):
+                    observed = os.fstat(fd)
+                    if (not injections and spool._stopped
+                            and (observed.st_dev, observed.st_ino) == checkpoint_identity):
+                        self.assertEqual(spool._capture.state, "SEALED")
+                        self.assertTrue(all(spool._ownership[token] == "closed"
+                                            for tokens in spool._tokens.values()
+                                            for token in tokens.values()))
+                        injections.append(checkpoint_identity)
+                        raise OSError(errno.EIO, "owned stopped checkpoint read fault")
+                    return actual_read(fd, count)
+
+                with mock.patch.object(module, "_FD_READ", side_effect=read_checkpoint):
+                    return actual_finish(spool, capture_result)
+
+            with mock.patch.object(module._TaskTestOutputSpool, "finish", new=finish_with_checkpoint_eio):
+                attempt = self._run_corrected_fixture(fixture, expected_exit=2)
+            self.assertEqual(len(injections), 1, "actual stopped checkpoint read fault was not reached once")
+            self.assertEqual(len(spools), 1)
+            result = attempt["terminal"]["result"]
+            self.assertEqual(result["status"], "task-tests-indeterminate-no-replay")
+            self.assertEqual(result["reasonCode"], "output-retention-incomplete")
+            self.assertEqual(attempt["terminal"]["exitCode"], 2)
+            self.assertEqual(result["totalTestsRun"], 7)
+            self.assertEqual(len(result["targetResults"]), 7)
+            self.assertEqual([row["target"] for row in result["targetResults"] if not row["successful"]],
+                             ["CIIdentityTests"])
+            self.assertTrue(all(row["testsRun"] == 1 and len(row["outcomes"]) == 1
+                                for row in result["targetResults"]))
+            self.assertEqual(result["captureEvidence"]["state"], "SEALED")
+            output = result["outputEvidence"]
+            self.assertEqual(output["state"], "UNAVAILABLE")
+            self.assertEqual(output["reasonCodes"], ["output-reopen-failed"])
+            self.assertEqual(output["captureEvidenceDigest"], result["captureEvidenceDigest"])
+            self.assertEqual(output["leaseAcquiredRecordDigest"],
+                             attempt["start"]["executionLeaseAcquiredRecordDigest"])
+            self.assertIsNone(output["ownerDigest"])
+            self.assertIsNone(output["attempt"])
+            self.assertIsNone(output["sealedDigest"])
+            self.assertEqual(output["channels"], {"stdout": None, "stderr": None})
+            state = module.recover_run_state(fixture["root"])
+            outer = state["sterileInvocations"][fixture["v5Outer"]["recordDigest"]]
+            self.assertEqual(outer["state"], "failed")
+            self.assertEqual(outer["completion"]["exitCode"], 2)
+            self._assert_corrected_terminal_cold(fixture, attempt)
+
+    def test_corrected_capture_slot_drift_preserves_incomplete_evidence(self):
+        """Break caught: real capture failure becomes retained success or invented rows."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._sentinel_corrected_fixture(Path(temporary))
+            actual_run = module._run_task_test_targets
+            injections = []
+            original_slot = sys.__stdout__
+
+            def run_then_drift(*args, **kwargs):
+                drafts = actual_run(*args, **kwargs)
+                sys.__stdout__ = object()
+                injections.append(True)
+                return drafts
+
+            with mock.patch.object(module, "_run_task_test_targets", side_effect=run_then_drift):
+                attempt = self._run_corrected_fixture(fixture, expected_exit=2)
+            self.assertEqual(injections, [True])
+            self.assertIs(sys.__stdout__, original_slot)
+            result = attempt["terminal"]["result"]
+            self.assertEqual(result["reasonCode"], "capture-incomplete")
+            self.assertEqual(result["targetResults"], [])
+            self.assertEqual(result["totalTestsRun"], 0)
+            self.assertEqual(result["captureEvidence"]["state"], "INCOMPLETE")
+            self.assertIn("sys-slot-drift", result["captureEvidence"]["failureCodes"])
+            self.assertIn(result["outputEvidence"]["state"], ("UNAVAILABLE", "DURABLE_PREFIX"))
+            self.assertEqual(result["outputEvidence"]["captureEvidenceDigest"], result["captureEvidenceDigest"])
+            self._assert_corrected_terminal_cold(fixture, attempt)
+
+    def test_corrected_materializer_fault_precedes_actual_retention_fault(self):
+        """Break caught: incomplete retention masks the independently observed runner failure."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._sentinel_corrected_fixture(Path(temporary))
+            with self._checkpoint_retention_fault() as failures:
+                with mock.patch.object(module, "_materialize_task_test_target_results",
+                                       side_effect=module.AuditError("owned combined materializer fault")) as materialize:
+                    attempt = self._run_corrected_fixture(fixture, expected_exit=2)
+            self.assertTrue(failures)
+            self.assertEqual(materialize.call_count, 1)
+            result = attempt["terminal"]["result"]
+            self.assertEqual(result["reasonCode"], "runner-indeterminate")
+            self.assertEqual(result["targetResults"], [])
+            self.assertEqual(result["totalTestsRun"], 0)
+            self.assertEqual(result["captureEvidence"]["state"], "SEALED")
+            self.assertEqual(result["outputEvidence"]["state"], "DURABLE_PREFIX")
+            self.assertIn("checkpoint-fsync-failed", result["outputEvidence"]["reasonCodes"])
+            self._assert_corrected_terminal_cold(fixture, attempt)
+
+    def test_exact_corrected_success_reuse_reopens_prior_output_without_body(self):
+        """Break caught: exact v5 success cannot be reused without a second test attempt."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._sentinel_corrected_fixture(Path(temporary))
+            prior = self._run_corrected_fixture(fixture)
+            root = fixture["root"]
+            state_before = module.recover_run_state(root)
+            prior_directory = root / "ledger/task-test-output" / prior["start"]["executionLeaseAcquiredRecordDigest"]
+            saved = {path: path.read_bytes() for path in prior_directory.iterdir()}
+            argv = self._corrected_fixture_argv(fixture)
+            outer, context = fixture["helper"]._append_outer(root, fixture["repository"], argv)
+            try:
+                with mock.patch.object(module, "_run_task_test_targets",
+                                       side_effect=AssertionError("reuse ran a second test body")) as run:
+                    self.assertEqual(module._dispatch_command(argv, context=context), 0)
+            except module.AuditError as error:
+                self.fail("exact corrected success reuse rejected: " + str(error))
+            self.assertEqual(run.call_count, 0)
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=0)
+            state = module.recover_run_state(root)
+            self.assertEqual(state["classification"], "complete", state.get("reason"))
+            self.assertEqual(state["taskTestAttempts"], state_before["taskTestAttempts"])
+            leases = [value for value in state["taskTestExecutionLeases"].values()
+                      if value["acquired"]["outerInvocationStartRecordDigest"] == outer["recordDigest"]]
+            self.assertEqual(len(leases), 1)
+            lease = leases[0]
+            self.assertEqual(lease["state"], "reused-success")
+            self.assertEqual(lease["terminal"]["attemptStartRecordDigest"], prior["start"]["recordDigest"])
+            self.assertEqual(lease["terminal"]["taskTestTerminalRecordDigest"], prior["terminal"]["recordDigest"])
+            self.assertEqual(module.reopen_task_test_output(root,
+                prior["start"]["executionLeaseAcquiredRecordDigest"]), prior["terminal"]["outputEvidence"])
+            diagnostic = module.reopen_task_test_output(root, lease["acquired"]["recordDigest"])
+            self.assertIsNone(diagnostic["attempt"])
+            self.assertIsNone(diagnostic["sealedDigest"])
+            for path, payload in saved.items():
+                self.assertEqual(path.read_bytes(), payload)
+            child, cold = fixture["helper"]._cold(fixture)
+            self.assertEqual(child.returncode, 0, child.stderr.decode(errors="replace"))
+            self.assertEqual(cold["classification"], "complete", cold.get("reason"))
+            self.assertEqual(cold["taskTestAttempts"], state_before["taskTestAttempts"])
+
+    def test_corrected_reuse_rejects_real_drift_after_activation_cleanup(self):
+        """Break caught: reuse returns old success after its actual live subject changes."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._sentinel_corrected_fixture(Path(temporary))
+            prior = self._run_corrected_fixture(fixture)
+            root, repository = fixture["root"], fixture["repository"]
+            before = module.recover_run_state(root)
+            prior_directory = root / "ledger/task-test-output" / prior["start"]["executionLeaseAcquiredRecordDigest"]
+            saved = {path: path.read_bytes() for path in prior_directory.iterdir()}
+            argv = self._corrected_fixture_argv(fixture)
+            outer, context = fixture["helper"]._append_outer(root, repository, argv)
+            actual_activation = module._task_test_module_activation
+            changed = []
+
+            @contextlib.contextmanager
+            def activate_then_change(*args, **kwargs):
+                with actual_activation(*args, **kwargs) as activation:
+                    yield activation
+                path = repository / "owned-v5-reuse-cleanup-drift"
+                path.write_bytes(b"actual drift after reuse activation cleanup\n")
+                changed.append(path)
+
+            with mock.patch.object(module, "_task_test_module_activation", side_effect=activate_then_change):
+                with mock.patch.object(module, "_run_task_test_targets",
+                                       side_effect=AssertionError("reuse executed another test body")) as run:
+                    with self.assertRaises(module.AuditError):
+                        module._dispatch_command(argv, context=context)
+            self.assertEqual(run.call_count, 0)
+            self.assertEqual(len(changed), 1)
+            self.assertTrue(changed[0].is_file())
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=2)
+            state = module.recover_run_state(root)
+            self.assertEqual(state["classification"], "complete", state.get("reason"))
+            self.assertEqual(state["taskTestAttempts"], before["taskTestAttempts"])
+            leases = [value for value in state["taskTestExecutionLeases"].values()
+                      if value["acquired"]["outerInvocationStartRecordDigest"] == outer["recordDigest"]]
+            self.assertEqual(len(leases), 1)
+            self.assertEqual(leases[0]["state"], "preactivation-failed")
+            self.assertEqual(leases[0]["terminal"]["attemptBinding"], "absent")
+            for path, payload in saved.items():
+                self.assertEqual(path.read_bytes(), payload)
+            child, cold = fixture["helper"]._cold(fixture)
+            self.assertEqual(child.returncode, 0, child.stderr.decode(errors="replace"))
+            self.assertEqual(cold["classification"], "complete", cold.get("reason"))
+            self.assertEqual(cold["taskTestAttempts"], before["taskTestAttempts"])
+
+    def test_corrected_materializer_error_retains_output_without_rows(self):
+        """Break caught: a real post-start materializer failure fabricates or leaves a result."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._sentinel_corrected_fixture(Path(temporary))
+            calls = []
+
+            def fail_materialization(*args):
+                calls.append(args)
+                raise module.AuditError("owned post-start materializer fault")
+
+            with mock.patch.object(module, "_materialize_task_test_target_results", side_effect=fail_materialization):
+                attempt = self._run_corrected_fixture(fixture, expected_exit=2)
+            self.assertEqual(len(calls), 1)
+            result = attempt["terminal"]["result"]
+            self.assertEqual(result["reasonCode"], "runner-indeterminate")
+            self.assertEqual(result["targetResults"], [])
+            self.assertEqual(result["totalTestsRun"], 0)
+            self.assertEqual(result["captureEvidence"]["state"], "SEALED")
+            self.assertEqual(result["outputEvidence"]["state"], "SEALED_COMPLETE")
+            self._assert_corrected_terminal_cold(fixture, attempt)
+
+    def test_corrected_actual_subject_drift_is_not_a_publication_error(self):
+        """Break caught: observed subject drift cannot produce its truthful v5 terminal."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._sentinel_corrected_fixture(Path(temporary))
+            actual_run = module._run_task_test_targets
+            created = []
+
+            def run_then_drift(*args, **kwargs):
+                drafts = actual_run(*args, **kwargs)
+                path = fixture["repository"] / "owned-v5-untracked-drift"
+                path.write_bytes(b"actual subject drift after real target execution\n")
+                created.append(path)
+                return drafts
+
+            with mock.patch.object(module, "_run_task_test_targets", side_effect=run_then_drift):
+                attempt = self._run_corrected_fixture(fixture, expected_exit=2)
+            self.assertEqual(len(created), 1)
+            self.assertTrue(created[0].is_file())
+            result = attempt["terminal"]["result"]
+            self.assertEqual(result["reasonCode"], "subject-drift")
+            self.assertEqual(result["targetResults"], [])
+            self.assertEqual(result["totalTestsRun"], 0)
+            self.assertEqual(result["captureEvidence"]["state"], "SEALED")
+            self.assertEqual(result["outputEvidence"]["state"], "SEALED_COMPLETE")
+            self._assert_corrected_terminal_cold(fixture, attempt)
+
+    def _closed_corrected_attempt(self, fixture, *, output_mode):
+        """Create a real guard-bound start and unwind its lease without a result."""
+        root, repository = fixture["root"], fixture["repository"]
+        argv = self._corrected_fixture_argv(fixture)
+        outer, _context = fixture["helper"]._append_outer(root, repository, argv)
+        targets = fixture["original"]["expectedTests"]
+        base = module._task_test_subject_snapshot(root, repository, fixture["original"],
+            outer, targets, task_correction_record_digest=fixture["correction"]["recordDigest"])
+        guard = module._TaskTestExecutionLeaseGuard.acquire_nonblocking(root)
+        acquired = module._append_task_test_execution_lease_acquired(
+            root, guard, fixture["original"], outer, outer["invocation"], base)
+        spool = None
+        start = None
+        try:
+            if output_mode != "absent":
+                spool = module._TaskTestOutputSpool.prepare(guard, acquired, outer)
+            capture = module._StrictProcessFDCapture(_task_test_spool=spool)
+            with capture:
+                with module._task_test_module_activation(base) as activation:
+                    plan, _suite = module._task_test_discover_plan(targets, base, activation)
+                    subject = module._task_test_bind_plan(base, plan)
+                    start = module._append_task_test_attempt_start(root, guard, acquired, subject)
+                    if spool is not None:
+                        spool.bind_attempt(start)
+                        os.write(1, b"actual prior output\x00\xff\n")
+            if spool is not None:
+                if output_mode == "sealed":
+                    local = spool.finish(capture.result)
+                    self.assertEqual(local["state"], "SEALED_COMPLETE")
+                else:
+                    spool._close_stopped()
+                    self.assertFalse((spool.path / "sealed.json").exists())
+        finally:
+            if spool is not None:
+                spool._close_stopped()
+            terminal = module._append_task_test_execution_lease_terminal(root, guard, acquired,
+                disposition="owner-unwound" if start is not None else "preactivation-failed",
+                attempt_binding="running" if start is not None else "absent",
+                attempt_start=start, task_test_terminal=None)
+            guard.release_after_terminal(terminal)
+        state = module.recover_run_state(root)
+        self.assertEqual(state["classification"], "complete", state.get("reason"))
+        self.assertEqual(state["taskTestAttempts"][start["attemptId"]]["state"], "task-tests-running")
+        return start, acquired, outer
+
+    def test_closed_recovery_never_adopts_absent_prefix_or_local_seal(self):
+        """Break caught: closed v5 recovery either cannot close or upgrades local output/replays."""
+        for output_mode in ("absent", "prefix", "sealed"):
+            with self.subTest(output=output_mode), tempfile.TemporaryDirectory() as temporary:
+                correction_helper = Task3PostResultCorrectionTests(methodName="runTest")
+                self.addCleanup(correction_helper.doCleanups)
+                fixture = correction_helper._corrected_result_fixture(Path(temporary))
+                root = fixture["root"]
+                start, acquired, old_outer = self._closed_corrected_attempt(fixture, output_mode=output_mode)
+                prior = module.recover_run_state(root)
+                lease_count = len(prior["taskTestExecutionLeases"])
+                before = {path: path.read_bytes() for path in (root / "ledger/records").iterdir()}
+                argv = self._corrected_fixture_argv(fixture)
+                outer, context = fixture["helper"]._append_outer(root, fixture["repository"], argv)
+                try:
+                    self.assertEqual(module._dispatch_command(argv, context=context), 2)
+                except module.AuditError as error:
+                    self.fail("genuine v5 closed-lease recovery rejected: " + str(error))
+                module._append_linked_sterile_invocation_completion(root, outer, exit_code=2)
+                state = module.recover_run_state(root)
+                self.assertEqual(state["classification"], "complete", state.get("reason"))
+                attempt = state["taskTestAttempts"][start["attemptId"]]
+                terminal = attempt["terminal"]
+                result = terminal["result"]
+                self.assertEqual(attempt["state"], "task-tests-indeterminate-no-replay")
+                self.assertEqual(result["schemaVersion"], "qinao.task-test-result.v5")
+                self.assertEqual(result["terminalAuthority"], "closedLeaseRecovery")
+                self.assertEqual(result["reasonCode"], "durable-start-no-terminal")
+                self.assertEqual(result["targetResults"], [])
+                self.assertEqual(result["totalTestsRun"], 0)
+                unavailable = module._task_test_capture_evidence(None, unavailable=True)
+                self.assertEqual(result["captureEvidence"], unavailable)
+                expected_output = self._signed({
+                    "schemaVersion": "qinao.task-test-output-evidence.v1",
+                    "outputContractDigest": self._output_digest(),
+                    "leaseAcquiredRecordDigest": acquired["recordDigest"],
+                    "state": "UNAVAILABLE", "reasonCodes": ["capture-unavailable"],
+                    "ownerDigest": None, "attempt": None,
+                    "captureEvidenceDigest": unavailable["captureEvidenceDigest"],
+                    "channels": {"stdout": None, "stderr": None}, "sealedDigest": None,
+                }, "outputEvidenceDigest")
+                self.assertEqual(result["outputEvidence"], expected_output)
+                self.assertEqual(len(state["taskTestExecutionLeases"]), lease_count)
+                self.assertEqual(len(state["taskTestAttempts"]), len(prior["taskTestAttempts"]))
+                self.assertEqual(state["sterileInvocations"][old_outer["recordDigest"]]["state"], "failed")
+                if output_mode != "absent":
+                    diagnostic = module.reopen_task_test_output(root, acquired["recordDigest"])
+                    self.assertEqual(diagnostic["state"],
+                                     "SEALED_COMPLETE" if output_mode == "sealed" else "DURABLE_PREFIX")
+                    self.assertGreater(diagnostic["channels"]["stdout"]["byteCount"], 0)
+                    self.assertNotEqual(diagnostic, result["outputEvidence"])
+                for path, payload in before.items():
+                    self.assertEqual(path.read_bytes(), payload)
+                child, cold = fixture["helper"]._cold(fixture)
+                self.assertEqual(child.returncode, 0, child.stderr.decode(errors="replace"))
+                self.assertEqual(cold["classification"], "complete", cold.get("reason"))
+                self.assertEqual(cold["taskTestAttempts"][start["attemptId"]], attempt)
+
+    @staticmethod
+    def _corrected_fixture_argv(fixture):
+        root, repository = fixture["root"], fixture["repository"]
+        argv = ["task-test-run", "--root", str(root), "--repository", str(repository),
+                "--task-correction-record", str(fixture["correctionPath"])]
+        for target in fixture["original"]["expectedTests"]:
+            argv.extend(["--target", target])
+        return argv
+
+    def _run_corrected_fixture(self, fixture, *, expected_exit=0):
+        """Publish and settle an actual corrected CLI attempt, not a converted row."""
+        root, repository = fixture["root"], fixture["repository"]
+        argv = self._corrected_fixture_argv(fixture)
+        # This fixture counts imports once per independent activation, not
+        # across the earlier immutable v4 execution and this corrected one.
+        builtins.__dict__.pop(fixture["helper"]._IMPORT_WITNESS_KEY, None)
+        outer, context = fixture["helper"]._append_outer(root, repository, argv)
+        stream = _ExternalMatrixStdout()
+        try:
+            with mock.patch.object(module.sys, "stdout", stream):
+                exit_code = module._dispatch_command(argv, context=context)
+        except (module.AuditError, SystemExit) as error:
+            self.fail("genuine corrected task-test CLI rejected: " + str(error))
+        if exit_code != expected_exit:
+            observed = module.recover_run_state(root)
+            diagnostics = []
+            for value in observed.get("taskTestAttempts", {}).values():
+                if value["start"]["outerInvocationStartRecordDigest"] != outer["recordDigest"]:
+                    continue
+                terminal = value.get("terminal", {})
+                stderr_path = (root / "ledger/task-test-output"
+                               / value["start"]["executionLeaseAcquiredRecordDigest"] / "stderr.raw")
+                with stderr_path.open("rb") as retained:
+                    stderr_prefix = retained.read(8192).decode("utf-8", errors="replace")
+                diagnostics.append({"state": value["state"],
+                    "reasonCode": terminal.get("result", {}).get("reasonCode"),
+                    "targetResults": terminal.get("targetResults"),
+                    "retainedStderrFirst8192Bytes": stderr_prefix})
+            self.fail("actual corrected CLI exit " + str(exit_code) + ": "
+                      + json.dumps(diagnostics, ensure_ascii=False, sort_keys=True))
+        module._append_linked_sterile_invocation_completion(root, outer, exit_code=exit_code)
+        state = module.recover_run_state(root)
+        self.assertEqual(state["classification"], "complete", state.get("reason"))
+        attempts = [value for value in state["taskTestAttempts"].values()
+                    if value["start"]["outerInvocationStartRecordDigest"] == outer["recordDigest"]]
+        self.assertEqual(len(attempts), 1)
+        fixture.update(v5Attempt=attempts[0], v5Outer=outer, v5Argv=argv)
+        return attempts[0]
+
+    def test_preattachment_rejection_closes_prepared_output_writers(self):
+        """Break caught: rejected capture entry releases a lease but leaks its spool writers."""
+        with tempfile.TemporaryDirectory() as temporary:
+            correction_helper = Task3PostResultCorrectionTests(methodName="runTest")
+            self.addCleanup(correction_helper.doCleanups)
+            fixture = correction_helper._corrected_result_fixture(Path(temporary))
+            root, repository = fixture["root"], fixture["repository"]
+            argv = self._corrected_fixture_argv(fixture)
+            outer, context = fixture["helper"]._append_outer(root, repository, argv)
+            prepared = []
+            original_prepare = module._TaskTestOutputSpool.prepare
+
+            def observe_prepare(*args, **kwargs):
+                spool = original_prepare(*args, **kwargs)
+                writers = [(token.fd, os.fstat(token.fd).st_dev, os.fstat(token.fd).st_ino)
+                           for channels in spool._tokens.values() for token in channels.values()]
+                prepared.append((spool, writers))
+                return spool
+
+            try:
+                # A real enclosing capture holds the existing process lock;
+                # the runner's second capture rejects before spool attachment.
+                with module._StrictProcessFDCapture():
+                    with mock.patch.object(module._TaskTestOutputSpool, "prepare", side_effect=observe_prepare):
+                        with self.assertRaisesRegex(module.AuditError, "^fd capture is already active$"):
+                            module._dispatch_command(argv, context=context)
+                self.assertEqual(len(prepared), 1)
+                spool, writers = prepared[0]
+                self.assertEqual(len(writers), 4)
+                self.assertIsNone(spool._capture)
+                still_owned = []
+                for fd, device, inode in writers:
+                    try:
+                        current = os.fstat(fd)
+                    except OSError as error:
+                        self.assertEqual(error.errno, errno.EBADF)
+                    else:
+                        if (current.st_dev, current.st_ino) == (device, inode):
+                            still_owned.append(fd)
+                self.assertEqual(still_owned, [], "prepared raw/checkpoint writer descriptors leaked")
+                state = module.recover_run_state(root)
+                self.assertEqual(state["classification"], "complete", state.get("reason"))
+                leases = [value for value in state["taskTestExecutionLeases"].values()
+                          if value["acquired"]["outerInvocationStartRecordDigest"] == outer["recordDigest"]]
+                self.assertEqual(len(leases), 1)
+                self.assertEqual(leases[0]["state"], "preactivation-failed")
+                self.assertEqual(leases[0]["terminal"]["attemptBinding"], "absent")
+            finally:
+                # Test-owned cleanup prevents the deliberately exposed leak
+                # from affecting later cases; this is not the runner fix.
+                for spool, _writers in prepared:
+                    spool._close_stopped()
+
+    def test_genuine_corrected_cli_retains_output_and_recovers_cold(self):
+        """Break caught: a real corrected generation cannot execute and retain v5 proof."""
+        with tempfile.TemporaryDirectory() as temporary:
+            correction_helper = Task3PostResultCorrectionTests(methodName="runTest")
+            self.addCleanup(correction_helper.doCleanups)
+            fixture = correction_helper._corrected_result_fixture(Path(temporary))
+            root = fixture["root"]
+            before = {path: path.read_bytes() for path in (root / "ledger/records").iterdir()}
+            attempt = self._run_corrected_fixture(fixture)
+            start, terminal = attempt["start"], attempt["terminal"]
+            subject, result = start["subject"], terminal["result"]
+            self.assertEqual(subject["schemaVersion"], "qinao.task-test-subject.v5")
+            self.assertEqual(result["schemaVersion"], "qinao.task-test-result.v5")
+            self.assertEqual(subject["executionContractVersion"], 3)
+            self.assertEqual(subject["executionContractDigest"], self._execution_digest())
+            self.assertEqual(subject["scanResultRelation"]["schemaVersion"],
+                             "qinao.task-scan-result-relation.v3")
+            self.assertEqual(subject["scanResultRelation"]["taskCorrectionRecordDigest"],
+                             fixture["correction"]["recordDigest"])
+            self.assertEqual(subject["resultHeadOid"], fixture["resultHead"])
+            self.assertEqual(attempt["state"], "task-tests-success")
+            self.assertEqual(terminal["totalTestsRun"], 7)
+            self.assertEqual([row["target"] for row in terminal["targetResults"]],
+                             fixture["original"]["expectedTests"])
+            self.assertTrue(all(row["successful"] for row in terminal["targetResults"]))
+            output = result["outputEvidence"]
+            lease_digest = start["executionLeaseAcquiredRecordDigest"]
+            self.assertEqual(output["state"], "SEALED_COMPLETE")
+            self.assertEqual(output["attempt"]["attemptStartRecordDigest"], start["recordDigest"])
+            self.assertEqual(module.reopen_task_test_output(root, lease_digest), output)
+            for channel in ("stdout", "stderr"):
+                raw = (root / "ledger/task-test-output" / lease_digest / (channel + ".raw")).read_bytes()
+                observed = {"byteCount": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+                self.assertEqual(result["captureEvidence"][channel], observed)
+                self.assertEqual({key: output["channels"][channel][key] for key in observed}, observed)
+            child, cold = fixture["helper"]._cold(fixture)
+            self.assertEqual(child.returncode, 0, child.stderr.decode(errors="replace"))
+            self.assertEqual(cold["classification"], "complete", cold.get("reason"))
+            self.assertEqual(cold["taskTestAttempts"][start["attemptId"]], attempt)
+            leases = [value for value in cold["taskTestExecutionLeases"].values()
+                      if value["acquired"]["recordDigest"] == lease_digest]
+            self.assertEqual(len(leases), 1)
+            lease = leases[0]
+            self.assertEqual(lease["state"], "completed")
+            self.assertEqual(lease["acquired"]["executionContractVersion"], 3)
+            self.assertEqual(cold["sterileInvocations"][fixture["v5Outer"]["recordDigest"]]["state"],
+                             "complete")
+            self.assertEqual(cold["taskTestAttempts"][fixture["priorAttempt"]["start"]["attemptId"]],
+                             fixture["priorAttempt"])
+            for path, payload in before.items():
+                self.assertEqual(path.read_bytes(), payload)
+
+    @staticmethod
+    def _digest(value):
+        return hashlib.sha256(json.dumps(
+            value, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8") + b"\n").hexdigest()
+
+    @classmethod
+    def _signed(cls, value, field):
+        result = dict(value)
+        result.pop(field, None)
+        result[field] = cls._digest(result)
+        return result
+
+    @classmethod
+    def _execution_digest(cls):
+        return cls._digest({
+            "schemaVersion": "qinao.task-test-execution-contract.v3",
+            "version": 3,
+            "subjectSchemaVersion": "qinao.task-test-subject.v5",
+            "resultSchemaVersion": "qinao.task-test-result.v5",
+            "acquiredOperation": "task-test-execution-lease-acquired",
+            "terminalOperation": "task-test-execution-lease-terminal",
+            "lockName": "ledger/identity.json",
+            "releaseRule": "darwin-flock-close-only-v1",
+            "authorityScope": "cooperative-canonical-root-v1",
+        })
+
+    @classmethod
+    def _output_digest(cls):
+        return cls._digest({
+            "schemaVersion": "qinao.task-test-output-contract.v1",
+            "namespace": "ledger/task-test-output/<leaseAcquiredRecordDigest>",
+            "metadata": "closed-owner-attempt-sealed-evidence-v1",
+            "channels": ["stdout", "stderr"],
+            "raw": "unchanged-bytes-no-merged-order",
+            "chunkBytes": 65536, "maxByteCount": 9007199254740991,
+            "checkpointBytes": 112,
+            "checkpointDomain": "qinao.task-test-output-checkpoint.v1",
+            "genesisDomain": "qinao.task-test-output-genesis.v1",
+            "durability": "raw-fsync-before-checkpoint-append-then-checkpoint-fsync",
+            "seal": "capture-sealed-restored-plus-reopened-exact-raw",
+            "reasonCodes": [
+                "attempt-binding-unavailable", "capture-incomplete",
+                "capture-unavailable", "checkpoint-fsync-failed",
+                "checkpoint-torn-tail", "checkpoint-write-failed",
+                "directory-fsync-failed", "metadata-fsync-failed",
+                "metadata-write-failed", "output-close-unproven",
+                "output-content-drift", "output-identity-drift",
+                "output-limit-exceeded", "output-reader-unproven",
+                "output-reopen-failed", "owner-interrupted",
+                "preparation-incomplete", "raw-fsync-failed",
+                "raw-uncommitted-tail", "raw-write-failed",
+                "seal-publication-unconfirmed", "seal-unavailable",
+            ],
+        })
+
+    def _observed_legacy_result(self, base, *, with_terminal=False):
+        helper = TaskTestEvidencePhase1Tests()
+        self.addCleanup(helper.doCleanups)
+        fixture = helper._fixture(base, variant="outcomes")
+        outer, context = helper._append_outer(
+            fixture["root"], fixture["repository"], fixture["argv"]
+        )
+        self.assertEqual(module._dispatch_command(
+            fixture["argv"], context=context
+        ), 1)
+        module._append_linked_sterile_invocation_completion(
+            fixture["root"], outer, exit_code=1
+        )
+        state = module.recover_run_state(fixture["root"])
+        attempt = next(iter(state["taskTestAttempts"].values()))
+        return attempt["start"], (
+            attempt["terminal"] if with_terminal else attempt["terminal"]["result"]
+        )
+
+    def _retained_row_candidate(self, original):
+        # Shape-only input: actual observation is retained, not backfilled or
+        # published as a conversion of the legacy fixture's ledger history.
+        value = json.loads(json.dumps(original))
+        output = self._signed({
+            "schemaVersion": "qinao.task-test-output-evidence.v1",
+            "outputContractDigest": self._output_digest(),
+            "leaseAcquiredRecordDigest": value["executionLeaseAcquiredRecordDigest"],
+            "ownerDigest": None, "attempt": None,
+            "captureEvidenceDigest": value["captureEvidenceDigest"],
+            "state": "UNAVAILABLE", "reasonCodes": ["preparation-incomplete"],
+            "channels": {"stdout": None, "stderr": None},
+            "sealedDigest": None,
+        }, "outputEvidenceDigest")
+        value.update({
+            "schemaVersion": "qinao.task-test-result.v5",
+            "executionContractVersion": 3,
+            "executionContractDigest": self._execution_digest(),
+            "outputContractVersion": 1,
+            "outputContractDigest": self._output_digest(),
+            "outputEvidence": output,
+            "outputEvidenceDigest": output["outputEvidenceDigest"],
+            "status": "task-tests-indeterminate-no-replay",
+            "reasonCode": "output-retention-incomplete",
+        })
+        return self._signed(value, "resultDigest")
+
+    def test_retention_failure_preserves_real_rows_only_in_v5(self):
+        """Break caught: retention failure discards completed assertion outcomes."""
+        with tempfile.TemporaryDirectory() as temporary:
+            _start, original = self._observed_legacy_result(Path(temporary))
+            candidate = self._retained_row_candidate(original)
+            try:
+                checked = module._validate_task_test_terminal_result(candidate)
+            except module.AuditError as error:
+                self.fail("valid retained-row v5 result rejected: " + str(error))
+            self.assertEqual(checked["totalTestsRun"], 7)
+            self.assertEqual(checked["targetResults"], original["targetResults"])
+            self.assertTrue(any(row["failures"] for row in checked["targetResults"]))
+            for updates in (
+                {"schemaVersion": "qinao.task-test-result.v4"},
+                {"reasonCode": "runner-indeterminate"},
+                {"status": "task-tests-success", "reasonCode": None},
+                {"outputContractDigest": "0" * 64},
+                {"executionContractVersion": 2},
+                {"outputEvidenceDigest": "0" * 64},
+            ):
+                with self.subTest(updates=updates):
+                    bad = self._signed({**candidate, **updates}, "resultDigest")
+                    with self.assertRaises(module.AuditError):
+                        module._validate_task_test_terminal_result(bad)
+            self.assertEqual(
+                module._validate_task_test_terminal_result(original), original
+            )
+
+    def test_v5_constructor_retains_rows_and_output_contract(self):
+        """Break caught: constructor silently falls back to legacy result version."""
+        with tempfile.TemporaryDirectory() as temporary:
+            start, original = self._observed_legacy_result(Path(temporary))
+            candidate = self._retained_row_candidate(original)
+            start = json.loads(json.dumps(start))
+            start["subject"].update({
+                "schemaVersion": "qinao.task-test-subject.v5",
+                "executionContractVersion": 3,
+                "executionContractDigest": self._execution_digest(),
+                "outputContractVersion": 1,
+                "outputContractDigest": self._output_digest(),
+            })
+            try:
+                result = module._task_test_result(
+                    start, status="task-tests-indeterminate-no-replay",
+                    target_results=original["targetResults"],
+                    reason_code="output-retention-incomplete",
+                    capture_evidence=original["captureEvidence"],
+                    terminal_authority="incumbent",
+                    execution_lease_acquired_record_digest=
+                        original["executionLeaseAcquiredRecordDigest"],
+                    output_evidence=candidate["outputEvidence"],
+                )
+            except (TypeError, module.AuditError) as error:
+                self.fail("v5 result constructor rejected output evidence: " + str(error))
+            self.assertEqual(result, candidate)
+            module._validate_task_test_terminal_result(result)
+
+    def test_v5_proof_binds_retention_contract_with_new_domain(self):
+        """Break caught: a hash-only proof is reused as a retained-output proof."""
+        fields = (
+            "runId", "identityDigest", "repository", "branch",
+            "resultHeadOid", "resultTreeOid", "indexTreeOid",
+            "cleanStatusSha256", "localConfigDigest", "protectedWitnessDigest",
+            "frontierId", "frontierStartRecordDigest", "expectedTestsDigest",
+            "cleanScanTerminalRecordDigest", "cleanScanSubjectDigest",
+            "moduleManifestDigest", "argvDigest", "runtimeDigest",
+            "importInventoryDigest", "testPlanDigest", "captureContractVersion",
+            "captureContractDigest", "executionContractVersion",
+            "executionContractDigest", "scanResultRelationDigest",
+            "outputContractVersion", "outputContractDigest",
+        )
+        projection = {name: "fixture:" + name for name in fields}
+        projection.update({
+            "captureContractVersion": 1, "executionContractVersion": 3,
+            "outputContractVersion": 1, "outputContractDigest": self._output_digest(),
+        })
+        subject = {**projection, "schemaVersion": "qinao.task-test-subject.v5"}
+        expected = hashlib.sha256(
+            b"qinao.task-test-proof-key.v5\x00" + json.dumps(
+                projection, ensure_ascii=False, allow_nan=False,
+                separators=(",", ":"), sort_keys=True,
+            ).encode("utf-8") + b"\n"
+        ).hexdigest()
+        self.assertEqual(module._task_test_proof_key(subject), expected)
+        self.assertNotEqual(module._task_test_proof_key({
+            **subject, "outputContractDigest": "0" * 64,
+        }), expected)
+        self.assertNotEqual(module._task_test_proof_key({
+            **subject, "schemaVersion": "qinao.task-test-subject.v4",
+        }), expected)
+
+    def test_v5_subject_start_and_terminal_are_exactly_version_bound(self):
+        """Break caught: v5 fields bypass or cannot reach closed envelope checks."""
+        with tempfile.TemporaryDirectory() as temporary:
+            original_start, original_terminal = self._observed_legacy_result(
+                Path(temporary), with_terminal=True
+            )
+            # These are parser inputs, not a fabricated ledger correction.
+            # Real correction publication/replay is tested by its own fixture.
+            subject = json.loads(json.dumps(original_start["subject"]))
+            relation = dict(subject["scanResultRelation"])
+            for name in ("taskStartDigest", "startingHeadOid", "startingTreeOid"):
+                relation.pop(name)
+            relation.update({
+                "schemaVersion": "qinao.task-scan-result-relation.v3",
+                "mode": "precommit-index-to-result",
+                "taskResumptionRecordDigest": "a" * 64,
+                "taskCorrectionRecordDigest": "b" * 64,
+                "correctionParentOid": "1" * 40,
+                "correctionParentTreeOid": "2" * 40,
+                "originalObservedHeadOid": "3" * 40,
+                "originalObservedTreeOid": "4" * 40,
+                "priorResultRelationDigest": "c" * 64,
+                "cumulativeRawDeltaSha256": "d" * 64,
+                "cumulativePathSetDigest": "e" * 64,
+                "parentOid": "1" * 40,
+            })
+            relation = self._signed(relation, "relationDigest")
+            subject.update({
+                "schemaVersion": "qinao.task-test-subject.v5",
+                "scanResultRelation": relation,
+                "scanResultRelationDigest": relation["relationDigest"],
+                "executionContractVersion": 3,
+                "executionContractDigest": self._execution_digest(),
+                "outputContractVersion": 1,
+                "outputContractDigest": self._output_digest(),
+            })
+            subject = self._signed(subject, "subjectDigest")
+            try:
+                checked = module._validate_task_test_subject(subject)
+            except module.AuditError as error:
+                self.fail("closed v5 correction subject rejected: " + str(error))
+            self.assertEqual(checked["scanResultRelation"], relation)
+            start = self._signed({
+                **original_start, "subject": subject,
+                "inputDigest": subject["subjectDigest"],
+                "subjectDigest": subject["subjectDigest"],
+                "proofKeyDigest": module._task_test_proof_key(subject),
+                "outputContractVersion": 1,
+                "outputContractDigest": self._output_digest(),
+            }, "recordDigest")
+            try:
+                module._validate_ledger_record_shape(start)
+            except module.AuditError as error:
+                self.fail("closed v5 start envelope rejected: " + str(error))
+            result = self._retained_row_candidate(original_terminal["result"])
+            result.update({
+                "subjectDigest": start["subjectDigest"],
+                "proofKeyDigest": start["proofKeyDigest"],
+                "scanResultRelationDigest": relation["relationDigest"],
+            })
+            result = self._signed(result, "resultDigest")
+            terminal = self._signed({
+                **original_terminal, "result": result,
+                "resultRecordDigest": result["resultDigest"],
+                "inputDigest": result["resultDigest"],
+                "invocationStartRecordDigest": start["recordDigest"],
+                "subjectDigest": start["subjectDigest"],
+                "proofKeyDigest": start["proofKeyDigest"],
+                "completionState": "task-tests-indeterminate-no-replay",
+                "exitCode": 2,
+                **{field: result[field] for field in (
+                    "outputContractVersion", "outputContractDigest",
+                    "outputEvidence", "outputEvidenceDigest",
+                )},
+            }, "recordDigest")
+            try:
+                module._validate_ledger_record_shape(terminal)
+            except module.AuditError as error:
+                self.fail("closed v5 terminal envelope rejected: " + str(error))
+            for label, value, validator, changes in (
+                ("subject-output", subject, module._validate_task_test_subject,
+                 {"outputContractVersion": True}),
+                ("subject-capture-bool", subject, module._validate_task_test_subject,
+                 {"captureContractVersion": True}),
+                ("result-capture-bool", result, module._validate_task_test_terminal_result,
+                 {"captureContractVersion": True}),
+                ("subject-downgrade", subject, module._validate_task_test_subject,
+                 {"scanResultRelation": original_start["subject"]["scanResultRelation"],
+                  "scanResultRelationDigest": original_start["subject"]["scanResultRelationDigest"]}),
+                ("start-output", start, module._validate_ledger_record_shape,
+                 {"outputContractDigest": "0" * 64}),
+                ("start-capture-bool", start, module._validate_ledger_record_shape,
+                 {"captureContractVersion": True}),
+                ("terminal-output", terminal, module._validate_ledger_record_shape,
+                 {"outputEvidenceDigest": "0" * 64}),
+                ("terminal-capture-bool", terminal, module._validate_ledger_record_shape,
+                 {"captureContractVersion": True}),
+                ("terminal-exit", terminal, module._validate_ledger_record_shape,
+                 {"exitCode": 0}),
+            ):
+                with self.subTest(case=label):
+                    key = ("subjectDigest" if value is subject else
+                           "resultDigest" if value is result else "recordDigest")
+                    with self.assertRaises(module.AuditError):
+                        validator(self._signed({**value, **changes}, key))
+            for old in (original_start, original_terminal):
+                module._validate_ledger_record_shape(old)
+                with self.assertRaises(module.AuditError):
+                    module._validate_ledger_record_shape(self._signed({
+                        **old, "outputContractVersion": 1,
+                        "outputContractDigest": self._output_digest(),
+                    }, "recordDigest"))
+
+
 class TaskTestEvidencePhase1Tests(_ModuleRequired):
     """Behavioral proof for the typed per-task test-evidence route."""
 
@@ -37938,16 +39743,24 @@ class TaskTestEvidencePhase1Tests(_ModuleRequired):
     def test_process_fd_capture_fault_seams_are_not_public_api(self):
         """Break caught: test fault knobs become caller-controlled capture API."""
 
+        capture_signature = inspect.signature(module._StrictProcessFDCapture)
+        init_signature = inspect.signature(module._StrictProcessFDCapture.__init__)
         self.assertEqual(
-            tuple(inspect.signature(
-                module._StrictProcessFDCapture
-            ).parameters), ()
+            tuple(capture_signature.parameters), ("_task_test_spool",)
         )
         self.assertEqual(
-            tuple(inspect.signature(
-                module._StrictProcessFDCapture.__init__
-            ).parameters), ("self",)
+            tuple(init_signature.parameters), ("self", "_task_test_spool")
         )
+        for signature in (capture_signature, init_signature):
+            parameter = signature.parameters["_task_test_spool"]
+            self.assertIs(parameter.kind, inspect.Parameter.KEYWORD_ONLY)
+            self.assertIsNone(parameter.default)
+        with self.assertRaises(TypeError):
+            module._StrictProcessFDCapture(None)
+        with self.assertRaises(TypeError):
+            module._StrictProcessFDCapture(_faults={})
+        with self.assertRaisesRegex(module.AuditError, "output spool type drift"):
+            module._StrictProcessFDCapture(_task_test_spool=object())
 
     def test_process_fd_capture_preactive_no_result_commits_poison_first(self):
         """Break caught: no-result return unlocks before close poison commits."""
@@ -52158,6 +53971,801 @@ class CompositeAtForkBarrierTests(_ModuleRequired):
                                             fixture["root"], reservation, "InterruptedBeforeNetworkAttempt")
                     self.assertEqual(self._fork_status(), 23)
                 self._fresh_worker(case)
+
+
+class Task3PostResultCorrectionTests(_ModuleRequired):
+    """A failed result remains immutable when a bounded forward repair is admitted."""
+
+    def _failed_generation(self, base):
+        # Reuse only fixture methods, not another class's discovered test suite.
+        helper = Task3RecoveryResumptionTests(methodName="runTest")
+        self.addCleanup(helper.doCleanups)
+        original_builder = helper._repository_with_test_classes
+
+        def failing_repository(directory):
+            repository = original_builder(directory)
+            path = repository / "scripts/test_qinao_convergence_audit.py"
+            source = path.read_bytes()
+            self.assertEqual(source.count(b"self.assertEqual(len(rows), 1)"), 1)
+            path.write_bytes(source.replace(b"self.assertEqual(len(rows), 1)",
+                                            b"self.assertEqual(len(rows), 2)"))
+            module._run_git(repository, ["add", "--", str(path)])
+            module._run_git(repository, ["-c", "user.name=Qinao Test",
+                "-c", "user.email=qinao-test@invalid.local", "commit", "--quiet",
+                "-m", "retain a genuine failing parser expectation"])
+            return repository
+
+        helper._repository_with_test_classes = failing_repository
+        fixture = helper._fixture(base)
+        root, repository = fixture["root"], fixture["repository"]
+        helper._resume(fixture)
+        module._run_git(repository, ["add", "--"] + helper._PATHS)
+        helper._scan(fixture)
+        module._run_git(repository, ["-c", "user.name=Qinao Test",
+            "-c", "user.email=qinao-test@invalid.local", "commit", "--quiet",
+            "-m", "retain failed original result"])
+        argv = helper._task_test_argv(fixture)
+        outer, context = helper._append_outer(root, repository, argv)
+        stream = _ExternalMatrixStdout()
+        with mock.patch.object(module.sys, "stdout", stream):
+            self.assertEqual(module._dispatch_command(argv, context=context), 1)
+        module._append_linked_sterile_invocation_completion(root, outer, exit_code=1)
+        state = module.recover_run_state(root)
+        self.assertEqual(state["classification"], "complete", state.get("reason"))
+        attempts = list(state["taskTestAttempts"].values())
+        self.assertEqual(len(attempts), 1)
+        attempt = attempts[0]
+        self.assertEqual(attempt["state"], "task-tests-failed")
+        self.assertEqual(attempt["start"]["subject"]["schemaVersion"],
+                         "qinao.task-test-subject.v4")
+        self.assertEqual(attempt["terminal"]["totalTestsRun"], 7)
+        self.assertEqual(sum(row["successful"] for row in
+                             attempt["terminal"]["targetResults"]), 6)
+        self.assertEqual(module._run_git(repository,
+            ["status", "--porcelain=v2", "-z", "--untracked-files=all"]), b"")
+        fixture.update(helper=helper, priorState=state, priorAttempt=attempt,
+            priorHead=module._run_git(repository, ["rev-parse", "HEAD"]).decode().strip())
+        return fixture
+
+    def _seal_correction_inputs(self, fixture, *, baseline_changes=None, repair_both=False):
+        root, repository, state = fixture["root"], fixture["repository"], fixture["priorState"]
+        by_digest = {row["recordDigest"]: row for row in state["records"]}
+        attempt = fixture["priorAttempt"]
+        start = attempt["start"]
+        relation = start["subject"]["scanResultRelation"]
+        scan_terminal = by_digest[relation["scanTerminalRecordDigest"]]
+        scan_outer = state["sterileInvocations"][scan_terminal["outerInvocationStartRecordDigest"]]
+        resumed = state["taskResumptions"][fixture["original"]["frontierId"]]
+        resumption_outer = state["sterileInvocations"][
+            resumed["record"]["resumption"]["outerInvocationStartRecordDigest"]]
+        test_outer = state["sterileInvocations"][start["outerInvocationStartRecordDigest"]]
+        lease = next(value for value in state["taskTestExecutionLeases"].values()
+            if value["acquired"]["recordDigest"] == start["executionLeaseAcquiredRecordDigest"])
+        roles = {
+            "original-start.json": fixture["original"],
+            "prior-resumption.json": resumed["record"],
+            "prior-resumption-outer-start.json": resumption_outer["start"],
+            "prior-resumption-outer-complete.json": resumption_outer["completion"],
+            "prior-scan-reservation.json": by_digest[relation["scanReservationRecordDigest"]],
+            "prior-scan-terminal.json": scan_terminal,
+            "prior-scan-outer-start.json": scan_outer["start"],
+            "prior-scan-outer-complete.json": scan_outer["completion"],
+            "prior-attempt-start.json": start,
+            "prior-attempt-terminal.json": attempt["terminal"],
+            "prior-lease-acquired.json": lease["acquired"],
+            "prior-lease-terminal.json": lease["terminal"],
+            "prior-test-outer-start.json": test_outer["start"],
+            "prior-test-outer-complete.json": test_outer["completion"],
+        }
+        payloads = {name: (root / "ledger/records" / ("%016d.json" % row["sequence"])).read_bytes()
+                    for name, row in roles.items()}
+        streams = {
+            "status-v2.bin": ["status", "--porcelain=v2", "-z", "--untracked-files=all"],
+            "index-stage.bin": ["ls-files", "--stage", "-z"],
+            "index-flags.bin": ["ls-files", "-v", "--stage", "-z"],
+            "local-config.bin": ["config", "--local", "--no-includes", "--null", "--show-origin", "--list"],
+            "replace-refs.bin": ["for-each-ref", "--format=%(refname)", "refs/replace/"],
+        }
+        payloads.update({name: module._run_git(repository, argv) for name, argv in streams.items()})
+        payloads["original-index.bin"] = fixture["indexPath"].read_bytes()
+        for label, relative in zip(("audit", "tests"), fixture["helper"]._PATHS):
+            payloads["source-" + label + ".py"] = (repository / relative).read_bytes()
+            self.assertEqual(payloads["source-" + label + ".py"],
+                module._run_git(repository, ["show", "HEAD:" + relative]))
+            self.assertEqual(payloads["source-" + label + ".py"],
+                module._run_git(repository, ["show", ":" + relative]))
+        self.assertEqual(len(payloads), 22)
+        if baseline_changes is not None:
+            baseline_changes(payloads)
+
+        def seal(phase, members):
+            allocation = module.allocate_capture(root, phase,
+                frontier_id=fixture["original"]["frontierId"])
+            for name, payload in members.items():
+                destination = Path(allocation["absolutePath"]) / name
+                mode = 0o644 if name == "original-index.bin" or name.startswith("source-") else 0o600
+                module._write_bytes_exclusive(destination, payload, mode=mode)
+            record = module.seal_capture(root, allocation["captureId"], list(members))
+            return root / "ledger/records" / ("%016d.json" % record["sequence"])
+
+        fixture["baselineSeal"] = seal("task3-correction-baseline", payloads)
+        path = repository / "scripts/test_qinao_convergence_audit.py"
+        repaired = path.read_bytes().replace(b"self.assertEqual(len(rows), 2)",
+                                             b"self.assertEqual(len(rows), 1)")
+        transform = getattr(self, "_correction_source_transform", None)
+        if transform is not None:
+            repaired = transform(fixture, repaired)
+            self.assertIsInstance(repaired, bytes)
+        path.write_bytes(repaired)
+        if repair_both:
+            audit = repository / "scripts/qinao_convergence_audit.py"
+            audit.write_bytes(audit.read_bytes() + b"\n# genuine second correction-file change\n")
+        fixture["sourceSeal"] = seal("task3-correction-source", {
+            "source-" + label + ".py": (repository / relative).read_bytes()
+            for label, relative in zip(("audit", "tests"), fixture["helper"]._PATHS)})
+        fixture["baselinePayloads"] = payloads
+        fixture["correctionArgv"] = ["task3-correct", "--root", str(root),
+            "--frontier-id", fixture["original"]["frontierId"],
+            "--original-start-record", str(fixture["originalPath"]),
+            "--baseline-seal-record", str(fixture["baselineSeal"]),
+            "--source-seal-record", str(fixture["sourceSeal"])]
+
+    def _published_correction_fixture(self, base, *, settle=True):
+        fixture = self._failed_generation(base)
+        self._seal_correction_inputs(fixture)
+        return self._publish_correction(fixture, settle=settle)
+
+    def _publish_correction(self, fixture, *, settle=True):
+        root = fixture["root"]
+        outer, context = fixture["helper"]._append_outer(root, fixture["repository"],
+            fixture["correctionArgv"])
+        stream = _ExternalMatrixStdout()
+        with mock.patch.object(module.sys, "stdout", stream):
+            self.assertEqual(module._dispatch_command(fixture["correctionArgv"], context=context), 0)
+        fixture["correction"] = module.parse_canonical_json(stream.buffer.getvalue())
+        fixture["correctionOuter"] = outer
+        fixture["correctionPath"] = root / "ledger/records" / ("%016d.json" % fixture["correction"]["sequence"])
+        if settle:
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=0)
+        return fixture
+
+    def test_standalone_allocator_requires_exact_correction_selector_and_phase(self):
+        """Break caught: standalone allocation creates untyped/wrong-generation correction evidence."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._published_correction_fixture(Path(temporary))
+            root, repository = fixture["root"], fixture["repository"]
+            module._run_git(repository, ["add", "--"] + fixture["correction"]["correction"]["changedPaths"])
+            argv = ["allocate-capture", "--root", str(root), "--phase", "task3-correction-scan-1",
+                "--frontier-id", fixture["original"]["frontierId"],
+                "--task-correction-record", str(fixture["correctionPath"])]
+            stream = _ExternalMatrixStdout()
+            try:
+                outer, context = fixture["helper"]._append_outer(root, repository, argv)
+                with mock.patch.object(module.sys, "stdout", stream):
+                    self.assertEqual(module._dispatch_command(argv, context=context), 0)
+            except (module.AuditError, SystemExit) as error:
+                self.fail("explicit correction allocation rejected: " + str(error))
+            allocation = module.parse_canonical_json(stream.buffer.getvalue())
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=0)
+            state = module.recover_run_state(root)
+            self.assertEqual(state["classification"], "complete", state.get("reason"))
+            scan = state["captures"][allocation["captureId"]]
+            self.assertEqual(scan["state"], "secret-scan-materialized")
+            self.assertEqual(scan["reservation"]["binding"]["schemaVersion"], "qinao.secret-scan-capture-binding.v3")
+            self.assertEqual(scan["reservation"]["binding"]["taskCorrectionRecordDigest"],
+                             fixture["correction"]["recordDigest"])
+            for invalid in (argv + ["--read-only-recovery"], argv[:-2],
+                            argv[:-1] + [str(fixture["originalPath"])],
+                            ["task3-candidate" if item == "task3-correction-scan-1" else item for item in argv]):
+                outer, context = fixture["helper"]._append_outer(root, repository, invalid)
+                with self.assertRaises(module.AuditError):
+                    module._dispatch_command(invalid, context=context)
+                module._append_linked_sterile_invocation_completion(root, outer, exit_code=2)
+            state = module.recover_run_state(root)
+            self.assertEqual(sum("reservation" in value for value in state["captures"].values()), 2)
+
+    def test_resealed_bad_baselines_reject_and_genuine_two_file_repair_publishes(self):
+        """Break caught: a valid generic seal promotes wrong raw roles or false baseline streams."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._failed_generation(Path(temporary))
+            root, repository = fixture["root"], fixture["repository"]
+            originals = {relative: (repository / relative).read_bytes() for relative in fixture["helper"]._PATHS}
+            mutations = {
+                "wrong-raw-role": lambda data: data.__setitem__("original-start.json", data["prior-resumption.json"]),
+                "nonempty-clean-status": lambda data: data.__setitem__("status-v2.bin", b"? outsider\x00"),
+                "hidden-index-flag": lambda data: data.__setitem__("index-flags.bin", b"h" + data["index-flags.bin"][1:]),
+                "wrong-baseline-source": lambda data: data.__setitem__("source-tests.py", data["source-tests.py"] + b"\n# not R0\n"),
+            }
+            for name, mutation in mutations.items():
+                with self.subTest(baseline=name):
+                    self._seal_correction_inputs(fixture, baseline_changes=mutation)
+                    state = module.recover_run_state(root)
+                    self.assertEqual(state["classification"], "complete", state.get("reason"))
+                    outer, context = fixture["helper"]._append_outer(root, repository, fixture["correctionArgv"])
+                    with self.assertRaises(module.AuditError):
+                        module._dispatch_command(fixture["correctionArgv"], context=context)
+                    module._append_linked_sterile_invocation_completion(root, outer, exit_code=2)
+                    self.assertEqual(module.recover_run_state(root)["taskCorrections"], {})
+                    for relative, payload in originals.items():
+                        (repository / relative).write_bytes(payload)
+            self._seal_correction_inputs(fixture, repair_both=True)
+            self._publish_correction(fixture)
+            self.assertEqual(fixture["correction"]["correction"]["changedPaths"], fixture["helper"]._PATHS)
+            state = module.recover_run_state(root)
+            self.assertEqual(state["classification"], "complete", state.get("reason"))
+            self.assertEqual(state["taskTestAttempts"][fixture["priorAttempt"]["start"]["attemptId"]]["terminal"],
+                             fixture["priorAttempt"]["terminal"])
+
+    def test_exact_reopen_ignores_live_drift_but_cold_record_tampering_fails_closed(self):
+        """Break caught: exact reopen reauthorizes current bytes, or cold authority trusts edited claims."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._published_correction_fixture(Path(temporary))
+            root, repository = fixture["root"], fixture["repository"]
+            path = repository / "scripts/test_qinao_convergence_audit.py"
+            saved_source = path.read_bytes()
+            path.write_bytes(saved_source + b"\n# later live drift, not another generation\n")
+            argv = fixture["correctionArgv"] + ["--recover-exact"]
+            outer, context = fixture["helper"]._append_outer(root, repository, argv)
+            stream = _ExternalMatrixStdout()
+            with mock.patch.object(module.sys, "stdout", stream):
+                self.assertEqual(module._dispatch_command(argv, context=context), 0)
+            self.assertEqual(module.parse_canonical_json(stream.buffer.getvalue()), fixture["correction"])
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=0)
+            path.write_bytes(saved_source)
+            outer, context = fixture["helper"]._append_outer(root, repository, fixture["correctionArgv"])
+            with self.assertRaises(module.AuditError):
+                module._dispatch_command(fixture["correctionArgv"], context=context)
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=2)
+            record_path = fixture["correctionPath"]
+            saved = record_path.read_bytes()
+            suffix = {member: member.read_bytes() for member in record_path.parent.iterdir() if member.name > record_path.name}
+            for key, replacement in (("generation", True), ("sourceSealRecordDigest", "0" * 64),
+                ("changedPaths", fixture["helper"]._PATHS),
+                ("outerInvocationStartRecordDigest", fixture["resumptionOuter"]["recordDigest"])):
+                with self.subTest(cold_field=key):
+                    changed = copy.deepcopy(fixture["correction"])
+                    changed["correction"][key] = replacement
+                    changed["correction"].pop("correctionDigest")
+                    changed["correction"] = module._self_digest_record(changed["correction"], "correctionDigest")
+                    changed.pop("recordDigest")
+                    changed = module._self_digest_record(changed)
+                    # Generated fixture only: remove descendants so the oracle is
+                    # the correction validator, not an unrelated hash-chain fork.
+                    for member in suffix:
+                        member.unlink()
+                    record_path.write_bytes(module.canonical_json_bytes(changed))
+                    try:
+                        state = module.recover_run_state(root)
+                        self.assertEqual(state["classification"], "indeterminate")
+                        self.assertNotIn("record chain fork", state.get("reason", ""))
+                    finally:
+                        record_path.write_bytes(saved)
+                        for member, payload in suffix.items():
+                            module._write_bytes_exclusive(member, payload)
+            self.assertEqual(module.recover_run_state(root)["classification"], "complete")
+
+    def test_atomic_publication_rechecks_live_source_and_raw_writer_cannot_bypass(self):
+        """Break caught: a valid draft bypasses atomicity or survives actual source drift before rename."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._failed_generation(Path(temporary))
+            self._seal_correction_inputs(fixture)
+            root, repository = fixture["root"], fixture["repository"]
+            outer, context = fixture["helper"]._append_outer(root, repository, fixture["correctionArgv"])
+            captured = {}
+            real_writer = module.LedgerTransaction.write_record_atomic
+
+            def retain_unpublished(transaction, sequence, record, **kwargs):
+                if record.get("operationKind") == "task-correction":
+                    captured.update(copy.deepcopy(record))
+                    raise KeyboardInterrupt("retain genuine uncommitted correction draft")
+                return real_writer(transaction, sequence, record, **kwargs)
+
+            with mock.patch.object(module.LedgerTransaction, "write_record_atomic", retain_unpublished):
+                with self.assertRaises(KeyboardInterrupt):
+                    module._dispatch_command(fixture["correctionArgv"], context=context)
+            self.assertEqual(captured["correction"]["changedPaths"], ["scripts/test_qinao_convergence_audit.py"])
+            before = module.recover_run_state(root)["records"]
+            with module.LedgerTransaction(root, operation_kind="task-correction") as transaction:
+                with self.assertRaisesRegex(module.AuditError, "requires atomic"):
+                    transaction.write_record(captured["sequence"], captured)
+            real_hit = module.DurabilityFaults.hit
+            hit = []
+
+            def drift(faults, boundary, kind, subject=""):
+                real_hit(faults, boundary, kind, subject)
+                if boundary == "record-stage-parent-fsync" and kind == "task-correction" and not hit:
+                    hit.append(boundary)
+                    path = repository / "scripts/test_qinao_convergence_audit.py"
+                    path.write_bytes(path.read_bytes() + b"\n# changed after draft validation\n")
+
+            with mock.patch.object(module.DurabilityFaults, "hit", drift):
+                with self.assertRaises(module.AuditError):
+                    module._dispatch_command(fixture["correctionArgv"], context=context)
+            self.assertEqual(hit, ["record-stage-parent-fsync"])
+            state = module.recover_run_state(root)
+            self.assertEqual(state["classification"], "complete", state.get("reason"))
+            self.assertEqual(state["records"], before)
+            self.assertEqual(state["taskCorrections"], {})
+            self.assertEqual(fixture["indexPath"].read_bytes(), fixture["baselinePayloads"]["original-index.bin"])
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=2)
+
+    def _corrected_result_fixture(self, base):
+        fixture = self._published_correction_fixture(base)
+        root, repository = fixture["root"], fixture["repository"]
+        changed = fixture["correction"]["correction"]["changedPaths"]
+        module._run_git(repository, ["add", "--"] + changed)
+        argv = ["secret-scan-worktree", "--root", str(root), "--repository", str(repository),
+            "--phase", "task3-correction-scan-1", "--frontier-id", fixture["original"]["frontierId"],
+            "--task-correction-record", str(fixture["correctionPath"])]
+        stream = _ExternalMatrixStdout()
+        try:
+            outer, context = fixture["helper"]._append_outer(root, repository, argv)
+            with mock.patch.object(module.sys, "stdout", stream):
+                self.assertEqual(module._dispatch_command(argv, context=context), 0)
+        except (module.AuditError, SystemExit) as error:
+            self.fail("real corrected scan rejected: " + str(error))
+        fixture["correctedScan"] = module.parse_canonical_json(stream.buffer.getvalue())
+        module._append_linked_sterile_invocation_completion(root, outer, exit_code=0)
+        module._run_git(repository, ["-c", "user.name=Qinao Test", "-c", "user.email=qinao-test@invalid.local",
+            "commit", "--quiet", "-m", "one forward correction result"])
+        fixture["resultHead"] = module._run_git(repository, ["rev-parse", "HEAD"]).decode().strip()
+        fixture["resultTree"] = module._run_git(repository, ["rev-parse", "HEAD^{tree}"]).decode().strip()
+        return fixture
+
+    def _successful_corrected_fixture(self, base):
+        fixture = self._corrected_result_fixture(base)
+        runner = TaskTestCorrectedV5Tests(methodName="runTest")
+        self.addCleanup(runner.doCleanups)
+        runner._run_corrected_fixture(fixture)
+        return fixture
+
+    def _run_guarded_corrected_attempt(self, fixture):
+        """Internal-producer fixture: execute a real later attempt, not CLI retry authority."""
+        root, repository = fixture["root"], fixture["repository"]
+        targets = fixture["original"]["expectedTests"]
+        argv = TaskTestCorrectedV5Tests._corrected_fixture_argv(fixture)
+        outer, _context = fixture["helper"]._append_outer(root, repository, argv)
+        digest = fixture["correction"]["recordDigest"]
+        guard = module._TaskTestExecutionLeaseGuard.acquire_nonblocking(root)
+        try:
+            base = module._task_test_subject_snapshot(root, repository, fixture["original"],
+                outer, targets, task_correction_record_digest=digest)
+            acquired = module._append_task_test_execution_lease_acquired(
+                root, guard, fixture["original"], outer, outer["invocation"], base)
+        except BaseException:
+            guard.release_unbound()
+            raise
+        spool, start, terminal = None, None, None
+        try:
+            spool = module._TaskTestOutputSpool.prepare(guard, acquired, outer)
+            capture = module._StrictProcessFDCapture(_task_test_spool=spool)
+            builtins.__dict__.pop(fixture["helper"]._IMPORT_WITNESS_KEY, None)
+            with capture:
+                with module._task_test_module_activation(base) as activation:
+                    plan, suite = module._task_test_discover_plan(targets, base, activation)
+                    subject = module._task_test_bind_plan(base, plan)
+                    start = module._append_task_test_attempt_start(root, guard, acquired, subject)
+                    spool.bind_attempt(start)
+                    drafts = module._run_task_test_targets(repository, targets, subject, plan, suite, activation)
+            evidence = module._task_test_capture_evidence_for_execution(capture.result)
+            output = spool.finish(capture.result)
+            rows = module._materialize_task_test_target_results(drafts, evidence)
+            status = "task-tests-success" if all(row["successful"] for row in rows) else "task-tests-failed"
+
+            def validate_live(_transaction, state, _record):
+                current = module._task_test_subject_snapshot(root, repository, fixture["original"],
+                    outer, targets, recovered=state, task_correction_record_digest=digest)
+                self.assertEqual(module._task_test_bind_plan(current, plan), subject)
+
+            terminal = module._append_task_test_terminal(root, start, status=status,
+                target_results=rows, reason_code=None if status == "task-tests-success" else "test-failure",
+                capture_evidence=evidence, output_evidence=output, live_validator=validate_live,
+                guard=guard, lease_acquired=acquired, terminal_authority="incumbent")
+        finally:
+            if spool is not None:
+                spool._close_stopped()
+            lease_terminal = module._append_task_test_execution_lease_terminal(root, guard, acquired,
+                disposition="completed" if terminal is not None else "owner-unwound" if start is not None else "preactivation-failed",
+                attempt_binding="terminal" if terminal is not None else "running" if start is not None else "absent",
+                attempt_start=start, task_test_terminal=terminal)
+            guard.release_after_terminal(lease_terminal)
+        module._append_linked_sterile_invocation_completion(root, outer, exit_code=terminal["exitCode"])
+        state = module.recover_run_state(root)
+        self.assertEqual(state["classification"], "complete", state.get("reason"))
+        return state["taskTestAttempts"][start["attemptId"]]
+
+    def test_later_real_failure_blocks_old_success_completion_and_runner_reuse(self):
+        """Break caught: matching an older successful subject hides a later same-generation failure."""
+        with tempfile.TemporaryDirectory() as temporary:
+            runner = TaskTestCorrectedV5Tests(methodName="runTest")
+            self.addCleanup(runner.doCleanups)
+            fixture = runner._sentinel_corrected_fixture(Path(temporary))
+            first = runner._run_corrected_fixture(fixture)
+            root, repository = fixture["root"], fixture["repository"]
+            before = {path: path.read_bytes() for path in (root / "ledger/records").iterdir()}
+            fixture["failureSentinel"].write_bytes(b"real later assertion failure\n")
+            later = self._run_guarded_corrected_attempt(fixture)
+            self.assertEqual(later["state"], "task-tests-failed")
+            self.assertEqual(later["terminal"]["totalTestsRun"], 7)
+            self.assertEqual(sum(row["successful"] for row in later["terminal"]["targetResults"]), 6)
+            self.assertEqual(later["terminal"]["result"]["outputEvidence"]["state"], "SEALED_COMPLETE")
+            self.assertGreater(later["start"]["sequence"], first["start"]["sequence"])
+            self.assertNotEqual(later["start"]["subjectDigest"], first["start"]["subjectDigest"])
+            self.assertEqual(later["start"]["proofKeyDigest"], first["start"]["proofKeyDigest"])
+            self.assertEqual(module._run_git(repository, ["status", "--porcelain=v2", "-z", "--untracked-files=all"]), b"")
+            self.assertEqual(module._run_git(repository, ["rev-parse", "HEAD"]).decode().strip(), fixture["resultHead"])
+            child, cold = fixture["helper"]._cold(fixture)
+            self.assertEqual(child.returncode, 0, child.stderr.decode(errors="replace"))
+            self.assertEqual(cold["classification"], "complete", cold.get("reason"))
+            self.assertEqual(cold["taskTestAttempts"][later["start"]["attemptId"]], later)
+            counts = (len(cold["taskTestAttempts"]), len(cold["taskTestExecutionLeases"]))
+            outputs = sorted(path.name for path in (root / "ledger/task-test-output").iterdir())
+            for argv in (self._correction_completion_argv(fixture), runner._corrected_fixture_argv(fixture)):
+                outer, context = fixture["helper"]._append_outer(root, repository, argv)
+                with self.assertRaises(module.AuditError):
+                    module._dispatch_command(argv, context=context)
+                module._append_linked_sterile_invocation_completion(root, outer, exit_code=2)
+            state = module.recover_run_state(root)
+            self.assertEqual(state["classification"], "complete", state.get("reason"))
+            self.assertEqual((len(state["taskTestAttempts"]), len(state["taskTestExecutionLeases"])), counts)
+            self.assertEqual(sorted(path.name for path in (root / "ledger/task-test-output").iterdir()), outputs)
+            self.assertFalse(any(row["operationKind"] == "frontier-complete" for row in state["records"]))
+            for path, payload in before.items():
+                self.assertEqual(path.read_bytes(), payload)
+
+    def test_later_running_then_indeterminate_blocks_older_success(self):
+        """Break caught: an older success outranks a later interrupted attempt before or after closure."""
+        with tempfile.TemporaryDirectory() as temporary:
+            runner = TaskTestCorrectedV5Tests(methodName="runTest")
+            self.addCleanup(runner.doCleanups)
+            fixture = runner._sentinel_corrected_fixture(Path(temporary))
+            first = runner._run_corrected_fixture(fixture)
+            root, repository = fixture["root"], fixture["repository"]
+            start, acquired, old_outer = runner._closed_corrected_attempt(fixture, output_mode="prefix")
+            prior = module.recover_run_state(root)
+            self.assertEqual(prior["classification"], "complete", prior.get("reason"))
+            self.assertEqual(prior["taskTestAttempts"][start["attemptId"]]["state"], "task-tests-running")
+            self.assertGreater(start["sequence"], first["start"]["sequence"])
+            self.assertNotEqual(start["subjectDigest"], first["start"]["subjectDigest"])
+            self.assertEqual(start["proofKeyDigest"], first["start"]["proofKeyDigest"])
+            counts = (len(prior["taskTestAttempts"]), len(prior["taskTestExecutionLeases"]))
+            before = {path: path.read_bytes() for path in (root / "ledger/records").iterdir()}
+            output_dir = root / "ledger/task-test-output"
+            output_bytes = {path: path.read_bytes() for directory in output_dir.iterdir()
+                            for path in directory.iterdir()}
+            with self.assertRaises(module.AuditError):
+                module.frontier_complete(root, fixture["original"]["frontierId"],
+                    input_digest=fixture["original"]["inputDigest"],
+                    declared_paths=fixture["original"]["declaredPaths"], outcome="completed",
+                    result_commit=fixture["resultHead"], task_correction_record=fixture["correctionPath"])
+            argv = runner._corrected_fixture_argv(fixture)
+            outer, context = fixture["helper"]._append_outer(root, repository, argv)
+            try:
+                with mock.patch.object(module, "_run_task_test_targets",
+                                       side_effect=AssertionError("closed recovery replayed a test body")):
+                    self.assertEqual(module._dispatch_command(argv, context=context), 2)
+            except module.AuditError as error:
+                self.fail("latest running correction did not close: " + str(error))
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=2)
+            state = module.recover_run_state(root)
+            self.assertEqual(state["classification"], "complete", state.get("reason"))
+            closed = state["taskTestAttempts"][start["attemptId"]]
+            result = closed["terminal"]["result"]
+            self.assertEqual(closed["state"], "task-tests-indeterminate-no-replay")
+            self.assertEqual(result["schemaVersion"], "qinao.task-test-result.v5")
+            self.assertEqual(result["terminalAuthority"], "closedLeaseRecovery")
+            self.assertEqual(result["reasonCode"], "durable-start-no-terminal")
+            self.assertEqual(result["targetResults"], [])
+            self.assertEqual(result["totalTestsRun"], 0)
+            output = result["outputEvidence"]
+            self.assertEqual(output["state"], "UNAVAILABLE")
+            self.assertEqual(output["reasonCodes"], ["capture-unavailable"])
+            self.assertEqual(output["leaseAcquiredRecordDigest"], acquired["recordDigest"])
+            self.assertEqual(output["channels"], {"stdout": None, "stderr": None})
+            for key in ("ownerDigest", "attempt", "sealedDigest"):
+                self.assertIsNone(output[key])
+            self.assertEqual(state["sterileInvocations"][old_outer["recordDigest"]]["state"], "failed")
+            diagnostic = module.reopen_task_test_output(root, acquired["recordDigest"])
+            self.assertEqual(diagnostic["state"], "DURABLE_PREFIX")
+            self.assertGreater(diagnostic["channels"]["stdout"]["byteCount"], 0)
+            for rejected in (argv, self._correction_completion_argv(fixture)):
+                owning, rejected_context = fixture["helper"]._append_outer(root, repository, rejected)
+                with mock.patch.object(module, "_run_task_test_targets",
+                                       side_effect=AssertionError("indeterminate attempt replayed a test body")):
+                    with self.assertRaises(module.AuditError):
+                        module._dispatch_command(rejected, context=rejected_context)
+                module._append_linked_sterile_invocation_completion(root, owning, exit_code=2)
+            child, cold = fixture["helper"]._cold(fixture)
+            self.assertEqual(child.returncode, 0, child.stderr.decode(errors="replace"))
+            self.assertEqual(cold["classification"], "complete", cold.get("reason"))
+            self.assertEqual(cold["taskTestAttempts"][start["attemptId"]], closed)
+            self.assertEqual(cold["taskTestAttempts"][first["start"]["attemptId"]], first)
+            self.assertEqual((len(cold["taskTestAttempts"]), len(cold["taskTestExecutionLeases"])), counts)
+            self.assertFalse(any(row["operationKind"] == "frontier-complete" for row in cold["records"]))
+            self.assertEqual({path: path.read_bytes() for directory in output_dir.iterdir()
+                              for path in directory.iterdir()}, output_bytes)
+            for path, payload in before.items():
+                self.assertEqual(path.read_bytes(), payload)
+
+    def test_reuse_pre_rename_subject_drift_preserves_old_success_without_publication(self):
+        """Break caught: reuse commits old success after real drift between early validation and rename."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._successful_corrected_fixture(Path(temporary))
+            root, repository, prior = fixture["root"], fixture["repository"], fixture["v5Attempt"]
+            before = module.recover_run_state(root)
+            original_records = {path: path.read_bytes() for path in (root / "ledger/records").iterdir()}
+            old_output = root / "ledger/task-test-output" / prior["start"]["executionLeaseAcquiredRecordDigest"]
+            output_bytes = {path: path.read_bytes() for path in old_output.iterdir()}
+            argv = TaskTestCorrectedV5Tests._corrected_fixture_argv(fixture)
+            outer, context = fixture["helper"]._append_outer(root, repository, argv)
+            real_hit, hits = module.DurabilityFaults.hit, []
+            drift_path = repository / "owned-reuse-pre-rename-drift"
+
+            def drift_after_stage(faults, boundary, kind, subject=""):
+                real_hit(faults, boundary, kind, subject)
+                if (boundary == "record-stage-parent-fsync"
+                    and kind == "task-test-execution-lease-terminal" and not hits):
+                    staged = list((root / "tmp").glob(".qinao-record-stage-" + subject[:-5] + "-*.json"))
+                    self.assertEqual(len(staged), 1)
+                    record = module.parse_canonical_json(staged[0].read_bytes())
+                    self.assertEqual(record["disposition"], "reused-success")
+                    self.assertFalse((root / "ledger/records" / subject).exists())
+                    hits.append(record)
+                    drift_path.write_bytes(b"actual untracked drift after reuse staging\n")
+
+            with mock.patch.object(module.DurabilityFaults, "hit", drift_after_stage):
+                with mock.patch.object(module, "_run_task_test_targets",
+                                       side_effect=AssertionError("reuse executed another body")):
+                    with self.assertRaises(module.AuditError):
+                        module.execute_task_test_run(root, repository=repository,
+                            targets=fixture["original"]["expectedTests"], context=context,
+                            task_correction_record=fixture["correctionPath"])
+            self.assertEqual(len(hits), 1)
+            self.assertTrue(drift_path.is_file())
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=2)
+            child, cold = fixture["helper"]._cold(fixture)
+            self.assertEqual(child.returncode, 0, child.stderr.decode(errors="replace"))
+            self.assertEqual(cold["classification"], "complete", cold.get("reason"))
+            self.assertEqual(cold["taskTestAttempts"], before["taskTestAttempts"])
+            leases = [value for value in cold["taskTestExecutionLeases"].values()
+                      if value["acquired"]["outerInvocationStartRecordDigest"] == outer["recordDigest"]]
+            self.assertEqual(len(leases), 1)
+            self.assertEqual(leases[0]["state"], "preactivation-failed")
+            self.assertEqual(leases[0]["terminal"]["attemptBinding"], "absent")
+            self.assertNotIn(hits[0]["recordDigest"], [row["recordDigest"] for row in cold["records"]])
+            for path, payload in {**original_records, **output_bytes}.items():
+                self.assertEqual(path.read_bytes(), payload)
+
+    def test_reuse_durable_terminal_ack_loss_returns_exact_prior_result_once(self):
+        """Break caught: lost acknowledgement after durable reuse causes conflicting closure or a second body."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._successful_corrected_fixture(Path(temporary))
+            root, repository, prior = fixture["root"], fixture["repository"], fixture["v5Attempt"]
+            before = module.recover_run_state(root)
+            original_records = {path: path.read_bytes() for path in (root / "ledger/records").iterdir()}
+            old_output = root / "ledger/task-test-output" / prior["start"]["executionLeaseAcquiredRecordDigest"]
+            output_bytes = {path: path.read_bytes() for path in old_output.iterdir()}
+            argv = TaskTestCorrectedV5Tests._corrected_fixture_argv(fixture)
+            outer, context = fixture["helper"]._append_outer(root, repository, argv)
+            real_hit, hits = module.DurabilityFaults.hit, []
+
+            def lose_durable_ack(faults, boundary, kind, subject=""):
+                real_hit(faults, boundary, kind, subject)
+                if (boundary == "records-fsync"
+                    and kind == "task-test-execution-lease-terminal" and not hits):
+                    record = module.parse_canonical_json((root / "ledger/records" / subject).read_bytes())
+                    self.assertEqual(record["disposition"], "reused-success")
+                    self.assertEqual(record["taskTestTerminalRecordDigest"], prior["terminal"]["recordDigest"])
+                    hits.append(record)
+                    raise module.AuditError("lost acknowledgement after durable reused terminal")
+
+            with mock.patch.object(module.DurabilityFaults, "hit", lose_durable_ack):
+                with mock.patch.object(module, "_run_task_test_targets",
+                                       side_effect=AssertionError("ack recovery executed another body")):
+                    returned = module.execute_task_test_run(root, repository=repository,
+                        targets=fixture["original"]["expectedTests"], context=context,
+                        task_correction_record=fixture["correctionPath"])
+            self.assertEqual(returned, prior["terminal"])
+            self.assertEqual(len(hits), 1)
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=0)
+            child, cold = fixture["helper"]._cold(fixture)
+            self.assertEqual(child.returncode, 0, child.stderr.decode(errors="replace"))
+            self.assertEqual(cold["classification"], "complete", cold.get("reason"))
+            self.assertEqual(cold["taskTestAttempts"], before["taskTestAttempts"])
+            leases = [value for value in cold["taskTestExecutionLeases"].values()
+                      if value["acquired"]["outerInvocationStartRecordDigest"] == outer["recordDigest"]]
+            self.assertEqual(len(leases), 1)
+            self.assertEqual(leases[0]["state"], "reused-success")
+            self.assertEqual(leases[0]["terminal"], hits[0])
+            terminals = [row for row in cold["records"]
+                         if row["operationKind"] == "task-test-execution-lease-terminal"
+                         and row["leaseAcquiredRecordDigest"] == leases[0]["acquired"]["recordDigest"]]
+            self.assertEqual(terminals, hits)
+            for path, payload in {**original_records, **output_bytes}.items():
+                self.assertEqual(path.read_bytes(), payload)
+
+    def _correction_completion_argv(self, fixture):
+        argv = ["frontier-complete", "--root", str(fixture["root"]),
+            "--frontier-id", fixture["original"]["frontierId"],
+            "--input-digest", fixture["original"]["inputDigest"],
+            "--outcome", "completed", "--result-commit", fixture["resultHead"]]
+        for path in fixture["original"]["declaredPaths"]:
+            argv += ["--declared-path", path]
+        return argv + ["--task-correction-record", str(fixture["correctionPath"])]
+
+    def test_corrected_completion_cli_binds_generation_and_exact_cold_reopen(self):
+        """Break caught: completion cannot close the selected repaired result or reopens another generation."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._successful_corrected_fixture(Path(temporary))
+            root, repository = fixture["root"], fixture["repository"]
+            before = {path: path.read_bytes() for path in (root / "ledger/records").iterdir()}
+            argv = self._correction_completion_argv(fixture)
+            stream = _ExternalMatrixStdout()
+            try:
+                outer, context = fixture["helper"]._append_outer(root, repository, argv)
+                with mock.patch.object(module.sys, "stdout", stream):
+                    self.assertEqual(module._dispatch_command(argv, context=context), 0)
+            except (module.AuditError, SystemExit) as error:
+                self.fail("real corrected completion rejected: " + str(error))
+            completed = module.parse_canonical_json(stream.buffer.getvalue())
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=0)
+            proof = completed["taskCompletion"]
+            relation = fixture["v5Attempt"]["start"]["subject"]["scanResultRelation"]
+            self.assertEqual(proof["schemaVersion"], "qinao.task-completion.v3")
+            self.assertEqual(proof["taskCorrectionRecordDigest"], fixture["correction"]["recordDigest"])
+            self.assertEqual(proof["taskResumptionRecordDigest"], fixture["resumption"]["recordDigest"])
+            self.assertEqual(proof["priorResultCommitOid"], fixture["priorHead"])
+            self.assertEqual(proof["parentOid"], fixture["priorHead"])
+            self.assertEqual(proof["resultCommitOid"], fixture["resultHead"])
+            self.assertEqual(proof["priorResultRelationDigest"],
+                fixture["priorAttempt"]["start"]["subject"]["scanResultRelationDigest"])
+            for key in ("cumulativeRawDeltaSha256", "cumulativePathSetDigest"):
+                self.assertEqual(proof[key], relation[key])
+            self.assertEqual(proof["taskTerminalRecordDigest"], fixture["v5Attempt"]["terminal"]["recordDigest"])
+            self.assertEqual(module._run_git(repository, ["rev-list", "--count",
+                fixture["resumption"]["resumption"]["observedHeadOid"] + "..HEAD"]), b"2\n")
+            child, cold = fixture["helper"]._cold(fixture)
+            self.assertEqual(child.returncode, 0, child.stderr.decode(errors="replace"))
+            self.assertEqual(cold["classification"], "complete", cold.get("reason"))
+            self.assertEqual(cold["openFrontiers"], [])
+            self.assertIn(completed, cold["records"])
+            for path, payload in before.items():
+                self.assertEqual(path.read_bytes(), payload)
+            path = repository / "scripts/test_qinao_convergence_audit.py"
+            path.write_bytes(path.read_bytes() + b"\n# later bytes are not completion authority\n")
+            for selector in (argv, argv[:-2], argv[:-1] + [str(fixture["originalPath"])]):
+                exact = selector + ["--recover-exact"]
+                outer, context = fixture["helper"]._append_outer(root, repository, exact)
+                stream = _ExternalMatrixStdout()
+                if selector == argv:
+                    with mock.patch.object(module.sys, "stdout", stream):
+                        self.assertEqual(module._dispatch_command(exact, context=context), 0)
+                    self.assertEqual(module.parse_canonical_json(stream.buffer.getvalue()), completed)
+                    exit_code = 0
+                else:
+                    with self.assertRaises(module.AuditError):
+                        module._dispatch_command(exact, context=context)
+                    exit_code = 2
+                module._append_linked_sterile_invocation_completion(root, outer, exit_code=exit_code)
+
+    def test_explicit_correction_basis_requires_its_own_settled_outer(self):
+        """Break caught: an unsettled/new generation silently falls back to original authority."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._published_correction_fixture(Path(temporary), settle=False)
+            root, original = fixture["root"], fixture["original"]
+            digest = fixture["correction"]["recordDigest"]
+            state = module.recover_run_state(root)
+            self.assertEqual(state["classification"], "complete", state.get("reason"))
+            try:
+                with self.assertRaises(module.AuditError):
+                    module._task_completion_basis(original, state,
+                        task_correction_record_digest=digest, live=True)
+                with self.assertRaises(module.AuditError):
+                    module._task_completion_basis(original, state, live=True)
+            except TypeError as error:
+                self.fail("explicit correction basis is unsupported: " + str(error))
+            module._append_linked_sterile_invocation_completion(root, fixture["correctionOuter"], exit_code=0)
+            state = module.recover_run_state(root)
+            basis = module._task_completion_basis(original, state,
+                task_correction_record_digest=digest, live=True)
+            self.assertEqual(basis["startingHeadOid"], fixture["priorHead"])
+            self.assertEqual(basis["taskCorrectionRecordDigest"], digest)
+            self.assertEqual(basis["correction"]["recordPath"], str(fixture["correctionPath"]))
+            historical = module._task_completion_basis(original, state)
+            self.assertEqual(historical["startingHeadOid"],
+                             fixture["resumption"]["resumption"]["observedHeadOid"])
+            self.assertNotEqual(historical["startingHeadOid"], basis["startingHeadOid"])
+            with self.assertRaises(module.AuditError):
+                module._task_completion_basis(original, state, live=True)
+            with self.assertRaises(module.AuditError):
+                module._task_completion_basis(original, state,
+                    task_correction_record_digest=fixture["resumption"]["recordDigest"], live=True)
+
+    def test_corrected_scan_and_single_child_relation_are_generation_bound(self):
+        """Break caught: a new scan/result is confused with immutable original generation evidence."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._corrected_result_fixture(Path(temporary))
+            root, original = fixture["root"], fixture["original"]
+            state = module.recover_run_state(root)
+            self.assertEqual(state["classification"], "complete", state.get("reason"))
+            digest = fixture["correction"]["recordDigest"]
+            basis = module._task_completion_basis(original, state,
+                task_correction_record_digest=digest, live=True)
+            scans = module._task_generation_scans(original, state, basis)
+            self.assertEqual(len(scans), 1)
+            binding = scans[0]["reservation"]["binding"]
+            self.assertEqual(binding["schemaVersion"], "qinao.secret-scan-capture-binding.v3")
+            self.assertEqual(binding["taskCorrectionRecordDigest"], digest)
+            self.assertEqual(binding["headOid"], fixture["priorHead"])
+            relation = module._task_scan_result_relation(original, basis, scans[0],
+                state["sterileInvocations"][scans[0]["terminal"]["outerInvocationStartRecordDigest"]],
+                fixture["resultHead"], fixture["resultTree"])
+            self.assertEqual(relation["schemaVersion"], "qinao.task-scan-result-relation.v3")
+            self.assertEqual(relation["taskCorrectionRecordDigest"], digest)
+            self.assertEqual(relation["parentOid"], fixture["priorHead"])
+            self.assertEqual(relation["originalObservedHeadOid"],
+                             fixture["resumption"]["resumption"]["observedHeadOid"])
+            self.assertEqual(module._run_git(fixture["repository"],
+                ["diff", "--name-only", fixture["priorHead"], fixture["resultHead"]]),
+                b"scripts/test_qinao_convergence_audit.py\n")
+            module._validate_task_scan_result_relation_shape(relation)
+            for key in ("schemaVersion", "parentOid", "taskCorrectionRecordDigest"):
+                changed = copy.deepcopy(relation)
+                changed[key] = "qinao.task-scan-result-relation.v2" if key == "schemaVersion" else "z" * 64
+                changed.pop("relationDigest")
+                changed = module._self_digest_record(changed, "relationDigest")
+                with self.assertRaises(module.AuditError):
+                    module._validate_task_scan_result_relation_shape(changed)
+            old_basis = module._task_completion_basis(original, state)
+            old_scans = module._task_generation_scans(original, state, old_basis)
+            self.assertEqual(len(old_scans), 1)
+            old_scan = old_scans[0]
+            old_relation = module._task_scan_result_relation(original, old_basis, old_scan,
+                state["sterileInvocations"][old_scan["terminal"]["outerInvocationStartRecordDigest"]],
+                fixture["priorHead"], fixture["priorAttempt"]["start"]["subject"]["resultTreeOid"])
+            self.assertEqual(old_relation, fixture["priorAttempt"]["start"]["subject"]["scanResultRelation"])
+            child, cold = fixture["helper"]._cold(fixture)
+            self.assertEqual(child.returncode, 0, child.stderr.decode(errors="replace"))
+            self.assertEqual(cold["classification"], "complete", cold.get("reason"))
+            self.assertEqual(cold["taskCorrections"][original["frontierId"]]["record"], fixture["correction"])
+
+    def test_failed_result_publishes_one_file_correction_without_rewriting_history(self):
+        """Break caught: a genuine failed result has no explicit forward correction route."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self._failed_generation(Path(temporary))
+            self._seal_correction_inputs(fixture)
+            root = fixture["root"]
+            original_records = {path: path.read_bytes() for path in (root / "ledger/records").iterdir()}
+            stream = _ExternalMatrixStdout()
+            try:
+                outer, context = fixture["helper"]._append_outer(root, fixture["repository"],
+                    fixture["correctionArgv"])
+                with mock.patch.object(module.sys, "stdout", stream):
+                    exit_code = module._dispatch_command(fixture["correctionArgv"], context=context)
+            except module.AuditError as error:
+                self.fail("real failed-generation correction rejected: " + str(error))
+            self.assertEqual(exit_code, 0)
+            record = module.parse_canonical_json(stream.buffer.getvalue())
+            correction = record["correction"]
+            self.assertEqual(correction["schemaVersion"], "qinao.task3-correction.v1")
+            self.assertEqual(correction["generation"], 1)
+            self.assertEqual(correction["changedPaths"], ["scripts/test_qinao_convergence_audit.py"])
+            self.assertEqual(correction["priorResultCommitOid"], fixture["priorHead"])
+            self.assertEqual(correction["priorTaskTerminalRecordDigest"],
+                             fixture["priorAttempt"]["terminal"]["recordDigest"])
+            state = module.recover_run_state(root)
+            self.assertEqual(state["classification"], "complete", state.get("reason"))
+            self.assertEqual(state["taskCorrections"][fixture["original"]["frontierId"]]["state"],
+                             "published-unsettled")
+            module._append_linked_sterile_invocation_completion(root, outer, exit_code=0)
+            state = module.recover_run_state(root)
+            self.assertEqual(state["classification"], "complete", state.get("reason"))
+            self.assertEqual(state["taskCorrections"][fixture["original"]["frontierId"]]["state"], "settled")
+            self.assertEqual(module._run_git(fixture["repository"], ["rev-parse", "HEAD"]).decode().strip(),
+                             fixture["priorHead"])
+            self.assertEqual(fixture["indexPath"].read_bytes(), fixture["baselinePayloads"]["original-index.bin"])
+            for path, payload in original_records.items():
+                self.assertEqual(path.read_bytes(), payload)
 
 
 class Task3RecoveryResumptionTests(_ModuleRequired):
