@@ -138,6 +138,7 @@ public struct MultiTurnDemo {
     /// Models (caller falls back to mock).
     struct AFMEndpoint: QinaoOrganEndpoint {
         let registry: BASOrganRegistry
+        let providerID: String
 
         func produceBody(
             prompt: String,
@@ -150,7 +151,7 @@ public struct MultiTurnDemo {
             let preset: BASOrganPreset =
                 internalRole == .scout ? .scout : .core
             let adapter = try await registry.adapter(
-                for: internalRole)
+                providerID: providerID)
             let request = BASOrganRequest(
                 requestID: UUID().uuidString,
                 role: internalRole,
@@ -183,9 +184,11 @@ public struct MultiTurnDemo {
             // Try AFM, fall back to mock on construction or
             // first-call failure.
             let registry = BASOrganRegistry()
-            await registry.register(
-                AppleFoundationOrganAdapter())
-            let afmEndpoint = AFMEndpoint(registry: registry)
+            let adapter = AppleFoundationOrganAdapter()
+            await registry.register(adapter)
+            let afmEndpoint = AFMEndpoint(
+                registry: registry,
+                providerID: adapter.descriptor.providerID)
             do {
                 return try await drive(
                     endpoint: afmEndpoint,

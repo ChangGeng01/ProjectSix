@@ -18,10 +18,8 @@ import QinaoAppleFoundation
 ///    is the only registered adapter. On supported OS, real model
 ///    invocation. On unsupported OS, the endpoint surfaces
 ///    `LoopError.organUnavailable`.
-/// 2. `includeDeterministicFallback: true` — `BASOrganDeterministicAdapter`
-///    is registered first, then Apple FM. Registry's "most-recent
-///    on-device wins" rule still picks Apple FM when reachable;
-///    when not, falls through to the deterministic stub.
+/// 2. `includeDeterministicFallback: true` — a deterministic adapter is also
+///    registered, but the endpoint explicitly remains bound to Apple FM.
 ///
 /// ## Real-LLM tests are env-gated
 ///
@@ -98,12 +96,10 @@ final class QinaoAppleFoundationFactoryTests: XCTestCase {
     /// here.
     ///
     /// Verified 2026-07-14, the deterministic adapter is UNREACHABLE:
-    ///   - BASOrganRegistry.adapter(for:) (BASOrganRegistry.swift:67-87) is
-    ///     selection-only — most-recently-registered on-device adapter wins, no
-    ///     retry, `currentCapacity()` never called;
-    ///   - the factory registers deterministic FIRST, Apple LAST;
-    ///   - Apple's descriptor hardcodes runsOnDevice:true unconditionally.
-    /// So Apple always wins selection, and an unreachable Apple FM THROWS rather
+    ///   - BASOrganRegistry.adapter(providerID:) is exact lookup with no retry;
+    ///   - the factory binds the wrapped Apple organ's provider ID explicitly;
+    ///   - the wrapper forwards Apple's descriptor identity.
+    /// So the endpoint always invokes Apple, and an unreachable Apple FM THROWS rather
     /// than degrading.
     ///
     /// Both outcomes prove the same fact, so this asserts it without gating:
@@ -144,8 +140,8 @@ final class QinaoAppleFoundationFactoryTests: XCTestCase {
 
         XCTAssertNotEqual(
             producedProviderID, "bas.deterministic.v1",
-            "includeDeterministicFallback:true must remain a NO-OP: the registry "
-            + "is selection-only and always resolves to the Apple organ. A "
+            "includeDeterministicFallback:true must remain a NO-OP: the endpoint "
+            + "binds the Apple organ's provider ID explicitly. A "
             + "deterministic providerID here means a REAL fallback now exists — "
             + "which is good, but the file-level doc on "
             + "QinaoAppleFoundationEndpoint.swift documents it as a no-op and "
@@ -153,9 +149,8 @@ final class QinaoAppleFoundationFactoryTests: XCTestCase {
         if let id = producedProviderID {
             XCTAssertEqual(
                 id, "apple.foundation-models.v1",
-                "when generation succeeds, the Apple organ must be what ran — it "
-                + "is registered last and the registry prefers most-recent "
-                + "on-device")
+                "when generation succeeds, the explicitly bound Apple organ "
+                + "must be what ran")
         }
     }
 
@@ -208,8 +203,7 @@ final class QinaoAppleFoundationFactoryTests: XCTestCase {
     }
 
     /// With `includeDeterministicFallback: true` AND a reachable
-    /// Apple FM, the registry's "most-recent on-device wins" rule
-    /// must still pick Apple FM (it's registered second).
+    /// Apple FM, the explicit provider binding must still invoke Apple FM.
     func testFactoryWithFallbackPrefersRealAppleFM() async throws {
         try skipUnlessRealLLMReady()
 
@@ -243,7 +237,6 @@ final class QinaoAppleFoundationFactoryTests: XCTestCase {
             result.first?.providerID,
             "apple.foundation-models.v1",
             "with both adapters registered AND Apple FM reachable, " +
-            "registry must prefer Apple FM (registered later, " +
-            "wins by most-recent on-device rule)")
+            "the endpoint must invoke its explicitly bound Apple provider")
     }
 }

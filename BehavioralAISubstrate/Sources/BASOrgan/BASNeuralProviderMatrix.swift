@@ -1,11 +1,9 @@
 import Foundation
 
-/// PURE, deterministic task→provider selection layered ON TOP of `BASOrganRegistry` (ADR-041 §D).
+/// PURE, deterministic task→provider ranking observation (ADR-041 §D).
 ///
-/// The registry RESOLVES a single adapter per role (most-recent on-device wins). This matrix is a SEPARATE,
-/// observation-class layer a host can use when it wants a RANKED selection with reasons — e.g. an exhaustion
-/// strategy ("try the chosen provider, then the first alternative, then fall back off-device"). It only RANKS
-/// `BASOrganDescriptor`s by their metadata; it resolves nothing, mutates nothing, and never touches the
+/// This matrix ranks `BASOrganDescriptor`s by metadata and returns reasons. It does not resolve a registry
+/// adapter, mutate registry state, or choose the explicit provider ID used for invocation. It never touches the
 /// byte-deterministic governance spine (红线 7 — reasoning-side, hint-only).
 ///
 /// Determinism: no Date / UUID / clock / randomness / call-order dependence. Same inputs → same `Selection`

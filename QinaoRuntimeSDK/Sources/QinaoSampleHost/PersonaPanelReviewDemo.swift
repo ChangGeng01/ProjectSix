@@ -151,9 +151,7 @@ public struct PersonaPanelReviewDemo {
         count: Int = 5
     ) async throws -> Outcome {
         let templates = selectTemplates(count: count)
-        let registry = BASOrganRegistry()
-        await registry.register(AppleFoundationOrganAdapter())
-        let adapter = try await registry.adapter(for: .core)
+        let adapter = AppleFoundationOrganAdapter()
 
         let started = ContinuousClock().now
         var outcomes: [TemplateOutcome] = []

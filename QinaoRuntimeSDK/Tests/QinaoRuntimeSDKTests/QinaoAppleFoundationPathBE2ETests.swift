@@ -63,21 +63,12 @@ final class QinaoAppleFoundationPathBE2ETests: XCTestCase {
             "/ visionOS 26+")
     }
 
-    private func makeAFMRegistry() async -> BASOrganRegistry {
-        let registry = BASOrganRegistry()
-        await registry.register(
-            AppleFoundationOrganAdapter())
-        return registry
-    }
-
     /// Drive AFM with a Path B draft prompt and return the raw
     /// LLM body. Used as the input to the parser.
     private func draftViaAFM(
         prompt: String
     ) async throws -> String {
-        let registry = await makeAFMRegistry()
-        let adapter = try await registry.adapter(
-            for: .core)
+        let adapter = AppleFoundationOrganAdapter()
         let request = BASOrganRequest(
             requestID: UUID().uuidString,
             role: .core,

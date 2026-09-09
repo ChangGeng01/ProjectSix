@@ -40,6 +40,7 @@ import QinaoLoop
 /// loop API can drive substrate adapters end-to-end.
 private struct AppleFoundationTestEndpoint: QinaoOrganEndpoint {
     let registry: BASOrganRegistry
+    let providerID: String
 
     func produceBody(
         prompt: String,
@@ -52,7 +53,7 @@ private struct AppleFoundationTestEndpoint: QinaoOrganEndpoint {
         let preset: BASOrganPreset =
             internalRole == .scout ? .scout : .core
 
-        let adapter = try await registry.adapter(for: internalRole)
+        let adapter = try await registry.adapter(providerID: providerID)
         let request = BASOrganRequest(
             requestID: UUID().uuidString,
             role: internalRole,
@@ -90,8 +91,11 @@ final class QinaoAppleFoundationE2ETests: XCTestCase {
 
     private func makeEndpoint() async -> AppleFoundationTestEndpoint {
         let registry = BASOrganRegistry()
-        await registry.register(AppleFoundationOrganAdapter())
-        return AppleFoundationTestEndpoint(registry: registry)
+        let adapter = AppleFoundationOrganAdapter()
+        await registry.register(adapter)
+        return AppleFoundationTestEndpoint(
+            registry: registry,
+            providerID: adapter.descriptor.providerID)
     }
 
     // MARK: - Single-seed E2E

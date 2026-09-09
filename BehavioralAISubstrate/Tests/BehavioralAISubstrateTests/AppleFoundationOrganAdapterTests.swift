@@ -105,22 +105,19 @@ final class AppleFoundationOrganAdapterTests: XCTestCase {
         XCTAssertFalse(cap.reasonCodes.isEmpty)
     }
 
-    // MARK: - Registry fallthrough
+    // MARK: - Explicit registry lookup
 
-    /// Wires the real concern: if Apple FM is unavailable, the
-    /// registry must produce a drafting path via another adapter
-    /// instead of failing the session.
-    func testRegistryFallsThroughToDeterministicAdapter() async throws {
+    /// A host that explicitly selects its deterministic fixture can
+    /// invoke it even while another provider is co-registered.
+    func testRegistryLooksUpDeterministicAdapterByID() async throws {
         if #available(iOS 26, macOS 26, visionOS 26, *) { return }
 
         let registry = BASOrganRegistry()
         await registry.register(AppleFoundationOrganAdapter())
         await registry.register(BASOrganDeterministicAdapter())
 
-        // Registry picks most-recent on-device adapter; both are
-        // on-device. The deterministic adapter is registered last
-        // so it wins and can *actually* produce a draft.
-        let chosen = try await registry.adapter(for: .scout)
+        let chosen = try await registry.adapter(
+            providerID: "bas.deterministic.v1")
         let draft = try await chosen.draft(BASOrganRequest(
             requestID: "r",
             role: .scout,

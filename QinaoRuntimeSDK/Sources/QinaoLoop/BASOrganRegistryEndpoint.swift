@@ -18,25 +18,49 @@ import BASOrgan
 /// byte-compatible so endpoints built before M77 — or callers that
 /// don't pass a budget — keep working unchanged.
 ///
-/// `adapterOverride` is an internal test hook: when present, it's
-/// used instead of `registry.adapter(for:)` so tests can drive a
-/// captured adapter without having to register+re-register. Hosts
-/// use `registry` only.
+/// Configured endpoints bind one explicit provider ID. Registry
+/// registration order and descriptor ranking never choose an
+/// invocation target. `adapterOverride` is an internal test hook
+/// whose returned adapter must match the same expected identity.
 package struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint,
     QinaoStreamingOrganEndpoint
 {
     package let registry: BASOrganRegistry?
+    package let providerID: String?
     package let adapterOverride: (@Sendable (BASOrganRole) async throws -> any BASOrganAdapter)?
     package let presetForRole: @Sendable (BASOrganRole) -> BASOrganPreset
     package let nextRequestID: @Sendable () -> String
 
+    /// Unconfigured endpoint retained solely for the typed negative path.
+    package init() {
+        registry = nil
+        providerID = nil
+        adapterOverride = nil
+        presetForRole = Self.defaultPreset
+        nextRequestID = { UUID().uuidString }
+    }
+
     package init(
-        registry: BASOrganRegistry? = nil,
-        adapterOverride: (@Sendable (BASOrganRole) async throws -> any BASOrganAdapter)? = nil,
+        registry: BASOrganRegistry,
+        providerID: String,
         presetForRole: @escaping @Sendable (BASOrganRole) -> BASOrganPreset = Self.defaultPreset,
         nextRequestID: @escaping @Sendable () -> String = { UUID().uuidString }
     ) {
         self.registry = registry
+        self.providerID = providerID
+        self.adapterOverride = nil
+        self.presetForRole = presetForRole
+        self.nextRequestID = nextRequestID
+    }
+
+    package init(
+        providerID: String,
+        adapterOverride: @escaping @Sendable (BASOrganRole) async throws -> any BASOrganAdapter,
+        presetForRole: @escaping @Sendable (BASOrganRole) -> BASOrganPreset = Self.defaultPreset,
+        nextRequestID: @escaping @Sendable () -> String = { UUID().uuidString }
+    ) {
+        self.registry = nil
+        self.providerID = providerID
         self.adapterOverride = adapterOverride
         self.presetForRole = presetForRole
         self.nextRequestID = nextRequestID
@@ -99,19 +123,8 @@ package struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint,
             // consumer break propagates down to the inner streamDraft (the guarded GPU decode).
             let task = Task {
                 do {
-                    let adapter: any BASOrganAdapter
-                    if let override = adapterOverride {
-                        adapter = try await override(internalRole)
-                    } else if let registry = registry {
-                        adapter = try await registry
-                            .adapter(for: internalRole)
-                    } else {
-                        continuation.finish(
-                            throwing: QinaoLoop.LoopError
-                                .organUnavailable(
-                                    reason: "no-endpoint-configured"))
-                        return
-                    }
+                    let adapter = try await resolveAdapter(
+                        internalRole: internalRole)
 
                     guard
                         let streamingAdapter =
@@ -188,15 +201,8 @@ package struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint,
         preset: BASOrganPreset
     ) async throws -> QinaoLoop.OrganResponse {
         do {
-            let adapter: any BASOrganAdapter
-            if let override = adapterOverride {
-                adapter = try await override(internalRole)
-            } else if let registry = registry {
-                adapter = try await registry.adapter(for: internalRole)
-            } else {
-                throw QinaoLoop.LoopError.organUnavailable(
-                    reason: "no-endpoint-configured")
-            }
+            let adapter = try await resolveAdapter(
+                internalRole: internalRole)
 
             let request = BASOrganRequest(
                 requestID: nextRequestID(),
@@ -224,6 +230,35 @@ package struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint,
                     reason: "unknown-provider:\(id)")
             }
         }
+    }
+
+    /// Shared identity and capability gate for eager and streaming calls.
+    private func resolveAdapter(
+        internalRole: BASOrganRole
+    ) async throws -> any BASOrganAdapter {
+        guard let providerID else {
+            throw QinaoLoop.LoopError.organUnavailable(
+                reason: "no-endpoint-configured")
+        }
+
+        let adapter: any BASOrganAdapter
+        if let adapterOverride {
+            adapter = try await adapterOverride(internalRole)
+        } else if let registry {
+            adapter = try await registry.adapter(providerID: providerID)
+        } else {
+            throw QinaoLoop.LoopError.organUnavailable(
+                reason: "no-endpoint-configured")
+        }
+
+        guard adapter.descriptor.providerID == providerID else {
+            throw QinaoLoop.LoopError.organUnavailable(
+                reason: "provider-identity-mismatch")
+        }
+        guard adapter.descriptor.supportedRoles.contains(internalRole) else {
+            throw BASOrganError.unsupportedRole(internalRole)
+        }
+        return adapter
     }
 
     // MARK: - Mapping helpers

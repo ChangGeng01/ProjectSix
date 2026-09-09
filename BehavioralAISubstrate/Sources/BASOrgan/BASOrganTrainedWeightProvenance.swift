@@ -212,7 +212,7 @@ public struct BASOrganTrainedWeightProvenance:
 /// Doctrine: only `.domainExpertReviewed` adapter weights may be
 /// loaded into a production `BASOrganRegistry`. Lower tiers may be
 /// useful for in-development testing but MUST NOT be returned by
-/// `adapter(for:role:)` in a production session.
+/// `adapter(providerID:)` in a production session.
 ///
 /// A future v6 doctrine candidate "Adapter-trained L2 doctrine"
 /// would use this gate as its enforcement primitive. v5 does not

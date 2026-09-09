@@ -322,9 +322,11 @@ final class QinaoMultiTurnEndToEndTests: XCTestCase {
         -> AppleFoundationMultiTurnEndpoint
     {
         let registry = BASOrganRegistry()
-        await registry.register(AppleFoundationOrganAdapter())
+        let adapter = AppleFoundationOrganAdapter()
+        await registry.register(adapter)
         return AppleFoundationMultiTurnEndpoint(
-            registry: registry)
+            registry: registry,
+            providerID: adapter.descriptor.providerID)
     }
 }
 
@@ -336,6 +338,7 @@ final class QinaoMultiTurnEndToEndTests: XCTestCase {
 /// driver doesn't depend on M178's test fixture.
 private struct AppleFoundationMultiTurnEndpoint: QinaoOrganEndpoint {
     let registry: BASOrganRegistry
+    let providerID: String
 
     func produceBody(
         prompt: String,
@@ -348,7 +351,7 @@ private struct AppleFoundationMultiTurnEndpoint: QinaoOrganEndpoint {
         let preset: BASOrganPreset =
             internalRole == .scout ? .scout : .core
         let adapter = try await registry.adapter(
-            for: internalRole)
+            providerID: providerID)
         let request = BASOrganRequest(
             requestID: UUID().uuidString,
             role: internalRole,

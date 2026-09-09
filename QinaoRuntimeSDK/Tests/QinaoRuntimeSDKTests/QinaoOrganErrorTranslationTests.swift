@@ -62,6 +62,7 @@ final class QinaoOrganErrorTranslationTests: XCTestCase {
     ) -> BASOrganRegistryEndpoint {
         let mock = ThrowingAdapter(error)
         return BASOrganRegistryEndpoint(
+            providerID: mock.descriptor.providerID,
             adapterOverride: { _ in mock })
     }
 
@@ -135,10 +136,13 @@ final class QinaoOrganErrorTranslationTests: XCTestCase {
 
     // MARK: - 2 BASOrganRegistry.RegistryError cases
 
-    func testNoAdapterForRoleTranslates() async {
-        // Empty registry — adapter(for:) throws .noAdapterForRole.
+    func testLegacyNoAdapterForRoleTranslatesWhenInjected() async {
         let endpoint = BASOrganRegistryEndpoint(
-            registry: BASOrganRegistry())
+            providerID: "legacy-provider",
+            adapterOverride: { _ in
+                throw BASOrganRegistry.RegistryError
+                    .noAdapterForRole(.scout)
+            })
         await callAndExpectLoopError(
             endpoint: endpoint,
             expectedReason: "no-adapter-for-role:scout")
@@ -149,15 +153,15 @@ final class QinaoOrganErrorTranslationTests: XCTestCase {
     ///
     /// Was an unconditional XCTSkip with zero assertions whose body conceded
     /// "code-presence check is implicit: this file imports the module" —
-    /// importing a module is not a test. Its stated premise (unknown-provider is
-    /// unreachable via `adapter(for:)`) is true, but the conclusion drawn from it
-    /// was false: the case is reachable through the very hook the 7 sibling
+    /// importing a module is not a test. The former role-selected lookup could
+    /// not reach unknown-provider, but the case is reachable through the hook the
+    /// 7 sibling
     /// tests already use, because `adapterOverride` is declared `throws`. So the
     /// reason-code grammar for unknown-provider was unpinned on both paths while
     /// the file's docstring claimed "8 paths ... runs every CI pass" — 7 ran.
     func testUnknownProviderTranslates() async {
         let endpoint = BASOrganRegistryEndpoint(
-            registry: BASOrganRegistry(),
+            providerID: "ghost.v1",
             adapterOverride: { _ in
                 throw BASOrganRegistry.RegistryError
                     .unknownProvider(id: "ghost.v1")
@@ -172,13 +176,13 @@ final class QinaoOrganErrorTranslationTests: XCTestCase {
     /// reason code.
     func testUnknownProviderTranslatesOnStreamingPath() async {
         let endpoint = BASOrganRegistryEndpoint(
-            registry: BASOrganRegistry(),
+            providerID: "ghost.v1",
             adapterOverride: { _ in
                 throw BASOrganRegistry.RegistryError
                     .unknownProvider(id: "ghost.v1")
             })
         do {
-            let stream = try await endpoint.streamBody(
+            let stream = endpoint.streamBody(
                 prompt: "ping", context: [], role: .scout, sessionID: "s")
             for try await _ in stream {}
             XCTFail("expected organUnavailable on the streaming path")

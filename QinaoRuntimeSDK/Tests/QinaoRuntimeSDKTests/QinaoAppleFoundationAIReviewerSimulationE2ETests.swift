@@ -37,10 +37,10 @@ final class QinaoAppleFoundationAIReviewerSimulationE2ETests:
         async throws -> String
     {
         let registry = BASOrganRegistry()
-        await registry.register(
-            AppleFoundationOrganAdapter())
+        let apple = AppleFoundationOrganAdapter()
+        await registry.register(apple)
         let adapter = try await registry.adapter(
-            for: .core)
+            providerID: apple.descriptor.providerID)
         let request = BASOrganRequest(
             requestID: UUID().uuidString,
             role: .core,

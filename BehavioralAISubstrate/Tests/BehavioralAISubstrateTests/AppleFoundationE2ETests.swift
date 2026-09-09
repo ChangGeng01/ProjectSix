@@ -145,9 +145,11 @@ final class AppleFoundationE2ETests: XCTestCase {
         try skipUnlessReady()
 
         let registry = BASOrganRegistry()
-        await registry.register(AppleFoundationOrganAdapter())
+        let apple = AppleFoundationOrganAdapter()
+        await registry.register(apple)
 
-        let adapter = try await registry.adapter(for: .scout)
+        let adapter = try await registry.adapter(
+            providerID: apple.descriptor.providerID)
         XCTAssertEqual(
             adapter.descriptor.providerID,
             "apple.foundation-models.v1",
@@ -167,31 +169,25 @@ final class AppleFoundationE2ETests: XCTestCase {
                 .isEmpty)
     }
 
-    /// Proves the registry's "prefer most-recent on-device" rule
-    /// keeps Apple FM selected even when a deterministic adapter is
-    /// also present (deterministic registers first → Apple FM second
-    /// → Apple FM wins). If a future change breaks this preference,
-    /// hosts that have both adapters wired would silently route
-    /// every turn through the deterministic stub instead of the real
-    /// model.
-    func testRegistryPrefersAppleFMOverDeterministicWhenBothPresent()
+    /// Proves an explicit Apple provider ID is stable when another
+    /// on-device adapter is co-registered.
+    func testRegistryLooksUpAppleFMWhenBothPresent()
         async throws
     {
         try skipUnlessReady()
 
         let registry = BASOrganRegistry()
-        // Register deterministic FIRST.
         await registry.register(BASOrganDeterministicAdapter())
-        // Apple FM SECOND — should win on most-recent ordering.
-        await registry.register(AppleFoundationOrganAdapter())
+        let apple = AppleFoundationOrganAdapter()
+        await registry.register(apple)
 
-        let adapter = try await registry.adapter(for: .scout)
+        let adapter = try await registry.adapter(
+            providerID: apple.descriptor.providerID)
         XCTAssertEqual(
             adapter.descriptor.providerID,
             "apple.foundation-models.v1",
-            "Apple FM (registered last) must be preferred over " +
-            "deterministic (registered first) per registry's " +
-            "most-recent-on-device rule")
+            "explicit Apple provider lookup must not select the " +
+            "co-registered deterministic adapter")
     }
 
     // MARK: - #1 native wires runtime cert (structured output + tool bridge)

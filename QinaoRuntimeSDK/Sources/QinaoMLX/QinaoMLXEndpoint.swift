@@ -80,7 +80,9 @@ public extension QinaoLoop {
         // Pre-embed the fact bank so the first ON turn doesn't stall before the first token (no-op when OFF).
         await BASLLMNeuralCoreService.prewarmAdjudicator(organ)
         await registry.register(organ)
-        return BASOrganRegistryEndpoint(registry: registry)
+        return BASOrganRegistryEndpoint(
+            registry: registry,
+            providerID: organ.descriptor.providerID)
     }
 
     /// Throughput-first MLX factory.
@@ -125,6 +127,7 @@ public extension QinaoLoop {
         await registry.register(organ)
         return BASOrganRegistryEndpoint(
             registry: registry,
+            providerID: organ.descriptor.providerID,
             presetForRole: { _ in .greedyDeterministic })
     }
 

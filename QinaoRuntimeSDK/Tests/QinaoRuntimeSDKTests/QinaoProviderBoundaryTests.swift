@@ -396,6 +396,7 @@ final class QinaoProviderBoundaryTests: XCTestCase {
             wrapping: rawProvider,
             counter: counter)
         let endpoint = BASOrganRegistryEndpoint(
+            providerID: countedProvider.descriptor.providerID,
             adapterOverride: { _ in countedProvider },
             nextRequestID: { "silicon.w0.request" })
         let loop = QinaoLoop(organEndpoint: endpoint)

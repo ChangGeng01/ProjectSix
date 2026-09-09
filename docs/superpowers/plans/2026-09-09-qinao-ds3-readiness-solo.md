@@ -335,13 +335,13 @@ if necessary. Test files live under each package's existing test target.
 Unlisted concrete caller migrations require a narrow source reference and root
 coordination, not a repository-wide redesign. No Task4 file changes.
 
-- [ ] **Step 1 — reproduce the specific existing RED.** Run only
+- [x] **Step 1 — reproduce the specific existing RED.** Run only
   `BASProviderBoundaryTests/testRegistryResolvesOnlyAnExplicitProviderID` in the
   handed-back native BAS scratch. Its existing protocol probes compile before
   and after the API migration and must report the actual missing-ID/role-election
   assertion, not a build failure. Preserve that output; do not repeat the full
   BAS or Qinao baselines. The test's no-role-API assertion remains unchanged.
-- [ ] **Step 2 — exact registry lookup and controls.** Implement:
+- [x] **Step 2 — exact registry lookup and controls.** Implement:
 
   ```swift
   public func adapter(providerID: String) throws -> any BASOrganAdapter {
@@ -384,7 +384,7 @@ coordination, not a repository-wide redesign. No Task4 file changes.
   Repeat with reversed registration order; test descriptor missing-ID and
   replacement preserves presentation order. Add legacy error Codable round-trip
   coverage without retaining executable role election.
-- [ ] **Step 3 — real endpoint binding and call-site migration.** Configured
+- [x] **Step 3 — real endpoint binding and call-site migration.** Configured
   registry initializers require `registry: BASOrganRegistry, providerID: String`;
   test-override initializers require an expected `providerID: String` alongside
   the existing role-taking override closure. Preserve `init()` solely for the
@@ -409,7 +409,7 @@ coordination, not a repository-wide redesign. No Task4 file changes.
   model selection or fallback is permitted. Migrate every listed real/test caller
   to an explicit ID or an already-held adapter. Do not change response transport,
   buffering, provider metadata format, canonical generation, or default models.
-- [ ] **Step 4 — prove invocation, not just lookup.** Add an actor spy with a
+- [x] **Step 4 — prove invocation, not just lookup.** Add an actor spy with a
   nonisolated immutable descriptor and separate eager/stream invocation counters,
   yielding deterministic nonempty content. Register A and B in both orders and
   bind A. Exercise legacy eager, decision-aware eager and streaming; assert A's
@@ -420,7 +420,7 @@ coordination, not a repository-wide redesign. No Task4 file changes.
   adapter invoked. Inject B under expected A: identity mismatch before either
   invocation in both paths. Keep no-endpoint, non-streaming and translated-error
   controls. Never use a real model, provider credential or live network.
-- [ ] **Step 5 — focused verification and handback.** Use Xcode-beta27 and the
+- [x] **Step 5 — focused verification and handback.** Use Xcode-beta27 and the
   real matching MLX_METAL_PATH from Task3. BAS scratch is
   `/private/tmp/qinao-bas-native-test-1329bde3`; Qinao scratch is
   `/private/tmp/qinao-sdk-native-test-7806dc5a`. The sole implementer owns both;
@@ -437,3 +437,170 @@ coordination, not a repository-wide redesign. No Task4 file changes.
   task-5-report.md for fresh independent task review. No staging/commit/push,
   subagents, new scan, full-suite rerun, dependency/toolchain mutation or cleanup
   of historical files inside this task; root owns review, commit and upload.
+
+## Task 6: Resolve MLX production construction from the BAS manifest
+
+Start only after Task5 acceptance and source handback. This bounded slice fixes
+the real BAS `testProductionDefaultComesFromManifestOnly` failure and follows
+its selected entry through the existing Qinao MLX factory. It does not implement
+full Qinao provider inversion/shared TurnOperation, certify Qwen, or claim all
+device-runner defaults have converged. Existing explicit experimental model
+choices remain explicit. The independent proposal is context, not extra scope.
+
+**Consumes:** unchanged `BASModelManifestRegistry.productionDefault`,
+`BASModelCapabilityManifest.modelID` and `peakBytesEstimate`, existing
+`MLXModelCatalog.Entry`, Task5's required endpoint `providerID`, and existing
+memory/load/adjudicator behavior.
+
+**Produces:** `MLXModelCatalog.entry(for:) throws -> Entry`, a truthful
+`certifiedEntries` view, adapters requiring explicit `model:`, and no-model
+`QinaoLoop.makeMLXEndpoint(progressHandler:)` composition which resolves the BAS
+manifest and refuses an insufficient cap before any model load. The existing
+`makeMLXEndpoint(model:progressHandler:)` remains explicit-only and compatible
+with every existing enum choice. No new Qinao-owned default constant or enum case.
+
+**Source files:**
+
+- `BehavioralAISubstrate/Sources/BASMLXAdapter/MLXModelCatalog.swift`: import
+  BASOrgan; exact manifest lookup; rename certification view; remove independent
+  `recommendedDefault`. Keep all entry identities, EOS tokens, local paths,
+  existing member order and speculative pairings unchanged.
+- Same directory `MLXOrganAdapter.swift`: require `model:` in both initializers,
+  use certification view, update obsolete documentation/refusal guidance only;
+  no decoder/loading algorithm/actor lifecycle change.
+- Same directory `MLXMemoryPolicy.swift`: synchronize model-explicit examples;
+  keep every memory/cache/KV default and behavior unchanged.
+- `QinaoRuntimeSDK/Sources/QinaoMLX/QinaoMLXEndpoint.swift`: manifest-default and
+  explicit-choice overloads, one internal preparation/composition path and a
+  narrow offline loader injection seam, remove LoRA trainer's model default,
+  truthful model/certification descriptions. Retain throughput opt-in unchanged.
+- `BehavioralAISubstrate/DeviceTestApp/Sources/App/BASSpecDefaultOnProbe.swift`:
+  make its Gemma dormancy fixture explicit and label it as an experiment; add
+  a construction-only manifest-selected identity observation within existing
+  opt-in execution. Do not load the production model or change Llama experiment.
+
+**Tests:** under BAS's existing test directory, `BASProviderBoundaryTests.swift`,
+`MLXOrganAdapterTests.swift`, `BASMLXMemoryBudgetTests.swift`,
+`MLXMemoryPolicyTests.swift`, `BASSpeculativeDecodeConfigTests.swift`,
+`BASSessionLaneTests.swift`, `BASMLXSeatRoutingH21Tests.swift`,
+`BASQINAOSubstrateGatesBatch10Tests.swift`; under Qinao's existing test directory,
+`QinaoMLXEndpointTests.swift`, `QinaoMLXSpeculativeSurfaceTests.swift`, and the
+unchanged explicit-choice/cache controls in `QinaoSampleSessionTests.swift`.
+One focused manifest/factory preparation test file may be added to the respective
+existing test target. Only files with actual affected references need edits;
+the others are verification scope. Unlisted concrete compile callers require
+a narrow root ruling before edits, not a broad migration.
+
+- [ ] **Step 1 — preserve the real failure.** Run only
+  `BASProviderBoundaryTests/testProductionDefaultComesFromManifestOnly` on the
+  handed-back BAS scratch before edits. Preserve its actual catalog-default and
+  competing-recommendation assertion failure. No full baseline rerun. Then add
+  focused lookup/construction tests; test API absence via a temporary compilable
+  stub if needed, never count a compiler error as behavioral RED.
+- [ ] **Step 2 — separate selection from certification.** Implement this exact
+  lookup contract in the existing catalog, with an Equatable local error type:
+
+  ```swift
+  public enum LookupError: Error, Equatable {
+      case unknownModelID(String)
+  }
+  public static func entry(for manifest: BASModelCapabilityManifest) throws -> Entry {
+      guard let entry = allEntries.first(where: { $0.id == manifest.modelID }) else {
+          throw LookupError.unknownModelID(manifest.modelID)
+      }
+      return entry
+  }
+  public static let certifiedEntries: [Entry] = [
+      gemma4_E4B_4bit, gemma4_E2B_4bit, gemma3_4B_it_4bit
+  ]
+  ```
+
+  `allEntries` remains those three plus the existing alternatives in their
+  unchanged order. Remove `defaultEntries` and `recommendedDefault` after
+  migrating consumers; no compatibility alias retains a competing default.
+  Production default stays exact `mlx-community/Qwen3.5-4B-4bit` in BAS, with
+  its existing catalog provider ID. Qwen remains experimental. Lookup resolves
+  identity, not artifact provenance or certification of arbitrary manifest facts.
+  Preserve explicit local-only experiment entries without adding them to a
+  published/default catalog merely to satisfy this lookup.
+- [ ] **Step 3 — explicit adapter and legacy callers.** Remove only the default
+  value from both `model: MLXModelCatalog.Entry` constructor parameters. Keep
+  their other parameters/delegation unchanged. Migrate every affected test and
+  the named probe to the model its assertions actually concern, normally explicit
+  Gemma E4B for existing speculation/dormancy fixtures. For memory-policy equality:
+
+  ```swift
+  let entry = MLXModelCatalog.gemma4_E4B_4bit
+  let flat = MLXOrganAdapter(model: entry)
+  let grouped = MLXOrganAdapter(model: entry, memoryPolicy: MLXMemoryPolicy())
+  XCTAssertEqual(flat.model, grouped.model)
+  XCTAssertEqual(flat.memoryPolicy, grouped.memoryPolicy)
+  ```
+
+  Use `certifiedEntries` for tier membership only. Refusal text asks the caller
+  for an explicit suitable selection, not a removed recommendation API. Keep
+  all explicit Qinao enum raw values/Codable identity and LoRA training targets;
+  `makeLoRATrainer(model:configuration:)` simply requires its model argument.
+- [ ] **Step 4 — real manifest-to-factory path.** Add the no-model public
+  overload and make the current enum overload explicit-only. Both must use one
+  small internal selected-entry composition path, preserving actual load,
+  wrapper, prewarm, registration and Task5 exact descriptor-ID binding. Do not
+  expose BAS/MLX types in any new public Qinao API. An internal closure accepting
+  the constructed adapter and progress handler may replace only `loadModel`
+  during offline tests; public production calls always use real `loadModel`.
+  The factory tests must exercise the same preparation/composition path used by
+  the public overloads, not a parallel test-only model resolver.
+
+  Resolve the default cap using existing `resolvedActiveHardCapBytes()` then
+  `measurediPhoneAirActiveHardCapBytes` fallback; allow the internal preparation
+  seam to accept an explicit cap for deterministic tests. For the manifest path:
+
+  ```swift
+  let entry = try MLXModelCatalog.entry(for: manifest)
+  guard capBytes > 0, manifest.peakBytesEstimate > 0,
+        manifest.peakBytesEstimate <= capBytes else {
+      throw BASOrganError.providerUnavailable(reason: "manifest-model-exceeds-active-cap")
+  }
+  let policy = MLXMemoryPolicy(
+      enforceMemoryAdmission: true, activeHardCapBytes: capBytes)
+  let adapter = MLXOrganAdapter(model: entry, memoryPolicy: policy)
+  ```
+
+  This pre-load check is necessary because the old provider-ID memory table
+  lacks Qwen3.5 and admits an unknown peak. Do not copy a second Qwen peak table
+  or pick Gemma on refusal. Keep legacy explicit-experiment memory policy and
+  named throughput behavior unchanged. The estimated check is not an OS heap
+  guarantee or proof of actual device performance.
+- [ ] **Step 5 — behavioral tests and compatibility.** Replace the old W0
+  catalog-list/recommendation assertions with actual manifest -> exact entry ->
+  adapter identity/EOS assertions, not deletion of the default invariant. Cover:
+  default Qwen, known explicit Gemma manifest, unknown ID typed refusal, both
+  adapter constructor forms, exact three-member certification/order and Qwen
+  experimental status. In Qinao replace the tautological local Gemma constant
+  test with actual factory-path load-spy observations: default selects Qwen;
+  explicit Gemma stays Gemma; only one entry is loaded; wrapper/endpoint keeps
+  that provider identity. Cap equal to selected peak accepts preparation; peak
+  minus one, zero and negative cap reject before load; unknown manifest rejects
+  before load; no fallback. Injected load error propagates with no second load.
+  Preserve existing enum round-trip/picker/cache, memory rejection/dual-residency,
+  speculation and unsupported-framework controls. No network/model loading in
+  these tests; no opt-in E2E activation.
+- [ ] **Step 6 — verify and hand back.** The sole implementer owns BAS scratch
+  `/private/tmp/qinao-bas-native-test-1329bde3` and Qinao scratch
+  `/private/tmp/qinao-sdk-native-test-7806dc5a` serially. Use Xcode-beta27,
+  `--build-system native` and the real MLX_METAL_PATH already recorded in Task3.
+  Run the changed suites plus both BAS identity/default boundaries and Qinao
+  explicit picker/cache compatibility. Compile all package test sources normally.
+  Search actual source/test references for removed defaults and omitted-model
+  constructors, not compilation alone. Record commands/counts/skips/full logs,
+  diff check and the complete frozen patch in this SDD workspace; report
+  `task-6-report.md`. Root owns fresh independent review, commit and upload.
+  No staging/commit/push, subagents, scans, dependency edits, toolchain mutation,
+  device launch, model download or full-suite repetition within implementation.
+
+**Explicit remaining work:** `BASEnduranceAppRunner.swift` has a distinct
+operator selector whose absent/unknown values currently fall back to Gemma E2B.
+It already passes an explicit adapter entry, so this API migration does not
+change it. Reconcile that selector and misleading experiment labels in a later
+bounded device-host follow-through before claiming end-to-end default convergence.
+The two full Qinao provider-inversion/shared-operation failures remain open.

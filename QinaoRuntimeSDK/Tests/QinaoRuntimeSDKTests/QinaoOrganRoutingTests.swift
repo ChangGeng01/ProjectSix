@@ -335,6 +335,7 @@ final class QinaoOrganRoutingTests: XCTestCase {
     func testRegistryEndpointHonorsDecisionPreset() async throws {
         let adapter = SpyAdapter(providerID: "spy.scout.v1")
         let endpoint = BASOrganRegistryEndpoint(
+            providerID: adapter.descriptor.providerID,
             adapterOverride: { _ in adapter },
             nextRequestID: { "req-1" })
         let decision = QinaoLoop.QinaoOrganRoutingDecision(

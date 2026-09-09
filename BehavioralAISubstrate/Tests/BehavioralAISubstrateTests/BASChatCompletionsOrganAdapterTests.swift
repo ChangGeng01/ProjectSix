@@ -348,11 +348,8 @@ final class BASChatCompletionsOrganAdapterTests: XCTestCase {
         let registry = BASOrganRegistry()
         await registry.register(adapter)
 
-        // Registry resolves it for both roles. The adapter's
-        // descriptor.runsOnDevice == false means in production it
-        // wouldn't be the most-recent on-device pick, but with no
-        // on-device adapter registered it falls through to it.
-        let resolved = try await registry.adapter(for: .scout)
+        let resolved = try await registry.adapter(
+            providerID: adapter.descriptor.providerID)
         XCTAssertEqual(
             resolved.descriptor.providerID, "test.openai-compat")
 

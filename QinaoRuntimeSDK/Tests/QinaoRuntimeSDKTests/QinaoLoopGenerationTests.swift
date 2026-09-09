@@ -302,6 +302,7 @@ final class QinaoLoopGenerationTests: XCTestCase {
             providerID: "bas.deterministic.v1",
             clock: clock)
         let endpoint = BASOrganRegistryEndpoint(
+            providerID: adapter.descriptor.providerID,
             adapterOverride: { _ in adapter },
             nextRequestID: { "req.fixed" })
         let loop = QinaoLoop(privateEndpoint: endpoint)
@@ -338,11 +339,12 @@ final class QinaoLoopGenerationTests: XCTestCase {
 
     /// If the internal registry adapter has nothing registered,
     /// the endpoint must surface a typed refusal (not crash).
-    func testEmptyRegistrySurfacesNoAdapterForRole() async throws {
+    func testEmptyRegistrySurfacesUnknownExplicitProvider() async throws {
         let clock: @Sendable () -> Date = { Date() }
         let registry = BASOrganRegistry(clock: clock)
         let endpoint = BASOrganRegistryEndpoint(
             registry: registry,
+            providerID: "missing.provider",
             nextRequestID: { "req.test" })
         let loop = QinaoLoop(privateEndpoint: endpoint)
         do {
@@ -350,9 +352,7 @@ final class QinaoLoopGenerationTests: XCTestCase {
                 sessionID: "s1", seeds: [makeSeed("c1")])
             XCTFail("empty registry must refuse")
         } catch QinaoLoop.LoopError.organUnavailable(let reason) {
-            XCTAssertTrue(
-                reason.hasPrefix("no-adapter-for-role:"),
-                "unexpected reason code: \(reason)")
+            XCTAssertEqual(reason, "unknown-provider:missing.provider")
         }
     }
 

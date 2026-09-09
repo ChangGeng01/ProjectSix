@@ -61,15 +61,12 @@ import QinaoLoop
 /// UNREACHABLE on every host, so nothing ever "falls back". Three verified
 /// links, each sufficient on its own:
 ///
-///  1. `BASOrganRegistry.adapter(for:)` (BASOrgan/BASOrganRegistry.swift:67-87)
-///     is SELECTION-ONLY: it returns the most-recently-registered on-device
-///     adapter for the role and never retries another on failure. It never
-///     calls `currentCapacity()`.
-///  2. This factory registers the deterministic adapter FIRST and the Apple
-///     organ LAST, so "prefer most-recent" always resolves to Apple.
-///  3. `AppleFoundationOrganAdapter`'s descriptor hardcodes `runsOnDevice: true`
-///     unconditionally — it wins selection even on hosts where `draft(_:)`
-///     throws.
+///  1. `BASOrganRegistry.adapter(providerID:)` performs exact lookup and never
+///     retries another provider on failure. It never calls `currentCapacity()`.
+///  2. This factory binds the wrapped Apple organ's descriptor ID explicitly;
+///     registration order cannot redirect it to the deterministic adapter.
+///  3. The wrapped Apple adapter forwards that same descriptor identity even on
+///     hosts where `draft(_:)` throws.
 ///
 /// So on an unavailable Apple FM this endpoint THROWS; it does not degrade.
 /// The prior text here ("silently falls back to the deterministic adapter on an
@@ -97,8 +94,8 @@ public extension QinaoLoop {
     /// `QinaoOrganEndpoint`. See file-level doc for full behavior.
     ///
     /// - Parameter includeDeterministicFallback: ⚠️ NO-OP — see the file-level
-    ///   doc. It registers `BASOrganDeterministicAdapter`, but the registry is
-    ///   selection-only and always resolves to the Apple organ, so an
+    ///   doc. It registers `BASOrganDeterministicAdapter`, but the endpoint binds
+    ///   the Apple organ's provider ID explicitly, so an
     ///   unavailable Apple FM still THROWS rather than falling through. Kept for
     ///   source compatibility; leave `false`.
     /// - Returns: an opaque endpoint hosts pass to
@@ -108,17 +105,16 @@ public extension QinaoLoop {
     ) async -> any QinaoOrganEndpoint {
         let registry = BASOrganRegistry()
         if includeDeterministicFallback {
-            // NO-OP in practice: the Apple organ is registered last and the
-            // registry prefers the most-recently-registered on-device adapter,
-            // so this one is never selected. Retained for source compatibility
-            // until a streaming-capable router exists. See the file-level doc.
+            // NO-OP in practice: the endpoint below explicitly binds the Apple
+            // organ's provider ID, so this one is never selected. Retained for
+            // source compatibility until a streaming-capable router exists.
             await registry.register(BASOrganDeterministicAdapter())
         }
         // observe→DISPOSE (Line A): route the live Apple FM organ through the factual-belief adjudicator.
         // Default-OFF (`BAS_FACTUAL_ADJUDICATE` unset) ⇒ returns the adapter byte-equal; ON ⇒ the
         // streaming-capable wrapper, so the chat loop's `as? BASStreamingOrganAdapter` probe resolves it and
-        // the verdict reaches `streamDraft`. The wrapper forwards `descriptor`, so the registry's
-        // on-device/recency selection (Apple FM over the deterministic fallback) is unchanged. FAIL-OPEN:
+        // the verdict reaches `streamDraft`. The wrapper forwards `descriptor`, preserving the exact provider
+        // identity bound by the endpoint below. FAIL-OPEN:
         // missing provider/corpus ⇒ the adapter is returned unchanged.
         let organ = BASLLMNeuralCoreService.adjudicating(
             AppleFoundationOrganAdapter(),
@@ -128,6 +124,8 @@ public extension QinaoLoop {
         // Pre-embed the fact bank so the first ON turn doesn't stall before the first token (no-op when OFF).
         await BASLLMNeuralCoreService.prewarmAdjudicator(organ)
         await registry.register(organ)
-        return BASOrganRegistryEndpoint(registry: registry)
+        return BASOrganRegistryEndpoint(
+            registry: registry,
+            providerID: organ.descriptor.providerID)
     }
 }
