@@ -655,7 +655,7 @@ in this patch. It does not promise storage-failure survival or permanent pins.
 - Actual writers/committer remain unchanged; their deletion decisions must be
   corrected through the real shared planner boundary, not a test-only helper.
 
-- [ ] **Step 1 — actual behavioral RED.** In the existing update-planner
+- [x] **Step 1 — actual behavioral RED.** In the existing update-planner
   regression at lines44-90, preserve its two minute-old fixtures, one stale
   fixture and `maxEntries: 1`, but require both recent IDs:
 
@@ -671,7 +671,7 @@ in this patch. It does not promise storage-failure survival or permanent pins.
   Record the expected missing-recent-ID assertion failure and the legitimate
   input-normalization control. No whole-baseline repeat or compiler-error RED.
 
-- [ ] **Step 2 — one small selection policy.** Implement the following shared
+- [x] **Step 2 — one small selection policy.** Implement the following shared
   selection, retaining each caller's canonical order before mapping the tuples:
 
   ```swift
@@ -710,7 +710,7 @@ in this patch. It does not promise storage-failure survival or permanent pins.
   floor. Future records remain protected as before; clock attestation, invalid
   record-date repair and timestamp clamping are outside this finite patch.
 
-- [ ] **Step 3 — planner regressions and truthful old controls.** For each
+- [x] **Step 3 — planner regressions and truthful old controls.** For each
   public planner, exercise these values through its actual public function:
 
   - Default61fresh updates /41distinct fresh checkpoints retain all IDs.
@@ -731,7 +731,7 @@ in this patch. It does not promise storage-failure survival or permanent pins.
   Preserve checkpoint dedup assertions and the existing recent-record explicit
   forget regression. Do not remove coverage or simply lower expected counts.
 
-- [ ] **Step 4 — actual disk persistence and reopen.** Add one test beside each
+- [x] **Step 4 — actual disk persistence and reopen.** Add one test beside each
   existing writer fixture, using its actual exported writer. Each test uses
   one unique temporary directory, explicit fixture-only schema and no CloudKit:
 
@@ -761,7 +761,7 @@ in this patch. It does not promise storage-failure survival or permanent pins.
   using Testing.Issue.record rather than swallowing them. No user database,
   default app container, iCloud, real provider, model or device access.
 
-- [ ] **Step 5 — focused verification and handback.** Use handed-back BAS
+- [x] **Step 5 — focused verification and handback.** Use handed-back BAS
   native scratch `/private/tmp/qinao-bas-native-test-1329bde3`, Xcode-beta27 and
   the retained real MLX_METAL_PATH. Run all seven named suites with:
 
@@ -779,3 +779,189 @@ in this patch. It does not promise storage-failure survival or permanent pins.
   independent review, final verification, commit and upload. No staging,
   commit/push, subagents, scans, full baseline repeat, dependency or toolchain
   changes within the implementation. DS3 is still separately authorized.
+
+Task7 acceptance: independent review approved; root's unchanged-patch seven-suite
+run with pipefail completed exit0,61passed/0failed/0skipped, including both actual
+disk reopens. The original tee-only logs are retained with their status caveat.
+See `docs/superpowers/validation/2026-09-09-current-brain-retention.md`.
+
+## Task 8: Enforce event-log retention from storage ingestion time
+
+Start only after Task7 acceptance and source/build handback. This is one
+cross-backend correction for confirmed DS1 `occ_f689fce8a8044ba9b5afec3b`, not
+a new retention service. A Swift-only patch is not completion. The read-only
+investigation and build preflight are in this plan's private SDD directory.
+
+**Invariant:** an automatic/periodic prune may delete a row only when BOTH its
+semantic `timestamp_ms < callerCutoff` and its storage-owned
+`ingested_at_ms < nowMs - 259_200_000`. The strict second comparison retains at
+exactly72hours and permits deletion at72hours+1ms. Keep semantic timestamps,
+public event Codable/wire formats, JSON/blob bytes, IDs, duplicate results,
+ordering and integrity hash inputs unchanged. Explicit user forget is separate.
+No guarantee for arbitrary third-party conformers, unavailable/full storage,
+compromised clocks, or recovery beyond the retained lifetime is introduced.
+
+**Scope and architecture:**
+
+- `BASRuntimeCore/BASEventLog.swift`, `BASSQLiteEventLogStorage.swift` and one
+  small `BASEventLogRecoveryRetention.swift` in that directory; no dependency on
+  BASMemory. A package-visible constant/checked-cutoff helper may also serve the
+  routed concrete adapter; it is not a policy registry or new public protocol.
+- `BASMemory/BASRoutedEventLogStorage.swift`, existing Rust
+  `Cargo/bas-l8-engine/src/event_log.rs`, and only necessary event-log wrappers
+  or symbol reexports in that crate/tracker crate. Do not alter unrelated L8
+  schemas, SQL execution policy, payload codecs or provider/generation code.
+- Canonical header `Cargo/bas-memory-usage-tracker/include/bas_rust_memory_tracker.h`
+  and generated `Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework`
+  through the existing build script. Preserve all old exported signatures.
+- Add focused `BASEventLogIngestionRetentionTests.swift` and, if needed, one
+  shared test-only locked clock fixture. Update real prune controls in
+  `BASEventLogTests`, `BASEventLogSeqHighWaterMarkTests`,
+  `BASEventLogTamperRedTeamTests`, `BASChapter901EventLogByteEqTests`, and
+  `BASFederatedEventLogStorageTests`. Other test files may change only a
+  demonstrated affected concrete retention/schema fixture, never assertions
+  unrelated to this changed contract; report every such addition to root.
+  Mock conformers with inert prune methods do not need migration.
+
+- [ ] **Step 1 — behavioral RED and storage clock.** Preserve one deterministic
+  failure showing a newly appended backdated event immediately deleted by an
+  actual in-memory or Swift SQLite backend, with a valid append/read control.
+  Introduce injectable clocks on concrete stores for tests, preserving existing
+  public initializer calls and using real system time by default. Test seams
+  should be internal where possible. The event's own timestamp never supplies
+  its age. Capture/stamp after duplicate detection, atomically with insert;
+  duplicates never refresh ingestion age. No sleep-based tests or user stores.
+
+- [ ] **Step 2 — Swift persistence and migration.** Bump the Swift SQLite
+  schema to3. In one checked transaction, accept versions0/1/2, ensure the
+  existing v2 columns without payload rewriting, add `ingested_at_ms` when
+  absent, backfill legacy unset rows to one captured migration time, initialize
+  persistent per-session high-water marks from surviving rows, and set
+  `user_version` LAST. Version0 with an existing Rust table is not a fresh DB.
+  Fresh rows require explicit ingestion metadata; current-version missing
+  required columns fail rather than silently manufacture another migration.
+  Reopening must not restamp existing rows. Preserve JSON/blob encodings and
+  hashes byte-for-byte; transaction failure must leave the old version/data
+  intact and release the failed-open database handle.
+
+  Sample the production migration clock after acquiring its transaction, not
+  before waiting for the database lock. Schema/column/sidecar probes must check
+  final SQLite step errors, not interpret them as absent. Acquire/setup each
+  SQLite/Rust handle as a local resource and transfer ownership only after
+  success; allow a narrow internal close observer around the real close for
+  failed-open exactly-once cleanup tests. No owning property may retain a
+  handle already closed in a catch path. Migration rollback means unchanged
+  event data/metadata/version, not byte-identical whole files after existing
+  WAL/secure-delete/VACUUM setup.
+
+  Use the same dual predicate for the sidecar subquery and event DELETE in one
+  transaction, preserving high-water marks and secure-delete checkpoint
+  behavior. Null ingestion metadata inserted by an old writer after migration
+  must be retained conservatively, not treated as old. In-memory metadata is
+  removed only with its row. For append-clock regression, conservatively clamp
+  new ingestion stamps to at least the maximum existing valid ingestion stamp;
+  do not clamp or rewrite semantic timestamps. This is ordinary metadata, not
+  authenticated time or a promise against large forward clock jumps.
+
+  **Integrity compatibility:** a session with any recorded integrity-sidecar
+  participation may prune only a contiguous sequence prefix satisfying BOTH
+  age predicates. Retain eligible interior/tail rows beyond its first
+  ineligible row. Sessions without sidecar participation retain the ordinary
+  dual predicate. Use identical selected IDs for sidecar/event deletion; never
+  rewrite hashes or relax verification to bless missing interior links. This
+  deliberately over-retains when event timestamps are nonmonotone.
+
+- [ ] **Step 3 — Rust/routed parity and old ABI.** Add deterministic-clock
+  Rust helpers/FFI siblings for testing schema initialization, append and
+  prune. Production routed calls retain the original system-clock exports.
+  These and the test-only explicit-time variants share a private non-stored
+  clock-provider implementation, evaluated inside the transaction after
+  duplicate detection for append. Do not sample production ingestion time in
+  Swift before the Rust mutex/SQLite lock. The routed internal test initializer
+  selects deterministic-time siblings only for fixtures. Old symbols use the
+  same protected algorithm, not timestamp-only pruning. No stored callback,
+  clock pointer or engine clock ABI is needed. Share validation/transactions.
+
+  Rust owns event-log table structure, not the whole L8 database's
+  `PRAGMA user_version` (the existing generic engine exposes that value to
+  callers). Preserve that value on Rust open. Recognize/migrate legacy event
+  tables structurally, including missing v2 payload columns; stamp a newly
+  introduced ingestion column's legacy rows once in the same transaction.
+  Already-present ingestion metadata is never reset on later Rust opens.
+  Swift opening a Rust version0 database subsequently sets its own version3
+  without changing existing ingestion ages. Test the reverse direction too.
+  Do not overwrite an unrelated database version or claim general mixed-schema
+  database compatibility from this event-log path.
+
+  Rust must preserve an unrelated caller version sentinel in a regression;
+  Swift rejects unsupported nonzero versions without replacing them. Preserve
+  current JSON-only routed reads: migration tests inspect legacy binary bytes
+  directly and exercise the existing Swift decoder, not claim Rust gained
+  format2 decoding. Rust may open/prune a Swift-created chain but does not
+  gain chain-writing support for subsequent appends into that chained session.
+
+  Use Swift's existing `event_log_seq_hwm` schema, seed all surviving sessions
+  before prune, and advance it atomically on append; never reset after full
+  prune/reopen. Preserve optional `event_log_integrity` cleanup in the same
+  dual-predicate delete transaction even when Rust itself did not create the
+  sidecar. Existing out-of-band deletion detection must still fail. Preserve
+  payload caps/error codes, SQL binding, per-engine serialization and secure
+  deletion/checkpoint behavior per backend. Swift retains its existing checked
+  post-commit TRUNCATE; Rust currently has no equivalent event-log hygiene
+  hook, so do not claim physical-erasure parity or add database-wide hygiene
+  policy in this patch. A post-commit checkpoint error cannot roll back an
+  already committed deletion. No raw pointer or binary parser redesign.
+
+- [ ] **Step 4 — arithmetic and public presets.** Checked multiplication and
+  subtraction in `BASEventLogRetentionPolicy.cutoff` must never trap. Zero age,
+  overflow, negative/too-small clock or nonpositive cutoff means retain-all
+  for the built-in pruners. Valid ingestion metadata is an integer storage
+  value in0...Int64.max; null, negative and non-integral metadata is retained
+  and excluded from max-stamp calculations. Add
+  `last72Hours`; keep `last24Hours` source-compatible with its original24hour
+  value and document that it is only the requested semantic window, subject
+  to the independent72hour ingestion floor. Do not introduce deprecation
+  warnings or silently change serialized/configured maxAgeSec values.
+
+- [ ] **Step 5 — actual cross-backend proof and bundled runtime.** Tests must
+  cover new backdated input, short TTL, exactly72h/+1ms, legitimate old-row
+  deletion, duplicate age/payload/sequence stability, clock regression and
+  checked Int64 extremes. Existing physical-prune tests must advance a fake
+  storage clock past72h; do not change expected deletions to0 or disable them.
+  Test real temporary-file close/reopen (no retained first connection/actor),
+  v1/v2/legacy-Rust-version0 fixtures, unchanged JSON/blob/hash data, failed
+  migration rollback, no restamp, full-prune HWM, sidecar lockstep and tamper
+  detection. Run matched Swift/Rust clock outcomes and federation over the
+  compliant built-ins. Preserve explicit non-persistence of in-memory stores.
+
+  Use an aborting legacy UPDATE trigger to prove late migration rollback of
+  columns/data/version, and an aborting event DELETE trigger to prove sidecar
+  deletion rolls back with it. Remove only test-owned triggers, retry, then
+  close/reopen. A second connection opening is not by itself proof the first
+  handle closed; observe the actual close exactly once through the internal
+  seam. Prove a Rust clock provider is called inside an active transaction
+  once for a new row and zero times for a duplicate; bound a real production
+  FFI stamp by before/after system observations. For chained retention, test
+  old ingestions with event timestamps[100,1,100] and cutoff50: preserve the
+  interior row and valid chain; retain the out-of-band middle-delete failure.
+
+  Run focused locked Rust tests first. Inspect installed pinned targets/rust-src
+  before the existing three-slice build; do not install/update dependencies or
+  toolchains silently. Use the ordinary existing script with Xcode-beta27,
+  retaining old committed binaries in Git and all unrelated dirty artifacts.
+  Do not enable cold-clean mode or change build flags to hide failures. Verify
+  all three generated slices' symbols, header alignment and minimum OS, then
+  execute actual Swift routed calls against the rebuilt macOS slice. One build
+  is not a two-cold-build reproducibility claim. If the existing script or
+  environment blocks this step, report concrete evidence and keep the task
+  incomplete; do not substitute source-only success or fabricate binary proof.
+
+  Swift focused verification includes all changed suites and existing event-log
+  binary-wiring/dual-write/corrupt-surfacing/failure-injection controls. Root owns
+  the final full candidate baseline. Use the handed-back BAS native scratch,
+  Xcode-beta27 and retained real MLX_METAL_PATH, sequentially with the Rust build.
+  Preserve complete RED/GREEN commands/logs with `pipefail`, actual test-process
+  exit status, nonzero counts, skips, patch/source/binary identities and diff
+  check. Inspect the whole patch and direct callers; hand back task-8-report.md
+  for independent review. No staging/commit/push, subagents, scan, user database,
+  live provider/device or unrelated source edits. Root owns commit/upload.

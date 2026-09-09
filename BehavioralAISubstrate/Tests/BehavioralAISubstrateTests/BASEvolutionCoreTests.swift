@@ -2,6 +2,27 @@ import XCTest
 @testable import BASMemory
 
 final class BASEvolutionCoreTests: XCTestCase {
+    private func checkpoint(
+        id: String,
+        createdAt: Date,
+        fingerprint: String? = nil
+    ) -> BASEvolutionCheckpointStoredFields {
+        BASEvolutionCheckpointStoredFields(
+            id: id,
+            createdAt: createdAt,
+            fingerprint: fingerprint ?? id,
+            previousCheckpointID: nil,
+            modeName: "primary",
+            sourceID: "launch",
+            identityRole: .pauseCompanion,
+            boundaryMode: .localOnlyAdvisory,
+            calibrationStatus: .stable,
+            diffSummary: [],
+            approvalState: .automatic,
+            rollbackReady: true
+        )
+    }
+
     func testLineageSummaryBackfillsSchemaVersionWhenDecodingLegacyPayload() throws {
         let legacyJSON = """
         {
@@ -246,6 +267,115 @@ final class BASEvolutionCoreTests: XCTestCase {
         XCTAssertEqual(state.checkpointCount, 3)
         XCTAssertEqual(state.pendingReviewCount, 1)
         XCTAssertEqual(state.latestCheckpoint?.id, "newer")
+    }
+
+    func testDefaultCheckpointCapIsSoftWhileFortyOneEntriesAreFresh() {
+        let now = Date(timeIntervalSince1970: 1_715_000_000)
+        let checkpoints = (1...41).map { index in
+            checkpoint(
+                id: String(format: "checkpoint-%02d", index),
+                createdAt: now.addingTimeInterval(-Double(index))
+            )
+        }
+
+        let retained = BASEvolutionCheckpointPlanner.retainedCheckpointIDs(
+            in: checkpoints,
+            now: now
+        )
+
+        XCTAssertEqual(retained, Set(checkpoints.map(\.id)))
+    }
+
+    func testCheckpointMinimumRecoveryAgeIsInclusiveAndProtectsFutureEntries() {
+        let now = Date(timeIntervalSince1970: 1_715_000_000)
+        let boundary = checkpoint(
+            id: "boundary",
+            createdAt: now.addingTimeInterval(-259_200)
+        )
+        let tooOld = checkpoint(
+            id: "too-old",
+            createdAt: now.addingTimeInterval(-259_201)
+        )
+        let future = checkpoint(
+            id: "future",
+            createdAt: now.addingTimeInterval(60)
+        )
+
+        let retained = BASEvolutionCheckpointPlanner.retainedCheckpointIDs(
+            in: [tooOld, future, boundary],
+            now: now,
+            maxEntries: 0,
+            retentionInterval: 60 * 60
+        )
+
+        XCTAssertEqual(retained, Set([boundary.id, future.id]))
+    }
+
+    func testCheckpointCountsPreserveFreshEntriesAndUseCanonicalOlderAllowance() {
+        let now = Date(timeIntervalSince1970: 1_715_000_000)
+        let fresh = checkpoint(
+            id: "fresh",
+            createdAt: now.addingTimeInterval(-60)
+        )
+        let olderHigh = checkpoint(
+            id: "older-z",
+            createdAt: now.addingTimeInterval(-259_201)
+        )
+        let olderLow = checkpoint(
+            id: "older-a",
+            createdAt: olderHigh.createdAt
+        )
+        let outsideWindow = checkpoint(
+            id: "outside-window",
+            createdAt: now.addingTimeInterval(-BASEvolutionCheckpointPlanner.defaultRetentionInterval - 1)
+        )
+        let checkpoints = [olderLow, outsideWindow, fresh, olderHigh]
+
+        for count in [0, -1, 1] {
+            let retained = BASEvolutionCheckpointPlanner.retainedCheckpointIDs(
+                in: checkpoints,
+                now: now,
+                maxEntries: count
+            )
+            XCTAssertEqual(retained, Set([fresh.id]))
+        }
+
+        let retainedWithOlderAllowance = BASEvolutionCheckpointPlanner.retainedCheckpointIDs(
+            in: checkpoints,
+            now: now,
+            maxEntries: 2
+        )
+        XCTAssertEqual(retainedWithOlderAllowance, Set([fresh.id, olderHigh.id]))
+    }
+
+    func testInvalidCheckpointIntervalsCannotRemoveProtectedEntries() {
+        let now = Date(timeIntervalSince1970: 1_715_000_000)
+        let protected = checkpoint(
+            id: "protected",
+            createdAt: now.addingTimeInterval(-259_200)
+        )
+        let old = checkpoint(
+            id: "old",
+            createdAt: now.addingTimeInterval(-259_201)
+        )
+
+        for interval in [0, -1, .nan, -.infinity] as [TimeInterval] {
+            let retained = BASEvolutionCheckpointPlanner.retainedCheckpointIDs(
+                in: [old, protected],
+                now: now,
+                maxEntries: 2,
+                retentionInterval: interval
+            )
+            XCTAssertEqual(retained, Set([protected.id]))
+        }
+
+        let retainedWithInfiniteWindow = BASEvolutionCheckpointPlanner.retainedCheckpointIDs(
+            in: [old, protected],
+            now: now,
+            maxEntries: 2,
+            retentionInterval: .infinity
+        )
+        XCTAssertEqual(retainedWithInfiniteWindow, Set([protected.id, old.id]))
     }
 
     func testCheckpointPlannerCarriesLineageSummaryIntoCurrentState() {

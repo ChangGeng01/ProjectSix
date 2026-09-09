@@ -115,16 +115,24 @@ public enum BASCurrentBrainPersistenceApplier {
         }
     }
 
+    /// Selects updates for automatic retention while protecting every update from the last 72 hours.
+    ///
+    /// `maxEntries` is a soft target: zero and negative values keep no optional older updates, but
+    /// cannot remove protected updates. A zero, negative, NaN, or negative-infinite interval grants
+    /// no optional age window; positive infinity disables optional age expiry subject to the soft cap.
     public static func retainedUpdateIDs(
         in updates: [BASCurrentBrainUpdateStoredFields],
         now: Date,
         maxEntries: Int = defaultUpdateLimit,
         retentionInterval: TimeInterval = defaultRetentionInterval
     ) -> Set<UUID> {
-        let freshnessFloor = now.addingTimeInterval(-retentionInterval)
-        let eligible = canonicalUpdateOrder(for: updates)
-            .filter { $0.createdAt >= freshnessFloor }
-        return Set(eligible.prefix(maxEntries).map(\.id))
+        let ordered = canonicalUpdateOrder(for: updates)
+        return BASMinimumRecoveryRetention.retainedIDs(
+            in: ordered.map { (id: $0.id, createdAt: $0.createdAt) },
+            now: now,
+            maxEntries: maxEntries,
+            retentionInterval: retentionInterval
+        )
     }
 
     private static func canonicalStrings(_ values: [String]) -> [String] {

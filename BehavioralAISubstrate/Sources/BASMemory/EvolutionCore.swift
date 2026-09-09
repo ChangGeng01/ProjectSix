@@ -221,6 +221,11 @@ public enum BASEvolutionCheckpointPlanner {
         )
     }
 
+    /// Selects checkpoints for automatic retention while protecting every checkpoint from the last 72 hours.
+    ///
+    /// `maxEntries` is a soft target: zero and negative values keep no optional older checkpoints, but
+    /// cannot remove protected checkpoints. A zero, negative, NaN, or negative-infinite interval grants
+    /// no optional age window; positive infinity disables optional age expiry subject to the soft cap.
     public static func retainedCheckpointIDs(
         in checkpoints: [BASEvolutionCheckpointStoredFields],
         now: Date,
@@ -234,17 +239,11 @@ public enum BASEvolutionCheckpointPlanner {
             return lhs.createdAt > rhs.createdAt
         }
 
-        let limitedIDs = Set(ordered.prefix(maxEntries).map(\.id))
-        return Set(
-            ordered.compactMap { checkpoint in
-                guard limitedIDs.contains(checkpoint.id) else {
-                    return nil
-                }
-                guard checkpoint.createdAt.addingTimeInterval(retentionInterval) >= now else {
-                    return nil
-                }
-                return checkpoint.id
-            }
+        return BASMinimumRecoveryRetention.retainedIDs(
+            in: ordered.map { (id: $0.id, createdAt: $0.createdAt) },
+            now: now,
+            maxEntries: maxEntries,
+            retentionInterval: retentionInterval
         )
     }
 

@@ -125,9 +125,9 @@ struct BASAppleEvolutionCheckpointWriterTests {
                     calibrationStatus: .drifting
                 ),
                 in: context,
-                createdAt: baseDate.addingTimeInterval(120),
+                createdAt: baseDate.addingTimeInterval(4 * 86_400),
                 maxEntries: 2,
-                retentionInterval: 60 * 60
+                retentionInterval: BASEvolutionCheckpointPlanner.defaultRetentionInterval
             )
         let later: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
@@ -140,9 +140,9 @@ struct BASAppleEvolutionCheckpointWriterTests {
                     calibrationStatus: .stable
                 ),
                 in: context,
-                createdAt: baseDate.addingTimeInterval(180),
+                createdAt: baseDate.addingTimeInterval(8 * 86_400),
                 maxEntries: 2,
-                retentionInterval: 60 * 60
+                retentionInterval: BASEvolutionCheckpointPlanner.defaultRetentionInterval
             )
 
         let checkpoints = try context.fetch(FetchDescriptor<EvolutionCheckpointFixture>())
@@ -154,6 +154,162 @@ struct BASAppleEvolutionCheckpointWriterTests {
         #expect(checkpoints.count == 2)
         #expect(checkpoints.contains(where: { $0.fingerprint == "fingerprint-c" }))
         #expect(!checkpoints.contains(where: { $0.fingerprint == "fingerprint-a" }))
+    }
+
+    @Test("writer keeps distinct fresh checkpoints when they exceed the count target")
+    func writerKeepsDistinctFreshCheckpointsOverCountTarget() throws {
+        let container = try ModelContainer(
+            for: EvolutionCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
+
+        for index in 0..<3 {
+            let result: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+                BASAppleEvolutionCheckpointWriter.record(
+                    input: BASEvolutionCheckpointInput(
+                        modeName: "primary",
+                        sourceID: "fresh-\(index)",
+                        fingerprint: "fresh-fingerprint-\(index)",
+                        identityRole: .pauseCompanion,
+                        boundaryMode: .localOnlyAdvisory,
+                        calibrationStatus: .stable
+                    ),
+                    in: context,
+                    createdAt: baseDate.addingTimeInterval(Double(index) * 60),
+                    maxEntries: 2,
+                    retentionInterval: 60 * 60
+                )
+            #expect(result.wroteCheckpoint)
+        }
+
+        let checkpoints = try context.fetch(FetchDescriptor<EvolutionCheckpointFixture>())
+        #expect(checkpoints.count == 3)
+        #expect(Set(checkpoints.map(\.fingerprint)) == Set((0..<3).map { "fresh-fingerprint-\($0)" }))
+    }
+
+    @Test("writer persists forty-one fresh checkpoints across a disk reopen")
+    func writerPersistsFortyOneFreshCheckpointsAcrossDiskReopen() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bas-checkpoint-writer-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            do {
+                try FileManager.default.removeItem(at: directory)
+            } catch {
+                Issue.record("Failed to remove checkpoint-writer fixture directory: \(error)")
+            }
+        }
+
+        let storeURL = directory.appendingPathComponent("checkpoints.store")
+        let schema = Schema([EvolutionCheckpointFixture.self])
+        let now = Date(timeIntervalSince1970: 1_744_100_000)
+        let staleID = "checkpoint-expired"
+        let seededFreshIDs = Set((1...40).map { String(format: "checkpoint-%02d", $0) })
+        var expectedFreshIDs = seededFreshIDs
+        var newCheckpointID: String?
+
+        do {
+            let configuration = ModelConfiguration(
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(for: schema, configurations: [configuration])
+            let context = ModelContext(container)
+
+            for index in 1...40 {
+                context.insert(EvolutionCheckpointFixture(fields: BASEvolutionCheckpointStoredFields(
+                    id: String(format: "checkpoint-%02d", index),
+                    createdAt: now.addingTimeInterval(-Double(index) * 60),
+                    fingerprint: "fingerprint-\(index)",
+                    previousCheckpointID: index == 40
+                        ? nil
+                        : String(format: "checkpoint-%02d", index + 1),
+                    modeName: "primary",
+                    sourceID: "seed-\(index)",
+                    identityRole: .pauseCompanion,
+                    boundaryMode: .localOnlyAdvisory,
+                    calibrationStatus: .stable,
+                    diffSummary: ["seed-\(index)"],
+                    approvalState: .automatic,
+                    rollbackReady: true
+                )))
+            }
+            context.insert(EvolutionCheckpointFixture(fields: BASEvolutionCheckpointStoredFields(
+                id: staleID,
+                createdAt: now.addingTimeInterval(
+                    -BASEvolutionCheckpointPlanner.defaultRetentionInterval - 1
+                ),
+                fingerprint: "expired",
+                previousCheckpointID: nil,
+                modeName: "primary",
+                sourceID: "expired",
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["expired"],
+                approvalState: .automatic,
+                rollbackReady: true
+            )))
+            try context.save()
+
+            var saveError: Error?
+            let result: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+                BASAppleEvolutionCheckpointWriter.record(
+                    input: BASEvolutionCheckpointInput(
+                        modeName: "reflective",
+                        sourceID: "task-7-disk",
+                        fingerprint: "fingerprint-41",
+                        identityRole: .reflectiveWitness,
+                        boundaryMode: .localOnlyProtective,
+                        calibrationStatus: .drifting
+                    ),
+                    in: context,
+                    createdAt: now,
+                    onSaveError: { saveError = $0 }
+                )
+
+            if let saveError {
+                Issue.record("Checkpoint writer save failed: \(saveError)")
+            }
+            #expect(result.wroteCheckpoint)
+            #expect(result.orderedCheckpoints.count == 41)
+            let written = try #require(result.orderedCheckpoints.first?.basSnapshot)
+            newCheckpointID = written.id
+            expectedFreshIDs.insert(written.id)
+            #expect(written.fingerprint == "fingerprint-41")
+            #expect(written.previousCheckpointID == "checkpoint-01")
+            #expect(Set(result.orderedCheckpoints.map { $0.basSnapshot.id }) == expectedFreshIDs)
+            #expect(!result.orderedCheckpoints.contains { $0.basSnapshot.id == staleID })
+        }
+
+        let reopenedConfiguration = ModelConfiguration(
+            schema: schema,
+            url: storeURL,
+            cloudKitDatabase: .none
+        )
+        let reopenedContainer = try ModelContainer(
+            for: schema,
+            configurations: [reopenedConfiguration]
+        )
+        let reopenedContext = ModelContext(reopenedContainer)
+        let reopened = try reopenedContext.fetch(FetchDescriptor<EvolutionCheckpointFixture>())
+        let requiredNewCheckpointID = try #require(newCheckpointID)
+        let newest = try #require(reopened.first { $0.id == requiredNewCheckpointID })
+
+        #expect(reopened.count == 41)
+        #expect(Set(reopened.map(\.id)) == expectedFreshIDs)
+        #expect(!reopened.contains { $0.id == staleID })
+        #expect(newest.fingerprint == "fingerprint-41")
+        #expect(newest.previousCheckpointID == "checkpoint-01")
+        #expect(newest.modeName == "reflective")
+        #expect(newest.sourceID == "task-7-disk")
+        #expect(newest.identityRoleRaw == BASIdentityRole.reflectiveWitness.rawValue)
+        #expect(newest.boundaryModeRaw == BASBoundaryPolicyMode.localOnlyProtective.rawValue)
+        #expect(newest.calibrationStatusRaw == BASCalibrationStatus.drifting.rawValue)
+        #expect(newest.rollbackReady)
     }
 
     @Test("writer updates checkpoint approval state without adding a checkpoint")
