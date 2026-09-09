@@ -85,6 +85,83 @@ final class BASEventLogIngestionMigrationTests: XCTestCase {
         }
     }
 
+    private func textRows(
+        _ url: URL, _ sql: String, column: Int32
+    ) throws -> [String] {
+        try withDatabase(url, flags: SQLITE_OPEN_READONLY) { db in
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK,
+                  let stmt else { throw NSError(domain: "SQLiteTest", code: 5) }
+            defer { sqlite3_finalize(stmt) }
+            var values: [String] = []
+            while true {
+                let rc = sqlite3_step(stmt)
+                if rc == SQLITE_DONE { return values }
+                guard rc == SQLITE_ROW,
+                      let text = sqlite3_column_text(stmt, column) else {
+                    throw NSError(domain: "SQLiteTest", code: 6)
+                }
+                values.append(String(cString: text))
+            }
+        }
+    }
+
+    private func assertValidIngestionIndex(
+        _ url: URL,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let indexCount = try scalarInt(url, """
+            SELECT count(*) FROM sqlite_master
+            WHERE type='index' AND name='event_log_valid_ingestion_idx'
+            """)
+        XCTAssertEqual(indexCount, 1, file: file, line: line)
+        guard indexCount == 1 else { return }
+        XCTAssertEqual(
+            try scalarInt(url, """
+                SELECT partial FROM pragma_index_list('event_log')
+                WHERE name='event_log_valid_ingestion_idx'
+                """),
+            1,
+            file: file,
+            line: line)
+        XCTAssertEqual(
+            try scalarText(url, """
+                SELECT group_concat(name, ',')
+                FROM pragma_index_info('event_log_valid_ingestion_idx')
+                """),
+            "ingested_at_ms",
+            file: file,
+            line: line)
+        let schema = try scalarText(url, """
+            SELECT sql FROM sqlite_master
+            WHERE type='index' AND name='event_log_valid_ingestion_idx'
+            """)
+            .split(whereSeparator: \Character.isWhitespace)
+            .joined(separator: " ")
+        XCTAssertTrue(
+            schema.contains("""
+                ON event_log(ingested_at_ms) WHERE typeof(ingested_at_ms)='integer' AND ingested_at_ms >= 0
+                """),
+            schema,
+            file: file,
+            line: line)
+        let plan = try textRows(
+            url,
+            """
+            EXPLAIN QUERY PLAN
+            SELECT MAX(ingested_at_ms) FROM event_log
+            WHERE typeof(ingested_at_ms) = 'integer' AND ingested_at_ms >= 0
+            """,
+            column: 3)
+            .joined(separator: " | ")
+        XCTAssertTrue(
+            plan.contains("event_log_valid_ingestion_idx"),
+            plan,
+            file: file,
+            line: line)
+    }
+
     private func entry(_ id: String, timestampMs: Int64, session: String = "s") -> BASEventLogEntry {
         BASEventLogEntry(
             eventID: id,
@@ -105,6 +182,78 @@ final class BASEventLogIngestionMigrationTests: XCTestCase {
         let count = try await store?.totalCountOrThrow()
         XCTAssertEqual(count, 2)
         store = nil
+    }
+
+    func testSwiftInitializerInstallsValidIngestionIndexAcrossFreshLegacyAndCurrentReopen() async throws {
+        let (directory, freshURL) = try temporaryDatabase("fresh-index.sqlite")
+        defer { XCTAssertNoThrow(try FileManager.default.removeItem(at: directory)) }
+        let legacyURL = directory.appendingPathComponent("legacy-index.sqlite")
+        let currentURL = directory.appendingPathComponent("current-index.sqlite")
+        try exec(legacyURL, """
+            PRAGMA user_version=2;
+            CREATE TABLE event_log (
+              event_id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL,
+              sequence_number INTEGER NOT NULL, timestamp_ms INTEGER NOT NULL,
+              kind TEXT NOT NULL, risk_band TEXT NOT NULL, payload_json TEXT NOT NULL,
+              payload_format INTEGER NOT NULL DEFAULT 1, payload_blob BLOB
+            );
+            INSERT INTO event_log VALUES ('legacy','legacy',0,1,'chat','low','{}',1,NULL);
+            """)
+        try exec(currentURL, """
+            PRAGMA user_version=3;
+            CREATE TABLE event_log (
+              event_id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL,
+              sequence_number INTEGER NOT NULL, timestamp_ms INTEGER NOT NULL,
+              kind TEXT NOT NULL, risk_band TEXT NOT NULL, payload_json TEXT NOT NULL,
+              payload_format INTEGER NOT NULL DEFAULT 1, payload_blob BLOB,
+              ingested_at_ms INTEGER
+            );
+            CREATE TABLE event_log_seq_hwm (
+              session_id TEXT PRIMARY KEY NOT NULL, max_seq INTEGER NOT NULL
+            );
+            """)
+
+        for (storeNumber, url) in [freshURL, legacyURL, currentURL].enumerated() {
+            var initialized: BASSQLiteEventLogStorage? = try BASSQLiteEventLogStorage(
+                databaseURL: url, nowMs: { 500 })
+            _ = try await initialized?.totalCountOrThrow()
+            initialized = nil
+            try assertValidIngestionIndex(url)
+
+            try exec(url, """
+                INSERT INTO event_log
+                  (event_id,session_id,sequence_number,timestamp_ms,kind,risk_band,
+                   payload_json,payload_format,payload_blob,ingested_at_ms)
+                VALUES
+                  ('valid-low-\(storeNumber)','valid-low-\(storeNumber)',0,1,'chat','low','{}',1,NULL,200),
+                  ('valid-high-\(storeNumber)','valid-high-\(storeNumber)',0,1,'chat','low','{}',1,NULL,700),
+                  ('legacy-null-\(storeNumber)','legacy-null-\(storeNumber)',0,1,'chat','low','{}',1,NULL,NULL),
+                  ('invalid-negative-\(storeNumber)','invalid-negative-\(storeNumber)',0,1,'chat','low','{}',1,NULL,-1),
+                  ('invalid-text-\(storeNumber)','invalid-text-\(storeNumber)',0,1,'chat','low','{}',1,NULL,'invalid-text');
+                """)
+            XCTAssertEqual(
+                try scalarInt(url, """
+                    SELECT MAX(ingested_at_ms) FROM event_log
+                    WHERE typeof(ingested_at_ms) = 'integer' AND ingested_at_ms >= 0
+                    """),
+                700)
+            XCTAssertEqual(
+                try scalarText(url, """
+                    SELECT group_concat(typeof(ingested_at_ms), ',') FROM (
+                      SELECT ingested_at_ms FROM event_log
+                      WHERE event_id LIKE 'invalid-%-\(storeNumber)'
+                      ORDER BY event_id
+                    )
+                    """),
+                "integer,text")
+
+            var reopened: BASSQLiteEventLogStorage? = try BASSQLiteEventLogStorage(
+                databaseURL: url, nowMs: { 9_999 })
+            _ = try await reopened?.totalCountOrThrow()
+            reopened = nil
+            try assertValidIngestionIndex(url)
+            XCTAssertEqual(try scalarInt(url, "PRAGMA user_version"), 3)
+        }
     }
 
     func testV2MigrationRollsBackLateFailureClosesExactlyOnceAndNeverRestamps() async throws {

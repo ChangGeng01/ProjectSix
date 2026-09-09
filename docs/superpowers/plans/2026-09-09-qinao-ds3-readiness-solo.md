@@ -1118,11 +1118,14 @@ implements restart recovery, finite preparation repair, or exactly-once work.
 
 ## Task 10: Keep retained event-log ingestion off a full-history scan
 
-**State:** Queued, not implemented or part of Task 8 fix round 1. Start only
-after Task 8 correctness acceptance and Task 9's local-only fallback boundary
-are complete. Root owns sequencing and transfers source/build ownership
-explicitly. This addresses the concrete Task 8 review Minor, not a new
-performance framework or a prerequisite invented from hypothetical attacks.
+**State:** Accepted after Tasks8–9, with source/build ownership returned.
+Worker Swift62/62, Rust33/33 and ordinary three-slice rebuild checks passed;
+fresh root acceptance also passed62/62. Independent review and scoped report
+fix round2 are approved. The original minimal test-first raw log is missing;
+later mutation tests are sensitivity evidence, not reconstructed history. See
+`docs/superpowers/validation/2026-09-09-event-log-ingestion-hotpath.md`.
+This addresses the concrete Task8 review Minor, not a new performance
+framework or a prerequisite invented from hypothetical attacks.
 
 **Evidence and decision:** `event-ingestion-hotpath-assessment.md` records a
 bounded read-only 100,000-row SQLite fixture. The exact valid-ingestion MAX

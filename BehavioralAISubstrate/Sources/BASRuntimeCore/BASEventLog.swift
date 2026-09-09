@@ -456,6 +456,7 @@ public actor BASInMemoryEventLogStorage: BASEventLogStorage {
     private var entries: [StoredEntry] = []
     private var idIndex: Set<String> = []
     private var sessionSequenceCounters: [String: Int64] = [:]
+    private var maximumIngestionStamp: Int64? = nil
     private let nowMs: @Sendable () -> Int64
 
     public init() {
@@ -505,11 +506,11 @@ public actor BASInMemoryEventLogStorage: BASEventLogStorage {
             actions: entry.actions,
             confidence: entry.confidence,
             payloadJson: entry.payloadJson)
-        let maximumStamp = entries.map(\.ingestedAtMs).max()
         let ingestionStamp = BASEventLogRecoveryRetention.clampedStamp(
-            nowMs: nowMs(), maximumValidStamp: maximumStamp)
+            nowMs: nowMs(), maximumValidStamp: maximumIngestionStamp)
         entries.append(StoredEntry(entry: stamped, ingestedAtMs: ingestionStamp))
         idIndex.insert(stamped.eventID)
+        maximumIngestionStamp = ingestionStamp
         return (wasNew: true, assignedSequenceNumber: sessionSeq)
     }
 
@@ -561,6 +562,13 @@ public actor BASInMemoryEventLogStorage: BASEventLogStorage {
         if removed > 0 {
             // Rebuild idIndex to match new entries set
             idIndex = Set(entries.map { $0.entry.eventID })
+            var retainedMaximum: Int64?
+            for stored in entries {
+                retainedMaximum = max(
+                    retainedMaximum ?? stored.ingestedAtMs,
+                    stored.ingestedAtMs)
+            }
+            maximumIngestionStamp = retainedMaximum
             // Note:sessionSequenceCounters intentionally NOT
             // reset。Sequence numbers continue monotonically
             // from where they were,so future appends in the

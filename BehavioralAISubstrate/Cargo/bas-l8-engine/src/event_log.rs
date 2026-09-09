@@ -151,6 +151,11 @@ where
             // Fresh schema needs no migration clock sample because it has no
             // rows. Production append still supplies metadata explicitly.
         }
+        conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS event_log_valid_ingestion_idx
+             ON event_log(ingested_at_ms)
+             WHERE typeof(ingested_at_ms)='integer' AND ingested_at_ms >= 0;",
+        )?;
         migrate_unique_session_seq(conn)?;
         conn.execute_batch(
             "INSERT INTO event_log_seq_hwm(session_id,max_seq)
@@ -1223,6 +1228,101 @@ mod tests {
     use super::*;
     use crate::{bas_l8_engine_close, bas_l8_engine_init};
 
+    fn insert_mixed_ingestion_metadata(conn: &Connection, suffix: &str) {
+        let rows = [
+            ("valid-low", rusqlite::types::Value::Integer(200)),
+            ("valid-high", rusqlite::types::Value::Integer(700)),
+            ("legacy-null", rusqlite::types::Value::Null),
+            ("invalid-negative", rusqlite::types::Value::Integer(-1)),
+            (
+                "invalid-text",
+                rusqlite::types::Value::Text("invalid-text".into()),
+            ),
+        ];
+        for (label, ingestion) in rows {
+            let id = format!("{label}-{suffix}");
+            conn.execute(
+                "INSERT INTO event_log
+                   (event_id,session_id,sequence_number,timestamp_ms,kind,risk_band,
+                    payload_json,payload_format,payload_blob,ingested_at_ms)
+                 VALUES (?,?,0,1,'chat','low','{}',1,NULL,?)",
+                params![id, id, ingestion],
+            )
+            .unwrap();
+        }
+    }
+
+    fn assert_valid_ingestion_index(conn: &Connection) {
+        let index_count: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master
+                 WHERE type='index' AND name='event_log_valid_ingestion_idx'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(index_count, 1);
+        let partial: i64 = conn
+            .query_row(
+                "SELECT partial FROM pragma_index_list('event_log')
+                 WHERE name='event_log_valid_ingestion_idx'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(partial, 1);
+        let indexed_column: String = conn
+            .query_row(
+                "SELECT group_concat(name, ',')
+                 FROM pragma_index_info('event_log_valid_ingestion_idx')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(indexed_column, "ingested_at_ms");
+        let schema: String = conn
+            .query_row(
+                "SELECT sql FROM sqlite_master
+                 WHERE type='index' AND name='event_log_valid_ingestion_idx'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let normalized = schema.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            normalized.contains(
+                "ON event_log(ingested_at_ms) WHERE typeof(ingested_at_ms)='integer' AND ingested_at_ms >= 0"
+            ),
+            "unexpected index schema: {normalized}"
+        );
+        let maximum: Option<i64> = conn
+            .query_row(
+                "SELECT MAX(ingested_at_ms) FROM event_log
+                 WHERE typeof(ingested_at_ms)='integer' AND ingested_at_ms >= 0",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(maximum, Some(700));
+        let mut plan_stmt = conn
+            .prepare(
+                "EXPLAIN QUERY PLAN
+                 SELECT MAX(ingested_at_ms) FROM event_log
+                 WHERE typeof(ingested_at_ms)='integer' AND ingested_at_ms >= 0",
+            )
+            .unwrap();
+        let plan: Vec<String> = plan_stmt
+            .query_map([], |row| row.get(3))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert!(
+            plan.iter()
+                .any(|detail| detail.contains("event_log_valid_ingestion_idx")),
+            "query plan did not use ingestion index: {plan:?}"
+        );
+    }
+
     fn make_engine() -> *mut L8Engine {
         unsafe { bas_l8_engine_init(std::ptr::null(), 0) }
     }
@@ -1890,6 +1990,81 @@ mod tests {
         .unwrap();
         assert_eq!(prune_events_before_at(&conn, 2, 259_201_000).unwrap(), 0);
         assert_eq!(prune_events_before_at(&conn, 2, 259_201_001).unwrap(), 1);
+    }
+
+    #[test]
+    fn initializer_installs_valid_ingestion_index_across_fresh_legacy_and_current_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "bas-l8-ingestion-index-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let fresh_path = root.join("fresh.sqlite");
+        let legacy_path = root.join("legacy.sqlite");
+        let current_path = root.join("current.sqlite");
+
+        {
+            let legacy = Connection::open(&legacy_path).unwrap();
+            legacy
+                .execute_batch(
+                    "PRAGMA user_version=77;
+                     CREATE TABLE event_log (
+                       event_id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL,
+                       sequence_number INTEGER NOT NULL, timestamp_ms INTEGER NOT NULL,
+                       kind TEXT NOT NULL, risk_band TEXT NOT NULL, payload_json TEXT NOT NULL,
+                       payload_format INTEGER NOT NULL DEFAULT 1, payload_blob BLOB
+                     );
+                     INSERT INTO event_log VALUES ('legacy','legacy',0,1,'chat','low','{}',1,NULL);",
+                )
+                .unwrap();
+        }
+        {
+            let current = Connection::open(&current_path).unwrap();
+            current
+                .execute_batch(
+                    "PRAGMA user_version=77;
+                     CREATE TABLE event_log (
+                       event_id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL,
+                       sequence_number INTEGER NOT NULL, timestamp_ms INTEGER NOT NULL,
+                       kind TEXT NOT NULL, risk_band TEXT NOT NULL, payload_json TEXT NOT NULL,
+                       payload_format INTEGER NOT NULL DEFAULT 1, payload_blob BLOB,
+                       ingested_at_ms INTEGER,
+                       UNIQUE(session_id, sequence_number)
+                     );
+                     CREATE TABLE event_log_seq_hwm (
+                       session_id TEXT PRIMARY KEY NOT NULL, max_seq INTEGER NOT NULL
+                     );",
+                )
+                .unwrap();
+        }
+
+        for (suffix, path) in [
+            ("fresh", &fresh_path),
+            ("legacy", &legacy_path),
+            ("current", &current_path),
+        ] {
+            {
+                let conn = Connection::open(path).unwrap();
+                init_schema_with_clock(&conn, |_| 500).unwrap();
+                insert_mixed_ingestion_metadata(&conn, suffix);
+                assert_valid_ingestion_index(&conn);
+                let version: i64 = conn
+                    .query_row("PRAGMA user_version", [], |row| row.get(0))
+                    .unwrap();
+                assert_eq!(version, if suffix == "fresh" { 0 } else { 77 });
+            }
+            {
+                let reopened = Connection::open(path).unwrap();
+                init_schema_with_clock(&reopened, |_| 9_999).unwrap();
+                assert_valid_ingestion_index(&reopened);
+            }
+        }
+
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

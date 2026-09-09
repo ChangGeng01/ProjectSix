@@ -879,6 +879,11 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         try runExec(db: db, sql: "CREATE INDEX IF NOT EXISTS event_log_session_seq_idx ON event_log(session_id, sequence_number);")
         try runExec(db: db, sql: "CREATE INDEX IF NOT EXISTS event_log_timestamp_idx ON event_log(timestamp_ms);")
         try runExec(db: db, sql: "CREATE INDEX IF NOT EXISTS event_log_kind_idx ON event_log(kind);")
+        try runExec(db: db, sql: """
+            CREATE INDEX IF NOT EXISTS event_log_valid_ingestion_idx
+            ON event_log(ingested_at_ms)
+            WHERE typeof(ingested_at_ms)='integer' AND ingested_at_ms >= 0;
+            """)
     }
 
     fileprivate static func seedSequenceHighWaterMarks(db: OpaquePointer) throws {

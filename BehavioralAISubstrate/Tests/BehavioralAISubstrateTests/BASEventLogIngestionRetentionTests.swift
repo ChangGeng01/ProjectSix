@@ -137,6 +137,112 @@ final class BASEventLogIngestionRetentionTests: XCTestCase {
         }
     }
 
+    func testInMemoryRetainedMaximumTracksOnlySurvivorsAcrossPrunes() async throws {
+        let clock = BASEventLogTestClock(1_000)
+        let store = BASInMemoryEventLogStorage(nowMs: clock.now)
+        let session = "retained-maximum"
+
+        let first = try await store.append(BASEventLogEntry(
+            eventID: "semantic-survivor",
+            timestampMs: 100,
+            kind: .chat,
+            sessionID: session,
+            sequenceNumber: 0,
+            actions: ["original"],
+            payloadJson: "{\"version\":1}"))
+        clock.set(500)
+        let regressed = try await store.append(BASEventLogEntry(
+            eventID: "regressed-new",
+            timestampMs: 1,
+            kind: .voice,
+            sessionID: session,
+            sequenceNumber: 0,
+            payloadJson: "{\"regressed\":true}"))
+        clock.set(9_000)
+        let duplicate = try await store.append(BASEventLogEntry(
+            eventID: "semantic-survivor",
+            timestampMs: 999,
+            kind: .toolInvocation,
+            sessionID: "changed-session",
+            sequenceNumber: 99,
+            actions: ["changed"],
+            payloadJson: "{\"version\":2}"))
+
+        XCTAssertEqual(first.assignedSequenceNumber, 0)
+        XCTAssertEqual(regressed.assignedSequenceNumber, 1)
+        XCTAssertFalse(duplicate.wasNew)
+        XCTAssertEqual(duplicate.assignedSequenceNumber, 0)
+        clock.set(500 + floorMs + 1)
+        let removedAfterRegressedAppend = try await store.pruneEventsBefore(timestampMs: 50)
+        XCTAssertEqual(removedAfterRegressedAppend, 0)
+        var retained = await store.events(forSession: session)
+        XCTAssertEqual(retained.map(\.eventID), ["semantic-survivor", "regressed-new"])
+        XCTAssertEqual(retained.map(\.sequenceNumber), [0, 1])
+        XCTAssertEqual(retained[0].actions, ["original"])
+        XCTAssertEqual(retained[0].payloadJson, "{\"version\":1}")
+
+        clock.set(2_000)
+        let maximum = try await store.append(BASEventLogEntry(
+            eventID: "remove-maximum",
+            timestampMs: 1,
+            kind: .file,
+            sessionID: session,
+            sequenceNumber: 0,
+            payloadJson: "{\"maximum\":true}"))
+        XCTAssertEqual(maximum.assignedSequenceNumber, 2)
+        clock.set(2_000 + floorMs + 1)
+        let removedIncludingMaximum = try await store.pruneEventsBefore(timestampMs: 50)
+        XCTAssertEqual(removedIncludingMaximum, 2)
+        retained = await store.events(forSession: session)
+        XCTAssertEqual(retained.map(\.eventID), ["semantic-survivor"])
+        XCTAssertEqual(retained.map(\.sequenceNumber), [0])
+        XCTAssertEqual(retained.map(\.payloadJson), ["{\"version\":1}"])
+
+        clock.set(1_500)
+        let between = try await store.append(BASEventLogEntry(
+            eventID: "between-surviving-and-removed",
+            timestampMs: 1,
+            kind: .web,
+            sessionID: session,
+            sequenceNumber: 0,
+            payloadJson: "{\"between\":true}"))
+        XCTAssertEqual(between.assignedSequenceNumber, 3)
+        clock.set(1_500 + floorMs)
+        let removedAtBetweenBoundary = try await store.pruneEventsBefore(timestampMs: 50)
+        XCTAssertEqual(removedAtBetweenBoundary, 0)
+        clock.advance(by: 1)
+        let removedAfterBetweenBoundary = try await store.pruneEventsBefore(timestampMs: 50)
+        XCTAssertEqual(removedAfterBetweenBoundary, 1)
+        retained = await store.events(forSession: session)
+        XCTAssertEqual(retained.map(\.eventID), ["semantic-survivor"])
+        XCTAssertEqual(retained.map(\.sequenceNumber), [0])
+        XCTAssertEqual(retained.map(\.payloadJson), ["{\"version\":1}"])
+
+        clock.set(1_000 + floorMs + 1)
+        let removedByFullPrune = try await store.pruneEventsBefore(timestampMs: 200)
+        XCTAssertEqual(removedByFullPrune, 1)
+        let emptyAfterFullPrune = await store.events(forSession: session)
+        XCTAssertEqual(emptyAfterFullPrune, [])
+
+        clock.set(200)
+        let afterFullPrune = try await store.append(BASEventLogEntry(
+            eventID: "after-full-prune",
+            timestampMs: 1,
+            kind: .calendar,
+            sessionID: session,
+            sequenceNumber: 0,
+            payloadJson: "{\"after\":true}"))
+        XCTAssertEqual(afterFullPrune.assignedSequenceNumber, 4)
+        clock.set(200 + floorMs)
+        let removedAtFinalBoundary = try await store.pruneEventsBefore(timestampMs: 2)
+        XCTAssertEqual(removedAtFinalBoundary, 0)
+        clock.advance(by: 1)
+        let removedAfterFinalBoundary = try await store.pruneEventsBefore(timestampMs: 2)
+        XCTAssertEqual(removedAfterFinalBoundary, 1)
+        let finalEvents = await store.events(forSession: session)
+        XCTAssertEqual(finalEvents, [])
+    }
+
     func testNonpositiveCutoffSentinelsRetainAcrossAllBuiltIns() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("bas-ingestion-sentinels-\(UUID().uuidString)")
