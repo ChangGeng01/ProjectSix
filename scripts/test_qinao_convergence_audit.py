@@ -25088,18 +25088,89 @@ def _task4_real_inputs():
     return repository, capture, contract, source
 
 
+class RepositoryDocumentTypedDiscoveryTests(_ModuleRequired):
+    """Exercise the actual inventory class at verified activation/discovery,
+    not live candidate acceptance or execution against a synthetic history.
+    """
+
+    def test_real_inventory_class_is_admitted_by_verified_typed_discovery(self):
+        expected_ids = [
+            "scripts.test_qinao_convergence_audit.RepositoryDocumentInventoryTests."
+            + name for name in (
+                "test_complete_S_to_D_delta_rejects_an_outside_root_addition",
+                "test_constructor_rejects_wrong_identity_seed_and_capture",
+                "test_inventory_framing_is_canonical_and_reproducible",
+                "test_missing_immutable_history_is_an_explicit_failure",
+                "test_producer_reopens_exact_source_and_derives_all_final_bytes",
+                "test_real_C_all_29_unchanged_worktree_objects_are_exact",
+                "test_real_C_persisted_inventory_equals_sole_constructor",
+                "test_real_C_source_evidence_is_exact_and_inert",
+                "test_real_C_source_partition_and_marker_evidence",
+                "test_real_C_worktree_matches_every_expected_final_blob",
+                "test_rehashed_inventory_tamper_is_rejected_by_field",
+                "test_renderer_emits_only_exact_sorted_pointer_insertions",
+            )
+        ]
+        helper = TaskTestEvidencePhase1Tests(methodName="runTest")
+        self.addCleanup(helper.doCleanups)
+        with tempfile.TemporaryDirectory() as temporary:
+            # Commit the actual source bytes in the existing isolated fixture
+            # so manifest construction checks index/tree/worktree equality.
+            # Discovery does not run setUp or substitute synthetic test cases.
+            repository = helper._repository_with_custom_test_module(
+                Path(temporary),
+                source=Path(__file__).read_text(encoding="utf-8"),
+                message="bind actual inventory discovery source",
+            )
+            index = module._git_index_entry_records(repository)
+            tree = module._run_git(
+                repository, ["rev-parse", "HEAD^{tree}"]
+            ).decode("ascii").strip()
+            manifest = [
+                module._task_test_manifest_row(
+                    repository, index, role=role, module_name=name,
+                    relative_path=path, result_tree_oid=tree,
+                )
+                for role, name, path in (
+                    ("production", "qinao_convergence_audit",
+                     "scripts/qinao_convergence_audit.py"),
+                    ("tests", "scripts.test_qinao_convergence_audit",
+                     "scripts/test_qinao_convergence_audit.py"),
+                )
+            ]
+            # This is exactly the input projection consumed by these two
+            # boundaries, not a fabricated durable task-test subject.
+            subject = {"moduleManifest": manifest}
+            with module._task_test_module_activation(subject) as activation:
+                activated_tests = activation["modules"][
+                    "scripts.test_qinao_convergence_audit"]
+                self.assertIs(activated_tests.module,
+                              activation["modules"]["qinao_convergence_audit"])
+                try:
+                    plan, suite = module._task_test_discover_plan(
+                        ["RepositoryDocumentInventoryTests"], subject, activation,
+                    )
+                except module.AuditError as exc:
+                    self.fail("real typed inventory discovery rejected: " + str(exc))
+                self.assertEqual(plan["flattenedTestIds"], expected_ids)
+                self.assertEqual(len(plan["groups"]), 1)
+                self.assertEqual(plan["groups"][0]["testIds"], expected_ids)
+                self.assertEqual(suite.countTestCases(), 12)
+                self.assertTrue(all(
+                    type(case) is activated_tests.RepositoryDocumentInventoryTests
+                    for case in suite
+                ))
+
+
 class ExpectedPlanSpecProducerTests(_ModuleRequired):
     """Breaks: absent producer, accepted input drift, noncanonical/rehashed output,
     wrong patch bytes or a CLI that writes caller-selected repository paths.
     Real module repository/full immutable history required; no fetch or skips.
     """
 
-    @classmethod
-    def setUpClass(cls):
-        cls.repository, cls.capture, cls.contract, cls.source = _task4_real_inputs()
-
     def setUp(self):
         super().setUp()
+        self.repository, self.capture, self.contract, self.source = _task4_real_inputs()
         for name in ("capture_expected_plan_spec_inventory",
                      "verify_expected_plan_spec_inventory", "render_expected_plan_spec_patch"):
             self.assertTrue(callable(getattr(module, name, None)), "missing Task 4 " + name)
