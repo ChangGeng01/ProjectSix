@@ -13,9 +13,9 @@ import BASRuntimeCore
 ///   iOS 18.1+ / macOS 26+); fall back to MLX-LoRA on older OS
 ///   or non-Apple-Intelligence devices. Same `BASOrganAdapter`
 ///   contract either way.
-/// - **Local + Remote** — prefer on-device for privacy, fall
-///   back to a remote chat-completions provider when the local
-///   model can't satisfy the request (e.g. exceeds maxInputTokens).
+/// - **Local + Remote** — select either provider explicitly. A
+///   configured remote secondary is held but is never an automatic
+///   fallback for a failed local request.
 /// - **Two on-device** — `MLXOrganAdapter` with M247 LoRA as
 ///   primary, deterministic adapter as secondary for hermetic
 ///   tests.
@@ -27,52 +27,39 @@ import BASRuntimeCore
 ///
 /// ## Strategies
 ///
-/// - `.primaryWithFallback` (default): try `primary` first; on
-///   `BASOrganError.providerUnavailable` or `pressureRefusal`,
-///   fall through to `secondary`. Any other error propagates
-///   directly. Inputs that violate either adapter (unsupportedRole,
-///   inputTooLong, deadlineExpired) hit the original error
-///   surface unchanged.
-/// - `.primaryOnly`: never invoke `secondary`. Used when hosts
+/// - `.primaryOnly` (default): never invoke `secondary`. Used when hosts
 ///   want to A/B compare two routers without rewiring downstream.
 /// - `.secondaryOnly`: never invoke `primary`. Same reason.
+/// - `.primaryWithFallback`: try `primary` first; on
+///   `BASOrganError.providerUnavailable` or `pressureRefusal`,
+///   fall through only when the configured secondary also declares
+///   on-device execution. Any other error propagates directly.
 ///
 /// ## Why two errors trigger fallback (not all)
 ///
-/// `providerUnavailable` and `pressureRefusal` are infrastructure
-/// signals — "this provider can't run the request right now."
-/// Falling back is correct: the secondary provider might be able
-/// to. The other three (`unsupportedRole`, `inputTooLong`,
-/// `deadlineExpired`) are caller-input violations or hard limits
-/// that the secondary would also reject. Falling back on those
-/// would mask the real error from the caller.
+/// `providerUnavailable` and `pressureRefusal` are routing signals,
+/// but they do not prove generation never started. They permit a
+/// configured fallback only to another on-device provider. Other
+/// errors, including cancellation, propagate without a second call.
 ///
 /// ## Capacity & descriptor
 ///
 /// - `descriptor.providerID`: synthesized as
 ///   `"routing.\(primary.providerID)+\(secondary.providerID)"`
-/// - `descriptor.supportedRoles`: intersection of both adapters'
-///   supported roles — a routed request must be servable by
-///   *both* (so fallback works for any role we accept)
-/// - `descriptor.supportsStreaming`: AND of both
-///   (router itself doesn't conform to BASStreamingOrganAdapter
-///   today; that's M255-followup if needed)
-/// - `descriptor.runsOnDevice`: AND of both
-/// - `descriptor.maxInputTokens` / `maxOutputTokens`: min of both
-///   (so any input we accept fits both providers' limits)
+/// - execution capabilities describe only providers reachable under
+///   the configured strategy; eligible local fallback uses the
+///   conservative intersection/min/AND of both descriptors
 /// - `currentCapacity()`: returns the primary's capacity when
-///   primary is healthy; otherwise the secondary's. Reasoning:
-///   the metric callers consult is "how much can we send right
-///   now", and the router's effective answer is whichever
-///   provider is about to handle the next request.
+///   primary is healthy or fallback is ineligible; otherwise it
+///   returns the eligible local secondary's capacity
 public actor BASRoutingOrganAdapter: BASOrganAdapter {
 
     public enum Strategy:
         Sendable, Equatable, Hashable, Codable
     {
-        /// Try primary; on infrastructure failure (provider
-        /// unavailable / pressure refusal) fall through to
-        /// secondary. Any other error propagates.
+        /// Try primary; on provider unavailability or pressure
+        /// refusal, fall through only when the secondary declares
+        /// `runsOnDevice == true`. Any other error propagates.
         case primaryWithFallback
         /// Always use primary. Secondary is held but never
         /// invoked. Useful for A/B comparison without rewiring.
@@ -84,7 +71,11 @@ public actor BASRoutingOrganAdapter: BASOrganAdapter {
 
     public let primary: any BASOrganAdapter
     public let secondary: any BASOrganAdapter
-    public var strategy: Strategy
+    public let strategy: Strategy
+
+    /// One construction-time decision shared by descriptor synthesis,
+    /// every draft overload, and capacity reporting.
+    private let automaticSecondaryIsEligible: Bool
 
     public nonisolated let descriptor: BASOrganDescriptor
 
@@ -95,8 +86,7 @@ public actor BASRoutingOrganAdapter: BASOrganAdapter {
     ///   - secondary: fallback provider (tried after `primary`'s
     ///     infra error under `.primaryWithFallback`, exclusive
     ///     under `.secondaryOnly`)
-    ///   - strategy: routing policy. Defaults to
-    ///     `.primaryWithFallback`.
+    ///   - strategy: routing policy. Defaults to `.primaryOnly`.
     ///   - providerID: optional override for the synthetic
     ///     descriptor's `providerID`. Defaults to
     ///     `"routing.\(primary.providerID)+\(secondary.providerID)"`.
@@ -104,7 +94,7 @@ public actor BASRoutingOrganAdapter: BASOrganAdapter {
     public init(
         primary: any BASOrganAdapter,
         secondary: any BASOrganAdapter,
-        strategy: Strategy = .primaryWithFallback,
+        strategy: Strategy = .primaryOnly,
         providerID: String? = nil,
         providerName: String? = nil
     ) {
@@ -112,31 +102,53 @@ public actor BASRoutingOrganAdapter: BASOrganAdapter {
         self.secondary = secondary
         self.strategy = strategy
 
+        let p = primary.descriptor
+        let s = secondary.descriptor
+        let eligible = strategy == .primaryWithFallback
+            && s.runsOnDevice
+        self.automaticSecondaryIsEligible = eligible
+
         let pid = providerID
-            ?? "routing.\(primary.descriptor.providerID)+" +
-                "\(secondary.descriptor.providerID)"
+            ?? "routing.\(p.providerID)+\(s.providerID)"
         let pname = providerName
-            ?? "Routing(\(primary.descriptor.providerName)" +
-               " + \(secondary.descriptor.providerName))"
+            ?? "Routing(\(p.providerName) + \(s.providerName))"
+
+        let executionDescriptors: (BASOrganDescriptor, BASOrganDescriptor?)
+        switch strategy {
+        case .primaryOnly:
+            executionDescriptors = (p, nil)
+        case .secondaryOnly:
+            executionDescriptors = (s, nil)
+        case .primaryWithFallback where eligible:
+            executionDescriptors = (p, s)
+        case .primaryWithFallback:
+            executionDescriptors = (p, nil)
+        }
+        let selected = executionDescriptors.0
+        let fallback = executionDescriptors.1
         self.descriptor = BASOrganDescriptor(
             providerID: pid,
             providerName: pname,
             supportsStreaming:
-                primary.descriptor.supportsStreaming
-                && secondary.descriptor.supportsStreaming,
-            maxInputTokens: min(
-                primary.descriptor.maxInputTokens,
-                secondary.descriptor.maxInputTokens),
-            maxOutputTokens: min(
-                primary.descriptor.maxOutputTokens,
-                secondary.descriptor.maxOutputTokens),
+                fallback.map {
+                    selected.supportsStreaming
+                        && $0.supportsStreaming
+                } ?? selected.supportsStreaming,
+            maxInputTokens: fallback.map {
+                min(selected.maxInputTokens, $0.maxInputTokens)
+            } ?? selected.maxInputTokens,
+            maxOutputTokens: fallback.map {
+                min(selected.maxOutputTokens, $0.maxOutputTokens)
+            } ?? selected.maxOutputTokens,
             runsOnDevice:
-                primary.descriptor.runsOnDevice
-                && secondary.descriptor.runsOnDevice,
+                fallback.map {
+                    selected.runsOnDevice && $0.runsOnDevice
+                } ?? selected.runsOnDevice,
             supportedRoles:
-                primary.descriptor.supportedRoles
-                .intersection(
-                    secondary.descriptor.supportedRoles))
+                fallback.map {
+                    selected.supportedRoles.intersection(
+                        $0.supportedRoles)
+                } ?? selected.supportedRoles)
     }
 
     public func draft(
@@ -158,15 +170,12 @@ public actor BASRoutingOrganAdapter: BASOrganAdapter {
         case .primaryWithFallback:
             do {
                 return try await primary.draft(request)
-            } catch BASOrganError.providerUnavailable {
-                return try await secondary.draft(request)
-            } catch BASOrganError.pressureRefusal {
+            } catch let failure as BASOrganError {
+                guard allowsAutomaticSecondary(after: failure) else {
+                    throw failure
+                }
                 return try await secondary.draft(request)
             }
-            // Other errors (unsupportedRole, inputTooLong,
-            // deadlineExpired) propagate — they're caller-input
-            // violations and hard limits that secondary wouldn't
-            // accept either.
         }
     }
 
@@ -188,10 +197,13 @@ public actor BASRoutingOrganAdapter: BASOrganAdapter {
         case .primaryWithFallback:
             do {
                 return try await primary.draft(request, electAccelerated: electAccelerated)
-            } catch BASOrganError.providerUnavailable {
-                return try await secondary.draft(request, electAccelerated: electAccelerated)
-            } catch BASOrganError.pressureRefusal {
-                return try await secondary.draft(request, electAccelerated: electAccelerated)
+            } catch let failure as BASOrganError {
+                guard allowsAutomaticSecondary(after: failure) else {
+                    throw failure
+                }
+                return try await secondary.draft(
+                    request,
+                    electAccelerated: electAccelerated)
             }
         }
     }
@@ -213,11 +225,26 @@ public actor BASRoutingOrganAdapter: BASOrganAdapter {
         case .primaryWithFallback:
             do {
                 return try await primary.draft(request, purpose: purpose)
-            } catch BASOrganError.providerUnavailable {
-                return try await secondary.draft(request, purpose: purpose)
-            } catch BASOrganError.pressureRefusal {
-                return try await secondary.draft(request, purpose: purpose)
+            } catch let failure as BASOrganError {
+                guard allowsAutomaticSecondary(after: failure) else {
+                    throw failure
+                }
+                return try await secondary.draft(
+                    request,
+                    purpose: purpose)
             }
+        }
+    }
+
+    private func allowsAutomaticSecondary(
+        after failure: BASOrganError
+    ) -> Bool {
+        guard automaticSecondaryIsEligible else { return false }
+        switch failure {
+        case .providerUnavailable, .pressureRefusal:
+            return true
+        default:
+            return false
         }
     }
 
@@ -228,13 +255,10 @@ public actor BASRoutingOrganAdapter: BASOrganAdapter {
         case .secondaryOnly:
             return await secondary.currentCapacity()
         case .primaryWithFallback:
-            // Report primary's capacity when primary is healthy
-            // (under no infra pressure). When primary signals
-            // underPressure we'd fall through on actual draft;
-            // expose the fallback's capacity to give callers an
-            // honest answer about what they can send next.
             let primaryCap = await primary.currentCapacity()
-            if !primaryCap.underPressure {
+            guard primaryCap.underPressure,
+                  automaticSecondaryIsEligible
+            else {
                 return primaryCap
             }
             return await secondary.currentCapacity()

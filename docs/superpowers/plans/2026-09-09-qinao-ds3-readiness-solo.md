@@ -17,6 +17,7 @@
 - All changes to main use a PR. Before merge, show the exact candidate, review/test result and remaining limitations, and obtain a fresh user decision. Ordinary in-scope edits/tests/commits/PR work do not require repetitive task-level approvals.
 - DS1 is the first successful scan; DS2 is the later failed scan. Preserve that chronology. DS3 remains not started and requires a separate explicit user authorization.
 - User's latest runtime policy: if the selected local model is unavailable, do not invoke a cloud fallback, including PCC. Pause only dependent model steps, preserve plan/progress/results/error and distinguish not-started from possibly-started work. Existing credentials, configured remote adapters or earlier generic fallback approval do not override this temporary restriction. Local diagnosis and bounded safe recovery may continue; do not silently switch models, retry uncertain effects or mark the task complete. Changing this policy requires a later explicit user instruction. This concerns Qinao inference fallback, not revocation of the separately authorized ordinary Git development workflow. Record and test the runtime enforcement before claiming it implemented.
+- User-confirmed product capability boundary: only trusted host code holds credential issuers and halt-reset interfaces. Models, Agents and plugins submit data or intents; their supported interfaces must not expose those host capabilities. Three signed credentials authenticate their fields, not three independent approvals. Check actual host composition and interface exposure before claiming this boundary enforced; no extra authority service or approval ceremony is required. This product boundary does not change the trusted single-owner development workflow.
 - A missing original artifact is not a successful reconstruction; a recovered DS2 draft is not a sealed finding. Do not mark an issue fixed from a closed label or unrelated green tests.
 - Necessary verification stays: nonempty relevant tests, meaningful review, checks for accidental secrets/destructive changes, dependency integrity, and recovery behavior where retained code promises it. No known blocking defect or critical evidence gap may be hidden in the readiness claim.
 - Existing tool/platform permissions remain in force. Do not evade a denied action or widen credentials/network authority under the guise of simplifying repository workflow.
@@ -1009,7 +1010,7 @@ host to resume a failed local operation on a remote endpoint. That prohibition
 also belongs in the later durable-operation owner. Do not claim this task alone
 implements restart recovery, finite preparation repair, or exactly-once work.
 
-- [ ] **Step 1 — behavioral RED for forbidden fallback.** Extend the existing
+- [x] **Step 1 — behavioral RED for forbidden fallback.** Extend the existing
   actor stub with per-overload draft counters, a capacity counter, captured
   elect/purpose values and a cancellation response. Do not add a second router
   implementation in tests. Add the plain-path regression before product edits:
@@ -1041,7 +1042,7 @@ implements restart recovery, finite preparation repair, or exactly-once work.
   Run only this regression first; record the expected returned-remote-result
   and counter failure. A cache/manifest/compile error is not behavioral RED.
 
-- [ ] **Step 2 — one immutable reachability decision.** Snapshot the two
+- [x] **Step 2 — one immutable reachability decision.** Snapshot the two
   descriptors once during construction, set the immutable strategy, then use
   one immutable eligibility value in descriptor synthesis and all execution
   paths:
@@ -1078,7 +1079,7 @@ implements restart recovery, finite preparation repair, or exactly-once work.
   unchanged. Update misleading router docs about default/remote fallback and
   infrastructure errors; such errors do not prove generation never started.
 
-- [ ] **Step 3 — complete focused behavior matrix.** Verify both infrastructure
+- [x] **Step 3 — complete focused behavior matrix.** Verify both infrastructure
   errors through plain, elect and purpose paths with configured remote spies:
   exact original error, primary called once, every remote draft count zero.
   Verify default omitted strategy does not silently swap even to a local
@@ -1103,7 +1104,7 @@ implements restart recovery, finite preparation repair, or exactly-once work.
   from automatic fallback. Two-local nested routers retain their conservative
   combined capabilities. No live local model, network or PCC calls in tests.
 
-- [ ] **Step 4 — focused GREEN and handback.** Use the existing native BAS
+- [x] **Step 4 — focused GREEN and handback.** Use the existing native BAS
   scratch `/private/tmp/qinao-bas-native-test-1329bde3`, Xcode-beta and retained
   real `MLX_METAL_PATH` only after root transfers ownership. Run the complete
   changed router suite and the named wrapper/registry/Codable controls with
