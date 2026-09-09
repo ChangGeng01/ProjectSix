@@ -103,3 +103,180 @@ Base1329bde36b5351e2bf59a570ddafd4dda25a6580. Existing DS2 candidate `supply-cha
 **Delivery:** TDD red first, then narrow implementation, inspect exact diff, run relevant nonempty tests with actual complete outputs and counts. Source identity and logs go in this plan's private SDD report. Root will arrange a fresh independent bypass/regression review. No staging/commit/push/scan/subagents or other source edits.
 
 **Post-review verification amendment:** The frozen patch passed its seven real-PyTorch tests and the fresh static reviewer found no concrete bypass/regression, but real Apple-backend compatibility was not established by stubbed backend tests. Root therefore extends verification only: run both unchanged main entrypoints with disposable trainer-shaped inputs and real conversion backends, direct outputs exclusively into temporary directories, inspect output structure and numeric parity where supported. Existing assets/environments must not be overwritten. A new isolated temporary environment may install source-verified fixed official dependencies through normal permissions; do not weaken the PyTorch floor to resolve a dependency conflict. Preserve backend/platform limitations separately from checkpoint-boundary tests. This amendment overrides the earlier no-real-conversion test restriction for this bounded verification, not the no-training/no-model-download/no-asset-overwrite rules. No implementation ownership is delegated by this amendment.
+
+## Task 3: Bound remote Chat Completions receipt and lossless streaming
+
+Base7806dc5a57e97162b339b6bdffac1be8060de8b2. Existing DS1 occurrence
+occ_0335bc4ba9b93ef6ecf90884 is statically confirmed in provider-response-triage.json.
+Root and a fresh independent investigator read the actual entrypoints, protocol,
+host caller and tests. The explicit hostile/misconfigured-peer resource promise
+is at BASChatCompletionsOrganAdapter.swift64-67; no SECURITY.md applies.
+
+**Scope:** both files in `BehavioralAISubstrate/Sources/BASChatCompletionsAdapter/`,
+one focused adapter-local bounded-response helper, the existing
+`BASChatCompletionsOrganAdapterTests.swift` and `BASChatCompletionsStreamingTests.swift`,
+and one focused response-boundary test file if needed. Root owns plan, reports,
+commit and candidate review. Do not change BASOrgan public protocol/models,
+registry routing, provider defaults, other transports, unrelated tests or assets.
+
+**Required boundary:** all received HTTP body bytes are charged before the
+adapter retains them, including ignored SSE frames/delimiters/metadata. The
+existing maxResponseBytes is also the raw response budget, not merely decoded
+content; document this intentional stricter treatment of formerly uncounted
+framing. Keep the decoded-content cap and check before cumulative append using
+overflow-safe subtraction. No silent truncation, dropped/coalesced deltas,
+unbounded chunk/Task queues or cumulative snapshot producer buffer.
+
+**Chosen narrow strategy:** use the injected URLSession's ordinary dataTask with
+a request-local URLSessionDataDelegate. In synchronous didReceive(data), check
+the monotonic total and append only within budget into one bounded Data buffer;
+do not first enqueue Data in Task/actor callbacks. A cursor can expose incremental
+consumption; no complicated compaction protocol is required. Prefer retaining
+Foundation's existing line semantics via `.lines` on this already bounded byte
+sequence instead of inventing a subtly different SSE parser. The public stream
+uses AsyncThrowingStream(unfolding:) (or an equally small proven lossless
+consumer-driven equivalent), yielding exactly one next nonempty delta with its
+correct cumulativeBody. Nonstream collects at most the bounded body before the
+unchanged response parser. Raw receipt enforcement continues even when a
+consumer pauses; simply changing data(for:) to bytes(for:) is insufficient.
+
+Set task.delegate before resume. The installed SDK documents that it cannot be
+changed after resume, is not supported on background sessions, is retained until
+completion, and unimplemented methods fall through to the session delegate.
+Do not mutate a running task's delegate, create/invalidate the injected session,
+or intercept authentication/redirect/cache policies unnecessarily. Preserve
+supported injected-session configuration/URLProtocol behavior. Report unsupported
+background-session compatibility explicitly instead of crashing or pretending
+the delegate is applied.
+
+**Lifecycle:** one optional absolute request.deadline covers headers, idle body,
+and pending consumption through producing the terminal response. Do not add a
+default deadline when nil or restart a relative timeout on each read. A timer and
+explicit owned-task cancellation must wake a pending waiter, even before headers
+or waiter registration. Normal network completion is distinct from consumption
+of buffered final bytes. Keep the deadline active until final delivery/EOF or
+[DONE]; check after synchronous parsing and before returning/yielding as well.
+Cancellation/overflow/HTTP rejection/[DONE]/abandonment must stop only this task.
+Use a small independent stream owner or equivalent to break receiver↔task cycles;
+deinit on a cycle is not cleanup. Exactly one terminal outcome wins; cleanup must
+not replace a size/deadline failure with a later URLError.cancelled or erase a
+completed [DONE] success. Do not invoke continuations, handlers or task.cancel
+while holding state locks. Avoid data races when callbacks/waiters compete.
+
+**Compatibility:** preserve request/model/auth/custom headers, endpoint/role
+checks, HTTP error vocabulary and public return types. Keep parser helpers:
+malformed/comment/role-only/empty SSE produces no delta; EOF without [DONE]
+succeeds and processes a final unterminated line; retain Foundation's supported
+newline/UTF-8 splitting behavior. Do not import the vendored EventSource parser
+which joins multiline data and changes semantics. Preserve exact bodyDelta and
+cumulativeBody (BASStreamingOrganAdapter.swift19-28,50-55). Nonstream maps transfer
+errors to transport:...; streaming historically maps startup errors but lets
+body-read errors escape—preserve this distinction unless root explicitly rules
+on a demonstrated incompatibility. Retain buffered valid-prefix streaming output
+before a later transport error where the existing path would emit it. HTTP
+non-2xx is rejected on headers before accepting body; actual received bytes,
+not Content-Length alone, enforce the size limit.
+
+This bounds adapter-owned body/line/output state to O(cap), not a precise cap on
+Foundation's opaque network buffers, allocation growth or one delivered callback
+argument. Do not claim a new OS-level memory quota or build a new HTTP stack.
+
+**TDD and verification:** first add an incremental offline URLProtocol fixture
+driving both real entrypoints, with small scheduled chunks and cancellation
+observations rather than a giant preallocated payload. Show at least one failing
+oversized-receipt/deadline/queue case and a legitimate control before production
+edits. Cover exact raw cap/cap+1, unterminated line, ignored/malformed/metadata and
+empty frames, many tiny frames, split Unicode/newlines, final EOF/[DONE], paused
+consumer preserving deltas, deadline before headers/during idle receipt/paused
+consumption, transport-error prefix, and cleanup on failure/cancel/abandonment.
+Test injected-session policy behavior. Small pure state tests may supplement but
+must not replace actual entrypoint/URLProtocol checks. Avoid network access,
+real provider credentials, real user data or model downloads.
+
+The completed native BAS build provides reusable scratch
+`/private/tmp/qinao-bas-native-test-1329bde3`, with Xcode-beta27 and real same-source
+MLX_METAL_PATH `/private/tmp/qinao-mlx-metallib-1329bde3/mlx/backend/metal/kernels/mlx.metallib`.
+No process owns it now. Run focused relevant XCTest selectors under
+`swift test --package-path BehavioralAISubstrate --build-system native --scratch-path ... --filter ...`;
+record selected counts and full output. Do not use the headless wrapper or claim
+unrelated tests passed. Root's earlier unfiltered baseline had10 assertion
+failures in journal CLI discovery/W0 provider-default tests; those remain separate
+open work and do not authorize removing coverage. Root will perform the later
+coherent full-candidate validation; do not wastefully rerun the whole suite after
+each edit. Freeze final diff/source/test logs in this plan's SDD workspace and
+return for fresh independent bypass/regression review. No staging/commit/push,
+new scan, subagents, system-toolchain edits or other source writes in this task.
+
+## Task 4: Locate the real journal CLI in the current test build
+
+This is the finite test-only repair diagnosed by the actual native BAS run at
+1329bde3 (Swift sources unchanged through7806dc5a). The built BASJournalCLI exists
+beside BehavioralAISubstratePackageTests.xctest in the external scratch products
+directory. Three suites search only working-directory .build paths; throwing
+XCTSkip from run() inside XCTest assertions also generates assertion failures.
+The baseline is retained in native-bas-full-test-1329bde3.log; do not repeat the
+whole suite to rediscover it. Begin only after Task3 hands back source ownership.
+
+**Files:** Modify only the three suites under
+`BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/`:
+`BASJournalCLIIntegrationTests.swift`, `BASJournalGroundingIntegrationTests.swift`,
+`BASBetCommitIntegrationTests.swift`; add one small macOS-only shared test helper
+and its focused locator tests if necessary. No CLI/product/package/toolchain
+edits, binary copying/symlinks, PATH override, fake end-to-end executable, or
+unrelated test changes. Preserve all32 existing integration cases and assertions.
+
+**Interface:** The shared test-only locator consumes the actual test bundle URL
+and a working-directory URL and returns an executable regular CLI URL or nil.
+Prefer the sibling of the actual test bundle before compatible old .build paths:
+
+```swift
+static func binaryURL(testBundleURL: URL, workingDirectory: URL) -> URL? {
+    let sibling = testBundleURL.deletingLastPathComponent()
+        .appendingPathComponent("BASJournalCLI")
+    let legacy = [".build/debug/BASJournalCLI", ".build/release/BASJournalCLI",
+                  ".build/arm64-apple-macosx/debug/BASJournalCLI",
+                  ".build/x86_64-apple-macosx/debug/BASJournalCLI"]
+        .map { workingDirectory.appendingPathComponent($0) }
+    return ([sibling] + legacy).first { url in
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            && !isDirectory.boolValue
+            && FileManager.default.isExecutableFile(atPath: url.path)
+    }
+}
+```
+
+Each suite obtains Bundle(for: Self.self).bundleURL and resolves once in
+setUpWithError(), using XCTSkipIf for a genuinely absent product BEFORE assertion
+bodies. Store the resolved URL for run(); a missing setup invariant in run()
+must be a normal assertion/error, not a nested skip. Keep process arguments,
+disposable journal locations, fixture Git repositories and existing environment
+handling unchanged. Do not introduce a base-class hierarchy or process framework.
+
+- [ ] **Step 1 — focused RED:** Add a discovery regression to the existing journal
+  suite against its existing cliBinaryURL(), asserting the actual same-build
+  sibling URL is found when the external scratch holds the real executable.
+  The exact expected URL is
+  Bundle(for: Self.self).bundleURL.deletingLastPathComponent()
+  .appendingPathComponent("BASJournalCLI"). Run that one case in the authorized
+  native scratch before changing the locator; inspect the assertion failure,
+  not a compile error or a skipped test. Preserve the run output.
+- [ ] **Step 2 — narrow repair:** Add the shared locator with the interface above
+  and migrate all three suites' setup/run access. Add temporary-filesystem unit
+  cases for same-build sibling preference over an existing legacy candidate,
+  each retained legacy fallback, absent product, nonexecutable file and directory
+  rejection. These fixture files test discovery only and are never executed as
+  the CLI. The integration discovery regression must still assert the actual
+  executable path, not merely a helper's candidate list.
+- [ ] **Step 3 — real verification:** Run the locator suite AND all three complete
+  integration suites, with unchanged actual BASJournalCLI built by the same
+  package. Use Xcode-beta27, --build-system native and the handed-back scratch
+  /private/tmp/qinao-bas-native-test-1329bde3 with the real matching MLX_METAL_PATH
+  documented in Task3. Record the exact command, selected/executed/skipped counts,
+  full output, actual executable URL and source identity. All32 existing cases
+  must execute rather than newly skip; report actual newly exposed product
+  failures for a separate bounded diagnosis, never loosen their assertions.
+- [ ] **Step 4 — handback:** Inspect diff/check, freeze source/test evidence and
+  report to task-4-report.md in this plan's private SDD workspace. Root arranges
+  fresh task review and the ordinary commit. No staging/commit/push, subagents,
+  new scan or full-package rerun inside this implementation.

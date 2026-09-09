@@ -65,6 +65,9 @@ public actor BASChatCompletionsOrganAdapter: BASOrganAdapter {
     /// chat-completions response approaches it — but bounds memory against a
     /// hostile / misconfigured endpoint that returns a multi-GB body or an
     /// unbounded stream. Hosts override per-endpoint via `init(maxResponseBytes:)`.
+    /// Counts every raw body byte (including ignored SSE framing/metadata), as
+    /// well as decoded content. Adapter-owned state is O(cap); this is not an
+    /// OS-level quota on Foundation's network buffers or callback allocations.
     public static let defaultMaxResponseBytes: Int = 32 * 1024 * 1024
 
     public nonisolated let descriptor: BASOrganDescriptor
@@ -142,39 +145,19 @@ public actor BASChatCompletionsOrganAdapter: BASOrganAdapter {
         }
         urlRequest.httpBody = body
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await urlSession
-                .data(for: urlRequest)
-        } catch {
-            throw BASOrganError.providerUnavailable(
-                reason: "transport:\(error.localizedDescription)")
+        let response = try BoundedChatResponse(session: urlSession, request: urlRequest,
+            cap: maxResponseBytes, deadline: request.deadline, streaming: false)
+        let data = try await response.collect()
+        let parsed = Result { try Self.parseResponseBody(data) }
+        // Parsing is synchronous; a deadline that won during it still governs
+        // delivery, including when the parser found malformed JSON.
+        try Task.checkCancellation()
+        try response.check()
+        let bodyText = try parsed.get()
+        guard bodyText.utf8.count <= maxResponseBytes else {
+            throw BASOrganError.providerUnavailable(reason: "response-too-large:decoded>\(maxResponseBytes)")
         }
-
-        guard let http = response as? HTTPURLResponse else {
-            throw BASOrganError.providerUnavailable(
-                reason: "non-http-response")
-        }
-        guard (200..<300).contains(http.statusCode) else {
-            throw BASOrganError.providerUnavailable(
-                reason: "http-\(http.statusCode)")
-        }
-
-        // Bound the accepted body. HONEST RESIDUAL: `URLSession.data(for:)` has
-        // already buffered the full body by the time we reach here, so this guard
-        // bounds what we ACCEPT + parse (avoiding a second large allocation) but
-        // cannot stop the transport from buffering an over-cap body first. Hosts
-        // facing untrusted endpoints should prefer the streaming API (which IS
-        // pre-bounded — see `+Streaming.swift`) and/or set a small `maxResponseBytes`.
-        guard data.count <= maxResponseBytes else {
-            throw BASOrganError.providerUnavailable(
-                reason: "response-too-large:\(data.count)>\(maxResponseBytes)")
-        }
-
-        let bodyText = try Self.parseResponseBody(data)
-
-        return BASOrganDraft(
+        let draft = BASOrganDraft(
             requestID: request.requestID,
             providerID: descriptor.providerID,
             role: request.role,
@@ -187,6 +170,9 @@ public actor BASChatCompletionsOrganAdapter: BASOrganAdapter {
             producedAt: Date(),
             traceID: BASOrganDeterministicAdapter
                 .digest(for: request, providerID: descriptor.providerID))
+        try Task.checkCancellation()
+        try response.finish()
+        return draft
     }
 
     public func currentCapacity() async -> BASOrganCapacity {

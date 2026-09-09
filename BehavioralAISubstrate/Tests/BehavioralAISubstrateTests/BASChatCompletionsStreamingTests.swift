@@ -10,11 +10,8 @@ import XCTest
 ///   2. Streaming request body (must include `"stream": true`)
 ///   3. Conformance to `BASStreamingOrganAdapter` (cast probe)
 ///
-/// Network-driven streaming end-to-end requires a chunked
-/// `URLProtocol` mock that delivers bytes in pieces. That's out
-/// of scope for this offline suite; the pure parser + cast probe
-/// already pin every code path other than `URLSession.bytes(...)`,
-/// which is Apple framework code.
+/// Incremental offline URLProtocol coverage for the real streaming
+/// entrypoint lives in BASChatCompletionsResponseBoundaryTests.
 final class BASChatCompletionsStreamingTests: XCTestCase {
 
     private let endpoint = BASChatCompletionsOrganAdapter.Endpoint(

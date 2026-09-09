@@ -12,7 +12,7 @@ import BASOrgan
 ///
 /// 1. Sends the same Chat Completions request body with
 ///    `"stream": true` added.
-/// 2. Reads `URLSession.AsyncBytes` line-by-line.
+/// 2. Receives raw bytes into a request-local bounded buffer.
 /// 3. Parses SSE format (each event is `data: {json}\n\n`).
 /// 4. Extracts `choices[0].delta.content` from each event.
 /// 5. Accumulates the cumulative body and yields one
@@ -27,48 +27,24 @@ import BASOrgan
 /// Mistral, Together AI, Groq, Fireworks, llama.cpp, vLLM,
 /// LM Studio, Ollama.
 ///
-/// ## Error mapping (same as non-streaming)
-///
-/// HTTP non-2xx, malformed JSON, transport throws — all surfaced
-/// via the stream's terminal failure with the same stable
-/// reason-code grammar (`http-NNN`, `malformed-json`,
-/// `transport:<msg>`).
+/// Startup transport errors use `transport:<msg>`; body-read transport
+/// errors remain the original errors. Malformed SSE frames are ignored.
 extension BASChatCompletionsOrganAdapter: BASStreamingOrganAdapter {
 
     public nonisolated func streamDraft(
         _ request: BASOrganRequest
     ) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
-        AsyncThrowingStream { continuation in
-            // audit H18: cancel the pump on stream termination, else a consumer cancel leaks the
-            // SSE network pump (it keeps reading to completion). onTermination propagates
-            // cooperative cancellation into `streamViaSSE`'s await points (URLSession honors it).
-            let task = Task {
-                guard
-                    descriptor.supportedRoles.contains(request.role)
-                else {
-                    continuation.finish(
-                        throwing: BASOrganError
-                            .unsupportedRole(request.role))
-                    return
-                }
-                if let deadline = request.deadline,
-                   deadline < Date()
-                {
-                    continuation.finish(
-                        throwing: BASOrganError.deadlineExpired)
-                    return
-                }
-                do {
-                    try await self.streamViaSSE(
-                        request: request,
-                        continuation: continuation)
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
+        let state = Result { () throws -> ChatSSEPull in
+            guard descriptor.supportedRoles.contains(request.role) else {
+                throw BASOrganError.unsupportedRole(request.role)
             }
-            continuation.onTermination = { @Sendable _ in task.cancel() }
+            if let deadline = request.deadline, deadline <= Date() {
+                throw BASOrganError.deadlineExpired
+            }
+            return try makeSSEPull(request: request)
         }
+        // One consumer request produces one delta. No queued cumulative snapshots.
+        return AsyncThrowingStream(unfolding: { try await state.get().next() })
     }
 
     /// Build the same JSON body as `buildRequestBody(for:model:)`
@@ -140,14 +116,10 @@ extension BASChatCompletionsOrganAdapter: BASStreamingOrganAdapter {
             || trimmed == "data:[DONE]"
     }
 
-    // MARK: - Private SSE pump
+    // MARK: - Request-local lossless SSE pull
 
     @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *)
-    private nonisolated func streamViaSSE(
-        request: BASOrganRequest,
-        continuation: AsyncThrowingStream<
-            BASOrganDraftChunk, Error>.Continuation
-    ) async throws {
+    private nonisolated func makeSSEPull(request: BASOrganRequest) throws -> ChatSSEPull {
         let body = try Self.buildStreamingRequestBody(
             for: request, model: streamingEndpoint.model)
 
@@ -164,48 +136,58 @@ extension BASChatCompletionsOrganAdapter: BASStreamingOrganAdapter {
         }
         urlRequest.httpBody = body
 
-        let (bytes, response): (URLSession.AsyncBytes, URLResponse)
-        do {
-            (bytes, response) = try await streamingURLSession
-                .bytes(for: urlRequest)
-        } catch {
-            throw BASOrganError.providerUnavailable(
-                reason: "transport:\(error.localizedDescription)")
-        }
+        let response = try BoundedChatResponse(session: streamingURLSession, request: urlRequest,
+            cap: streamingMaxResponseBytes, deadline: request.deadline, streaming: true)
+        return ChatSSEPull(response: response, request: request, providerID: descriptor.providerID,
+                           cap: streamingMaxResponseBytes)
+    }
+}
 
-        guard let http = response as? HTTPURLResponse else {
-            throw BASOrganError.providerUnavailable(
-                reason: "non-http-response")
-        }
-        guard (200..<300).contains(http.statusCode) else {
-            throw BASOrganError.providerUnavailable(
-                reason: "http-\(http.statusCode)")
-        }
+/// AsyncIteratorProtocol requires serial next() calls. The unfolding stream owns
+/// this state; its last release drops the independent response owner and cancels
+/// unfinished receipt, even when no next() call is pending.
+private final class ChatSSEPull: @unchecked Sendable {
+    private let response: BoundedChatResponse
+    private var lines: AsyncLineSequence<BoundedChatResponse.Bytes>.AsyncIterator
+    private let request: BASOrganRequest
+    private let providerID: String
+    private let cap: Int
+    private var cumulative = ""
+    private var cumulativeBytes = 0
+    private var ended = false
 
-        var cumulative = ""
-        let responseCap = streamingMaxResponseBytes
-        for try await line in bytes.lines {
-            if Self.isSSEDoneLine(line) { return }
-            guard let delta = Self.parseSSEDataLine(line) else {
-                continue
+    init(response: BoundedChatResponse, request: BASOrganRequest, providerID: String, cap: Int) {
+        self.response = response; self.request = request; self.providerID = providerID; self.cap = cap
+        lines = response.bytes.lines.makeAsyncIterator()
+    }
+
+    func next() async throws -> BASOrganDraftChunk? {
+        if ended { return nil }
+        return try await withTaskCancellationHandler {
+            do {
+                try Task.checkCancellation()
+                try response.check()
+                while let line = try await lines.next() {
+                    try response.check()
+                    if BASChatCompletionsOrganAdapter.isSSEDoneLine(line) {
+                        try response.finish(); ended = true; return nil
+                    }
+                    guard let delta = BASChatCompletionsOrganAdapter.parseSSEDataLine(line), !delta.isEmpty else { continue }
+                    let deltaBytes = delta.utf8.count
+                    guard deltaBytes <= cap - cumulativeBytes else {
+                        throw BASOrganError.providerUnavailable(reason: "response-too-large:stream>\(cap)")
+                    }
+                    cumulative += delta; cumulativeBytes += deltaBytes
+                    try Task.checkCancellation()
+                    try response.check()
+                    return BASOrganDraftChunk(requestID: request.requestID, providerID: providerID,
+                        role: request.role, bodyDelta: delta, cumulativeBody: cumulative, producedAt: Date())
+                }
+                try response.finish(); ended = true; return nil
+            } catch {
+                ended = true; response.cancel(); throw error
             }
-            if delta.isEmpty { continue }
-            cumulative += delta
-            // Pre-bounded: refuse an unbounded stream from a hostile / runaway
-            // endpoint instead of growing `cumulative` without limit.
-            if cumulative.utf8.count > responseCap {
-                throw BASOrganError.providerUnavailable(
-                    reason: "response-too-large:stream>\(responseCap)")
-            }
-            continuation.yield(
-                BASOrganDraftChunk(
-                    requestID: request.requestID,
-                    providerID: descriptor.providerID,
-                    role: request.role,
-                    bodyDelta: delta,
-                    cumulativeBody: cumulative,
-                    producedAt: Date()))
-        }
+        } onCancel: { self.response.cancel() }
     }
 }
 
