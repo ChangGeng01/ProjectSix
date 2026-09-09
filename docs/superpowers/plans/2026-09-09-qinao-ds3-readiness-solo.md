@@ -253,7 +253,7 @@ must be a normal assertion/error, not a nested skip. Keep process arguments,
 disposable journal locations, fixture Git repositories and existing environment
 handling unchanged. Do not introduce a base-class hierarchy or process framework.
 
-- [ ] **Step 1 — focused RED:** Add a discovery regression to the existing journal
+- [x] **Step 1 — focused RED:** Add a discovery regression to the existing journal
   suite against its existing cliBinaryURL(), asserting the actual same-build
   sibling URL is found when the external scratch holds the real executable.
   The exact expected URL is
@@ -261,14 +261,14 @@ handling unchanged. Do not introduce a base-class hierarchy or process framework
   .appendingPathComponent("BASJournalCLI"). Run that one case in the authorized
   native scratch before changing the locator; inspect the assertion failure,
   not a compile error or a skipped test. Preserve the run output.
-- [ ] **Step 2 — narrow repair:** Add the shared locator with the interface above
+- [x] **Step 2 — narrow repair:** Add the shared locator with the interface above
   and migrate all three suites' setup/run access. Add temporary-filesystem unit
   cases for same-build sibling preference over an existing legacy candidate,
   each retained legacy fallback, absent product, nonexecutable file and directory
   rejection. These fixture files test discovery only and are never executed as
   the CLI. The integration discovery regression must still assert the actual
   executable path, not merely a helper's candidate list.
-- [ ] **Step 3 — real verification:** Run the locator suite AND all three complete
+- [x] **Step 3 — real verification:** Run the locator suite AND all three complete
   integration suites, with unchanged actual BASJournalCLI built by the same
   package. Use Xcode-beta27, --build-system native and the handed-back scratch
   /private/tmp/qinao-bas-native-test-1329bde3 with the real matching MLX_METAL_PATH
@@ -276,7 +276,164 @@ handling unchanged. Do not introduce a base-class hierarchy or process framework
   full output, actual executable URL and source identity. All32 existing cases
   must execute rather than newly skip; report actual newly exposed product
   failures for a separate bounded diagnosis, never loosen their assertions.
-- [ ] **Step 4 — handback:** Inspect diff/check, freeze source/test evidence and
+- [x] **Step 4 — handback:** Inspect diff/check, freeze source/test evidence and
   report to task-4-report.md in this plan's private SDD workspace. Root arranges
   fresh task review and the ordinary commit. No staging/commit/push, subagents,
   new scan or full-package rerun inside this implementation.
+
+## Task 5: Bind registry invocation to an explicit provider identity
+
+This is one ordinary product-correctness slice from the real BAS native failure
+`BASProviderBoundaryTests.testRegistryResolvesOnlyAnExplicitProviderID`, not the
+whole July Silicon Task7 and not a new security scan. Start after Task4 review
+and source handback. The unchanged registry/endpoint baseline is397833fa.
+The two full Qinao failures, MLX production-default mismatch and shared-operation
+prerequisites remain separate work. This task must not claim to close them.
+
+**Consumes:** `BASOrganAdapter.descriptor.providerID`, existing registry
+registration and descriptor presentation, and the actual wrapped adapter already
+constructed by each current host factory. No UUID, registration-order winner,
+role preference or matrix recommendation becomes the selected provider identity.
+
+**Produces:** exact `BASOrganRegistry.adapter(providerID:)` and
+`descriptor(providerID:)`, plus a pinned identity used by both real eager and
+streaming `BASOrganRegistryEndpoint` invocations. The registry becomes a lookup,
+not an election mechanism. This is not durable provider-execution ownership.
+
+**Production files:**
+
+- `BehavioralAISubstrate/Sources/BASOrgan/BASOrganRegistry.swift`: exact lookup;
+  retain registration, replacement, removal, descriptor order/count and read-only
+  `hasRole`. Preserve the Codable `RegistryError.noAdapterForRole` case for old
+  serialized errors, though lookup no longer generates it.
+- `BehavioralAISubstrate/Sources/BASOrgan/BASProviderRouting.swift`: remove the
+  now-unconsumed election policy after migrating its callers. Do not remove
+  `BASNeuralProviderMatrix` or its pure observation/ranking capabilities.
+- `QinaoRuntimeSDK/Sources/QinaoLoop/BASOrganRegistryEndpoint.swift`: explicit
+  constructor binding and one shared resolver for eager/routed/streaming calls.
+- `QinaoRuntimeSDK/Sources/QinaoMLX/QinaoMLXEndpoint.swift` and
+  `Sources/QinaoAppleFoundation/QinaoAppleFoundationEndpoint.swift`: pass each
+  already-wrapped organ's exact descriptor ID. Preserve all model choices,
+  loading, prewarm, presets, error behavior and wrapper identity forwarding.
+- `QinaoRuntimeSDK/Sources/QinaoSampleHost/MultiTurnDemo.swift`: carry the actual
+  selected adapter ID into its existing endpoint, without changing explicit
+  demo fallback labels/behavior.
+- `QinaoRuntimeSDK/Sources/QinaoSampleHost/PersonaPanelReviewDemo.swift`: hold
+  the adapter it just constructed directly instead of electing it by role.
+
+**Test files:** BAS tests `BASProviderBoundaryTests`, `BASOrganRegistryTests`,
+`BASMultiProviderRegistryTests`, `BASProviderRoutingTests`,
+`BASNeuralProviderMatrixTests`, `AppleFoundationOrganAdapterTests`,
+`AppleFoundationE2ETests`, `BASChatCompletionsOrganAdapterTests`; Qinao tests
+`QinaoOrganErrorTranslationTests`, `QinaoOrganRoutingTests`,
+`QinaoLoopGenerationTests`, `QinaoProviderBoundaryTests`,
+`QinaoAppleFoundationE2ETests`, `QinaoAppleFoundationPathBE2ETests`,
+`QinaoAppleFoundationAIReviewerSimulationE2ETests`,
+`QinaoAppleFoundationAIPersonaSetE2ETests`, `QinaoMultiTurnEndToEndTests`,
+`QinaoAppleFoundationFactoryTests`, and one focused endpoint-identity test file
+if necessary. Test files live under each package's existing test target.
+Unlisted concrete caller migrations require a narrow source reference and root
+coordination, not a repository-wide redesign. No Task4 file changes.
+
+- [ ] **Step 1 — reproduce the specific existing RED.** Run only
+  `BASProviderBoundaryTests/testRegistryResolvesOnlyAnExplicitProviderID` in the
+  handed-back native BAS scratch. Its existing protocol probes compile before
+  and after the API migration and must report the actual missing-ID/role-election
+  assertion, not a build failure. Preserve that output; do not repeat the full
+  BAS or Qinao baselines. The test's no-role-API assertion remains unchanged.
+- [ ] **Step 2 — exact registry lookup and controls.** Implement:
+
+  ```swift
+  public func adapter(providerID: String) throws -> any BASOrganAdapter {
+      guard let entry = entries[providerID] else {
+          throw RegistryError.unknownProvider(id: providerID)
+      }
+      return entry.adapter
+  }
+
+  public func descriptor(providerID: String) throws -> BASOrganDescriptor {
+      guard let entry = entries[providerID] else {
+          throw RegistryError.unknownProvider(id: providerID)
+      }
+      return entry.descriptor
+  }
+  ```
+
+  Remove both role-selected `adapter(for:)` overloads and routing execution.
+  Rewrite obsolete election assertions as explicit-ID behavior or direct matrix
+  observations; keep register/re-register/remove/count/order/capability tests.
+  Add these concrete assertions with the existing deterministic adapter:
+
+  ```swift
+  let registry = BASOrganRegistry()
+  await registry.register(BASOrganDeterministicAdapter(providerID: "provider-a"))
+  await registry.register(BASOrganDeterministicAdapter(providerID: "provider-b"))
+  let selected = try await registry.adapter(providerID: "provider-a")
+  XCTAssertEqual(selected.descriptor.providerID, "provider-a")
+  let descriptor = try await registry.descriptor(providerID: "provider-a")
+  XCTAssertEqual(descriptor.providerID, "provider-a")
+  try await registry.unregister(providerID: "provider-a")
+  do {
+      _ = try await registry.adapter(providerID: "provider-a")
+      XCTFail("missing selection must not fall back to provider-b")
+  } catch BASOrganRegistry.RegistryError.unknownProvider(let id) {
+      XCTAssertEqual(id, "provider-a")
+  }
+  ```
+
+  Repeat with reversed registration order; test descriptor missing-ID and
+  replacement preserves presentation order. Add legacy error Codable round-trip
+  coverage without retaining executable role election.
+- [ ] **Step 3 — real endpoint binding and call-site migration.** Configured
+  registry initializers require `registry: BASOrganRegistry, providerID: String`;
+  test-override initializers require an expected `providerID: String` alongside
+  the existing role-taking override closure. Preserve `init()` solely for the
+  typed `no-endpoint-configured` negative path, with no inferred selection.
+  Preserve existing presetForRole/nextRequestID injection in configured forms.
+  A single resolver serves eager and streaming paths and enforces:
+
+  ```swift
+  // After exact lookup or the explicitly bound fixture override:
+  guard adapter.descriptor.providerID == providerID else {
+      throw QinaoLoop.LoopError.organUnavailable(reason: "provider-identity-mismatch")
+  }
+  guard adapter.descriptor.supportedRoles.contains(internalRole) else {
+      throw BASOrganError.unsupportedRole(internalRole)
+  }
+  ```
+
+  Missing exact ID retains `unknown-provider:<id>` translation. Unsupported role
+  and provider errors retain existing reason-code grammar; the old Codable error
+  still translates if explicitly injected. No failure selects another adapter.
+  Factories bind `organ.descriptor.providerID` after their existing wrap; no new
+  model selection or fallback is permitted. Migrate every listed real/test caller
+  to an explicit ID or an already-held adapter. Do not change response transport,
+  buffering, provider metadata format, canonical generation, or default models.
+- [ ] **Step 4 — prove invocation, not just lookup.** Add an actor spy with a
+  nonisolated immutable descriptor and separate eager/stream invocation counters,
+  yielding deterministic nonempty content. Register A and B in both orders and
+  bind A. Exercise legacy eager, decision-aware eager and streaming; assert A's
+  corresponding counters and zero B calls, exact returned provider ID/body and
+  unchanged role/preset request fields. Register later on-device/certified B:
+  same result. Remove A with B present: exact unknown-A and zero B calls for
+  eager and streaming. Select scout-only A for core: typed refusal and neither
+  adapter invoked. Inject B under expected A: identity mismatch before either
+  invocation in both paths. Keep no-endpoint, non-streaming and translated-error
+  controls. Never use a real model, provider credential or live network.
+- [ ] **Step 5 — focused verification and handback.** Use Xcode-beta27 and the
+  real matching MLX_METAL_PATH from Task3. BAS scratch is
+  `/private/tmp/qinao-bas-native-test-1329bde3`; Qinao scratch is
+  `/private/tmp/qinao-sdk-native-test-7806dc5a`. The sole implementer owns both;
+  do not run builds simultaneously. Compile all test sources as normal, then
+  run the changed registry/matrix/endpoint/error/loop-generation/factory suites
+  and the exact BAS identity boundary test. Record exact selectors, executed,
+  skipped and failure counts, full logs, source/diff identities and diff check.
+  Platform-opt-in E2E tests remain explicit skips; do not activate them. The
+  unrelated BAS model-default and two Qinao ownership failures remain open and
+  must not be removed, loosened, or counted passed by selectors excluding them.
+  Search the named package sources/test call sites to ensure role lookup only
+  remains in the deliberate W0 absence probe; successful compilation alone may
+  accidentally bind that test-only fallback. Freeze complete patch, logs and
+  task-5-report.md for fresh independent task review. No staging/commit/push,
+  subagents, new scan, full-suite rerun, dependency/toolchain mutation or cleanup
+  of historical files inside this task; root owns review, commit and upload.

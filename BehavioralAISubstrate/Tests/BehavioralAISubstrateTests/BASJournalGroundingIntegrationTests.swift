@@ -16,21 +16,25 @@ final class BASJournalGroundingIntegrationTests: XCTestCase {
 
     private struct CLIResult { let stdout: String; let stderr: String; let exit: Int32 }
 
-    private func cliBinaryURL() -> URL? {
-        let fm = FileManager.default
-        for path in [".build/debug/BASJournalCLI", ".build/release/BASJournalCLI",
-                     ".build/arm64-apple-macosx/debug/BASJournalCLI"] {
-            let url = URL(fileURLWithPath: fm.currentDirectoryPath).appendingPathComponent(path)
-            if fm.fileExists(atPath: url.path) { return url }
-        }
-        return nil
+    private var cliBinaryURL: URL?
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        cliBinaryURL = BASJournalCLIBinaryLocator.binaryURL(
+            testBundleURL: Bundle(for: Self.self).bundleURL,
+            workingDirectory: URL(
+                fileURLWithPath: FileManager.default.currentDirectoryPath,
+                isDirectory: true))
+        try XCTSkipIf(
+            cliBinaryURL == nil,
+            "BASJournalCLI binary not found — run `swift build` first.")
     }
 
     private func run(_ args: [String], journalDir: URL, ground: Bool, repo: URL?,
                      semantic: Bool = false) throws -> CLIResult {
-        guard let binary = cliBinaryURL() else {
-            throw XCTSkip("BASJournalCLI binary not found — run `swift build` first.")
-        }
+        let binary = try XCTUnwrap(
+            cliBinaryURL,
+            "setUpWithError must resolve BASJournalCLI before running assertions")
         let p = Process()
         p.executableURL = binary
         p.arguments = args
