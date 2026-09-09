@@ -155,9 +155,12 @@ final class BASEventLogTamperRedTeamTests: XCTestCase {
 
     func testFrontPruningStaysContiguousAndIsNotFlagged() async throws {
         let p = path("evt-prune.sqlite")
-        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        let clock = BASEventLogTestClock(1_000)
+        let store = try BASSQLiteEventLogStorage(
+            databaseURL: URL(fileURLWithPath: p), nowMs: clock.now)
         try await appendN(store, session: "s", n: 5)   // ts base+0..4, seq 0..4
         // Legitimate retention prune of the two oldest by timestamp.
+        clock.advance(by: 259_200_001)
         _ = try await store.pruneEventsBefore(timestampMs: 1_700_000_000_002)
         let verified = try await store.eventsVerifyingContiguity(forSession: "s")
         XCTAssertEqual(verified.map(\.sequenceNumber), [2, 3, 4],
@@ -345,8 +348,11 @@ final class BASEventLogTamperRedTeamTests: XCTestCase {
     func testHashChainPruneIsNotFalseFlagged() async throws {
         BASSQLiteEventLogStorage.rowIntegrityChainEnabled = true
         let p = path("evt-chain-prune.sqlite")
-        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        let clock = BASEventLogTestClock(1_000)
+        let store = try BASSQLiteEventLogStorage(
+            databaseURL: URL(fileURLWithPath: p), nowMs: clock.now)
         try await appendN(store, session: "s", n: 5)   // ts base+0..4 (seq 0..4)
+        clock.advance(by: 259_200_001)
         _ = try await store.pruneEventsBefore(timestampMs: 1_700_000_000_002)   // legitimate front-prune of 0,1
         try await store.verifyIntegrityChain(forSession: "s")   // must NOT throw (seeds from surviving head)
     }
@@ -399,10 +405,13 @@ final class BASEventLogTamperRedTeamTests: XCTestCase {
     func testHashChainFullPruneDoesNotFalseFlagAsErasure() async throws {
         BASSQLiteEventLogStorage.rowIntegrityChainEnabled = true
         let p = path("evt-chain-fullprune.sqlite")
-        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        let clock = BASEventLogTestClock(1_000)
+        let store = try BASSQLiteEventLogStorage(
+            databaseURL: URL(fileURLWithPath: p), nowMs: clock.now)
         try await appendN(store, session: "s", n: 3)   // ts base+0..2
         // FULL retention prune (cutoff past the last event) removes ALL events; the sidecar is pruned in
         // lockstep, so verify sees no events + no chain = CLEAN (not a false total-erasure alarm).
+        clock.advance(by: 259_200_001)
         _ = try await store.pruneEventsBefore(timestampMs: 1_700_000_000_999)
         try await store.verifyIntegrityChain(forSession: "s")   // must NOT throw
 

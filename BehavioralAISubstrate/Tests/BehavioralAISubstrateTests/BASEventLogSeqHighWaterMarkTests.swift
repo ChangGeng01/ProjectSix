@@ -22,14 +22,16 @@ final class BASEventLogSeqHighWaterMarkTests: XCTestCase {
     }
 
     func testFullPruneDoesNotResetSequenceNumber() async throws {
+        let clock = BASEventLogTestClock(1_000)
         let store = try BASSQLiteEventLogStorage(
-            databaseURL: dir.appendingPathComponent("evt.sqlite"))
+            databaseURL: dir.appendingPathComponent("evt.sqlite"), nowMs: clock.now)
         let s = "session-X"
         let s0 = try await store.append(entry("e0", ts: 1000, session: s)).assignedSequenceNumber
         let s1 = try await store.append(entry("e1", ts: 1001, session: s)).assignedSequenceNumber
         let s2 = try await store.append(entry("e2", ts: 1002, session: s)).assignedSequenceNumber
         XCTAssertEqual([s0, s1, s2], [0, 1, 2])
 
+        clock.advance(by: 259_200_001)
         let pruned = try await store.pruneEventsBefore(timestampMs: 2000)
         XCTAssertEqual(pruned, 3, "all 3 events pruned (whole-session erasure)")
         let empty = try await store.eventsOrThrow(forSession: s)

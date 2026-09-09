@@ -104,7 +104,7 @@ export MACOSX_DEPLOYMENT_TARGET="14.0"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
 XCODE_MAJOR="$(
   DEVELOPER_DIR="${DEVELOPER_DIR}" xcodebuild -version |
-    awk '/^Xcode / { split($2, version, "."); print version[1]; exit }'
+    awk '/^Xcode / && !found { split($2, version, "."); print version[1]; found=1 } END { if (!found) exit 1 }'
 )"
 if [ -z "${XCODE_MAJOR}" ] || [ "${XCODE_MAJOR}" -lt 27 ]; then
   echo "ERROR: Xcode 27+ is required; DEVELOPER_DIR=${DEVELOPER_DIR}" >&2

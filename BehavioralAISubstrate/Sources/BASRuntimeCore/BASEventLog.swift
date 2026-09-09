@@ -403,12 +403,19 @@ public struct BASEventLogRetentionPolicy:
         self.pruneCadenceSec = max(60, pruneCadenceSec)
     }
 
-    /// Common preset:keep last 24 hours,prune hourly。
-    /// Suitable for iPhone hosts running stress / observation
-    /// sessions but not long-term audit ledgers。
+    /// Common semantic-window preset: request pruning of event timestamps older
+    /// than 24 hours. Shipped concrete stores additionally require the row to
+    /// have spent more than 72 hours in storage before physically deleting it.
     public static let last24Hours =
         BASEventLogRetentionPolicy(
             maxAgeSec: 24 * 3600,
+            pruneCadenceSec: 3600)
+
+    /// Common semantic-window preset matching the independent physical
+    /// ingestion floor enforced by the shipped concrete stores.
+    public static let last72Hours =
+        BASEventLogRetentionPolicy(
+            maxAgeSec: 72 * 3600,
             pruneCadenceSec: 3600)
 
     /// Common preset:keep last 7 days,prune every 6 hours。
@@ -423,7 +430,11 @@ public struct BASEventLogRetentionPolicy:
     /// should be pruned。
     public func cutoff(nowMs: Int64) -> Int64 {
         guard maxAgeSec > 0 else { return 0 }
-        return nowMs - (maxAgeSec * 1000)
+        let (ageMs, multiplyOverflow) = maxAgeSec.multipliedReportingOverflow(by: 1_000)
+        guard !multiplyOverflow else { return 0 }
+        let (cutoff, subtractOverflow) = nowMs.subtractingReportingOverflow(ageMs)
+        guard !subtractOverflow, cutoff > 0 else { return 0 }
+        return cutoff
     }
 }
 
@@ -437,11 +448,23 @@ public struct BASEventLogRetentionPolicy:
 /// For cross-session continuity use `BASSQLiteEventLogStorage`。
 public actor BASInMemoryEventLogStorage: BASEventLogStorage {
 
-    private var entries: [BASEventLogEntry] = []
+    private struct StoredEntry: Sendable {
+        let entry: BASEventLogEntry
+        let ingestedAtMs: Int64
+    }
+
+    private var entries: [StoredEntry] = []
     private var idIndex: Set<String> = []
     private var sessionSequenceCounters: [String: Int64] = [:]
+    private let nowMs: @Sendable () -> Int64
 
-    public init() {}
+    public init() {
+        self.nowMs = BASEventLogRecoveryRetention.systemNowMs
+    }
+
+    init(nowMs: @escaping @Sendable () -> Int64) {
+        self.nowMs = nowMs
+    }
 
     @discardableResult
     public func append(
@@ -452,12 +475,12 @@ public actor BASInMemoryEventLogStorage: BASEventLogStorage {
         if idIndex.contains(entry.eventID) {
             // Idempotent: find existing entry's sequenceNumber
             let existing = entries.first {
-                $0.eventID == entry.eventID
+                $0.entry.eventID == entry.eventID
             }
             return (
                 wasNew: false,
                 assignedSequenceNumber:
-                    existing?.sequenceNumber ?? 0)
+                    existing?.entry.sequenceNumber ?? 0)
         }
         let sessionSeq = (
             sessionSequenceCounters[entry.sessionID] ?? -1
@@ -482,7 +505,10 @@ public actor BASInMemoryEventLogStorage: BASEventLogStorage {
             actions: entry.actions,
             confidence: entry.confidence,
             payloadJson: entry.payloadJson)
-        entries.append(stamped)
+        let maximumStamp = entries.map(\.ingestedAtMs).max()
+        let ingestionStamp = BASEventLogRecoveryRetention.clampedStamp(
+            nowMs: nowMs(), maximumValidStamp: maximumStamp)
+        entries.append(StoredEntry(entry: stamped, ingestedAtMs: ingestionStamp))
         idIndex.insert(stamped.eventID)
         return (wasNew: true, assignedSequenceNumber: sessionSeq)
     }
@@ -491,6 +517,7 @@ public actor BASInMemoryEventLogStorage: BASEventLogStorage {
         forSession sessionID: String
     ) async -> [BASEventLogEntry] {
         entries
+            .map(\.entry)
             .filter { $0.sessionID == sessionID }
             .sorted { $0.sequenceNumber < $1.sequenceNumber }
     }
@@ -502,6 +529,7 @@ public actor BASInMemoryEventLogStorage: BASEventLogStorage {
         let safeLimit = max(0, limit)
         guard safeLimit > 0 else { return [] }
         return entries
+            .map(\.entry)
             .filter { $0.timestampMs >= since }
             .sorted { lhs, rhs in
                 if lhs.timestampMs != rhs.timestampMs {
@@ -521,13 +549,18 @@ public actor BASInMemoryEventLogStorage: BASEventLogStorage {
     public func pruneEventsBefore(
         timestampMs cutoff: Int64
     ) async throws -> Int {
-        // M896 retention:filter-out events older than cutoff
+        guard cutoff > 0,
+              let ingestionCutoff = BASEventLogRecoveryRetention.ingestionCutoff(nowMs: nowMs())
+        else { return 0 }
         let beforeCount = entries.count
-        entries.removeAll { $0.timestampMs < cutoff }
+        entries.removeAll {
+            $0.entry.timestampMs < cutoff
+                && $0.ingestedAtMs < ingestionCutoff
+        }
         let removed = beforeCount - entries.count
         if removed > 0 {
             // Rebuild idIndex to match new entries set
-            idIndex = Set(entries.map { $0.eventID })
+            idIndex = Set(entries.map { $0.entry.eventID })
             // Note:sessionSequenceCounters intentionally NOT
             // reset。Sequence numbers continue monotonically
             // from where they were,so future appends in the

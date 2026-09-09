@@ -108,7 +108,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     /// bump。 Existing rows keep payload_format=1 + payload_json,
     /// no row-level rewrite needed。 Read path detects format via
     /// the payload_format column。
-    public static let schemaVersion: Int = 2
+    public static let schemaVersion: Int = 3
 
     // deep-audit runtimecore-b LOW #8 (2026-07-13): the three `nonisolated(unsafe) static var`
     // flags below are SET-ONCE CONFIGURATION — a host sets them BEFORE the first store opens, and
@@ -150,6 +150,9 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     /// access through actor-isolated methods。
     private nonisolated(unsafe) var db: OpaquePointer?
 
+    private let nowMs: @Sendable () -> Int64
+    private nonisolated let closeObserver: (@Sendable () -> Void)?
+
     /// ADR-040 — set once the integrity sidecar table has been ensured for this handle (lazy create on the first
     /// chained append, so a flag-off store never touches the DB). Actor-isolated instance state.
     private var integrityTableEnsured = false
@@ -167,7 +170,21 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     // MARK: - Lifecycle
 
     public init(databaseURL: URL) throws {
+        try self.init(
+            databaseURL: databaseURL,
+            nowMs: BASEventLogRecoveryRetention.systemNowMs,
+            closeObserver: nil)
+    }
+
+    init(
+        databaseURL: URL,
+        nowMs: @escaping @Sendable () -> Int64,
+        closeObserver: (@Sendable () -> Void)? = nil
+    ) throws {
         self.databaseURL = databaseURL
+        self.nowMs = nowMs
+        self.closeObserver = closeObserver
+        self.db = nil
 
         var handle: OpaquePointer?
         let flags = SQLITE_OPEN_READWRITE
@@ -183,7 +200,13 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             throw StorageError.openFailed(
                 code: openRC, message: message)
         }
-        self.db = handle
+        var transferred = false
+        defer {
+            if !transferred {
+                sqlite3_close_v2(handle)
+                closeObserver?()
+            }
+        }
 
         // Audit fix (LOW): set busy_timeout BEFORE the WAL/checkpoint pragmas so a checkpoint/reader collision
         // makes a write block-and-retry internally (up to 5s) rather than throwing SQLITE_BUSY + losing the
@@ -212,40 +235,33 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             db: handle,
             sql: "PRAGMA wal_autocheckpoint=200;")
 
-        // M886 backport (M882 audit fix):read user_version FIRST。
-        let existingVersion = try Self.readUserVersion(
-            db: handle)
-        if existingVersion == 0 {
-            // Fresh DB — set straight to current version
-            try Self.runExec(
-                db: handle,
-                sql: "PRAGMA user_version=\(Self.schemaVersion);")
-        } else if existingVersion == 1
-                  && Self.schemaVersion == 2
-        {
-            // chapter 七百三十二 第一刀 — v1 → v2 migration
-            // path。 ensureSchema() runs ensureV2Columns() which
-            // ALTER TABLE-adds the missing columns。 After the
-            // ALTER completes,bump user_version to 2 to mark
-            // the migration done。
-            try Self.ensureSchema(db: handle)
-            try Self.runExec(
-                db: handle,
-                sql: "PRAGMA user_version=\(Self.schemaVersion);")
-        } else if existingVersion != Self.schemaVersion {
+        let existingVersion = try Self.readUserVersion(db: handle)
+        guard existingVersion == 0 || existingVersion == 1
+                || existingVersion == 2 || existingVersion == Self.schemaVersion
+        else {
             throw StorageError.schemaVersionMismatch(
                 found: existingVersion,
                 expected: Self.schemaVersion)
         }
-        try Self.ensureSchema(db: handle)
+        if existingVersion == Self.schemaVersion {
+            try Self.verifyCurrentSchema(db: handle)
+        } else {
+            try Self.migrateToCurrentSchema(
+                db: handle, migrationNowMs: nowMs)
+        }
         try Self.verifySchemaVersion(db: handle)
         if Self.runIntegrityCheckOnOpen {
             try Self.assertIntegrity(db: handle)   // 先稳 P2 — opt-in proactive corruption scan
         }
+        self.db = handle
+        transferred = true
     }
 
     deinit {
-        if let db { sqlite3_close_v2(db) }
+        if let db {
+            sqlite3_close_v2(db)
+            closeObserver?()
+        }
     }
 
     /// 先稳 P2 — run `PRAGMA integrity_check`; throw if not "ok" (called at init when the flag is set).
@@ -309,6 +325,9 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             }
             let assigned = try Self.nextSequenceNumber(
                 db: db, sessionID: entry.sessionID)
+            let ingestionStamp = BASEventLogRecoveryRetention.clampedStamp(
+                nowMs: nowMs(),
+                maximumValidStamp: try Self.maximumValidIngestionStamp(db: db))
             let stamped = BASEventLogEntry(
                 eventID: entry.eventID,
                 timestampMs: entry.timestampMs,
@@ -330,6 +349,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 payloadJson: entry.payloadJson)
             try Self.insertEntry(
                 db: db, entry: stamped,
+                ingestedAtMs: ingestionStamp,
                 useBinaryPayload: useBinarySnapshot, chainEnabled: chainOn)
             // audit runtimecore-b MED-2: advance the never-pruned seq high-water
             // mark in the SAME txn, so a later full prune can't reset the sequence.
@@ -650,7 +670,8 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 code: -1,
                 message: "db handle nil after init")
         }
-        let pruned = try Self.pruneBefore(db: db, cutoff: cutoff)
+        let pruned = try Self.pruneBefore(
+            db: db, cutoff: cutoff, nowMs: nowMs())
         // deep-audit P2-18 (2026-07-13): a retention prune's deleted event payloads live on as the
         // original INSERT frames in the -wal until a checkpoint truncates it. Truncate now (post-
         // COMMIT, non-hot retention path) so a forensic reader of the sidecar can't recover them.
@@ -660,7 +681,8 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
 
     fileprivate static func pruneBefore(
         db: OpaquePointer,
-        cutoff: Int64
+        cutoff: Int64,
+        nowMs: Int64
     ) throws -> Int {
         // Audit fix (ADR-040): prune the integrity sidecar in LOCKSTEP with event_log, atomically, so a
         // retention prune leaves no orphan chain rows AND a FULL prune does not later read as total-session
@@ -669,20 +691,80 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         // The sidecar rows are deleted FIRST (their subquery reads event_log before its rows are removed).
         try runExec(db: db, sql: "BEGIN IMMEDIATE;")
         do {
-            if try sidecarTableExists(db: db) {
-                try pruneSidecarBefore(db: db, cutoff: cutoff)
+            guard let ingestionCutoff = BASEventLogRecoveryRetention.ingestionCutoff(nowMs: nowMs),
+                  cutoff > 0
+            else {
+                try runExec(db: db, sql: "COMMIT;")
+                return 0
             }
-            let sql = "DELETE FROM event_log WHERE timestamp_ms < ?"
+            let hasSidecar = try sidecarTableExists(db: db)
+            try runExec(db: db, sql: """
+                CREATE TEMP TABLE bas_event_log_prune_ids (
+                    event_id TEXT PRIMARY KEY NOT NULL
+                );
+                """)
+            let selectionSQL: String
+            if hasSidecar {
+                selectionSQL = """
+                    INSERT INTO bas_event_log_prune_ids(event_id)
+                    SELECT e.event_id FROM event_log AS e
+                    WHERE e.timestamp_ms < ?
+                      AND typeof(e.ingested_at_ms) = 'integer'
+                      AND e.ingested_at_ms >= 0
+                      AND e.ingested_at_ms < ?
+                      AND (
+                        NOT EXISTS (
+                          SELECT 1 FROM event_log_integrity AS own
+                          WHERE own.session_id = e.session_id
+                        )
+                        OR NOT EXISTS (
+                          SELECT 1 FROM event_log AS p
+                          WHERE p.session_id = e.session_id
+                            AND p.sequence_number < e.sequence_number
+                            AND NOT (
+                              p.timestamp_ms < ?
+                              AND typeof(p.ingested_at_ms) = 'integer'
+                              AND p.ingested_at_ms >= 0
+                              AND p.ingested_at_ms < ?
+                            )
+                        )
+                      )
+                    """
+            } else {
+                selectionSQL = """
+                    INSERT INTO bas_event_log_prune_ids(event_id)
+                    SELECT event_id FROM event_log
+                    WHERE timestamp_ms < ?
+                      AND typeof(ingested_at_ms) = 'integer'
+                      AND ingested_at_ms >= 0
+                      AND ingested_at_ms < ?
+                    """
+            }
             var stmt: OpaquePointer?
-            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
-                throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+            guard sqlite3_prepare_v2(db, selectionSQL, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+                throw StorageError.prepareFailed(sql: selectionSQL, message: String(cString: sqlite3_errmsg(db)))
             }
-            defer { sqlite3_finalize(stmt) }
             sqlite3_bind_int64(stmt, 1, cutoff)
-            guard sqlite3_step(stmt) == SQLITE_DONE else {
-                throw StorageError.stepFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+            sqlite3_bind_int64(stmt, 2, ingestionCutoff)
+            if hasSidecar {
+                sqlite3_bind_int64(stmt, 3, cutoff)
+                sqlite3_bind_int64(stmt, 4, ingestionCutoff)
             }
+            let selectionRC = sqlite3_step(stmt)
+            sqlite3_finalize(stmt)
+            guard selectionRC == SQLITE_DONE else {
+                throw StorageError.stepFailed(sql: selectionSQL, message: String(cString: sqlite3_errmsg(db)))
+            }
+            if hasSidecar {
+                try runExec(db: db, sql: """
+                    DELETE FROM event_log_integrity
+                    WHERE event_id IN (SELECT event_id FROM bas_event_log_prune_ids);
+                    """)
+            }
+            let sql = "DELETE FROM event_log WHERE event_id IN (SELECT event_id FROM bas_event_log_prune_ids)"
+            try runExec(db: db, sql: sql)
             let changed = Int(sqlite3_changes(db))
+            try runExec(db: db, sql: "DROP TABLE bas_event_log_prune_ids;")
             try runExec(db: db, sql: "COMMIT;")
             return changed
         } catch {
@@ -699,80 +781,112 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
-        return sqlite3_step(stmt) == SQLITE_ROW
-    }
-
-    /// Delete sidecar rows for events being pruned (event_id matches an event_log row below the cutoff). MUST
-    /// run BEFORE the event_log delete so the subquery still sees those rows.
-    fileprivate static func pruneSidecarBefore(db: OpaquePointer, cutoff: Int64) throws {
-        let sql = """
-            DELETE FROM event_log_integrity WHERE event_id IN
-              (SELECT event_id FROM event_log WHERE timestamp_ms < ?)
-            """
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
-            throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
-        }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_int64(stmt, 1, cutoff)
-        guard sqlite3_step(stmt) == SQLITE_DONE else {
-            throw StorageError.stepFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
-        }
+        let rc = sqlite3_step(stmt)
+        if rc == SQLITE_ROW { return true }
+        if rc == SQLITE_DONE { return false }
+        throw StorageError.stepFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
     }
 
     // MARK: - Schema setup
 
-    fileprivate static func ensureSchema(
-        db: OpaquePointer
+    private static let requiredEventColumns: Set<String> = [
+        "event_id", "session_id", "sequence_number", "timestamp_ms",
+        "kind", "risk_band", "payload_json", "payload_format",
+        "payload_blob", "ingested_at_ms",
+    ]
+
+    fileprivate static func migrateToCurrentSchema(
+        db: OpaquePointer,
+        migrationNowMs: @Sendable () -> Int64
     ) throws {
-        try runExec(db: db, sql: """
-            CREATE TABLE IF NOT EXISTS event_log (
-                event_id TEXT PRIMARY KEY NOT NULL,
-                session_id TEXT NOT NULL,
-                sequence_number INTEGER NOT NULL,
-                timestamp_ms INTEGER NOT NULL,
-                kind TEXT NOT NULL,
-                risk_band TEXT NOT NULL,
-                payload_json TEXT NOT NULL
-            );
-            """)
-        try runExec(db: db, sql: """
-            CREATE INDEX IF NOT EXISTS
-                event_log_session_seq_idx
-                ON event_log(session_id, sequence_number);
-            """)
-        try runExec(db: db, sql: """
-            CREATE INDEX IF NOT EXISTS
-                event_log_timestamp_idx
-                ON event_log(timestamp_ms);
-            """)
-        try runExec(db: db, sql: """
-            CREATE INDEX IF NOT EXISTS
-                event_log_kind_idx
-                ON event_log(kind);
-            """)
-        // audit runtimecore-b MED-2: a per-session monotonic sequence high-water
-        // mark that SURVIVES pruning. `nextSequenceNumber` derived the next seq
-        // from SURVIVING rows only, so a whole-session prune reset it to 0 —
-        // colliding with already-exported (session_id, seq) keys downstream. This
-        // table is NEVER pruned (pruneBefore only deletes event_log + the
-        // integrity sidecar), so the seq stays monotone for the DB's lifetime.
-        // Migration note: existing sessions seed the hwm on their next append; a
-        // session pruned-to-empty BEFORE this upgrade can still reset once (its
-        // pre-upgrade max is unrecoverable) — the fix prevents all FUTURE resets.
+        try runExec(db: db, sql: "BEGIN IMMEDIATE;")
+        do {
+            let eventTableExists = try tableExists(name: "event_log", db: db)
+            if !eventTableExists {
+                try runExec(db: db, sql: """
+                    CREATE TABLE event_log (
+                        event_id TEXT PRIMARY KEY NOT NULL,
+                        session_id TEXT NOT NULL,
+                        sequence_number INTEGER NOT NULL,
+                        timestamp_ms INTEGER NOT NULL,
+                        kind TEXT NOT NULL,
+                        risk_band TEXT NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        payload_format INTEGER NOT NULL DEFAULT 1,
+                        payload_blob BLOB,
+                        ingested_at_ms INTEGER
+                    );
+                    """)
+            } else {
+                try ensureV2Columns(db: db)
+                var columns = try columnsOf(table: "event_log", db: db)
+                if !columns.contains("ingested_at_ms") {
+                    // Nullable on migrated tables so an older writer can still
+                    // append without fabricating age; such rows retain forever.
+                    try runExec(db: db, sql: "ALTER TABLE event_log ADD COLUMN ingested_at_ms INTEGER;")
+                    let baseline = BASEventLogRecoveryRetention.clampedStamp(
+                        nowMs: migrationNowMs(), maximumValidStamp: nil)
+                    try executeBoundInt64(
+                        db: db,
+                        sql: "UPDATE event_log SET ingested_at_ms = ? WHERE ingested_at_ms IS NULL",
+                        value: baseline)
+                    columns.insert("ingested_at_ms")
+                }
+                guard requiredEventColumns.isSubset(of: columns) else {
+                    throw StorageError.corruptedRow(
+                        eventID: "<schema>",
+                        reason: "event_log missing required columns after migration")
+                }
+            }
+            try ensureIndicesAndHighWaterMark(db: db)
+            try seedSequenceHighWaterMarks(db: db)
+            try runExec(db: db, sql: "PRAGMA user_version=\(schemaVersion);")
+            try runExec(db: db, sql: "COMMIT;")
+        } catch {
+            try? runExec(db: db, sql: "ROLLBACK;")
+            throw error
+        }
+    }
+
+    fileprivate static func verifyCurrentSchema(db: OpaquePointer) throws {
+        guard try tableExists(name: "event_log", db: db) else {
+            throw StorageError.corruptedRow(
+                eventID: "<schema>", reason: "current schema has no event_log table")
+        }
+        let columns = try columnsOf(table: "event_log", db: db)
+        guard requiredEventColumns.isSubset(of: columns) else {
+            throw StorageError.corruptedRow(
+                eventID: "<schema>", reason: "current event_log schema is incomplete")
+        }
+        guard try tableExists(name: "event_log_seq_hwm", db: db) else {
+            throw StorageError.corruptedRow(
+                eventID: "<schema>", reason: "current schema has no event_log_seq_hwm table")
+        }
+        try ensureIndices(db: db)
+    }
+
+    fileprivate static func ensureIndicesAndHighWaterMark(db: OpaquePointer) throws {
+        try ensureIndices(db: db)
         try runExec(db: db, sql: """
             CREATE TABLE IF NOT EXISTS event_log_seq_hwm (
                 session_id TEXT PRIMARY KEY NOT NULL,
                 max_seq INTEGER NOT NULL
             );
             """)
-        // chapter 七百三十二 第一刀 — lazy ALTER TABLE migration
-        // for v2 columns。 PRAGMA-checked first so we don't try
-        // to add columns that already exist on a freshly-created
-        // database that ran the CREATE TABLE above。 SQLite's
-        // ALTER TABLE ... ADD COLUMN is O(1) on append-only
-        // tables (no row rewrite),so this is safe on large logs。
-        try ensureV2Columns(db: db)
+    }
+
+    fileprivate static func ensureIndices(db: OpaquePointer) throws {
+        try runExec(db: db, sql: "CREATE INDEX IF NOT EXISTS event_log_session_seq_idx ON event_log(session_id, sequence_number);")
+        try runExec(db: db, sql: "CREATE INDEX IF NOT EXISTS event_log_timestamp_idx ON event_log(timestamp_ms);")
+        try runExec(db: db, sql: "CREATE INDEX IF NOT EXISTS event_log_kind_idx ON event_log(kind);")
+    }
+
+    fileprivate static func seedSequenceHighWaterMarks(db: OpaquePointer) throws {
+        try runExec(db: db, sql: """
+            INSERT INTO event_log_seq_hwm(session_id, max_seq)
+            SELECT session_id, MAX(sequence_number) FROM event_log GROUP BY session_id
+            ON CONFLICT(session_id) DO UPDATE SET max_seq = MAX(max_seq, excluded.max_seq);
+            """)
     }
 
     /// chapter 七百三十二 第一刀 — idempotent column-add for v2。
@@ -802,6 +916,20 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         }
     }
 
+    fileprivate static func tableExists(name: String, db: OpaquePointer) throws -> Bool {
+        let sql = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, name)
+        let rc = sqlite3_step(stmt)
+        if rc == SQLITE_ROW { return true }
+        if rc == SQLITE_DONE { return false }
+        throw StorageError.stepFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+    }
+
     /// PRAGMA table_info reader。 Returns the set of column
     /// names。 Throws on prepare/step failure。
     fileprivate static func columnsOf(
@@ -819,7 +947,12 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         }
         defer { sqlite3_finalize(stmt) }
         var out: Set<String> = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        while true {
+            let rc = sqlite3_step(stmt)
+            if rc == SQLITE_DONE { break }
+            guard rc == SQLITE_ROW else {
+                throw StorageError.stepFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+            }
             // PRAGMA table_info columns:
             //   0=cid, 1=name, 2=type, 3=notnull,
             //   4=dflt_value, 5=pk
@@ -829,6 +962,20 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             }
         }
         return out
+    }
+
+    fileprivate static func executeBoundInt64(
+        db: OpaquePointer, sql: String, value: Int64
+    ) throws {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, value)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw StorageError.stepFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
     }
 
     fileprivate static func verifySchemaVersion(
@@ -877,6 +1024,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     fileprivate static func insertEntry(
         db: OpaquePointer,
         entry: BASEventLogEntry,
+        ingestedAtMs: Int64,
         useBinaryPayload: Bool,
         chainEnabled: Bool
     ) throws {
@@ -891,8 +1039,8 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             INSERT INTO event_log (
                 event_id, session_id, sequence_number,
                 timestamp_ms, kind, risk_band, payload_json,
-                payload_format, payload_blob
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                payload_format, payload_blob, ingested_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
@@ -964,6 +1112,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         } else {
             sqlite3_bind_null(stmt, 9)
         }
+        sqlite3_bind_int64(stmt, 10, ingestedAtMs)
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw StorageError.stepFailed(
                 sql: sql,
@@ -1263,6 +1412,25 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         return max + 1
     }
 
+    fileprivate static func maximumValidIngestionStamp(
+        db: OpaquePointer
+    ) throws -> Int64? {
+        let sql = """
+            SELECT MAX(ingested_at_ms) FROM event_log
+            WHERE typeof(ingested_at_ms) = 'integer' AND ingested_at_ms >= 0
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            throw StorageError.stepFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        guard sqlite3_column_type(stmt, 0) != SQLITE_NULL else { return nil }
+        return sqlite3_column_int64(stmt, 0)
+    }
+
     /// audit runtimecore-b MED-2: bump the per-session sequence high-water mark
     /// (called INSIDE the append txn, atomic with the row insert). Monotone —
     /// `MAX(existing, new)` — and never decremented, so pruning can't reset it.
@@ -1498,4 +1666,3 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         return String(cString: raw)
     }
 }
-

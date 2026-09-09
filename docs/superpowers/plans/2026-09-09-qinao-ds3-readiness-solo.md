@@ -16,6 +16,7 @@
 - Keep the repository private and use the existing development branch/remote. Excluded private support exports, old drafts, credentials and ignored runtime records are not automatically uploadable.
 - All changes to main use a PR. Before merge, show the exact candidate, review/test result and remaining limitations, and obtain a fresh user decision. Ordinary in-scope edits/tests/commits/PR work do not require repetitive task-level approvals.
 - DS1 is the first successful scan; DS2 is the later failed scan. Preserve that chronology. DS3 remains not started and requires a separate explicit user authorization.
+- User's latest runtime policy: if the selected local model is unavailable, do not invoke a cloud fallback, including PCC. Pause only dependent model steps, preserve plan/progress/results/error and distinguish not-started from possibly-started work. Existing credentials, configured remote adapters or earlier generic fallback approval do not override this temporary restriction. Local diagnosis and bounded safe recovery may continue; do not silently switch models, retry uncertain effects or mark the task complete. Changing this policy requires a later explicit user instruction. This concerns Qinao inference fallback, not revocation of the separately authorized ordinary Git development workflow. Record and test the runtime enforcement before claiming it implemented.
 - A missing original artifact is not a successful reconstruction; a recovered DS2 draft is not a sealed finding. Do not mark an issue fixed from a closed label or unrelated green tests.
 - Necessary verification stays: nonempty relevant tests, meaningful review, checks for accidental secrets/destructive changes, dependency integrity, and recovery behavior where retained code promises it. No known blocking defect or critical evidence gap may be hidden in the readiness claim.
 - Existing tool/platform permissions remain in force. Do not evade a denied action or widen credentials/network authority under the guise of simplifying repository workflow.
@@ -787,6 +788,13 @@ See `docs/superpowers/validation/2026-09-09-current-brain-retention.md`.
 
 ## Task 8: Enforce event-log retention from storage ingestion time
 
+**Accepted:** independent initial review plus scoped fix round1 closed all
+three Important findings; final Rust32/32, rebuilt-runtime Swift60/60,
+refined duplicate1/1 and fresh root21/21 passed. Evidence and limitations:
+`docs/superpowers/validation/2026-09-09-event-log-ingestion-retention.md`.
+The separately assessed per-append MAX performance correction is queued as
+Task10; Task8 acceptance is not whole-candidate or DS3 readiness.
+
 Start only after Task7 acceptance and source/build handback. This is one
 cross-backend correction for confirmed DS1 `occ_f689fce8a8044ba9b5afec3b`, not
 a new retention service. A Swift-only patch is not completion. The read-only
@@ -823,7 +831,7 @@ compromised clocks, or recovery beyond the retained lifetime is introduced.
   unrelated to this changed contract; report every such addition to root.
   Mock conformers with inert prune methods do not need migration.
 
-- [ ] **Step 1 — behavioral RED and storage clock.** Preserve one deterministic
+- [x] **Step 1 — behavioral RED and storage clock.** Preserve one deterministic
   failure showing a newly appended backdated event immediately deleted by an
   actual in-memory or Swift SQLite backend, with a valid append/read control.
   Introduce injectable clocks on concrete stores for tests, preserving existing
@@ -832,7 +840,7 @@ compromised clocks, or recovery beyond the retained lifetime is introduced.
   its age. Capture/stamp after duplicate detection, atomically with insert;
   duplicates never refresh ingestion age. No sleep-based tests or user stores.
 
-- [ ] **Step 2 — Swift persistence and migration.** Bump the Swift SQLite
+- [x] **Step 2 — Swift persistence and migration.** Bump the Swift SQLite
   schema to3. In one checked transaction, accept versions0/1/2, ensure the
   existing v2 columns without payload rewriting, add `ingested_at_ms` when
   absent, backfill legacy unset rows to one captured migration time, initialize
@@ -871,7 +879,7 @@ compromised clocks, or recovery beyond the retained lifetime is introduced.
   rewrite hashes or relax verification to bless missing interior links. This
   deliberately over-retains when event timestamps are nonmonotone.
 
-- [ ] **Step 3 — Rust/routed parity and old ABI.** Add deterministic-clock
+- [x] **Step 3 — Rust/routed parity and old ABI.** Add deterministic-clock
   Rust helpers/FFI siblings for testing schema initialization, append and
   prune. Production routed calls retain the original system-clock exports.
   These and the test-only explicit-time variants share a private non-stored
@@ -912,7 +920,7 @@ compromised clocks, or recovery beyond the retained lifetime is introduced.
   policy in this patch. A post-commit checkpoint error cannot roll back an
   already committed deletion. No raw pointer or binary parser redesign.
 
-- [ ] **Step 4 — arithmetic and public presets.** Checked multiplication and
+- [x] **Step 4 — arithmetic and public presets.** Checked multiplication and
   subtraction in `BASEventLogRetentionPolicy.cutoff` must never trap. Zero age,
   overflow, negative/too-small clock or nonpositive cutoff means retain-all
   for the built-in pruners. Valid ingestion metadata is an integer storage
@@ -923,7 +931,7 @@ compromised clocks, or recovery beyond the retained lifetime is introduced.
   to the independent72hour ingestion floor. Do not introduce deprecation
   warnings or silently change serialized/configured maxAgeSec values.
 
-- [ ] **Step 5 — actual cross-backend proof and bundled runtime.** Tests must
+- [x] **Step 5 — actual cross-backend proof and bundled runtime.** Tests must
   cover new backdated input, short TTL, exactly72h/+1ms, legitimate old-row
   deletion, duplicate age/payload/sequence stability, clock regression and
   checked Int64 extremes. Existing physical-prune tests must advance a fake
@@ -965,3 +973,234 @@ compromised clocks, or recovery beyond the retained lifetime is introduced.
   check. Inspect the whole patch and direct callers; hand back task-8-report.md
   for independent review. No staging/commit/push, subagents, scan, user database,
   live provider/device or unrelated source edits. Root owns commit/upload.
+
+## Task 9: Prevent automatic off-device router fallback
+
+This bounded correction implements the user's latest no-cloud-on-local-failure
+instruction at the existing router boundary. It does not enable any cloud or
+PCC provider. Execute after Task8 handback/acceptance; do not contend for its
+BAS build scratch. The existing DS1 provider-consent aggregate remains open
+until separately reconciled against the actual patch and operation consumers.
+
+**Files:**
+- Modify `BehavioralAISubstrate/Sources/BASOrgan/BASRoutingOrganAdapter.swift`.
+- Test `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASRoutingOrganAdapterTests.swift`.
+- Inspect existing `BASPromptLookupElectTests`, `BASContractedWiringIntegrationTests`,
+  `BASRegistryFrozenHashTests` and strategy Codable tests as focused controls.
+  Change another file only for a concrete affected assertion/comment, recording
+  why. No provider implementation, registry election or persistence subsystem
+  belongs in this patch.
+
+**Interfaces and decisions:** Retain `Strategy` case names/Codable representation,
+all three `draft` overloads and `currentCapacity()`. Change the initializer's
+default to `.primaryOnly` and `strategy` to `public let`. Repository source
+inspection found no router strategy reassignment; replacing an immutable
+configured router is the supported way to select another strategy. This is a
+small external source compatibility change for clients that assigned this
+property, not a serialization change. Keep composite provider ID/name synthesis
+and explicit overrides unchanged.
+
+Use the existing trusted-provider `descriptor.runsOnDevice` contract; off-device
+includes PCC. No PCC adapter was found in the scoped current sources. This is
+enforcement against correctly declared providers, not platform attestation or
+a sandbox for a dishonest adapter. Preserve `.primaryOnly` and `.secondaryOnly`
+as direct-selection library semantics; neither constitutes permission for a
+host to resume a failed local operation on a remote endpoint. That prohibition
+also belongs in the later durable-operation owner. Do not claim this task alone
+implements restart recovery, finite preparation repair, or exactly-once work.
+
+- [ ] **Step 1 — behavioral RED for forbidden fallback.** Extend the existing
+  actor stub with per-overload draft counters, a capacity counter, captured
+  elect/purpose values and a cancellation response. Do not add a second router
+  implementation in tests. Add the plain-path regression before product edits:
+
+  ```swift
+  func testUnavailablePrimaryNeverInvokesRemoteFallback() async {
+      let primary = StubAdapter(
+          providerID: "local", response: .draftThrows(
+              .providerUnavailable(reason: "selected-local-unavailable")))
+      let remote = StubAdapter(
+          providerID: "remote", runsOnDevice: false,
+          response: .draftSucceeds(body: "must-not-run"))
+      let router = BASRoutingOrganAdapter(
+          primary: primary, secondary: remote,
+          strategy: .primaryWithFallback)
+      do {
+          _ = try await router.draft(makeRequest())
+          XCTFail("a local outage must not invoke a remote provider")
+      } catch BASOrganError.providerUnavailable(let reason) {
+          XCTAssertEqual(reason, "selected-local-unavailable")
+      } catch {
+          XCTFail("unexpected error: \(error)")
+      }
+      let remoteCalls = await remote.plainDraftCount
+      XCTAssertEqual(remoteCalls, 0)
+  }
+  ```
+
+  Run only this regression first; record the expected returned-remote-result
+  and counter failure. A cache/manifest/compile error is not behavioral RED.
+
+- [ ] **Step 2 — one immutable reachability decision.** Snapshot the two
+  descriptors once during construction, set the immutable strategy, then use
+  one immutable eligibility value in descriptor synthesis and all execution
+  paths:
+
+  ```swift
+  private let automaticSecondaryIsEligible: Bool
+  // In init, after descriptor snapshots p and s:
+  let eligible = strategy == .primaryWithFallback && s.runsOnDevice
+  self.automaticSecondaryIsEligible = eligible
+  // In each existing infrastructure-error catch, bind the original error:
+  // catch let failure as BASOrganError { switch failure { ... } }
+  // For providerUnavailable / pressureRefusal only:
+  guard automaticSecondaryIsEligible else { throw failure }
+  ```
+
+  Preserve each original associated-value error and forward the exact request,
+  elect flag or purpose to the chosen provider. Other BAS errors and
+  CancellationError propagate without secondary invocation. No loop, third
+  provider, retry or cloud-approval override is added. For capacity, use:
+
+  ```swift
+  let primaryCap = await primary.currentCapacity()
+  guard primaryCap.underPressure, automaticSecondaryIsEligible else {
+      return primaryCap
+  }
+  return await secondary.currentCapacity()
+  ```
+
+  Descriptor capabilities/locality describe reachable execution, not held
+  objects: `.primaryOnly` uses primary; `.secondaryOnly` uses secondary;
+  eligible local fallback uses existing intersection/min/AND; ineligible
+  remote fallback uses primary only. Use the same eligibility snapshot, not
+  repeated independent predicates. Keep optional observation metadata behavior
+  unchanged. Update misleading router docs about default/remote fallback and
+  infrastructure errors; such errors do not prove generation never started.
+
+- [ ] **Step 3 — complete focused behavior matrix.** Verify both infrastructure
+  errors through plain, elect and purpose paths with configured remote spies:
+  exact original error, primary called once, every remote draft count zero.
+  Verify default omitted strategy does not silently swap even to a local
+  secondary. Cancellation across all three paths, unsupported role, oversized
+  input and deadline expiry must also leave secondary counts zero. Preserve
+  explicit local fallback controls across all overloads, including exact
+  elect/purpose forwarding, and exclusive strategy selection with non-selected
+  provider counts zero. Existing fallback tests must opt in explicitly rather
+  than weakening their expected provider result.
+
+  Test pressured local primary/held remote capacity returns the exact primary
+  capacity and remote capacity count zero; explicit local fallback still uses
+  secondary capacity. Check strategy-aware roles, limits, streaming and locality
+  with deliberately different child capabilities and stable composite identity.
+  For nested routers, a local-primary/held-remote fallback router advertises
+  local execution and may be an outer local fallback: local child called once,
+  held remote zero. If that local child also fails, propagate its error without
+  another route. Nested capacity leaves all held-remote capacity counters zero.
+  An inner `.primaryOnly` local router is eligible; an inner `.secondaryOnly`
+  remote router is ineligible, and neither nested child is called. Preserve an
+  explicit direct `.secondaryOnly` control to distinguish library selection
+  from automatic fallback. Two-local nested routers retain their conservative
+  combined capabilities. No live local model, network or PCC calls in tests.
+
+- [ ] **Step 4 — focused GREEN and handback.** Use the existing native BAS
+  scratch `/private/tmp/qinao-bas-native-test-1329bde3`, Xcode-beta and retained
+  real `MLX_METAL_PATH` only after root transfers ownership. Run the complete
+  changed router suite and the named wrapper/registry/Codable controls with
+  `swift test --filter` on those exact suites; preserve real commands, counts,
+  skips, full logs, process exits and source identity. Use pipefail and a
+  nonreserved status variable; do not rerun the full candidate baseline here.
+  Read the entire source/test diff and hand back `task-9-report.md` with TDD,
+  changed files and limitations. Root owns independent review, acceptance,
+  ordinary commit/push and later readiness reconciliation. No subagents,
+  staging/commit/push, reset, scan, model download or user-store changes.
+
+## Task 10: Keep retained event-log ingestion off a full-history scan
+
+**State:** Queued, not implemented or part of Task 8 fix round 1. Start only
+after Task 8 correctness acceptance and Task 9's local-only fallback boundary
+are complete. Root owns sequencing and transfers source/build ownership
+explicitly. This addresses the concrete Task 8 review Minor, not a new
+performance framework or a prerequisite invented from hypothetical attacks.
+
+**Evidence and decision:** `event-ingestion-hotpath-assessment.md` records a
+bounded read-only 100,000-row SQLite fixture. The exact valid-ingestion MAX
+query scans retained rows without an index and uses the final qualifying entry
+of a covering partial index when that index exists. Illustrative warm timings
+are not a production latency claim. Root also read the actual memory append,
+prune, Swift migration/index setup and Rust initialization: memory append
+allocates an array and scans every retained stamp; both database append paths
+perform the unindexed MAX. Longer retention amplifies repeated work.
+
+Use an exact partial index for the database query, and one optional cached
+maximum of the **currently retained** entries in memory. A nonallocating scan
+alone removes allocation but keeps O(N) work on every append. A permanent
+high-water mark would silently change post-prune clock semantics. The chosen
+cache is derived actor-local state, never durable authority or a new protocol.
+
+**Scope:** `BASEventLog.swift`, `BASSQLiteEventLogStorage.swift`, Rust
+`event_log.rs`, narrowly relevant existing ingestion tests or one new focused
+test file, and ordinary rebuilt Rust XCFramework slices/metadata as needed.
+No wire, Codable, schema-version, clock, retention-policy, chain, public API,
+dependency, recovery-store or provider change. No hot-path benchmark service,
+stored callback, public test hook, cold-clean build or user-database experiment.
+
+**Implementation contract:**
+
+- Install the same index in both stores:
+
+  ```sql
+  CREATE INDEX IF NOT EXISTS event_log_valid_ingestion_idx
+  ON event_log(ingested_at_ms)
+  WHERE typeof(ingested_at_ms)='integer' AND ingested_at_ms >= 0;
+  ```
+
+  In Swift, put it in the existing checked `ensureIndices`, reached after the
+  ingestion column exists on legacy migrations and current-schema verification.
+  In Rust, put it inside `init_schema_with_clock`'s existing transaction,
+  **after** the ingestion-column add/backfill block and before later migration
+  work. Do not add it to `SCHEMA_EVENT_LOG`, which runs before legacy ALTER.
+  Preserve Rust's caller-owned `user_version`, checked errors and rollback.
+  Do not restamp rows or rewrite payloads to create an index. Existing current
+  stores acquire it idempotently without a schema-version bump.
+- Memory starts with `maximumIngestionStamp: Int64? = nil`. Duplicate append
+  does not sample the clock or change this value. Successful new append uses
+  the existing clamping helper and updates the maximum to that appended stamp.
+  After an actual removal, recompute from surviving entries using a
+  nonallocating reduction; empty storage resets it to nil. No removal means no
+  recomputation. Keep sequence counters independent and monotone across prune.
+  This actor has only append/prune mutations; inspect that fact again before
+  implementing so every mutation maintains the cache.
+- Keep cutoff <= 0, invalid clocks, exact 72-hour boundaries, legacy invalid
+  metadata, duplicate payload preservation and integrity-prefix rules exactly
+  as accepted in Task 8. Database MAX remains a database query, not a process
+  cache that becomes stale when another supported writer changes the file.
+
+**Focused verification:**
+
+1. First add a failing ordinary schema/index assertion against the current
+   production initializer, proving this is absent rather than assuming it.
+   Use fresh temporary stores only. Cover fresh, supported legacy, and current
+   schema initialization/reopen in Swift and Rust, checking the partial index
+   and that the exact production MAX query uses it. Do not assert a complete
+   version-specific EXPLAIN string or use elapsed milliseconds as a test gate.
+   Include mixed integer/NULL/negative/text metadata and unchanged MAX result.
+2. Preserve memory behavior with a black-box scan-of-survivors oracle: new IDs
+   under a regressed clock, changed duplicates, partial prune removing the
+   maximum, full prune, and later append at a lower clock. In the partial case,
+   retain an older-ingested row by semantic cutoff, remove the newer maximum,
+   append a new eligible row at a time between those stamps, then prune just
+   after its exact 72-hour boundary. This detects an incorrectly permanent or
+   stale maximum without exposing private state. Assert exact retained IDs,
+   original payloads and continuing sequence numbers, not just row counts.
+3. Run the changed focused ingestion/migration classes, locked Rust event-log
+   tests and directly relevant chain/byte-equality controls. Rust changes need
+   the existing ordinary three-slice rebuild and recorded header/export/minimum
+   OS checks plus an actual routed macOS test on the refreshed slice. Reuse the
+   installed toolchain and existing scratch only after ownership transfer.
+4. Record exact commands, actual counts/exits/skips, warnings, source and
+   archive identities, migration/index costs and remaining measurement limits.
+   Index creation is a one-time scan with write-lock and disk-space cost;
+   subsequent inserts maintain it. Do not claim measured end-to-end speed,
+   bounded total storage or power-loss guarantees from a query-plan check.
+   Root arranges independent scoped review and normal commit/push after handback.

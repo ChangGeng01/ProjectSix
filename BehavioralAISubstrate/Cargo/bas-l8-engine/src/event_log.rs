@@ -37,9 +37,10 @@
 //   payload_format INTEGER NOT NULL DEFAULT 1 (1=json, 2=blob)
 //   payload_blob BLOB (nullable when payload_format=1)
 
-use std::os::raw::{c_char, c_int};
 use rusqlite::Connection;
 use rusqlite::params;
+use std::os::raw::{c_char, c_int};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::L8Engine;
 
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS event_log (
     payload_json TEXT NOT NULL,
     payload_format INTEGER NOT NULL DEFAULT 1,
     payload_blob BLOB,
+    ingested_at_ms INTEGER,
     -- chapter 九百十九 / M3300 CRITICAL fix C4:enforce
     -- per-session sequence uniqueness at the schema level
     -- so multi-engine race conditions surface as constraint
@@ -77,6 +79,10 @@ CREATE INDEX IF NOT EXISTS event_log_kind_idx
 -- events that's a multi-ms scan per query。
 CREATE INDEX IF NOT EXISTS event_log_session_time_idx
   ON event_log(session_id, timestamp_ms DESC);
+CREATE TABLE IF NOT EXISTS event_log_seq_hwm (
+    session_id TEXT PRIMARY KEY NOT NULL,
+    max_seq INTEGER NOT NULL
+);
 -- chapter 九百二十四 / M3325 fix NH1:explicit migration to
 -- DROP the redundant index that pre-ch-923 schema strings
 -- created。 `CREATE TABLE IF NOT EXISTS` doesn't remove old
@@ -96,10 +102,67 @@ DROP INDEX IF EXISTS event_log_session_seq_idx;
 -- baked into this constant — see comment there。
 "#;
 
+const MINIMUM_INGESTION_AGE_MS: i64 = 259_200_000;
+
+fn system_now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|d| i64::try_from(d.as_millis()).ok())
+        .unwrap_or(0)
+}
+
+fn event_columns(conn: &Connection) -> rusqlite::Result<Vec<String>> {
+    let mut stmt = conn.prepare("PRAGMA table_info(event_log)")?;
+    let columns = stmt.query_map([], |row| row.get::<_, String>(1))?.collect();
+    columns
+}
+
+pub fn init_schema_with_clock<F>(conn: &Connection, clock: F) -> rusqlite::Result<()>
+where
+    F: FnOnce(&Connection) -> i64,
+{
+    crate::transactional(conn, |conn| {
+        // A legacy table may be structurally v1/v2 even when the generic
+        // database user_version is zero or belongs to another caller.
+        let before = event_columns(conn)?;
+        conn.execute_batch(SCHEMA_EVENT_LOG)?;
+        let mut columns = event_columns(conn)?;
+        if !columns.iter().any(|c| c == "payload_format") {
+            conn.execute_batch(
+                "ALTER TABLE event_log ADD COLUMN payload_format INTEGER NOT NULL DEFAULT 1;",
+            )?;
+            columns.push("payload_format".into());
+        }
+        if !columns.iter().any(|c| c == "payload_blob") {
+            conn.execute_batch("ALTER TABLE event_log ADD COLUMN payload_blob BLOB;")?;
+            columns.push("payload_blob".into());
+        }
+        if !columns.iter().any(|c| c == "ingested_at_ms") {
+            // Nullable on legacy tables: later writes from an old binary omit
+            // the value and are consequently retained conservatively.
+            conn.execute_batch("ALTER TABLE event_log ADD COLUMN ingested_at_ms INTEGER;")?;
+            let baseline = clock(conn).max(0);
+            conn.execute(
+                "UPDATE event_log SET ingested_at_ms=? WHERE ingested_at_ms IS NULL",
+                params![baseline],
+            )?;
+        } else if before.is_empty() {
+            // Fresh schema needs no migration clock sample because it has no
+            // rows. Production append still supplies metadata explicitly.
+        }
+        migrate_unique_session_seq(conn)?;
+        conn.execute_batch(
+            "INSERT INTO event_log_seq_hwm(session_id,max_seq)
+             SELECT session_id,MAX(sequence_number) FROM event_log GROUP BY session_id
+             ON CONFLICT(session_id) DO UPDATE SET max_seq=MAX(max_seq,excluded.max_seq);",
+        )?;
+        Ok(())
+    })
+}
+
 pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
-    conn.execute_batch(SCHEMA_EVENT_LOG)?;
-    migrate_unique_session_seq(conn)?;
-    Ok(())
+    init_schema_with_clock(conn, |_| system_now_ms())
 }
 
 /// chapter 九百二十六 / M3335 fix CRITICAL-1 — conditional
@@ -119,9 +182,7 @@ pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
 /// (broken) ch 924 init had created it on a fresh DB —
 /// that's the cleanup path for anyone whose binary upgrade
 /// crossed the broken ch 924 → fixed ch 926 boundary。
-fn migrate_unique_session_seq(
-    conn: &Connection,
-) -> rusqlite::Result<()> {
+fn migrate_unique_session_seq(conn: &Connection) -> rusqlite::Result<()> {
     // chapter 九百三十九 / M3400 fix MED-5 (9P-MED-4 carryover):
     // REPLACED brittle substring-against-table-SQL check with
     // structural PRAGMA index_list query that asks SQLite
@@ -140,8 +201,7 @@ fn migrate_unique_session_seq(
     // against any future schema-text reformatting。 Same query
     // used by `fresh_db_table_level_unique_constraint_intact`
     // test (ch 927)。
-    let mut stmt = conn.prepare(
-        "PRAGMA index_list('event_log')")?;
+    let mut stmt = conn.prepare("PRAGMA index_list('event_log')")?;
     let mut rows = stmt.query([])?;
     let mut has_table_constraint = false;
     while let Some(row) = rows.next()? {
@@ -154,17 +214,12 @@ fn migrate_unique_session_seq(
         if !is_unique || origin != "u" {
             continue;
         }
-        let info_q = format!(
-            "PRAGMA index_info('{}')", name);
+        let info_q = format!("PRAGMA index_info('{}')", name);
         let mut info_stmt = conn.prepare(&info_q)?;
         let cols: Vec<String> = info_stmt
             .query_map([], |r| r.get::<_, String>(2))?
-            .filter_map(|r| r.ok())
-            .collect();
-        if cols == vec![
-            "session_id".to_string(),
-            "sequence_number".to_string(),
-        ] {
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        if cols == vec!["session_id".to_string(), "sequence_number".to_string()] {
             has_table_constraint = true;
             break;
         }
@@ -172,10 +227,7 @@ fn migrate_unique_session_seq(
     if has_table_constraint {
         // Fresh / post-ch-919 DB: drop the redundant
         // explicit index if a buggy ch 924 binary added it。
-        conn.execute(
-            "DROP INDEX IF EXISTS event_log_session_seq_uniq",
-            [],
-        )?;
+        conn.execute("DROP INDEX IF EXISTS event_log_session_seq_uniq", [])?;
     } else {
         // Legacy pre-ch-919 DB: the table lacks the UNIQUE
         // constraint at the schema level,so we add an
@@ -195,14 +247,14 @@ fn migrate_unique_session_seq(
 /// Look up next sequence number for a session。 Returns 0 for
 /// first event in session,or MAX(existing) + 1 otherwise。
 /// Matches Swift `nextSequenceNumber` exactly。
-pub fn next_sequence_number(
-    conn: &Connection,
-    session_id: &str,
-) -> rusqlite::Result<i64> {
+pub fn next_sequence_number(conn: &Connection, session_id: &str) -> rusqlite::Result<i64> {
     let next: i64 = conn.query_row(
-        "SELECT COALESCE(MAX(sequence_number) + 1, 0)
-         FROM event_log WHERE session_id = ?",
-        params![session_id],
+        "SELECT COALESCE(MAX(v) + 1, 0) FROM (
+           SELECT MAX(sequence_number) AS v FROM event_log WHERE session_id = ?
+           UNION ALL
+           SELECT MAX(max_seq) AS v FROM event_log_seq_hwm WHERE session_id = ?
+         )",
+        params![session_id, session_id],
         |row| row.get(0),
     )?;
     Ok(next)
@@ -210,16 +262,15 @@ pub fn next_sequence_number(
 
 /// Returns the existing sequence_number if event_id already
 /// inserted,or None if not present。 Used for idempotent append。
-pub fn fetch_existing_sequence(
-    conn: &Connection,
-    event_id: &str,
-) -> rusqlite::Result<Option<i64>> {
+pub fn fetch_existing_sequence(conn: &Connection, event_id: &str) -> rusqlite::Result<Option<i64>> {
     conn.query_row(
         "SELECT sequence_number FROM event_log
          WHERE event_id = ?",
         params![event_id],
         |row| row.get::<_, i64>(0),
-    ).map(Some).or_else(|e| match e {
+    )
+    .map(Some)
+    .or_else(|e| match e {
         rusqlite::Error::QueryReturnedNoRows => Ok(None),
         other => Err(other),
     })
@@ -239,6 +290,36 @@ pub fn append_event(
     payload_format: i32,
     payload_blob: Option<&[u8]>,
 ) -> rusqlite::Result<(bool, i64)> {
+    append_event_with_clock(
+        conn,
+        event_id,
+        session_id,
+        timestamp_ms,
+        kind,
+        risk_band,
+        payload_json,
+        payload_format,
+        payload_blob,
+        |_| system_now_ms(),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn append_event_with_clock<F>(
+    conn: &Connection,
+    event_id: &str,
+    session_id: &str,
+    timestamp_ms: i64,
+    kind: &str,
+    risk_band: &str,
+    payload_json: &str,
+    payload_format: i32,
+    payload_blob: Option<&[u8]>,
+    clock: F,
+) -> rusqlite::Result<(bool, i64)>
+where
+    F: FnOnce(&Connection) -> i64,
+{
     // chapter 九百二十二 / M3315 CRITICAL fix NC1:use the
     // centralized `transactional` helper to guarantee
     // ROLLBACK on ALL error paths,not just INSERT failure。
@@ -246,65 +327,130 @@ pub fn append_event(
     // leaks on read-step errors (fetch_existing_sequence,
     // next_sequence_number returning Err)。
     crate::transactional(conn, |conn| {
-        if let Some(existing_seq) =
-            fetch_existing_sequence(conn, event_id)?
-        {
+        if let Some(existing_seq) = fetch_existing_sequence(conn, event_id)? {
             return Ok((false, existing_seq));
         }
         let assigned = next_sequence_number(conn, session_id)?;
+        let maximum_stamp: Option<i64> = conn.query_row(
+            "SELECT MAX(ingested_at_ms) FROM event_log
+             WHERE typeof(ingested_at_ms)='integer' AND ingested_at_ms >= 0",
+            [],
+            |row| row.get(0),
+        )?;
+        let ingested_at_ms = clock(conn).max(0).max(maximum_stamp.unwrap_or(0));
         conn.execute(
             "INSERT INTO event_log (
                 event_id, session_id, sequence_number,
                 timestamp_ms, kind, risk_band, payload_json,
-                payload_format, payload_blob
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                payload_format, payload_blob, ingested_at_ms
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
-                event_id, session_id, assigned,
-                timestamp_ms, kind, risk_band, payload_json,
-                payload_format, payload_blob,
+                event_id,
+                session_id,
+                assigned,
+                timestamp_ms,
+                kind,
+                risk_band,
+                payload_json,
+                payload_format,
+                payload_blob,
+                ingested_at_ms,
             ],
+        )?;
+        conn.execute(
+            "INSERT INTO event_log_seq_hwm(session_id,max_seq) VALUES (?,?)
+             ON CONFLICT(session_id) DO UPDATE SET max_seq=MAX(max_seq,excluded.max_seq)",
+            params![session_id, assigned],
         )?;
         Ok((true, assigned))
     })
 }
 
-pub fn count_events(
-    conn: &Connection,
-) -> rusqlite::Result<i64> {
-    conn.query_row(
-        "SELECT COUNT(*) FROM event_log",
-        [], |row| row.get(0))
+pub fn count_events(conn: &Connection) -> rusqlite::Result<i64> {
+    conn.query_row("SELECT COUNT(*) FROM event_log", [], |row| row.get(0))
 }
 
-pub fn count_events_for_session(
-    conn: &Connection,
-    session_id: &str,
-) -> rusqlite::Result<i64> {
+pub fn count_events_for_session(conn: &Connection, session_id: &str) -> rusqlite::Result<i64> {
     conn.query_row(
         "SELECT COUNT(*) FROM event_log
          WHERE session_id = ?",
-        params![session_id], |row| row.get(0))
+        params![session_id],
+        |row| row.get(0),
+    )
 }
 
-pub fn count_events_for_kind(
-    conn: &Connection,
-    kind: &str,
-) -> rusqlite::Result<i64> {
+pub fn count_events_for_kind(conn: &Connection, kind: &str) -> rusqlite::Result<i64> {
     conn.query_row(
         "SELECT COUNT(*) FROM event_log WHERE kind = ?",
-        params![kind], |row| row.get(0))
+        params![kind],
+        |row| row.get(0),
+    )
 }
 
 /// Delete rows where timestamp_ms < cutoff。 Returns count of
 /// rows deleted (matches Swift M896 retention semantics)。
-pub fn prune_events_before(
+pub fn prune_events_before(conn: &Connection, cutoff_ms: i64) -> rusqlite::Result<i64> {
+    prune_events_before_at(conn, cutoff_ms, system_now_ms())
+}
+
+pub fn prune_events_before_at(
     conn: &Connection,
     cutoff_ms: i64,
+    now_ms: i64,
 ) -> rusqlite::Result<i64> {
-    let n = conn.execute(
-        "DELETE FROM event_log WHERE timestamp_ms < ?",
-        params![cutoff_ms])?;
-    Ok(n as i64)
+    let Some(ingestion_cutoff) = now_ms
+        .checked_sub(MINIMUM_INGESTION_AGE_MS)
+        .filter(|cutoff| *cutoff > 0)
+    else {
+        return Ok(0);
+    };
+    if cutoff_ms <= 0 {
+        return Ok(0);
+    }
+    crate::transactional(conn, |conn| {
+        let has_sidecar: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='event_log_integrity')",
+            [], |row| row.get(0),
+        )?;
+        conn.execute_batch(
+            "CREATE TEMP TABLE bas_event_log_prune_ids(event_id TEXT PRIMARY KEY NOT NULL);",
+        )?;
+        if has_sidecar {
+            conn.execute(
+                "INSERT INTO bas_event_log_prune_ids(event_id)
+                 SELECT e.event_id FROM event_log e
+                 WHERE e.timestamp_ms < ? AND typeof(e.ingested_at_ms)='integer'
+                   AND e.ingested_at_ms >= 0 AND e.ingested_at_ms < ?
+                   AND (NOT EXISTS(SELECT 1 FROM event_log_integrity own WHERE own.session_id=e.session_id)
+                        OR NOT EXISTS(
+                          SELECT 1 FROM event_log p
+                          WHERE p.session_id=e.session_id AND p.sequence_number < e.sequence_number
+                            AND NOT (p.timestamp_ms < ? AND typeof(p.ingested_at_ms)='integer'
+                                     AND p.ingested_at_ms >= 0 AND p.ingested_at_ms < ?)))",
+                params![cutoff_ms, ingestion_cutoff, cutoff_ms, ingestion_cutoff],
+            )?;
+            conn.execute(
+                "DELETE FROM event_log_integrity WHERE event_id IN
+                   (SELECT event_id FROM bas_event_log_prune_ids)",
+                [],
+            )?;
+        } else {
+            conn.execute(
+                "INSERT INTO bas_event_log_prune_ids(event_id)
+                 SELECT event_id FROM event_log
+                 WHERE timestamp_ms < ? AND typeof(ingested_at_ms)='integer'
+                   AND ingested_at_ms >= 0 AND ingested_at_ms < ?",
+                params![cutoff_ms, ingestion_cutoff],
+            )?;
+        }
+        let n = conn.execute(
+            "DELETE FROM event_log WHERE event_id IN
+               (SELECT event_id FROM bas_event_log_prune_ids)",
+            [],
+        )?;
+        conn.execute_batch("DROP TABLE bas_event_log_prune_ids;")?;
+        Ok(n as i64)
+    })
 }
 
 /// chapter 九百九 / M3250 — hot-path consolidation #2
@@ -330,10 +476,9 @@ pub fn recent_event_timestamps_for_session(
            FROM event_log
           WHERE session_id = ?
           ORDER BY timestamp_ms DESC
-          LIMIT ?"
+          LIMIT ?",
     )?;
-    let mut rows = stmt.query(params![
-        session_id, limit as i64])?;
+    let mut rows = stmt.query(params![session_id, limit as i64])?;
     let mut out: Vec<(i64, i64)> = Vec::with_capacity(limit);
     while let Some(row) = rows.next()? {
         let ts: i64 = row.get(0)?;
@@ -346,16 +491,29 @@ pub fn recent_event_timestamps_for_session(
 // MARK: - FFI
 
 #[no_mangle]
-pub unsafe extern "C" fn bas_l8_event_log_init_schema(
-    engine: *const L8Engine,
-) -> c_int {
-    if engine.is_null() { return -1; }
+pub unsafe extern "C" fn bas_l8_event_log_init_schema(engine: *const L8Engine) -> c_int {
+    if engine.is_null() {
+        return -1;
+    }
     let engine_ref = unsafe { &*engine };
-    engine_ref.with_conn(|conn| {
-        match init_schema(conn) {
-            Ok(()) => 0,
-            Err(_) => -2,
-        }
+    engine_ref.with_conn(|conn| match init_schema(conn) {
+        Ok(()) => 0,
+        Err(_) => -2,
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_event_log_init_schema_at(
+    engine: *const L8Engine,
+    now_ms: i64,
+) -> c_int {
+    if engine.is_null() {
+        return -1;
+    }
+    let engine_ref = unsafe { &*engine };
+    engine_ref.with_conn(|conn| match init_schema_with_clock(conn, |_| now_ms) {
+        Ok(()) => 0,
+        Err(_) => -2,
     })
 }
 
@@ -372,20 +530,28 @@ pub unsafe extern "C" fn bas_l8_event_log_init_schema(
 ///
 /// Payload format:1 = json (payload_blob_len = 0),2 = blob
 /// (payload_json must be empty string ""),3+ = reserved。
-#[no_mangle]
-pub unsafe extern "C" fn bas_l8_event_log_append(
+unsafe fn bas_l8_event_log_append_impl(
     engine: *const L8Engine,
-    event_id_utf8: *const c_char, event_id_len: usize,
-    session_id_utf8: *const c_char, session_id_len: usize,
+    event_id_utf8: *const c_char,
+    event_id_len: usize,
+    session_id_utf8: *const c_char,
+    session_id_len: usize,
     timestamp_ms: i64,
-    kind_utf8: *const c_char, kind_len: usize,
-    risk_band_utf8: *const c_char, risk_band_len: usize,
-    payload_json_utf8: *const c_char, payload_json_len: usize,
+    kind_utf8: *const c_char,
+    kind_len: usize,
+    risk_band_utf8: *const c_char,
+    risk_band_len: usize,
+    payload_json_utf8: *const c_char,
+    payload_json_len: usize,
     payload_format: i32,
-    payload_blob_bytes: *const u8, payload_blob_len: usize,
-    out_was_new: *mut i32,  // 1 if newly inserted, 0 if dup
+    payload_blob_bytes: *const u8,
+    payload_blob_len: usize,
+    ingested_at_ms: Option<i64>,
+    out_was_new: *mut i32, // 1 if newly inserted, 0 if dup
 ) -> i64 {
-    if engine.is_null() { return -1; }
+    if engine.is_null() {
+        return -1;
+    }
     // chapter 九百二十三 / M3320 NH3 fix:bound BLOB
     // + JSON sizes to prevent OOM-via-upsert。
     if payload_json_len > crate::MAX_PAYLOAD_JSON_BYTES {
@@ -403,40 +569,37 @@ pub unsafe extern "C" fn bas_l8_event_log_append(
     if payload_format != 1 && payload_format != 2 {
         return -3;
     }
-    if payload_format == 1
-        && (payload_json_len == 0 || payload_blob_len > 0)
-    {
+    if payload_format == 1 && (payload_json_len == 0 || payload_blob_len > 0) {
         return -3;
     }
-    if payload_format == 2
-        && (payload_blob_len == 0 || payload_json_len > 0)
-    {
+    if payload_format == 2 && (payload_blob_len == 0 || payload_json_len > 0) {
         return -3;
     }
-    let event_id = match crate::cstr_to_str(
-        event_id_utf8, event_id_len) {
-        Some(s) => s, None => return -3,
+    let event_id = match crate::cstr_to_str(event_id_utf8, event_id_len) {
+        Some(s) => s,
+        None => return -3,
     };
-    let session_id = match crate::cstr_to_str(
-        session_id_utf8, session_id_len) {
-        Some(s) => s, None => return -3,
+    let session_id = match crate::cstr_to_str(session_id_utf8, session_id_len) {
+        Some(s) => s,
+        None => return -3,
     };
-    let kind = match crate::cstr_to_str(
-        kind_utf8, kind_len) {
-        Some(s) => s, None => return -3,
+    let kind = match crate::cstr_to_str(kind_utf8, kind_len) {
+        Some(s) => s,
+        None => return -3,
     };
-    let risk_band = match crate::cstr_to_str(
-        risk_band_utf8, risk_band_len) {
-        Some(s) => s, None => return -3,
+    let risk_band = match crate::cstr_to_str(risk_band_utf8, risk_band_len) {
+        Some(s) => s,
+        None => return -3,
     };
     // chapter 九百十五 / M3280 fix C1:payload_json may be
     // legitimately empty (format=2 binary path stores data
     // in payload_blob),so use the empty-allowing variant
     // for this ONE field。 All other string fields use the
     // strict cstr_to_str。
-    let payload_json = match crate::cstr_to_str_allowing_empty(
-        payload_json_utf8, payload_json_len) {
-        Some(s) => s, None => return -3,
+    let payload_json = match crate::cstr_to_str_allowing_empty(payload_json_utf8, payload_json_len)
+    {
+        Some(s) => s,
+        None => return -3,
     };
     if payload_blob_bytes.is_null() && payload_blob_len > 0 {
         return -3;
@@ -444,18 +607,36 @@ pub unsafe extern "C" fn bas_l8_event_log_append(
     let payload_blob: Option<&[u8]> = if payload_blob_len == 0 {
         None
     } else {
-        Some(unsafe {
-            core::slice::from_raw_parts(
-                payload_blob_bytes, payload_blob_len)
-        })
+        Some(unsafe { core::slice::from_raw_parts(payload_blob_bytes, payload_blob_len) })
     };
     let engine_ref = unsafe { &*engine };
     engine_ref.with_conn(|conn| {
-        match append_event(
-            conn, event_id, session_id, timestamp_ms,
-            kind, risk_band, payload_json,
-            payload_format, payload_blob)
-        {
+        let result = match ingested_at_ms {
+            Some(now_ms) => append_event_with_clock(
+                conn,
+                event_id,
+                session_id,
+                timestamp_ms,
+                kind,
+                risk_band,
+                payload_json,
+                payload_format,
+                payload_blob,
+                |_| now_ms,
+            ),
+            None => append_event(
+                conn,
+                event_id,
+                session_id,
+                timestamp_ms,
+                kind,
+                risk_band,
+                payload_json,
+                payload_format,
+                payload_blob,
+            ),
+        };
+        match result {
             Ok((was_new, seq)) => {
                 if !out_was_new.is_null() {
                     unsafe {
@@ -463,69 +644,155 @@ pub unsafe extern "C" fn bas_l8_event_log_append(
                     }
                 }
                 seq
-            },
+            }
             Err(_) => -2,
         }
     })
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn bas_l8_event_log_count(
+pub unsafe extern "C" fn bas_l8_event_log_append(
     engine: *const L8Engine,
+    event_id_utf8: *const c_char,
+    event_id_len: usize,
+    session_id_utf8: *const c_char,
+    session_id_len: usize,
+    timestamp_ms: i64,
+    kind_utf8: *const c_char,
+    kind_len: usize,
+    risk_band_utf8: *const c_char,
+    risk_band_len: usize,
+    payload_json_utf8: *const c_char,
+    payload_json_len: usize,
+    payload_format: i32,
+    payload_blob_bytes: *const u8,
+    payload_blob_len: usize,
+    out_was_new: *mut i32,
 ) -> i64 {
-    if engine.is_null() { return -1; }
+    unsafe {
+        bas_l8_event_log_append_impl(
+            engine,
+            event_id_utf8,
+            event_id_len,
+            session_id_utf8,
+            session_id_len,
+            timestamp_ms,
+            kind_utf8,
+            kind_len,
+            risk_band_utf8,
+            risk_band_len,
+            payload_json_utf8,
+            payload_json_len,
+            payload_format,
+            payload_blob_bytes,
+            payload_blob_len,
+            None,
+            out_was_new,
+        )
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_event_log_append_at(
+    engine: *const L8Engine,
+    event_id_utf8: *const c_char,
+    event_id_len: usize,
+    session_id_utf8: *const c_char,
+    session_id_len: usize,
+    timestamp_ms: i64,
+    kind_utf8: *const c_char,
+    kind_len: usize,
+    risk_band_utf8: *const c_char,
+    risk_band_len: usize,
+    payload_json_utf8: *const c_char,
+    payload_json_len: usize,
+    payload_format: i32,
+    payload_blob_bytes: *const u8,
+    payload_blob_len: usize,
+    ingested_at_ms: i64,
+    out_was_new: *mut i32,
+) -> i64 {
+    unsafe {
+        bas_l8_event_log_append_impl(
+            engine,
+            event_id_utf8,
+            event_id_len,
+            session_id_utf8,
+            session_id_len,
+            timestamp_ms,
+            kind_utf8,
+            kind_len,
+            risk_band_utf8,
+            risk_band_len,
+            payload_json_utf8,
+            payload_json_len,
+            payload_format,
+            payload_blob_bytes,
+            payload_blob_len,
+            Some(ingested_at_ms),
+            out_was_new,
+        )
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_event_log_count(engine: *const L8Engine) -> i64 {
+    if engine.is_null() {
+        return -1;
+    }
     let engine_ref = unsafe { &*engine };
-    engine_ref.with_conn(|conn| {
-        count_events(conn).unwrap_or(-2)
-    })
+    engine_ref.with_conn(|conn| count_events(conn).unwrap_or(-2))
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn bas_l8_event_log_count_for_session(
     engine: *const L8Engine,
-    session_id_utf8: *const c_char, session_id_len: usize,
+    session_id_utf8: *const c_char,
+    session_id_len: usize,
 ) -> i64 {
-    if engine.is_null() { return -1; }
-    let session_id = match crate::cstr_to_str(
-        session_id_utf8, session_id_len) {
-        Some(s) => s, None => return -3,
+    if engine.is_null() {
+        return -1;
+    }
+    let session_id = match crate::cstr_to_str(session_id_utf8, session_id_len) {
+        Some(s) => s,
+        None => return -3,
     };
     let engine_ref = unsafe { &*engine };
-    engine_ref.with_conn(|conn| {
-        count_events_for_session(conn, session_id).unwrap_or(-2)
-    })
+    engine_ref.with_conn(|conn| count_events_for_session(conn, session_id).unwrap_or(-2))
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn bas_l8_event_log_count_for_kind(
     engine: *const L8Engine,
-    kind_utf8: *const c_char, kind_len: usize,
+    kind_utf8: *const c_char,
+    kind_len: usize,
 ) -> i64 {
-    if engine.is_null() { return -1; }
-    let kind = match crate::cstr_to_str(
-        kind_utf8, kind_len) {
-        Some(s) => s, None => return -3,
+    if engine.is_null() {
+        return -1;
+    }
+    let kind = match crate::cstr_to_str(kind_utf8, kind_len) {
+        Some(s) => s,
+        None => return -3,
     };
     let engine_ref = unsafe { &*engine };
-    engine_ref.with_conn(|conn| {
-        count_events_for_kind(conn, kind).unwrap_or(-2)
-    })
+    engine_ref.with_conn(|conn| count_events_for_kind(conn, kind).unwrap_or(-2))
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn bas_l8_event_log_next_sequence(
     engine: *const L8Engine,
-    session_id_utf8: *const c_char, session_id_len: usize,
+    session_id_utf8: *const c_char,
+    session_id_len: usize,
 ) -> i64 {
-    if engine.is_null() { return -1; }
-    let session_id = match crate::cstr_to_str(
-        session_id_utf8, session_id_len) {
-        Some(s) => s, None => return -3,
+    if engine.is_null() {
+        return -1;
+    }
+    let session_id = match crate::cstr_to_str(session_id_utf8, session_id_len) {
+        Some(s) => s,
+        None => return -3,
     };
     let engine_ref = unsafe { &*engine };
-    engine_ref.with_conn(|conn| {
-        next_sequence_number(conn, session_id).unwrap_or(-2)
-    })
+    engine_ref.with_conn(|conn| next_sequence_number(conn, session_id).unwrap_or(-2))
 }
 
 #[no_mangle]
@@ -533,11 +800,24 @@ pub unsafe extern "C" fn bas_l8_event_log_prune_before(
     engine: *const L8Engine,
     cutoff_ms: i64,
 ) -> i64 {
-    if engine.is_null() { return -1; }
+    if engine.is_null() {
+        return -1;
+    }
     let engine_ref = unsafe { &*engine };
-    engine_ref.with_conn(|conn| {
-        prune_events_before(conn, cutoff_ms).unwrap_or(-2)
-    })
+    engine_ref.with_conn(|conn| prune_events_before(conn, cutoff_ms).unwrap_or(-2))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_event_log_prune_before_at(
+    engine: *const L8Engine,
+    cutoff_ms: i64,
+    now_ms: i64,
+) -> i64 {
+    if engine.is_null() {
+        return -1;
+    }
+    let engine_ref = unsafe { &*engine };
+    engine_ref.with_conn(|conn| prune_events_before_at(conn, cutoff_ms, now_ms).unwrap_or(-2))
 }
 
 /// chapter 九百九 / M3250 hot-path consolidation FFI:fetches
@@ -553,39 +833,37 @@ pub unsafe extern "C" fn bas_l8_event_log_prune_before(
 ///   out_sequences:  [i64; limit]
 /// Both filled in DESC-by-timestamp order。
 #[no_mangle]
-pub unsafe extern "C" fn
-bas_l8_event_log_recent_timestamps_for_session(
+pub unsafe extern "C" fn bas_l8_event_log_recent_timestamps_for_session(
     engine: *const L8Engine,
-    session_id_utf8: *const c_char, session_id_len: usize,
+    session_id_utf8: *const c_char,
+    session_id_len: usize,
     limit: usize,
     out_timestamps: *mut i64,
     out_sequences: *mut i64,
 ) -> i32 {
-    if engine.is_null() { return -1; }
-    if limit == 0 || limit > crate::MAX_HOTPATH_LIMIT { return -4; }
+    if engine.is_null() {
+        return -1;
+    }
+    if limit == 0 || limit > crate::MAX_HOTPATH_LIMIT {
+        return -4;
+    }
     if out_timestamps.is_null() || out_sequences.is_null() {
         return -3;
     }
-    let session_id = match crate::cstr_to_str(
-        session_id_utf8, session_id_len) {
-        Some(s) => s, None => return -3,
+    let session_id = match crate::cstr_to_str(session_id_utf8, session_id_len) {
+        Some(s) => s,
+        None => return -3,
     };
     let engine_ref = unsafe { &*engine };
-    let result = engine_ref.with_conn(|conn| {
-        recent_event_timestamps_for_session(
-            conn, session_id, limit)
-    });
+    let result =
+        engine_ref.with_conn(|conn| recent_event_timestamps_for_session(conn, session_id, limit));
     let rows = match result {
         Ok(v) => v,
         Err(_) => return -2,
     };
     let n = rows.len();
-    let ts_slice = unsafe {
-        core::slice::from_raw_parts_mut(out_timestamps, n)
-    };
-    let seq_slice = unsafe {
-        core::slice::from_raw_parts_mut(out_sequences, n)
-    };
+    let ts_slice = unsafe { core::slice::from_raw_parts_mut(out_timestamps, n) };
+    let seq_slice = unsafe { core::slice::from_raw_parts_mut(out_sequences, n) };
     for (i, (ts, seq)) in rows.iter().enumerate() {
         ts_slice[i] = *ts;
         seq_slice[i] = *seq;
@@ -634,9 +912,13 @@ fn splice_sequence_number(pj: &str, seq: i64) -> String {
     while i < bytes.len() {
         let b = bytes[i];
         if in_string {
-            if escape { escape = false; }
-            else if b == b'\\' { escape = true; }
-            else if b == b'"' { in_string = false; }
+            if escape {
+                escape = false;
+            } else if b == b'\\' {
+                escape = true;
+            } else if b == b'"' {
+                in_string = false;
+            }
             i += 1;
             continue;
         }
@@ -645,20 +927,13 @@ fn splice_sequence_number(pj: &str, seq: i64) -> String {
         // must compare it as a whole at non-in-string positions
         // before letting the `"` flip us into string mode (which
         // would skip the rest of the key)。
-        if depth == 1
-            && i + needle.len() <= bytes.len()
-            && &bytes[i..i + needle.len()] == needle
-        {
+        if depth == 1 && i + needle.len() <= bytes.len() && &bytes[i..i + needle.len()] == needle {
             let after = i + needle.len();
             let mut digit_end = after;
-            if digit_end < bytes.len()
-                && bytes[digit_end] == b'-'
-            {
+            if digit_end < bytes.len() && bytes[digit_end] == b'-' {
                 digit_end += 1;
             }
-            while digit_end < bytes.len()
-                && bytes[digit_end].is_ascii_digit()
-            {
+            while digit_end < bytes.len() && bytes[digit_end].is_ascii_digit() {
                 digit_end += 1;
             }
             let mut out = String::with_capacity(pj.len() + 20);
@@ -667,18 +942,19 @@ fn splice_sequence_number(pj: &str, seq: i64) -> String {
             out.push_str(&pj[digit_end..]);
             return out;
         }
-        if b == b'"' { in_string = true; }
-        else if b == b'{' { depth += 1; }
-        else if b == b'}' { depth -= 1; }
+        if b == b'"' {
+            in_string = true;
+        } else if b == b'{' {
+            depth += 1;
+        } else if b == b'}' {
+            depth -= 1;
+        }
         i += 1;
     }
     pj.to_string()
 }
 
-pub fn events_for_session_json(
-    conn: &Connection,
-    session_id: &str,
-) -> rusqlite::Result<String> {
+pub fn events_for_session_json(conn: &Connection, session_id: &str) -> rusqlite::Result<String> {
     // chapter 九百四十一 / M3410 fix CRITICAL — also SELECT
     // sequence_number,splice into payload_json on each row
     // so read-back returns correct (column-authoritative) seq。
@@ -692,16 +968,20 @@ pub fn events_for_session_json(
         "SELECT payload_json, sequence_number FROM event_log \
          WHERE session_id = ? AND payload_format = 1 \
          ORDER BY sequence_number \
-         LIMIT ?")?;
-    let mut rows = stmt.query(params![
-        session_id, crate::MAX_HOTPATH_LIMIT as i64])?;
+         LIMIT ?",
+    )?;
+    let mut rows = stmt.query(params![session_id, crate::MAX_HOTPATH_LIMIT as i64])?;
     let mut out = String::from("[");
     let mut first = true;
     while let Some(row) = rows.next()? {
         let pj: String = row.get(0)?;
         let seq: i64 = row.get(1)?;
-        if pj.is_empty() { continue; }  // defensive skip
-        if !first { out.push(','); }
+        if pj.is_empty() {
+            continue;
+        } // defensive skip
+        if !first {
+            out.push(',');
+        }
         first = false;
         out.push_str(&splice_sequence_number(&pj, seq));
     }
@@ -729,23 +1009,31 @@ pub fn events_for_session_page_json(
     after_seq: i64,
     limit: i64,
 ) -> rusqlite::Result<String> {
-    let bounded_limit = if limit <= 0 { 1 }
-        else if limit as usize > crate::MAX_HOTPATH_LIMIT {
-            crate::MAX_HOTPATH_LIMIT as i64
-        } else { limit };
+    let bounded_limit = if limit <= 0 {
+        1
+    } else if limit as usize > crate::MAX_HOTPATH_LIMIT {
+        crate::MAX_HOTPATH_LIMIT as i64
+    } else {
+        limit
+    };
     let mut stmt = conn.prepare(
         "SELECT payload_json, sequence_number FROM event_log \
          WHERE session_id = ? AND payload_format = 1 AND sequence_number > ? \
          ORDER BY sequence_number \
-         LIMIT ?")?;
+         LIMIT ?",
+    )?;
     let mut rows = stmt.query(params![session_id, after_seq, bounded_limit])?;
     let mut out = String::from("[");
     let mut first = true;
     while let Some(row) = rows.next()? {
         let pj: String = row.get(0)?;
         let seq: i64 = row.get(1)?;
-        if pj.is_empty() { continue; }
-        if !first { out.push(','); }
+        if pj.is_empty() {
+            continue;
+        }
+        if !first {
+            out.push(',');
+        }
         first = false;
         out.push_str(&splice_sequence_number(&pj, seq));
     }
@@ -760,25 +1048,33 @@ pub fn events_since_timestamp_json(
 ) -> rusqlite::Result<String> {
     // chapter 九百二十二 / M3315 NC4 — cap on limit。 Apply same
     // discipline to read-paths (caller-supplied bound)。
-    let bounded_limit = if limit < 0 { 0 }
-        else if limit as usize > crate::MAX_HOTPATH_LIMIT {
-            crate::MAX_HOTPATH_LIMIT as i64
-        } else { limit };
+    let bounded_limit = if limit < 0 {
+        0
+    } else if limit as usize > crate::MAX_HOTPATH_LIMIT {
+        crate::MAX_HOTPATH_LIMIT as i64
+    } else {
+        limit
+    };
     // chapter 九百四十一 / M3410 fix CRITICAL — also SELECT
     // sequence_number, splice into payload_json on each row。
     let mut stmt = conn.prepare(
         "SELECT payload_json, sequence_number FROM event_log \
          WHERE timestamp_ms >= ? AND payload_format = 1 \
          ORDER BY timestamp_ms, sequence_number \
-         LIMIT ?")?;
+         LIMIT ?",
+    )?;
     let mut rows = stmt.query(params![since_ms, bounded_limit])?;
     let mut out = String::from("[");
     let mut first = true;
     while let Some(row) = rows.next()? {
         let pj: String = row.get(0)?;
         let seq: i64 = row.get(1)?;
-        if pj.is_empty() { continue; }
-        if !first { out.push(','); }
+        if pj.is_empty() {
+            continue;
+        }
+        if !first {
+            out.push(',');
+        }
         first = false;
         out.push_str(&splice_sequence_number(&pj, seq));
     }
@@ -796,36 +1092,38 @@ unsafe fn events_json_ffi(
     out_buf: *mut u8,
     out_capacity: usize,
 ) -> i32 {
-    if engine.is_null() { return -1; }
+    if engine.is_null() {
+        return -1;
+    }
     let engine_ref = unsafe { &*engine };
     let json_result = if by_session {
         let key = match crate::cstr_to_str(key_utf8, key_len) {
-            Some(s) => s, None => return -3,
+            Some(s) => s,
+            None => return -3,
         };
-        engine_ref.with_conn(|conn| {
-            events_for_session_json(conn, key)
-        })
+        engine_ref.with_conn(|conn| events_for_session_json(conn, key))
     } else {
-        engine_ref.with_conn(|conn| {
-            events_since_timestamp_json(conn, since_ms, limit)
-        })
+        engine_ref.with_conn(|conn| events_since_timestamp_json(conn, since_ms, limit))
     };
     let json = match json_result {
-        Ok(s) => s, Err(_) => return -2,
+        Ok(s) => s,
+        Err(_) => return -2,
     };
     let bytes = json.as_bytes();
     let needed = bytes.len();
     // chapter 九百四十一 / M3410 fix HIGH — i32 overflow guard
     let safe_needed = match crate::safe_i32_size(needed) {
-        Ok(n) => n, Err(c) => return c,
+        Ok(n) => n,
+        Err(c) => return c,
     };
     if out_buf.is_null() || out_capacity == 0 {
         return safe_needed;
     }
-    if out_capacity < needed { return -3; }
+    if out_capacity < needed {
+        return -3;
+    }
     unsafe {
-        std::ptr::copy_nonoverlapping(
-            bytes.as_ptr(), out_buf, needed);
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), out_buf, needed);
     }
     safe_needed
 }
@@ -833,15 +1131,21 @@ unsafe fn events_json_ffi(
 #[no_mangle]
 pub unsafe extern "C" fn bas_l8_event_log_events_for_session(
     engine: *const L8Engine,
-    session_id_utf8: *const c_char, session_id_len: usize,
+    session_id_utf8: *const c_char,
+    session_id_len: usize,
     out_buf: *mut u8,
     out_capacity: usize,
 ) -> i32 {
     events_json_ffi(
-        engine, true,
-        session_id_utf8, session_id_len,
-        0, 0,
-        out_buf, out_capacity)
+        engine,
+        true,
+        session_id_utf8,
+        session_id_len,
+        0,
+        0,
+        out_buf,
+        out_capacity,
+    )
 }
 
 #[no_mangle]
@@ -853,10 +1157,15 @@ pub unsafe extern "C" fn bas_l8_event_log_events_since_ts(
     out_capacity: usize,
 ) -> i32 {
     events_json_ffi(
-        engine, false,
-        std::ptr::null(), 0,
-        since_ms, limit,
-        out_buf, out_capacity)
+        engine,
+        false,
+        std::ptr::null(),
+        0,
+        since_ms,
+        limit,
+        out_buf,
+        out_capacity,
+    )
 }
 
 /// H10 (mega-audit, 2026-07-08) — FFI for the cursor-paginated session read. Returns the
@@ -868,32 +1177,39 @@ pub unsafe extern "C" fn bas_l8_event_log_events_since_ts(
 #[no_mangle]
 pub unsafe extern "C" fn bas_l8_event_log_events_for_session_page(
     engine: *const L8Engine,
-    session_id_utf8: *const c_char, session_id_len: usize,
+    session_id_utf8: *const c_char,
+    session_id_len: usize,
     after_seq: i64,
     limit: i64,
     out_buf: *mut u8,
     out_capacity: usize,
 ) -> i32 {
-    if engine.is_null() { return -1; }
+    if engine.is_null() {
+        return -1;
+    }
     let engine_ref = unsafe { &*engine };
     let key = match crate::cstr_to_str(session_id_utf8, session_id_len) {
-        Some(s) => s, None => return -3,
+        Some(s) => s,
+        None => return -3,
     };
-    let json_result = engine_ref.with_conn(|conn| {
-        events_for_session_page_json(conn, key, after_seq, limit)
-    });
+    let json_result =
+        engine_ref.with_conn(|conn| events_for_session_page_json(conn, key, after_seq, limit));
     let json = match json_result {
-        Ok(s) => s, Err(_) => return -2,
+        Ok(s) => s,
+        Err(_) => return -2,
     };
     let bytes = json.as_bytes();
     let needed = bytes.len();
     let safe_needed = match crate::safe_i32_size(needed) {
-        Ok(n) => n, Err(c) => return c,
+        Ok(n) => n,
+        Err(c) => return c,
     };
     if out_buf.is_null() || out_capacity == 0 {
         return safe_needed;
     }
-    if out_capacity < needed { return -3; }
+    if out_capacity < needed {
+        return -3;
+    }
     unsafe {
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), out_buf, needed);
     }
@@ -905,7 +1221,7 @@ pub unsafe extern "C" fn bas_l8_event_log_events_for_session_page(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{bas_l8_engine_init, bas_l8_engine_close};
+    use crate::{bas_l8_engine_close, bas_l8_engine_init};
 
     fn make_engine() -> *mut L8Engine {
         unsafe { bas_l8_engine_init(std::ptr::null(), 0) }
@@ -914,129 +1230,153 @@ mod tests {
     #[test]
     fn next_sequence_starts_at_zero_for_new_session() {
         let engine = make_engine();
-        let _ = unsafe {
-            bas_l8_event_log_init_schema(engine) };
+        let _ = unsafe { bas_l8_event_log_init_schema(engine) };
         let engine_ref = unsafe { &*engine };
         engine_ref.with_conn(|conn| {
-            assert_eq!(
-                next_sequence_number(
-                    conn, "fresh-session").unwrap(), 0);
+            assert_eq!(next_sequence_number(conn, "fresh-session").unwrap(), 0);
         });
-        unsafe { bas_l8_engine_close(engine); }
+        unsafe {
+            bas_l8_engine_close(engine);
+        }
     }
 
     #[test]
     fn auto_sequence_increments_per_session() {
         let engine = make_engine();
-        let _ = unsafe {
-            bas_l8_event_log_init_schema(engine) };
+        let _ = unsafe { bas_l8_event_log_init_schema(engine) };
         let engine_ref = unsafe { &*engine };
         engine_ref.with_conn(|conn| {
-            let (new1, s1) = append_event(
-                conn, "e1", "sess-A", 100, "k", "rb",
-                "{}", 1, None).unwrap();
-            let (new2, s2) = append_event(
-                conn, "e2", "sess-A", 200, "k", "rb",
-                "{}", 1, None).unwrap();
-            let (new3, s3) = append_event(
-                conn, "e3", "sess-B", 300, "k", "rb",
-                "{}", 1, None).unwrap();
+            let (new1, s1) =
+                append_event(conn, "e1", "sess-A", 100, "k", "rb", "{}", 1, None).unwrap();
+            let (new2, s2) =
+                append_event(conn, "e2", "sess-A", 200, "k", "rb", "{}", 1, None).unwrap();
+            let (new3, s3) =
+                append_event(conn, "e3", "sess-B", 300, "k", "rb", "{}", 1, None).unwrap();
             assert!(new1 && new2 && new3);
             assert_eq!(s1, 0);
             assert_eq!(s2, 1);
-            assert_eq!(s3, 0,
-                "Different session starts at 0");
+            assert_eq!(s3, 0, "Different session starts at 0");
         });
-        unsafe { bas_l8_engine_close(engine); }
+        unsafe {
+            bas_l8_engine_close(engine);
+        }
     }
 
     #[test]
     fn idempotent_append_returns_existing_seq() {
         let engine = make_engine();
-        let _ = unsafe {
-            bas_l8_event_log_init_schema(engine) };
+        let _ = unsafe { bas_l8_event_log_init_schema(engine) };
         let engine_ref = unsafe { &*engine };
         engine_ref.with_conn(|conn| {
-            let (new1, s1) = append_event(
-                conn, "dup-e", "s", 100, "k", "rb",
-                "{}", 1, None).unwrap();
+            let (new1, s1) =
+                append_event(conn, "dup-e", "s", 100, "k", "rb", "{}", 1, None).unwrap();
             assert!(new1);
             // Try to append same event_id with DIFFERENT
             // values — should be a no-op + return existing seq
             let (new2, s2) = append_event(
-                conn, "dup-e", "DIFFERENT-SESSION",
-                999, "different-k", "different-rb",
-                r#"{"diff":true}"#, 2, Some(&[0xFFu8; 8])).unwrap();
-            assert!(!new2,
-                "Duplicate event_id returns was_new=false");
-            assert_eq!(s2, s1,
-                "Returned sequence is original, not new");
-            assert_eq!(count_events(conn).unwrap(), 1,
-                "Still only one row");
+                conn,
+                "dup-e",
+                "DIFFERENT-SESSION",
+                999,
+                "different-k",
+                "different-rb",
+                r#"{"diff":true}"#,
+                2,
+                Some(&[0xFFu8; 8]),
+            )
+            .unwrap();
+            assert!(!new2, "Duplicate event_id returns was_new=false");
+            assert_eq!(s2, s1, "Returned sequence is original, not new");
+            assert_eq!(count_events(conn).unwrap(), 1, "Still only one row");
         });
-        unsafe { bas_l8_engine_close(engine); }
+        unsafe {
+            bas_l8_engine_close(engine);
+        }
     }
 
     #[test]
     fn prune_deletes_old_events_returns_count() {
         let engine = make_engine();
-        let _ = unsafe {
-            bas_l8_event_log_init_schema(engine) };
+        let _ = unsafe { bas_l8_event_log_init_schema(engine) };
         let engine_ref = unsafe { &*engine };
         engine_ref.with_conn(|conn| {
             for i in 0..5 {
-                append_event(
-                    conn, &format!("e{}", i), "s",
-                    100 + (i as i64) * 100, "k", "rb",
-                    "{}", 1, None).unwrap();
+                append_event_with_clock(
+                    conn,
+                    &format!("e{}", i),
+                    "s",
+                    100 + (i as i64) * 100,
+                    "k",
+                    "rb",
+                    "{}",
+                    1,
+                    None,
+                    |_| 100,
+                )
+                .unwrap();
             }
             // Prune events with timestamp_ms < 300 (e0, e1)
-            let deleted = prune_events_before(
-                conn, 300).unwrap();
+            let deleted = prune_events_before_at(conn, 300, 259_200_101).unwrap();
             assert_eq!(deleted, 2);
             assert_eq!(count_events(conn).unwrap(), 3);
             // Prune-again (nothing to delete) returns 0
-            let deleted2 = prune_events_before(
-                conn, 300).unwrap();
+            let deleted2 = prune_events_before_at(conn, 300, 259_200_101).unwrap();
             assert_eq!(deleted2, 0);
         });
-        unsafe { bas_l8_engine_close(engine); }
+        unsafe {
+            bas_l8_engine_close(engine);
+        }
     }
 
     #[test]
     fn payload_format_2_with_blob() {
         let engine = make_engine();
-        let _ = unsafe {
-            bas_l8_event_log_init_schema(engine) };
+        let _ = unsafe { bas_l8_event_log_init_schema(engine) };
         let engine_ref = unsafe { &*engine };
         engine_ref.with_conn(|conn| {
             let blob = [0xCAu8; 64];
             let (new, _) = append_event(
-                conn, "bin-1", "s", 100, "k", "rb",
-                "",   // payload_json = empty (format=2)
-                2,    // binary format
-                Some(&blob)).unwrap();
+                conn,
+                "bin-1",
+                "s",
+                100,
+                "k",
+                "rb",
+                "", // payload_json = empty (format=2)
+                2,  // binary format
+                Some(&blob),
+            )
+            .unwrap();
             assert!(new);
             // Verify retrieval
-            let stored_format: i32 = conn.query_row(
-                "SELECT payload_format FROM event_log
+            let stored_format: i32 = conn
+                .query_row(
+                    "SELECT payload_format FROM event_log
                  WHERE event_id = ?",
-                params!["bin-1"], |r| r.get(0)).unwrap();
+                    params!["bin-1"],
+                    |r| r.get(0),
+                )
+                .unwrap();
             assert_eq!(stored_format, 2);
-            let stored_blob: Vec<u8> = conn.query_row(
-                "SELECT payload_blob FROM event_log
+            let stored_blob: Vec<u8> = conn
+                .query_row(
+                    "SELECT payload_blob FROM event_log
                  WHERE event_id = ?",
-                params!["bin-1"], |r| r.get(0)).unwrap();
+                    params!["bin-1"],
+                    |r| r.get(0),
+                )
+                .unwrap();
             assert_eq!(stored_blob, blob.to_vec());
         });
-        unsafe { bas_l8_engine_close(engine); }
+        unsafe {
+            bas_l8_engine_close(engine);
+        }
     }
 
     #[test]
     fn ffi_append_out_was_new_correct() {
         let engine = make_engine();
-        let _ = unsafe {
-            bas_l8_event_log_init_schema(engine) };
+        let _ = unsafe { bas_l8_event_log_init_schema(engine) };
         let eid = "ffi-1";
         let sid = "ffi-sess";
         let k = "kind";
@@ -1046,14 +1386,22 @@ mod tests {
         let s1 = unsafe {
             bas_l8_event_log_append(
                 engine,
-                eid.as_ptr() as *const c_char, eid.len(),
-                sid.as_ptr() as *const c_char, sid.len(),
+                eid.as_ptr() as *const c_char,
+                eid.len(),
+                sid.as_ptr() as *const c_char,
+                sid.len(),
                 100,
-                k.as_ptr() as *const c_char, k.len(),
-                rb.as_ptr() as *const c_char, rb.len(),
-                pj.as_ptr() as *const c_char, pj.len(),
-                1, std::ptr::null(), 0,
-                &mut was_new)
+                k.as_ptr() as *const c_char,
+                k.len(),
+                rb.as_ptr() as *const c_char,
+                rb.len(),
+                pj.as_ptr() as *const c_char,
+                pj.len(),
+                1,
+                std::ptr::null(),
+                0,
+                &mut was_new,
+            )
         };
         assert_eq!(s1, 0);
         assert_eq!(was_new, 1);
@@ -1063,18 +1411,28 @@ mod tests {
         let s2 = unsafe {
             bas_l8_event_log_append(
                 engine,
-                eid.as_ptr() as *const c_char, eid.len(),
-                sid.as_ptr() as *const c_char, sid.len(),
+                eid.as_ptr() as *const c_char,
+                eid.len(),
+                sid.as_ptr() as *const c_char,
+                sid.len(),
                 999,
-                k.as_ptr() as *const c_char, k.len(),
-                rb.as_ptr() as *const c_char, rb.len(),
-                pj.as_ptr() as *const c_char, pj.len(),
-                1, std::ptr::null(), 0,
-                &mut was_new)
+                k.as_ptr() as *const c_char,
+                k.len(),
+                rb.as_ptr() as *const c_char,
+                rb.len(),
+                pj.as_ptr() as *const c_char,
+                pj.len(),
+                1,
+                std::ptr::null(),
+                0,
+                &mut was_new,
+            )
         };
         assert_eq!(s2, 0, "Dup returns original seq=0");
         assert_eq!(was_new, 0, "Dup signals was_new=false");
-        unsafe { bas_l8_engine_close(engine); }
+        unsafe {
+            bas_l8_engine_close(engine);
+        }
     }
 
     // chapter 九百三十八 / M3395 — full-row events round-trip
@@ -1083,8 +1441,7 @@ mod tests {
     // 0/1,splice should put correct values in read-back JSON)
     #[test]
     fn events_for_session_json_round_trip() {
-        let engine = unsafe {
-            bas_l8_engine_init(std::ptr::null(), 0) };
+        let engine = unsafe { bas_l8_engine_init(std::ptr::null(), 0) };
         let _ = unsafe { bas_l8_event_log_init_schema(engine) };
         let engine_ref = unsafe { &*engine };
         engine_ref.with_conn(|conn| {
@@ -1093,24 +1450,43 @@ mod tests {
             let pl1 = "{\"eventID\":\"e1\",\"sequenceNumber\":0,\"x\":1}";
             let pl2 = "{\"eventID\":\"e2\",\"sequenceNumber\":0,\"x\":2}";
             // append 2 format=1 entries
-            append_event(conn, "e1", "sess-RT", 100,
-                "user.input", "low", pl1, 1, None).unwrap();
-            append_event(conn, "e2", "sess-RT", 200,
-                "user.input", "low", pl2, 1, None).unwrap();
-            let json = events_for_session_json(
-                conn, "sess-RT").unwrap();
+            append_event(
+                conn,
+                "e1",
+                "sess-RT",
+                100,
+                "user.input",
+                "low",
+                pl1,
+                1,
+                None,
+            )
+            .unwrap();
+            append_event(
+                conn,
+                "e2",
+                "sess-RT",
+                200,
+                "user.input",
+                "low",
+                pl2,
+                1,
+                None,
+            )
+            .unwrap();
+            let json = events_for_session_json(conn, "sess-RT").unwrap();
             // SQL-assigned seqs are 0, 1 (per session)。 Splice
             // overlays the correct values in read-back JSON。
             let expected_pl1 = "{\"eventID\":\"e1\",\"sequenceNumber\":0,\"x\":1}";
             let expected_pl2 = "{\"eventID\":\"e2\",\"sequenceNumber\":1,\"x\":2}";
-            assert_eq!(json,
-                format!("[{},{}]", expected_pl1, expected_pl2));
+            assert_eq!(json, format!("[{},{}]", expected_pl1, expected_pl2));
             // Empty session case
-            let empty = events_for_session_json(
-                conn, "sess-NONE").unwrap();
+            let empty = events_for_session_json(conn, "sess-NONE").unwrap();
             assert_eq!(empty, "[]");
         });
-        unsafe { bas_l8_engine_close(engine); }
+        unsafe {
+            bas_l8_engine_close(engine);
+        }
     }
 
     // chapter 九百四十一 / M3410 — explicit splicer correctness
@@ -1134,8 +1510,10 @@ mod tests {
         let pj = "{\"nested\":{\"sequenceNumber\":99},\"sequenceNumber\":0}";
         let out = splice_sequence_number(pj, 5);
         // Top-level seq replaced,nested preserved
-        assert_eq!(out,
-            "{\"nested\":{\"sequenceNumber\":99},\"sequenceNumber\":5}");
+        assert_eq!(
+            out,
+            "{\"nested\":{\"sequenceNumber\":99},\"sequenceNumber\":5}"
+        );
     }
 
     #[test]
@@ -1198,8 +1576,10 @@ mod tests {
         // depth=3 nested sequenceNumber must be preserved
         let pj = "{\"a\":{\"b\":{\"sequenceNumber\":99}},\"sequenceNumber\":0}";
         let out = splice_sequence_number(pj, 5);
-        assert_eq!(out,
-            "{\"a\":{\"b\":{\"sequenceNumber\":99}},\"sequenceNumber\":5}");
+        assert_eq!(
+            out,
+            "{\"a\":{\"b\":{\"sequenceNumber\":99}},\"sequenceNumber\":5}"
+        );
     }
 
     // chapter 九百四十三 / M3420 (15P-HIGH-4) — fixture now includes
@@ -1220,7 +1600,10 @@ mod tests {
         //   source < timestampMs
         let pj = "{\"actions\":[\"permit:answer\"],\"confidence\":0.85,\"eventID\":\"rt-1\",\"intent\":\"ask_question\",\"kind\":\"chat\",\"memoryRefs\":[\"atom-1\",\"atom-2\"],\"riskBand\":\"low\",\"sequenceNumber\":0,\"sessionID\":\"sess-A\",\"source\":\"test\",\"timestampMs\":1000}";
         let out = splice_sequence_number(pj, 7);
-        assert_eq!(out, "{\"actions\":[\"permit:answer\"],\"confidence\":0.85,\"eventID\":\"rt-1\",\"intent\":\"ask_question\",\"kind\":\"chat\",\"memoryRefs\":[\"atom-1\",\"atom-2\"],\"riskBand\":\"low\",\"sequenceNumber\":7,\"sessionID\":\"sess-A\",\"source\":\"test\",\"timestampMs\":1000}");
+        assert_eq!(
+            out,
+            "{\"actions\":[\"permit:answer\"],\"confidence\":0.85,\"eventID\":\"rt-1\",\"intent\":\"ask_question\",\"kind\":\"chat\",\"memoryRefs\":[\"atom-1\",\"atom-2\"],\"riskBand\":\"low\",\"sequenceNumber\":7,\"sessionID\":\"sess-A\",\"source\":\"test\",\"timestampMs\":1000}"
+        );
     }
 
     // chapter 九百四十三 / M3420 (15P-HIGH-6) — extended idempotency
@@ -1233,8 +1616,10 @@ mod tests {
         let once_to_5 = splice_sequence_number(pj, 5);
         let then_to_7 = splice_sequence_number(&once_to_5, 7);
         let direct_to_7 = splice_sequence_number(pj, 7);
-        assert_eq!(then_to_7, direct_to_7,
-            "Re-splicing to different value must equal direct splice;else splicer is inserting duplicates");
+        assert_eq!(
+            then_to_7, direct_to_7,
+            "Re-splicing to different value must equal direct splice;else splicer is inserting duplicates"
+        );
     }
 
     // chapter 九百四十三 / M3420 (15P-HIGH-7) — defensive cases for
@@ -1271,37 +1656,49 @@ mod tests {
         let out = splice_sequence_number(pj, 5);
         // Top-level sequenceNumber replaced;nested-string content
         // preserved byte-for-byte
-        assert!(out.contains("\\\"sequenceNumber\\\":99"),
-            "nested-string-as-payload must NOT be replaced");
-        assert!(out.contains("\"sequenceNumber\":5}"),
-            "top-level sequenceNumber must be replaced");
+        assert!(
+            out.contains("\\\"sequenceNumber\\\":99"),
+            "nested-string-as-payload must NOT be replaced"
+        );
+        assert!(
+            out.contains("\"sequenceNumber\":5}"),
+            "top-level sequenceNumber must be replaced"
+        );
     }
 
     #[test]
     fn events_for_session_skips_format_2_blob_rows() {
-        let engine = unsafe {
-            bas_l8_engine_init(std::ptr::null(), 0) };
+        let engine = unsafe { bas_l8_engine_init(std::ptr::null(), 0) };
         let _ = unsafe { bas_l8_event_log_init_schema(engine) };
         let engine_ref = unsafe { &*engine };
         engine_ref.with_conn(|conn| {
             // format=1 with JSON payload — should be returned
             let pl_json = "{\"eventID\":\"j1\"}";
-            append_event(conn, "j1", "sess-mix", 100,
-                "k", "low", pl_json, 1, None).unwrap();
+            append_event(conn, "j1", "sess-mix", 100, "k", "low", pl_json, 1, None).unwrap();
             // format=2 with BLOB payload (empty json,non-empty
             // blob) — should be SKIPPED (binary can't decode
             // back to BASEventLogEntry Codable)
             let pl_empty = "";
             let blob = vec![0u8; 16];
-            append_event(conn, "b1", "sess-mix", 200,
-                "k", "low", pl_empty, 2,
-                Some(&blob)).unwrap();
-            let json = events_for_session_json(
-                conn, "sess-mix").unwrap();
+            append_event(
+                conn,
+                "b1",
+                "sess-mix",
+                200,
+                "k",
+                "low",
+                pl_empty,
+                2,
+                Some(&blob),
+            )
+            .unwrap();
+            let json = events_for_session_json(conn, "sess-mix").unwrap();
             // Only j1 returned,b1 filtered by payload_format=1
             assert_eq!(json, format!("[{}]", pl_json));
         });
-        unsafe { bas_l8_engine_close(engine); }
+        unsafe {
+            bas_l8_engine_close(engine);
+        }
     }
 
     // chapter 九百四十二 / M3415 fix CRITICAL-1 — payload now includes
@@ -1312,25 +1709,30 @@ mod tests {
     // for events_since_timestamp_json+splicer interaction)。
     #[test]
     fn events_since_timestamp_respects_limit_and_order() {
-        let engine = unsafe {
-            bas_l8_engine_init(std::ptr::null(), 0) };
+        let engine = unsafe { bas_l8_engine_init(std::ptr::null(), 0) };
         let _ = unsafe { bas_l8_event_log_init_schema(engine) };
         let engine_ref = unsafe { &*engine };
         engine_ref.with_conn(|conn| {
             for i in 0..5 {
                 let pj = format!(
                     "{{\"eventID\":\"ts-{}\",\"sequenceNumber\":0,\"i\":{}}}",
-                    i, i);
+                    i, i
+                );
                 append_event(
                     conn,
                     &format!("ts-{}", i),
                     "ts-sess",
                     1000 + i * 100,
-                    "k", "low", &pj, 1, None).unwrap();
+                    "k",
+                    "low",
+                    &pj,
+                    1,
+                    None,
+                )
+                .unwrap();
             }
             // since=1200 → expect ts-2, ts-3, ts-4 (3 rows)
-            let json = events_since_timestamp_json(
-                conn, 1200, 100).unwrap();
+            let json = events_since_timestamp_json(conn, 1200, 100).unwrap();
             assert!(json.contains("\"eventID\":\"ts-2\""));
             assert!(json.contains("\"eventID\":\"ts-3\""));
             assert!(json.contains("\"eventID\":\"ts-4\""));
@@ -1338,37 +1740,40 @@ mod tests {
             // chapter 九百四十二 — splicer overlays SQL seq:
             // ts-0/1/2/3/4 got assigned 0/1/2/3/4 by Rust。
             // Without splice they'd ALL show「sequenceNumber:0」。
-            assert!(json.contains("\"sequenceNumber\":2"),
-                "ts-2 must have spliced seq=2 (REGRESSION: if splice removed, all show seq=0)");
+            assert!(
+                json.contains("\"sequenceNumber\":2"),
+                "ts-2 must have spliced seq=2 (REGRESSION: if splice removed, all show seq=0)"
+            );
             assert!(json.contains("\"sequenceNumber\":3"));
             assert!(json.contains("\"sequenceNumber\":4"));
             // limit=2 → only first 2
-            let limited = events_since_timestamp_json(
-                conn, 1200, 2).unwrap();
+            let limited = events_since_timestamp_json(conn, 1200, 2).unwrap();
             assert!(limited.contains("\"eventID\":\"ts-2\""));
             assert!(limited.contains("\"eventID\":\"ts-3\""));
             assert!(!limited.contains("\"eventID\":\"ts-4\""));
             assert!(limited.contains("\"sequenceNumber\":2"));
             assert!(limited.contains("\"sequenceNumber\":3"));
         });
-        unsafe { bas_l8_engine_close(engine); }
+        unsafe {
+            bas_l8_engine_close(engine);
+        }
     }
 
     #[test]
     fn events_since_timestamp_limit_cap_enforced() {
-        let engine = unsafe {
-            bas_l8_engine_init(std::ptr::null(), 0) };
+        let engine = unsafe { bas_l8_engine_init(std::ptr::null(), 0) };
         let _ = unsafe { bas_l8_event_log_init_schema(engine) };
         let engine_ref = unsafe { &*engine };
         engine_ref.with_conn(|conn| {
             // Pass usize::MAX-equivalent → must clamp to
             // MAX_HOTPATH_LIMIT, not abort with Vec allocation
-            let _json = events_since_timestamp_json(
-                conn, 0, i64::MAX).unwrap();
+            let _json = events_since_timestamp_json(conn, 0, i64::MAX).unwrap();
             // No assertion on content — just verify no panic
             // and clean return when result is empty
         });
-        unsafe { bas_l8_engine_close(engine); }
+        unsafe {
+            bas_l8_engine_close(engine);
+        }
     }
 
     // H10 (mega-audit, 2026-07-08) — cursor pagination reads the FULL session history,
@@ -1382,14 +1787,23 @@ mod tests {
             // 5 events for one session (seq 0..4); the LAST is a "removed" event —
             // exactly the kind that lands past the cap in a long session and gets lost.
             for (i, kind) in ["created", "governed", "touched", "touched", "removed"]
-                .iter().enumerate()
+                .iter()
+                .enumerate()
             {
                 // `idx` is a per-event marker the read returns verbatim (used to check
                 // cursor exclusivity); `sequenceNumber` is the field splice populates.
                 let (was_new, _) = append_event(
-                    conn, &format!("ev-{i}"), "long-sess",
-                    100 + i as i64, kind, "rb",
-                    &format!("{{\"kind\":\"{kind}\",\"idx\":{i},\"sequenceNumber\":0}}"), 1, None).unwrap();
+                    conn,
+                    &format!("ev-{i}"),
+                    "long-sess",
+                    100 + i as i64,
+                    kind,
+                    "rb",
+                    &format!("{{\"kind\":\"{kind}\",\"idx\":{i},\"sequenceNumber\":0}}"),
+                    1,
+                    None,
+                )
+                .unwrap();
                 assert!(was_new);
             }
 
@@ -1402,7 +1816,9 @@ mod tests {
                 pages += 1;
                 let count = page.matches("\"kind\"").count();
                 all.push_str(&page);
-                if count < 2 { break; }
+                if count < 2 {
+                    break;
+                }
                 // Advance cursor to the highest seq in this page.
                 after += 2;
                 assert!(pages < 10, "pagination did not terminate");
@@ -1410,18 +1826,33 @@ mod tests {
             assert_eq!(pages, 3, "5 events / batch 2 → pages of 2,2,1");
             // The CRUX: the late `removed` event (seq 4) is present via pagination — the
             // resurrection bug is that a capped single-shot read would have dropped it.
-            assert!(all.contains("\"kind\":\"removed\""),
-                "late removed event must be read by pagination (H10 resurrection guard)");
-            assert!(all.contains("\"kind\":\"created\""), "first event also present");
-            assert_eq!(all.matches("\"kind\"").count(), 5, "all 5 events read exactly once");
+            assert!(
+                all.contains("\"kind\":\"removed\""),
+                "late removed event must be read by pagination (H10 resurrection guard)"
+            );
+            assert!(
+                all.contains("\"kind\":\"created\""),
+                "first event also present"
+            );
+            assert_eq!(
+                all.matches("\"kind\"").count(),
+                5,
+                "all 5 events read exactly once"
+            );
 
             // Cursor is EXCLUSIVE: after_seq=1 skips seq 0,1 (idx 0,1) and returns seq 2,3.
             let mid = events_for_session_page_json(conn, "long-sess", 1, 2).unwrap();
             assert!(!mid.contains("\"idx\":0"), "cursor>1 must skip seq 0");
             assert!(!mid.contains("\"idx\":1"), "cursor>1 must skip seq 1");
-            assert!(mid.contains("\"idx\":2") && mid.contains("\"idx\":3"), "cursor>1 returns seq 2,3");
+            assert!(
+                mid.contains("\"idx\":2") && mid.contains("\"idx\":3"),
+                "cursor>1 returns seq 2,3"
+            );
             // splice populates the authoritative seq: seq 2's payload reads sequenceNumber:2.
-            assert!(mid.contains("\"sequenceNumber\":2"), "splice writes the real seq on read-back");
+            assert!(
+                mid.contains("\"sequenceNumber\":2"),
+                "splice writes the real seq on read-back"
+            );
 
             // Past the end → empty batch.
             let empty = events_for_session_page_json(conn, "long-sess", 4, 2).unwrap();
@@ -1429,8 +1860,274 @@ mod tests {
 
             // limit is clamped to >= 1 (a 0/negative limit must not silently read nothing-forever).
             let clamped = events_for_session_page_json(conn, "long-sess", -1, 0).unwrap();
-            assert_eq!(clamped.matches("\"kind\"").count(), 1, "limit<=0 clamps to 1");
+            assert_eq!(
+                clamped.matches("\"kind\"").count(),
+                1,
+                "limit<=0 clamps to 1"
+            );
         });
-        unsafe { bas_l8_engine_close(engine); }
+        unsafe {
+            bas_l8_engine_close(engine);
+        }
+    }
+
+    #[test]
+    fn ingestion_floor_uses_storage_clock_and_strict_boundary() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_schema_with_clock(&conn, |_| 1_000).unwrap();
+        append_event_with_clock(
+            &conn,
+            "new-backdated",
+            "s",
+            1,
+            "k",
+            "low",
+            "{}",
+            1,
+            None,
+            |_| 1_000,
+        )
+        .unwrap();
+        assert_eq!(prune_events_before_at(&conn, 2, 259_201_000).unwrap(), 0);
+        assert_eq!(prune_events_before_at(&conn, 2, 259_201_001).unwrap(), 1);
+    }
+
+    #[test]
+    fn duplicate_does_not_resample_or_refresh_ingestion_age() {
+        use std::cell::Cell;
+        let conn = Connection::open_in_memory().unwrap();
+        init_schema_with_clock(&conn, |_| 10).unwrap();
+        let calls = Cell::new(0);
+        append_event_with_clock(&conn, "dup-age", "s", 1, "k", "low", "{}", 1, None, |c| {
+            assert!(!c.is_autocommit());
+            calls.set(calls.get() + 1);
+            10
+        })
+        .unwrap();
+        append_event_with_clock(
+            &conn,
+            "dup-age",
+            "other",
+            999,
+            "x",
+            "high",
+            "{\"changed\":true}",
+            1,
+            None,
+            |_| {
+                calls.set(calls.get() + 1);
+                999_999
+            },
+        )
+        .unwrap();
+        assert_eq!(calls.get(), 1);
+        assert_eq!(prune_events_before_at(&conn, 2, 259_200_011).unwrap(), 1);
+    }
+
+    #[test]
+    fn migration_preserves_user_version_and_seeds_high_water_mark() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "PRAGMA user_version=77;
+            CREATE TABLE event_log (
+              event_id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL,
+              sequence_number INTEGER NOT NULL, timestamp_ms INTEGER NOT NULL,
+              kind TEXT NOT NULL, risk_band TEXT NOT NULL, payload_json TEXT NOT NULL
+            );
+            INSERT INTO event_log VALUES ('legacy','s',4,1,'k','low','{}');",
+        )
+        .unwrap();
+        init_schema_with_clock(&conn, |_| 1234).unwrap();
+        let version: i64 = conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        let stamp: i64 = conn
+            .query_row(
+                "SELECT ingested_at_ms FROM event_log WHERE event_id='legacy'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(version, 77);
+        assert_eq!(stamp, 1234);
+        assert_eq!(next_sequence_number(&conn, "s").unwrap(), 5);
+        init_schema_with_clock(&conn, |_| 9999).unwrap();
+        let reopened_stamp: i64 = conn
+            .query_row(
+                "SELECT ingested_at_ms FROM event_log WHERE event_id='legacy'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(reopened_stamp, 1234);
+    }
+
+    #[test]
+    fn migration_failure_rolls_back_new_columns_and_data() {
+        let path = std::env::temp_dir().join(format!(
+            "bas-l8-migration-{}-{}.sqlite",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "PRAGMA user_version=77;
+                 CREATE TABLE event_log (
+                   event_id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL,
+                   sequence_number INTEGER NOT NULL, timestamp_ms INTEGER NOT NULL,
+                   kind TEXT NOT NULL, risk_band TEXT NOT NULL, payload_json TEXT NOT NULL,
+                   payload_format INTEGER NOT NULL DEFAULT 1, payload_blob BLOB
+                 );
+                 INSERT INTO event_log VALUES ('legacy','s',0,1,'k','low','bytes',1,X'CAFE');
+                 CREATE TRIGGER abort_ingestion_backfill BEFORE UPDATE ON event_log
+                 BEGIN SELECT RAISE(ABORT, 'abort ingestion backfill'); END;",
+            )
+            .unwrap();
+            assert!(init_schema_with_clock(&conn, |_| 1234).is_err());
+            assert!(!event_columns(&conn)
+                .unwrap()
+                .iter()
+                .any(|column| column == "ingested_at_ms"));
+            let preserved: (i64, String, String) = conn
+                .query_row(
+                    "SELECT (SELECT user_version FROM pragma_user_version),payload_json,hex(payload_blob)
+                     FROM event_log WHERE event_id='legacy'",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                )
+                .unwrap();
+            assert_eq!(preserved, (77, "bytes".into(), "CAFE".into()));
+
+            conn.execute_batch("DROP TRIGGER abort_ingestion_backfill")
+                .unwrap();
+            init_schema_with_clock(&conn, |_| 1234).unwrap();
+            let migrated: (i64, i64, String, String) = conn
+                .query_row(
+                    "SELECT (SELECT user_version FROM pragma_user_version),ingested_at_ms,
+                            payload_json,hex(payload_blob)
+                     FROM event_log WHERE event_id='legacy'",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                )
+                .unwrap();
+            assert_eq!(migrated, (77, 1234, "bytes".into(), "CAFE".into()));
+            assert_eq!(next_sequence_number(&conn, "s").unwrap(), 1);
+        }
+        {
+            let reopened = Connection::open(&path).unwrap();
+            init_schema_with_clock(&reopened, |_| 9999).unwrap();
+            let reopened_row: (i64, i64, String, String) = reopened
+                .query_row(
+                    "SELECT (SELECT user_version FROM pragma_user_version),ingested_at_ms,
+                            payload_json,hex(payload_blob)
+                     FROM event_log WHERE event_id='legacy'",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                )
+                .unwrap();
+            assert_eq!(reopened_row, (77, 1234, "bytes".into(), "CAFE".into()));
+            assert_eq!(next_sequence_number(&reopened, "s").unwrap(), 1);
+        }
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn invalid_ingestion_metadata_is_retained_and_full_prune_keeps_hwm() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_schema_with_clock(&conn, |_| 1000).unwrap();
+        append_event_with_clock(&conn, "valid", "s", 1, "k", "low", "{}", 1, None, |_| 1000)
+            .unwrap();
+        conn.execute_batch(
+            "INSERT INTO event_log VALUES ('null','s',1,1,'k','low','{}',1,NULL,NULL);
+             INSERT INTO event_log VALUES ('negative','s',2,1,'k','low','{}',1,NULL,-1);
+             INSERT INTO event_log VALUES ('real','s',3,1,'k','low','{}',1,NULL,1.5);",
+        )
+        .unwrap();
+        assert_eq!(prune_events_before_at(&conn, 50, 259_201_001).unwrap(), 1);
+        assert_eq!(count_events(&conn).unwrap(), 3);
+
+        let hwm = Connection::open_in_memory().unwrap();
+        init_schema_with_clock(&hwm, |_| 1000).unwrap();
+        append_event_with_clock(&hwm, "a", "h", 1, "k", "low", "{}", 1, None, |_| 1000)
+            .unwrap();
+        append_event_with_clock(&hwm, "b", "h", 2, "k", "low", "{}", 1, None, |_| 1000)
+            .unwrap();
+        assert_eq!(prune_events_before_at(&hwm, 50, 259_201_001).unwrap(), 2);
+        assert_eq!(next_sequence_number(&hwm, "h").unwrap(), 2);
+        init_schema_with_clock(&hwm, |_| 9999).unwrap();
+        assert_eq!(next_sequence_number(&hwm, "h").unwrap(), 2);
+    }
+
+    #[test]
+    fn chained_prefix_and_sidecar_event_delete_roll_back_together() {
+        let prefix = Connection::open_in_memory().unwrap();
+        init_schema_with_clock(&prefix, |_| 1000).unwrap();
+        prefix.execute_batch(
+            "CREATE TABLE event_log_integrity (
+               event_id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL,
+               sequence_number INTEGER NOT NULL, row_hash TEXT NOT NULL, prev_hash TEXT NOT NULL
+             );",
+        )
+        .unwrap();
+        for (index, timestamp) in [100, 1, 100].into_iter().enumerate() {
+            let id = format!("e{index}");
+            append_event_with_clock(
+                &prefix, &id, "chain", timestamp, "k", "low", "{}", 1, None, |_| 1000,
+            )
+            .unwrap();
+            prefix
+                .execute(
+                    "INSERT INTO event_log_integrity VALUES (?, 'chain', ?, 'hash', 'prev')",
+                    params![id, index as i64],
+                )
+                .unwrap();
+        }
+        assert_eq!(prune_events_before_at(&prefix, 50, 259_201_001).unwrap(), 0);
+        assert_eq!(count_events(&prefix).unwrap(), 3);
+
+        let rollback = Connection::open_in_memory().unwrap();
+        init_schema_with_clock(&rollback, |_| 1000).unwrap();
+        rollback.execute_batch(
+            "CREATE TABLE event_log_integrity (
+               event_id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL,
+               sequence_number INTEGER NOT NULL, row_hash TEXT NOT NULL, prev_hash TEXT NOT NULL
+             );",
+        )
+        .unwrap();
+        for index in 0..2 {
+            let id = format!("r{index}");
+            append_event_with_clock(
+                &rollback, &id, "r", index + 1, "k", "low", "{}", 1, None, |_| 1000,
+            )
+            .unwrap();
+            rollback
+                .execute(
+                    "INSERT INTO event_log_integrity VALUES (?, 'r', ?, 'hash', 'prev')",
+                    params![id, index],
+                )
+                .unwrap();
+        }
+        rollback
+            .execute_batch(
+                "CREATE TRIGGER abort_event_delete BEFORE DELETE ON event_log
+                 BEGIN SELECT RAISE(ABORT, 'abort event delete'); END;",
+            )
+            .unwrap();
+        assert!(prune_events_before_at(&rollback, 50, 259_201_001).is_err());
+        assert_eq!(count_events(&rollback).unwrap(), 2);
+        let sidecars: i64 = rollback
+            .query_row("SELECT count(*) FROM event_log_integrity", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(sidecars, 2);
+        rollback.execute_batch("DROP TRIGGER abort_event_delete").unwrap();
+        assert_eq!(prune_events_before_at(&rollback, 50, 259_201_001).unwrap(), 2);
+        let sidecars: i64 = rollback
+            .query_row("SELECT count(*) FROM event_log_integrity", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(sidecars, 0);
     }
 }

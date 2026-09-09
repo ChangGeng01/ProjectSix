@@ -776,7 +776,7 @@ final class BASEventLogTests: XCTestCase {
         // the same:any bump triggers an explicit migration review for
         // production event_log databases on disk。
         XCTAssertEqual(
-            BASSQLiteEventLogStorage.schemaVersion, 2,
+            BASSQLiteEventLogStorage.schemaVersion, 3,
             "Schema version pin: bump triggers explicit migration " +
             "review for any production event_log databases on disk。" +
             " chapter 七百三十二 第一刀 / M2330 bumped 1 → 2 for the " +
@@ -786,7 +786,8 @@ final class BASEventLogTests: XCTestCase {
     // MARK: - M896 retention policy (chapter 三百九七)
 
     func testM896InMemoryPruneRemovesOldEvents() async throws {
-        let log = BASInMemoryEventLogStorage()
+        let clock = BASEventLogTestClock(1_000)
+        let log = BASInMemoryEventLogStorage(nowMs: clock.now)
         for i in 0..<5 {
             _ = try await log.append(BASEventLogEntry(
                 eventID: "e\(i)",
@@ -799,6 +800,7 @@ final class BASEventLogTests: XCTestCase {
         XCTAssertEqual(countBefore, 5)
         // Cutoff at 1300 → remove e0 (1000), e1 (1100),
         // e2 (1200) → 3 events removed
+        clock.advance(by: 259_200_001)
         let removed = try await log.pruneEventsBefore(
             timestampMs: 1_300)
         XCTAssertEqual(removed, 3)
@@ -834,8 +836,9 @@ final class BASEventLogTests: XCTestCase {
         async throws
     {
         let url = try XCTUnwrap(tempURL)
+        let clock = BASEventLogTestClock(1_000)
         let log = try BASSQLiteEventLogStorage(
-            databaseURL: url)
+            databaseURL: url, nowMs: clock.now)
         for i in 0..<5 {
             _ = try await log.append(BASEventLogEntry(
                 eventID: "e\(i)",
@@ -844,6 +847,7 @@ final class BASEventLogTests: XCTestCase {
                 sessionID: "s",
                 sequenceNumber: 0))
         }
+        clock.advance(by: 259_200_001)
         let removed = try await log.pruneEventsBefore(
             timestampMs: 1_300)
         XCTAssertEqual(removed, 3,

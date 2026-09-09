@@ -1782,6 +1782,8 @@ int32_t bas_l8_vector_index_cosine_topk_atom_ids_for_domain(
 // decode. out_was_new is 1 if newly inserted, 0 if dup-no-op.
 
 int32_t bas_l8_event_log_init_schema(const L8Engine* engine);
+int32_t bas_l8_event_log_init_schema_at(
+    const L8Engine* engine, int64_t now_ms);
 
 int64_t bas_l8_event_log_append(
     const L8Engine* engine,
@@ -1793,6 +1795,21 @@ int64_t bas_l8_event_log_append(
     const char* payload_json_utf8, size_t payload_json_len,
     int32_t payload_format,
     const uint8_t* payload_blob_bytes, size_t payload_blob_len,
+    int32_t* out_was_new);
+
+// Deterministic-clock sibling for internal tests. Production callers retain
+// bas_l8_event_log_append so the Rust transaction owns clock sampling.
+int64_t bas_l8_event_log_append_at(
+    const L8Engine* engine,
+    const char* event_id_utf8, size_t event_id_len,
+    const char* session_id_utf8, size_t session_id_len,
+    int64_t timestamp_ms,
+    const char* kind_utf8, size_t kind_len,
+    const char* risk_band_utf8, size_t risk_band_len,
+    const char* payload_json_utf8, size_t payload_json_len,
+    int32_t payload_format,
+    const uint8_t* payload_blob_bytes, size_t payload_blob_len,
+    int64_t ingested_at_ms,
     int32_t* out_was_new);
 
 int64_t bas_l8_event_log_count(const L8Engine* engine);
@@ -1811,6 +1828,8 @@ int64_t bas_l8_event_log_next_sequence(
 
 int64_t bas_l8_event_log_prune_before(
     const L8Engine* engine, int64_t cutoff_ms);
+int64_t bas_l8_event_log_prune_before_at(
+    const L8Engine* engine, int64_t cutoff_ms, int64_t now_ms);
 
 // chapter 九百九 / M3250 — hot-path consolidation #2 for
 // event_log。 ONE FFI call returns N most-recent events for

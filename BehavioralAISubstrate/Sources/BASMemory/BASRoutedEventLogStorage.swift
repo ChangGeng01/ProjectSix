@@ -49,6 +49,7 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
 
     public let databaseURL: URL
     private nonisolated(unsafe) let enginePtr: OpaquePointer
+    private let deterministicNowMs: (@Sendable () -> Int64)?
 
     /// audit memory-b F12 — OPT-IN diagnostic hook (default nil), mirroring
     /// BASSQLiteEventLogStorage.onSilentFailure. The non-throwing read
@@ -65,7 +66,22 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
     }
 
     public init(databaseURL: URL) throws {
+        try self.init(databaseURL: databaseURL, deterministicNowMs: nil)
+    }
+
+    init(
+        databaseURL: URL,
+        nowMs: @escaping @Sendable () -> Int64
+    ) throws {
+        try self.init(databaseURL: databaseURL, deterministicNowMs: nowMs)
+    }
+
+    private init(
+        databaseURL: URL,
+        deterministicNowMs: (@Sendable () -> Int64)?
+    ) throws {
         self.databaseURL = databaseURL
+        self.deterministicNowMs = deterministicNowMs
         let pathStr = databaseURL.path
         let pathBytes = Array(pathStr.utf8)
         let engine = pathBytes.withUnsafeBufferPointer { buf in
@@ -79,12 +95,17 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
         guard let engine else {
             throw StoreError.engineInitFailed
         }
-        self.enginePtr = engine
-        let rc = bas_l8_event_log_init_schema(engine)
+        let rc: Int32
+        if let deterministicNowMs {
+            rc = bas_l8_event_log_init_schema_at(engine, deterministicNowMs())
+        } else {
+            rc = bas_l8_event_log_init_schema(engine)
+        }
         guard rc == 0 else {
             _ = bas_l8_engine_close(engine)
             throw StoreError.schemaInitFailed(code: rc)
         }
+        self.enginePtr = engine
     }
 
     deinit { _ = bas_l8_engine_close(enginePtr) }
@@ -120,7 +141,29 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
                 kind.withUnsafeBufferPointer { kindBuf in
                     riskBand.withUnsafeBufferPointer { rbBuf in
                         pj.withUnsafeBufferPointer { pjBuf in
-                            bas_l8_event_log_append(
+                            let append: Int64
+                            if let deterministicNowMs {
+                                append = bas_l8_event_log_append_at(
+                                    enginePtr,
+                                    eidBuf.baseAddress.map {
+                                        UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self)
+                                    }, eidBuf.count,
+                                    sidBuf.baseAddress.map {
+                                        UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self)
+                                    }, sidBuf.count,
+                                    entry.timestampMs,
+                                    kindBuf.baseAddress.map {
+                                        UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self)
+                                    }, kindBuf.count,
+                                    rbBuf.baseAddress.map {
+                                        UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self)
+                                    }, rbBuf.count,
+                                    pjBuf.baseAddress.map {
+                                        UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self)
+                                    }, pjBuf.count,
+                                    1, nil, 0, deterministicNowMs(), &wasNewFlag)
+                            } else {
+                                append = bas_l8_event_log_append(
                                 enginePtr,
                                 eidBuf.baseAddress.map {
                                     UnsafeRawPointer($0)
@@ -156,6 +199,8 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
                                 1,  // payload_format = 1 (json)
                                 nil, 0,  // no blob
                                 &wasNewFlag)
+                            }
+                            return append
                         }
                     }
                 }
@@ -237,8 +282,13 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
     public func pruneEventsBefore(
         timestampMs cutoff: Int64
     ) async throws -> Int {
-        let n = bas_l8_event_log_prune_before(
-            enginePtr, cutoff)
+        let n: Int64
+        if let deterministicNowMs {
+            n = bas_l8_event_log_prune_before_at(
+                enginePtr, cutoff, deterministicNowMs())
+        } else {
+            n = bas_l8_event_log_prune_before(enginePtr, cutoff)
+        }
         guard n >= 0 else {
             throw StoreError.pruneFailed(code: n)
         }

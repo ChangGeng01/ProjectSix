@@ -277,8 +277,9 @@ final class BASFederatedEventLogStorageTests:
     // MARK: - Prune propagation
 
     func testPruneEventsBeforePropagatesToAllBackends() async throws {
-        let a = BASInMemoryEventLogStorage()
-        let b = BASInMemoryEventLogStorage()
+        let clock = BASEventLogTestClock(1_000)
+        let a = BASInMemoryEventLogStorage(nowMs: clock.now)
+        let b = BASInMemoryEventLogStorage(nowMs: clock.now)
         _ = try await a.append(
             makeMemoryAtomEntry(
                 eventID: "a-old", timestampMs: 100,
@@ -293,6 +294,7 @@ final class BASFederatedEventLogStorageTests:
                 sessionID: "s", atomID: "z"))
         let federated = BASFederatedEventLogStorage(
             backends: [a, b])
+        clock.advance(by: 259_200_001)
         let removed = try await federated
             .pruneEventsBefore(timestampMs: 200)
         XCTAssertEqual(removed, 2,

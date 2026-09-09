@@ -117,8 +117,9 @@ final class BASChapter901EventLogByteEqTests: XCTestCase {
     func testPruneBeforeReturnsRowCount() async throws {
         let url = makeTempDBURL()
         defer { cleanup(url) }
+        let clock = BASEventLogTestClock(1_000)
         let routed = try BASRoutedEventLogStorage(
-            databaseURL: url)
+            databaseURL: url, nowMs: clock.now)
         for i in 0..<5 {
             _ = try await routed.append(
                 makeEvent(
@@ -128,6 +129,7 @@ final class BASChapter901EventLogByteEqTests: XCTestCase {
         let total = await routed.totalCount
         XCTAssertEqual(total, 5)
         // Prune events with ts < 300 → deletes p0(100) + p1(200)
+        clock.advance(by: 259_200_001)
         let deleted = try await routed.pruneEventsBefore(
             timestampMs: 300)
         XCTAssertEqual(deleted, 2)
@@ -200,10 +202,11 @@ final class BASChapter901EventLogByteEqTests: XCTestCase {
         let routedURL = makeTempDBURL()
         let swiftURL = makeTempDBURL()
         defer { cleanup(routedURL); cleanup(swiftURL) }
+        let clock = BASEventLogTestClock(1_000)
         let routed = try BASRoutedEventLogStorage(
-            databaseURL: routedURL)
+            databaseURL: routedURL, nowMs: clock.now)
         let swiftActor = try BASSQLiteEventLogStorage(
-            databaseURL: swiftURL)
+            databaseURL: swiftURL, nowMs: clock.now)
         for i in 0..<10 {
             let e = makeEvent(
                 id: "pp\(i)",
@@ -212,6 +215,7 @@ final class BASChapter901EventLogByteEqTests: XCTestCase {
             _ = try await swiftActor.append(e)
         }
         // Prune at boundary
+        clock.advance(by: 259_200_001)
         let rDel = try await routed.pruneEventsBefore(
             timestampMs: 500)
         let sDel = try await swiftActor.pruneEventsBefore(
