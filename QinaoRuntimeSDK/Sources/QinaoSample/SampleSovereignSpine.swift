@@ -21,6 +21,20 @@ import QinaoRuntime
 import QinaoSovereign
 import QinaoMemory
 
+private enum SampleLedgerSecretError: LocalizedError {
+    case invalidByteCount(path: String, actual: Int)
+    case missingKeyBesideLedgerHistory(path: String, artifact: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidByteCount(let path, let actual):
+            return "invalid ledger secret at \(path): expected 32 bytes, found \(actual)"
+        case .missingKeyBesideLedgerHistory(let path, let artifact):
+            return "refusing to create ledger secret at \(path): existing \(artifact) may require the original key"
+        }
+    }
+}
+
 extension SampleSession {
 
     /// Lazily assemble the LLM-free sovereign spine. The keyed ledger persists under
@@ -159,14 +173,96 @@ extension SampleSession {
     /// stored secret keeps the HMAC chain verifiable across restarts; regenerating it
     /// would quarantine the prior chain (integrity > availability, honestly surfaced).
     static func loadOrCreateLedgerSecret(in dir: URL) throws -> Data {
-        let url = dir.appendingPathComponent("ledger-secret.key")
-        if let existing = try? Data(contentsOf: url), existing.count == 32 {
+        let fileManager = FileManager.default
+        let keyName = "ledger-secret.key"
+        let url = dir.appendingPathComponent(keyName)
+
+        do {
+            let existing = try Data(contentsOf: url)
+            guard existing.count == 32 else {
+                throw SampleLedgerSecretError.invalidByteCount(
+                    path: url.path,
+                    actual: existing.count)
+            }
             return existing
+        } catch let error as SampleLedgerSecretError {
+            throw error
+        } catch {
+            let readError = error
+            let cocoaError = readError as NSError
+            guard cocoaError.domain == NSCocoaErrorDomain,
+                  cocoaError.code == CocoaError.Code.fileReadNoSuchFile.rawValue
+            else {
+                throw readError
+            }
+
+            func pathEntryExists(at candidate: URL) throws -> Bool {
+                do {
+                    _ = try fileManager.attributesOfItem(atPath: candidate.path)
+                    return true
+                } catch {
+                    let attributeError = error as NSError
+                    guard attributeError.domain == NSCocoaErrorDomain,
+                          attributeError.code == CocoaError.Code.fileReadNoSuchFile.rawValue
+                    else {
+                        throw error
+                    }
+                }
+
+                // attributesOfItem may follow a dangling link on some Foundation
+                // implementations. Ask for the link destination before calling the
+                // canonical path genuinely absent.
+                do {
+                    _ = try fileManager.destinationOfSymbolicLink(atPath: candidate.path)
+                    return true
+                } catch {
+                    let linkError = error as NSError
+                    guard linkError.domain == NSCocoaErrorDomain,
+                          linkError.code == CocoaError.Code.fileReadNoSuchFile.rawValue
+                    else {
+                        throw error
+                    }
+                    return false
+                }
+            }
+
+            let keyEntryExists: Bool
+            do {
+                keyEntryExists = try pathEntryExists(at: url)
+            } catch {
+                // The original key read remains the primary failure.
+                throw readError
+            }
+            guard !keyEntryExists else {
+                throw readError
+            }
+
+            let ledgerArtifactNames = [
+                "sovereign-ledger.sqlite",
+                "sovereign-ledger.sqlite-wal",
+                "sovereign-ledger.sqlite-shm",
+                "sovereign-ledger.sqlite-journal",
+            ]
+            for artifact in ledgerArtifactNames {
+                let artifactExists: Bool
+                do {
+                    artifactExists = try pathEntryExists(
+                        at: dir.appendingPathComponent(artifact))
+                } catch {
+                    throw readError
+                }
+                if artifactExists {
+                    throw SampleLedgerSecretError.missingKeyBesideLedgerHistory(
+                        path: url.path,
+                        artifact: artifact)
+                }
+            }
         }
+
         var bytes = [UInt8](repeating: 0, count: 32)
         for i in bytes.indices { bytes[i] = UInt8.random(in: .min ... .max) }
         let secret = Data(bytes)
-        try secret.write(to: url, options: [.atomic])
+        try secret.write(to: url, options: [.withoutOverwriting])
         return secret
     }
 }
