@@ -1,5 +1,7 @@
 # iPhone Air SemanticStateLake and Exact Context Convergence Implementation Plan
 
+> **Forward development status (2026-08-29):** Superseded by [Qinao single-developer Git and lightweight PR design](../specs/2026-08-29-qinao-single-developer-git-and-lightweight-pr-design.md). External authority closure was never completed, and no historical authority is retroactively claimed. The single developer selected ordinary Git plus lightweight PR review; former source-admission, controlled-document, signer/trust-root, controller/CAS, authority-receipt, registry, and quorum gates are retired for forward development. Historical facts and hashes remain evidence; a historical non-authority limitation remains a forward gate only when the superseding design explicitly restates it.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Extend the existing K3 event truth, scoped memory façade, L8 retrieval mechanisms, cache contract, and context compiler into one immutable, Artifact-Mesh-addressed L8→L7→L3 semantic state path with exactly one workspace/Attempt authority closure, one event sequence, one ordered lane watermark representation, one pre-query physical eligibility gate, one post-retrieval global hard gate, one erasure closure, and one token-packing owner.

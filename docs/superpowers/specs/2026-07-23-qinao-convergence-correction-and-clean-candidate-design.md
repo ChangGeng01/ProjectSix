@@ -1,5 +1,7 @@
 # Qinao Convergence Correction and Clean Candidate Reconstruction Design
 
+> **Forward development status (2026-08-29):** Superseded by [Qinao single-developer Git and lightweight PR design](2026-08-29-qinao-single-developer-git-and-lightweight-pr-design.md). External authority closure was never completed, and no historical authority is retroactively claimed. The single developer selected ordinary Git plus lightweight PR review; former source-admission, controlled-document, signer/trust-root, controller/CAS, authority-receipt, registry, and quorum gates are retired for forward development. Historical facts and hashes remain evidence; a historical non-authority limitation remains a forward gate only when the superseding design explicitly restates it.
+
 **Date:** 2026-07-23
 
 **Status:** Design approved in conversation; written record pending user review. This document is non-authoritative. Controlled-document convergence, implementation, migration, platform proof, certification, and production cutover remain `REVISE`.

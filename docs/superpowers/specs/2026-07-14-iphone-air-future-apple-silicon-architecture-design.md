@@ -1,5 +1,7 @@
 # iPhone Air → Future Apple Silicon 14-Layer System Architecture Design
 
+> **Forward development status (2026-08-29):** Superseded by [Qinao single-developer Git and lightweight PR design](2026-08-29-qinao-single-developer-git-and-lightweight-pr-design.md). External authority closure was never completed, and no historical authority is retroactively claimed. The single developer selected ordinary Git plus lightweight PR review; former source-admission, controlled-document, signer/trust-root, controller/CAS, authority-receipt, registry, and quorum gates are retired for forward development. Historical facts and hashes remain evidence; a historical non-authority limitation remains a forward gate only when the superseding design explicitly restates it.
+
 **Status:** A+ convergence approved; architecture and implementation remain `REVISE` until the reopened physical fault-model gates in Sections 34 and 37 close
 **Date:** 2026-07-14; A+ convergence revision 2026-07-16
 **Scope:** Current iPhone Air/A19 Pro baseline, iOS 27 minimum across every workspace-owned iOS package slice/app/extension target, and capability-driven future Apple Silicon

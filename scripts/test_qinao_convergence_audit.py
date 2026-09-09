@@ -894,6 +894,7 @@ INDEPENDENT_PUBLIC_SURFACE_CASES = {
         "seal-capture", "allocate-resource", "snapshot-resource",
         "snapshot-git-state", "frontier-start", "frontier-complete", "task3-resume",
         "recover-captures", "protected", "topology", "documents-capture",
+        "documents-expected-final",
         "documents-verify", "documents-lint", "diff-inventory",
         "review-assignment-verify", "validate-remote-advertisement",
         "remote-object-revisions", "remote-object-disclosure",
@@ -5338,6 +5339,9 @@ def _external_sterile_surface(base, command):
 def _run_independent_public_surface(command, base):
     if command not in INDEPENDENT_PUBLIC_SURFACE_CASES:
         raise module.AuditError("unknown independent public surface")
+
+    if command == "documents-expected-final":
+        return _task4_external_expected_final(base)
 
     if command in ("sterile-python", "init-run-state"):
         return _external_sterile_surface(base, command)
@@ -24978,6 +24982,557 @@ class RemoteObjectDisclosureTests(_ModuleRequired):
             )
 
 
+
+# Independently transcribed approved Task 4 oracle; never import the producer profile.
+_TASK4_ORACLE = (
+    ("docs/superpowers/plans/2026-04-18-l1-l5-vertical-chain.md", "4cfb49a9680a869ece4a4c9306f728a289283189", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-19-l13-evolution-governance-spine-stage-1.md", "4e8c6a5d5d3abecc5f77100dc773e4aacee57744", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-19-l6-presence-spine-stage-1.md", "dbe8001128beec66a4ce869dfd28ad614b8d0508", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-20-l13-candidate-nursery-activation-stage-2.md", "a66e3755092a38cdc5302a48573881c7d0eed851", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-20-l13-evolution-furnace-full-body-master-spec-and-roadmap.md", "eb2cfdd90dd3e3cca1d199bf83cecfd8cadd76ff", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-20-l13-shadow-trial-theater-stage-3.md", "5707a30ce150c178fce4927e450a8498bd3945cb", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-20-l13-version-arboretum-retraction-furnace-stage-4.md", "f0c5ddc92492db36e3190deb6e46b8804348590b", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-architecture-convergence-master.md", "f991607ed749a161300c632f7512f878cfc903f0", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md", "ec08d766a774657a15385fa55880b2c65cb31d17", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-runtime-replay-certification.md", "5fd41311f4e48993c7bd4ef89f9204f75e5a9c33", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-semantic-statelake-context.md", "7f234b388239d72dd3df842fdf318814441d9f93", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-silicon-execution-spine.md", "d78915f18b5ba0702dab959355f0b34fa0fe0952", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-sovereign-release-effects.md", "a2eff59752dddec5d8f245062bba20d57e76c742", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-19-qinao-coreai-agent-controlled-document-convergence.md", "0b75dc69fe4c64c3977e35cceef57f2d0f4dcea2", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-artifact-mesh-w1-task0.md", "6347a4a3527989b5f8d81427495bcb656df2fcfe", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-authority-ledger-and-cw-evidence.md", "87670a961c19dea47713f99ef582ff3e1839cc6f", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-bootstrap-verifier-and-admission-lineage.md", "6fbc59a212d7a0768f61c1d3ad369f0f300d9756", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-c0-provenance-and-safe-import.md", "2eba8758a549caed16832c01797236785dcc1ef8", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-clean-candidate-reconstruction-and-controlled-convergence.md", "5ed4a503dedb8aee583c21d01ae818b188c5f89f", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-w0-safety-and-k4-proof.md", "4ad1f20dda9b7261844c2de79efbacf2cc06f505", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-29-qinao-dual-space-automation-controlled-convergence.md", "3c32def5329705fa193150f3bbb74332d759ba2c", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-08-24-qinao-p0-execution-containment.md", "dc39773c6172a230022282a53e10f0fc3dea6f64", "historical-only", "historical-evidence"),
+    ("docs/superpowers/plans/2026-08-29-qinao-a03-source-identity-freeze-and-authority-gate.md", "e2c42adaecaa7c3e83406ea2d3e623e633622326", "historical-only", "historical-evidence"),
+    ("docs/superpowers/plans/2026-08-29-qinao-git-only-convergence-and-lightweight-pr.md", "113db5a316dc624035a6c1b82aa77d5954121fcb", "unrelated", "current-reviewed-plan"),
+    ("docs/superpowers/specs/2026-04-18-l1-l5-vertical-chain-design.md", "a71a512a3f3bf3e113bc3ce3acdf135323662def", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-19-l13-evolution-governance-spine-stage-1-design.md", "2fff4202ac21289e13c33630809d34076e44fd13", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-19-l6-presence-spine-stage-1-design.md", "8464b0f89bc9c465dc6fae9b7866b1ab9cc5b3d3", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-19-l8-temporal-memory-field-stage-1-design.md", "41a181b89629f30f22acb7adba1d059466a72961", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-20-l13-candidate-nursery-activation-stage-2-design.md", "783bf0831a97c2dd3c8632bcf95d223f959e6707", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-20-l13-evolution-furnace-full-body-master-design.md", "b4052f2244ec7f5931e653852a4e9dd32fb359d3", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-20-l13-shadow-trial-theater-stage-3-design.md", "99a56a65e7bc1a2c7937d170107e4d85a8c82f91", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-20-l13-version-arboretum-retraction-furnace-stage-4-design.md", "f9a8c18b11817347cb564f8c1d2199b97356034c", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md", "6c3f999ddd610e320ac02d3d89584aaa1f6e1279", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-17-k3-budget-provider-contract-addendum-design.md", "c24709091780c033ba7e2c75b69c3a37d4c51cc8", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-19-qinao-coreai-agent-context-memory-rsi-design.md", "83c132fabdb0f434852b2b3d9afffd0890192adf", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-22-qinao-model-independent-app-agent-self-design.md", "d1f4f5a707e2e54b1e9d5b61ab5eb63de29bf6d4", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-23-qinao-convergence-correction-and-clean-candidate-design.md", "e65b3a5a270403a42b02a341c73700b78ec1ab1e", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-23-qinao-governed-learning-plane-data-flywheel-thinking-design.md", "75a34022593ea2d85405021e75272d7c7f0c2af1", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md", "e2c59656f9eb184efc3ab933fe442c9dd0b7d507", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-29-qinao-dual-space-automation-apple-ecosystem-design.md", "bbc586cb5787d872f8980f95a766f8afa90f9221", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-08-02-qinao-biomimetic-sovereign-agent-system-design.md", "f3d4186769fd0119a418097fea8821d597770189", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-08-10-qinao-global-invariant-firewall-and-recovery-design.md", "887c23a28fb9098d86d252aa8b6dc9153380738b", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-08-24-qinao-p0-execution-containment-design.md", "33bdd35425f114984479ec74215bef02c873b751", "historical-only", "historical-evidence"),
+    ("docs/superpowers/specs/2026-08-28-qinao-recovery-spine-and-deep-scan-closure-design.md", "84346d35c8f366dca792f0c2e9fdbfb5161dc584", "historical-only", "historical-evidence"),
+    ("docs/superpowers/specs/2026-08-29-qinao-single-developer-git-and-lightweight-pr-design.md", "7212afb0b29d83d8695ab8ae1b7f042b87400863", "unrelated", "current-policy"),
+    ("docs/superpowers/specs/qinao-owner-ledger-v1.json", "64834006f035a21300d64d0fc41b945f75b10c52", "historical-only", "historical-evidence"),
+)
+_TASK4_REVIEW_REASONS = {
+    "current-policy": "current-policy",
+    "current-reviewed-plan": "current-reviewed-plan",
+    "unrelated-product-scope": "Unrelated product/runtime scope; preserve the exact source blob under the reviewed Task4 disposition.",
+    "historical-source-marker": "Pre-existing exact historical-only registry marker; preserve the source blob without a second pointer.",
+    "historical-evidence": "Preserve historical evidence unchanged under the reviewed Task4 disposition; do not infer completed work or current authority from this classification.",
+    "forward-development-control": "Contains forward development-control gates retired by the approved single-owner Git route and has no pre-existing historical-only marker."
+}
+_TASK4_C = "91bfb4c851279235ccde2ec21902c6a4c83555ee"
+_TASK4_BASE = "243c083f345f3586ef226020d42af4653b31a62a"
+_TASK4_4A = "4a9298db261bcfda97ea1748baad65649156ba66"
+_TASK4_D = "e602fe41ca74efad44ef00a3a34c930cfe41e2ce"
+_TASK4_S = "fba300fc9e040d2f5d9d08cd158fa3321dc36b93"
+_TASK4_SEED = "docs/superpowers/validation/qinao-plan-spec-disposition.v1.json"
+_TASK4_ARTIFACT = "docs/superpowers/evidence/2026-08-29-qinao-plan-spec-inventory.v1.json"
+_TASK4_POINTER = (
+    "> **Forward development status (2026-08-29):** Superseded by "
+    "[Qinao single-developer Git and lightweight PR design]({link}). "
+    "External authority closure was never completed, and no historical "
+    "authority is retroactively claimed. The single developer selected "
+    "ordinary Git plus lightweight PR review; former source-admission, "
+    "controlled-document, signer/trust-root, controller/CAS, "
+    "authority-receipt, registry, and quorum gates are retired for forward "
+    "development. Historical facts and hashes remain evidence; a historical "
+    "non-authority limitation remains a forward gate only when the "
+    "superseding design explicitly restates it."
+)
+
+
+def _task4_oracle_final(path, source, disposition):
+    if disposition != "supersede":
+        return source
+    link = "2026-08-29-qinao-single-developer-git-and-lightweight-pr-design.md"
+    if path.startswith("docs/superpowers/plans/"):
+        link = "../specs/" + link
+    first, rest = source.split(b"\n", 1)
+    pointer = _TASK4_POINTER.format(link=link).encode("ascii")
+    return first + b"\n\n" + pointer + b"\n" + (rest if rest.startswith(b"\n") else b"\n" + rest)
+
+
+def _task4_real_inputs():
+    repository = Path(__file__).resolve().parents[1]
+    for oid in (_TASK4_C, _TASK4_BASE, _TASK4_4A, _TASK4_D, _TASK4_S):
+        try:
+            module._run_git(repository, ["cat-file", "-e", oid + "^{commit}"])
+        except module.AuditError as exc:
+            raise AssertionError("Task 4 requires full immutable history; missing " + oid) from exc
+    capture = module.capture_documents_contract(
+        repository, C=_TASK4_C, merge_base=_TASK4_BASE,
+        parent_4a=_TASK4_4A, parent_D=_TASK4_D,
+    )
+    contract = json.loads((repository / _TASK4_SEED).read_bytes())
+    source = module.capture_plan_spec_inventory(repository, _TASK4_C)
+    return repository, capture, contract, source
+
+
+class ExpectedPlanSpecProducerTests(_ModuleRequired):
+    """Breaks: absent producer, accepted input drift, noncanonical/rehashed output,
+    wrong patch bytes or a CLI that writes caller-selected repository paths.
+    Real module repository/full immutable history required; no fetch or skips.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.repository, cls.capture, cls.contract, cls.source = _task4_real_inputs()
+
+    def setUp(self):
+        super().setUp()
+        for name in ("capture_expected_plan_spec_inventory",
+                     "verify_expected_plan_spec_inventory", "render_expected_plan_spec_patch"):
+            self.assertTrue(callable(getattr(module, name, None)), "missing Task 4 " + name)
+
+    def construct(self, capture=None, contract=None, spec_commit=_TASK4_S):
+        return module.capture_expected_plan_spec_inventory(
+            self.repository, self.capture if capture is None else capture,
+            self.contract if contract is None else contract, spec_commit=spec_commit,
+        )
+
+    def test_producer_reopens_exact_source_and_derives_all_final_bytes(self):
+        record = self.construct()
+        self.assertEqual(record["schemaVersion"], "qinao.plan-spec-source-final.v1")
+        self.assertEqual(len(record), 24)
+        self.assertEqual(set(record), {
+            "schemaVersion", "C", "CTree", "mergeBase", "mergeBaseTree",
+            "parent4a", "parent4aTree", "parentD", "parentDTree", "S", "STree",
+            "supersedingPath", "specBlobOid", "sourceCaptureDigest", "dispositionDigest",
+            "entryCount", "entries", "sourcePathListSha256", "expectedFinalPathListSha256",
+            "sourceRecordsSha256", "expectedFinalRecordsSha256", "pointerTransformId",
+            "pointerBytesSha256", "recordDigest"})
+        self.assertEqual(record["entryCount"], 46)
+        self.assertEqual(record["sourceCaptureDigest"], self.capture["recordDigest"])
+        self.assertEqual(record["S"], _TASK4_S)
+        self.assertEqual(record["STree"], "6e23fba9f09edcc56eb9692ef76df0006d8c2d4a")
+        self.assertEqual(record["specBlobOid"], "7212afb0b29d83d8695ab8ae1b7f042b87400863")
+        self.assertEqual(record["CTree"], "3a1674651a95e91b321b637b801db66d71e6fafb")
+        self.assertEqual(record["mergeBaseTree"], "90533f698f86cef275106509bc4e7241cbd60d88")
+        self.assertEqual(record["parent4aTree"], "22382c1de6680a263ec4a2f4a6c989c0f0e6e220")
+        self.assertEqual(record["parentDTree"], "611485101ef1c843bf1173ebd22e986e2a10a910")
+        for row, (path, oid, disposition, reason) in zip(record["entries"], _TASK4_ORACLE):
+            with self.subTest(path=path):
+                self.assertEqual(len(row), 19)
+                self.assertEqual(set(row), {
+                    "pathB64", "displayPath", "sourceMode", "sourceType", "sourceBlobOid",
+                    "sourceSha256", "mergeBaseObject", "parent1Object", "parent2Object",
+                    "disposition", "reasonCode", "reviewReason", "sourceLineEvidence",
+                    "permittedTransformation", "expectedFinalPathB64", "expectedFinalMode",
+                    "expectedFinalType", "expectedFinalBlobOid", "expectedFinalSha256"})
+                raw = path.encode("ascii")
+                self.assertEqual(base64.b64decode(row["pathB64"], validate=True), raw)
+                self.assertEqual(row["expectedFinalPathB64"], row["pathB64"])
+                self.assertEqual(row["displayPath"], path)
+                self.assertEqual(row["sourceBlobOid"], oid)
+                self.assertEqual(row["sourceSha256"], hashlib.sha256(self.source[path]["bytes"]).hexdigest())
+                self.assertEqual(row["disposition"], disposition)
+                self.assertEqual(row["reasonCode"], reason)
+                self.assertEqual(row["reviewReason"], _TASK4_REVIEW_REASONS[reason])
+                final = _task4_oracle_final(path, self.source[path]["bytes"], disposition)
+                self.assertEqual(row["expectedFinalSha256"], hashlib.sha256(final).hexdigest())
+                self.assertEqual(row["expectedFinalBlobOid"], hashlib.sha1(
+                    b"blob " + str(len(final)).encode("ascii") + b"\0" + final).hexdigest())
+                self.assertEqual((row["sourceMode"], row["expectedFinalMode"],
+                                  row["sourceType"], row["expectedFinalType"]),
+                                 ("100644", "100644", "blob", "blob"))
+
+    def test_inventory_framing_is_canonical_and_reproducible(self):
+        record = self.construct()
+        def J(value):
+            return (json.dumps(value, ensure_ascii=False, sort_keys=True,
+                               separators=(",", ":")) + "\n").encode("utf-8")
+        def digest(value):
+            return hashlib.sha256(J(value)).hexdigest()
+        paths = b"".join(path.encode("ascii") + b"\0" for path, *_ in _TASK4_ORACLE)
+        self.assertEqual(record["sourcePathListSha256"], hashlib.sha256(paths).hexdigest())
+        self.assertEqual(record["expectedFinalPathListSha256"], hashlib.sha256(paths).hexdigest())
+        sources, finals = [], []
+        for row in record["entries"]:
+            sources.append(dict(pathB64=row["pathB64"], mode=row["sourceMode"],
+                type=row["sourceType"], blobOid=row["sourceBlobOid"], sha256=row["sourceSha256"],
+                **{key: row[key] for key in ("mergeBaseObject", "parent1Object", "parent2Object")}))
+            finals.append(dict(pathB64=row["expectedFinalPathB64"], mode=row["expectedFinalMode"],
+                type=row["expectedFinalType"], blobOid=row["expectedFinalBlobOid"], sha256=row["expectedFinalSha256"]))
+        self.assertEqual(record["sourceRecordsSha256"], digest(sources))
+        self.assertEqual(record["expectedFinalRecordsSha256"], digest(finals))
+        self.assertEqual(record["dispositionDigest"], digest(self.contract))
+        self.assertEqual(record["recordDigest"], digest({k: v for k, v in record.items() if k != "recordDigest"}))
+        pointers = {}
+        for role in ("plans", "specs"):
+            link = ("../specs/" if role == "plans" else "") + "2026-08-29-qinao-single-developer-git-and-lightweight-pr-design.md"
+            pointers[role] = hashlib.sha256(_TASK4_POINTER.format(link=link).encode("ascii")).hexdigest()
+        self.assertEqual(record["pointerBytesSha256"], pointers)
+        self.assertEqual(J(record), J(self.construct()))
+
+    def test_constructor_rejects_wrong_identity_seed_and_capture(self):
+        with self.assertRaisesRegex(module.AuditError, "spec commit"):
+            self.construct(spec_commit="0" * 40)
+        for field in ("C", "mergeBase", "parent4a", "parentD"):
+            changed = copy.deepcopy(self.capture)
+            changed[field] = "0" * 40
+            with self.subTest(field=field), self.assertRaises(module.AuditError):
+                self.construct(capture=changed)
+        for field, value in (("path", "docs/superpowers/plans/substitution.md"),
+                             ("disposition", "supersede"), ("reviewReason", "rehashed caller review")):
+            changed = copy.deepcopy(self.contract)
+            changed["entries"][0][field] = value
+            with self.subTest(field=field), self.assertRaises(module.AuditError):
+                self.construct(contract=changed)
+
+    def test_rehashed_inventory_tamper_is_rejected_by_field(self):
+        record = self.construct()
+        edits = [
+            ("displayPath", "wrong"), ("pathB64", record["entries"][0]["pathB64"] + "="),
+            ("sourceBlobOid", "0" * 40), ("sourceSha256", "0" * 64),
+            ("sourceMode", "100755"), ("sourceType", "tree"),
+            ("expectedFinalPathB64", "YQ=="), ("expectedFinalMode", "100755"),
+            ("expectedFinalType", "tree"), ("expectedFinalBlobOid", "0" * 40),
+            ("expectedFinalSha256", "0" * 64), ("disposition", "historical-only"),
+            ("reasonCode", "historical-evidence"), ("reviewReason", "caller rehashed"),
+            ("sourceLineEvidence", ["bytes:0:1:sha256:" + "0" * 64]),
+            ("permittedTransformation", "arbitrary"),
+            ("mergeBaseObject", {"mode": None, "type": "blob", "oid": None}),
+            ("parent1Object", {"mode": "100644", "type": "blob", "oid": "0" * 40}),
+            ("parent2Object", {"mode": None, "type": None, "oid": None}),
+        ]
+        for field, value in edits:
+            changed = copy.deepcopy(record)
+            # Select a row whose parent2 exists for that specific tamper.
+            index = next((i for i, row in enumerate(changed["entries"])
+                          if row["parent2Object"]["oid"] is not None), 0) if field == "parent2Object" else 0
+            changed["entries"][index][field] = value
+            changed = module._self_digest_record({k: v for k, v in changed.items() if k != "recordDigest"})
+            with self.subTest(field=field), self.assertRaisesRegex(module.AuditError, field):
+                module.verify_expected_plan_spec_inventory(
+                    self.repository, self.capture, self.contract, changed, spec_commit=_TASK4_S)
+        for kind in ("H", "order", "duplicate", "same-count"):
+            changed = copy.deepcopy(record)
+            if kind == "H":
+                changed["H"] = _TASK4_C
+            elif kind == "order":
+                changed["entries"].reverse()
+            elif kind == "duplicate":
+                changed["entries"][1] = copy.deepcopy(changed["entries"][0])
+            else:
+                changed["entries"][0]["pathB64"] = base64.b64encode(b"docs/superpowers/plans/other.md").decode("ascii")
+            changed = module._self_digest_record({k: v for k, v in changed.items() if k != "recordDigest"})
+            with self.subTest(kind=kind), self.assertRaises(module.AuditError):
+                module.verify_expected_plan_spec_inventory(
+                    self.repository, self.capture, self.contract, changed, spec_commit=_TASK4_S)
+
+    def test_complete_S_to_D_delta_rejects_an_outside_root_addition(self):
+        # Only the read-only Git transport response is faulted. Every validator,
+        # immutable tree/parent check and the raw-NUL parser runs unmodified.
+        original = module._run_git
+        observed = []
+        def git_response(repository, arguments, **kwargs):
+            payload = original(repository, arguments, **kwargs)
+            if list(arguments[:4]) == ["diff", "--raw", "-z", "--full-index"]:
+                self.assertEqual(arguments[-3:], [_TASK4_S, _TASK4_D, "--"])
+                observed.append(tuple(arguments))
+                return payload + (b":000000 100644 " + b"0" * 40 + b" " +
+                    b"7212afb0b29d83d8695ab8ae1b7f042b87400863 A\0outside-plan-roots.txt\0")
+            return payload
+        with mock.patch.object(module, "_run_git", side_effect=git_response):
+            with self.assertRaisesRegex(module.AuditError, "complete S-to-D plan-only delta"):
+                self.construct()
+        self.assertEqual(len(observed), 1)
+        self.assertIn("--no-abbrev", observed[0])
+        self.assertIn("--no-renames", observed[0])
+
+    def test_missing_immutable_history_is_an_explicit_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            module._run_git(repository, ["init", "--quiet"])
+            with self.assertRaisesRegex(module.AuditError, "missing immutable object: " + _TASK4_C):
+                module.capture_expected_plan_spec_inventory(
+                    repository, self.capture, self.contract, spec_commit=_TASK4_S)
+
+    def test_renderer_emits_only_exact_sorted_pointer_insertions(self):
+        patch = module.render_expected_plan_spec_patch(self.source, self.contract)
+        self.assertTrue(patch.startswith(b"*** Begin Patch\n"))
+        self.assertTrue(patch.endswith(b"*** End Patch\n"))
+        self.assertEqual(patch.count(b"*** Update File: "), 17)
+        self.assertEqual(patch.count(b"\n@@\n"), 17)
+        self.assertNotIn(b"\n-", patch)
+        headers = [line[len(b"*** Update File: "):].decode("ascii")
+                   for line in patch.splitlines() if line.startswith(b"*** Update File: ")]
+        self.assertEqual(headers, [p for p, _, d, _ in _TASK4_ORACLE if d == "supersede"])
+        for path in headers:
+            original = self.source[path]["bytes"]
+            expected = _task4_oracle_final(path, original, "supersede")
+            insertion = expected[len(original.split(b"\n", 1)[0]) + 1:]
+            pointer = insertion.splitlines()[1]
+            self.assertIn(b"+" + pointer + b"\n", patch)
+
+
+
+class RepositoryDocumentInventoryTests(ExpectedPlanSpecProducerTests):
+    """Task 4 typed target: real repository, tracked documents and full immutable
+    history required. Task 8 validation entry must provide this history (CI
+    fetch-depth: 0); missing objects fail explicitly, never fetch or skip.
+    """
+
+    def test_real_C_persisted_inventory_equals_sole_constructor(self):
+        artifact_path = self.repository / _TASK4_ARTIFACT
+        self.assertTrue(artifact_path.is_file(), "generated canonical Task 4 inventory is absent")
+        payload, observed = module._read_ordinary_snapshot(artifact_path)
+        self.assertEqual(observed.st_mode & 0o111, 0)
+        expected = self.construct()
+        self.assertEqual(payload, module.canonical_json_bytes(expected))
+        self.assertEqual(module.verify_expected_plan_spec_inventory(
+            self.repository, self.capture, self.contract,
+            module.parse_canonical_json(payload), spec_commit=_TASK4_S), expected)
+
+    def test_real_C_source_partition_and_marker_evidence(self):
+        self.assertEqual(
+            [(p, item["oid"]) for p, item in self.source.items()],
+            [(p, oid) for p, oid, _d, _r in _TASK4_ORACLE])
+        self.assertEqual(len({oid for _p, oid, _d, _r in _TASK4_ORACLE}), 46)
+        self.assertEqual({d: sum(row[2] == d for row in _TASK4_ORACLE)
+                          for d in ("unrelated", "historical-only", "supersede")},
+                         {"unrelated": 17, "historical-only": 12, "supersede": 17})
+        expected_seed = [
+            dict(path=p, disposition=d, reviewReason=_TASK4_REVIEW_REASONS[r],
+                 permittedTransformation="insert-qinao-git-only-forward-pointer-v1" if d == "supersede" else "none")
+            for p, _oid, d, r in _TASK4_ORACLE]
+        self.assertEqual(self.contract["entries"], expected_seed)
+        july15 = [row for row in _TASK4_ORACLE if "/plans/2026-07-15-iphone-air-" in row[0]]
+        self.assertEqual(len(july15), 6)
+        self.assertTrue(all(row[2] == "supersede" for row in july15))
+        # The old registry's seven historical plans + annex + ten old specs
+        # are only 18; notably all six July15 plans lie outside that boundary.
+        old18 = {p for p, _, d, r in _TASK4_ORACLE
+                 if r == "historical-source-marker" or
+                 p.endswith("2026-07-29-qinao-dual-space-automation-controlled-convergence.md") or
+                 ("/specs/" in p and d == "supersede")}
+        self.assertEqual(len(old18), 18)
+        self.assertLess(old18, set(self.source))
+        self.assertTrue(all(p not in old18 for p, *_ in july15))
+        marker = b"> **QINAO-PLAN-REGISTRY-V1: SUPERSEDED_HISTORICAL**\n"
+        marked = {p for p, item in self.source.items() if marker in item["bytes"].splitlines(keepends=True)}
+        self.assertEqual(marked, {p for p, _, _, r in _TASK4_ORACLE if r == "historical-source-marker"})
+        for path in marked:
+            self.assertEqual(self.source[path]["bytes"].splitlines(keepends=True)[2], marker)
+            self.assertEqual(next(row for row in self.capture["threeWay"]["entries"] if row["path"] == path)["parent1Object"]["oid"], self.source[path]["oid"])
+        annex = "docs/superpowers/plans/2026-07-29-qinao-dual-space-automation-controlled-convergence.md"
+        self.assertEqual(self.source[annex]["bytes"].splitlines(keepends=True)[2],
+                         b"> **QINAO-PLAN-REGISTRY-V1: ACTIVE_TASKS_0_2_ANNEX**\n")
+        for path in (annex, "docs/superpowers/plans/2026-08-29-qinao-git-only-convergence-and-lightweight-pr.md"):
+            self.assertIn(b"SUPERSEDED_HISTORICAL", self.source[path]["bytes"])
+            self.assertNotIn(path, marked)
+        self.assertEqual(self.source["docs/superpowers/specs/qinao-owner-ledger-v1.json"]["oid"],
+                         "64834006f035a21300d64d0fc41b945f75b10c52")
+
+    def test_real_C_all_29_unchanged_worktree_objects_are_exact(self):
+        unchanged = [row for row in _TASK4_ORACLE if row[2] != "supersede"]
+        self.assertEqual(len(unchanged), 29)
+        for path, oid, _d, _r in unchanged:
+            with self.subTest(path=path):
+                payload, observed = module._read_ordinary_snapshot(self.repository / path)
+                self.assertEqual(observed.st_mode & 0o111, 0)
+                self.assertEqual(payload, self.source[path]["bytes"])
+                self.assertEqual(hashlib.sha1(b"blob " + str(len(payload)).encode("ascii") + b"\0" + payload).hexdigest(), oid)
+
+    def test_real_C_worktree_matches_every_expected_final_blob(self):
+        tracked = module._run_git(self.repository, [
+            "ls-files", "-z", "--", "docs/superpowers/plans", "docs/superpowers/specs"])
+        self.assertEqual(tracked.split(b"\0")[:-1],
+                         [p.encode("ascii") for p, *_ in _TASK4_ORACLE])
+        mismatches = []
+        for path, _oid, disposition, _reason in _TASK4_ORACLE:
+            actual, observed = module._read_ordinary_snapshot(self.repository / path)
+            self.assertEqual(observed.st_mode & 0o111, 0, path)
+            expected = _task4_oracle_final(path, self.source[path]["bytes"], disposition)
+            if actual != expected:
+                mismatches.append(path)
+        self.assertEqual(mismatches, [], "missing pointer/final blob paths:\n" + "\n".join(mismatches))
+
+    def test_real_C_source_evidence_is_exact_and_inert(self):
+        record = self.construct()
+        spans = {
+            "docs/superpowers/plans/2026-08-24-qinao-p0-execution-containment.md": [(2543, 482, "747b5e3f079d859f60f8e4a3eb667accf7bb9ec4d0b511f9895bf2c8c709b333")],
+            "docs/superpowers/plans/2026-08-29-qinao-a03-source-identity-freeze-and-authority-gate.md": [(81, 905, "3bc7fe8a5825d9b762444db6dd39be886e968e38f3139ea1d85b402711982870")],
+            "docs/superpowers/specs/2026-08-24-qinao-p0-execution-containment-design.md": [(41, 665, "8a502283a1ebe7d8ada42ab3261d59694d01115a03d36500d50663d455c12723")],
+            "docs/superpowers/specs/2026-08-28-qinao-recovery-spine-and-deep-scan-closure-design.md": [(74, 197, "c30fc56408ac2a9a67912be542d92df39d9717eff051545c963083fc08af076a"), (1056, 365, "4d777c89d1bdc5f4b5f6f0f3c917524057ec0b501523bdb84ba1809781219a23")],
+            "docs/superpowers/specs/qinao-owner-ledger-v1.json": [(0, 80033, "27b05cc556e1403183c3a17c1a79253b877f8f4cda0b283964e25a7c90b75e77")],
+        }
+        for row in record["entries"]:
+            path = row["displayPath"]
+            payload = self.source[path]["bytes"]
+            expected = []
+            if path.endswith(".md"):
+                lines = payload.splitlines(keepends=True)
+                expected.append("line:1:sha256:" + hashlib.sha256(lines[0]).hexdigest())
+                if row["reasonCode"] == "historical-source-marker" or path.endswith("2026-07-29-qinao-dual-space-automation-controlled-convergence.md"):
+                    expected.append(lines[2].decode("ascii"))
+            for offset, length, digest in spans.get(path, []):
+                self.assertEqual(hashlib.sha256(payload[offset:offset+length]).hexdigest(), digest)
+                expected.append("bytes:%d:%d:sha256:%s" % (offset, length, digest))
+            self.assertEqual(row["sourceLineEvidence"], expected, path)
+
+
+class ExpectedPlanSpecCLITests(_ModuleRequired):
+    """Break: public entry is absent, accepts unsafe options or changes files."""
+
+    def test_expected_final_cli_is_single_producer_and_read_only(self):
+        self.assertIn("documents-expected-final", module.PUBLIC_COMMAND_ROUTE_SPEC)
+        with tempfile.TemporaryDirectory() as temporary:
+            _task4_external_expected_final(Path(temporary))
+
+    def test_external_fixture_accepts_private_mode_source_copy(self):
+        """Break: fixture rejects valid seed bytes solely for source mode0600."""
+        tracked = Path(__file__).resolve().parents[1] / _TASK4_SEED
+        original = module._read_ordinary(tracked)
+        original_mode = stat.S_IMODE(tracked.stat().st_mode)
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            # This is a temporary source copy, not a chmod of a tracked checkout.
+            private_source = base / "private-source.json"
+            private_source.write_bytes(original)
+            private_source.chmod(0o600)
+            self.assertEqual(module._read_ordinary(private_source), original)
+            try:
+                _task4_external_expected_final(base, seed_source_path=private_source)
+            finally:
+                self.assertEqual(module._read_ordinary(tracked), original)
+                self.assertEqual(stat.S_IMODE(tracked.stat().st_mode), original_mode)
+                self.assertEqual(module._read_ordinary(private_source), original)
+                self.assertEqual(stat.S_IMODE(private_source.stat().st_mode), 0o600)
+
+    def test_expected_final_cli_rejects_leaf_and_parent_symlink_inputs(self):
+        """Break: resolving either new input hides symlinks before nofollow read."""
+        repository, capture, contract, source = _task4_real_inputs()
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = _new_run_root(base)
+            module.init_run_state(root, _task_identity_fields(repository), bootstrap_imports=[])
+            inputs = base / "inputs"
+            inputs.mkdir(mode=0o700)
+            capture_path = inputs / "documents.json"
+            capture_path.write_bytes(module.canonical_json_bytes(capture))
+            capture_path.chmod(0o600)
+            contract_path = inputs / "dispositions.json"
+            contract_path.write_bytes(module.canonical_json_bytes(contract))
+            contract_path.chmod(0o644)
+            inventory_path = inputs / "expected.json"
+            inventory_path.write_bytes(module._read_ordinary(repository / _TASK4_ARTIFACT))
+            inventory_path.chmod(0o644)
+            parent_link = base / "parent-link"
+            parent_link.symlink_to(inputs, target_is_directory=True)
+            args = ["documents-expected-final", "--repository", str(repository),
+                    "--capture", str(capture_path), "--dispositions", str(contract_path),
+                    "--spec-commit", _TASK4_S, "--verify-inventory", str(inventory_path)]
+            index_path = Path(module._run_git(repository, ["rev-parse", "--path-format=absolute", "--git-path", "index"]).decode("utf-8").strip())
+            files = [repository / p for p in list(source) + [
+                _TASK4_SEED, _TASK4_ARTIFACT, "scripts/qinao_convergence_audit.py",
+                "scripts/test_qinao_convergence_audit.py"]] + [
+                    capture_path, contract_path, inventory_path, index_path]
+            def state():
+                return ({str(p): (p.read_bytes(), p.lstat().st_mode, p.lstat().st_ino,
+                                  p.lstat().st_nlink, p.lstat().st_mtime_ns) for p in files},
+                        module._run_git(repository, ["for-each-ref", "--format=%(refname) %(objectname)"]))
+            before = state()
+            for role, original_path in (("--dispositions", contract_path),
+                                        ("--verify-inventory", inventory_path)):
+                leaf_link = base / (original_path.stem + "-leaf-link")
+                leaf_link.symlink_to(original_path)
+                for component, supplied in (("leaf", leaf_link),
+                                            ("parent", parent_link / original_path.name)):
+                    with self.subTest(role=role, component=component):
+                        target = list(args)
+                        target[target.index(role) + 1] = str(supplied)
+                        completed = subprocess.run(
+                            [sys.executable, "-I", "-S", "-B",
+                             str(repository / "scripts/qinao_convergence_audit.py"),
+                             "sterile-python", "--root", str(root), "--repository", str(repository),
+                             "--profile", "ledger", "--", *target],
+                            cwd=str(repository), env={"HOME": str(root / "home"),
+                                "TMPDIR": str(root / "tmp"), "LANG": "C", "LC_ALL": "C",
+                                "PATH": "/usr/bin:/bin"}, stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=180, check=False)
+                        self.assertEqual(state(), before)
+                        self.assertTrue(leaf_link.is_symlink())
+                        self.assertEqual(os.readlink(leaf_link), str(original_path))
+                        self.assertTrue(parent_link.is_symlink())
+                        self.assertEqual(os.readlink(parent_link), str(inputs))
+                        self.assertEqual(completed.returncode, 2, completed.stderr.decode("utf-8", "replace"))
+                        self.assertEqual(completed.stdout, b"")
+                        self.assertIn(b"path is not an ordinary file", completed.stderr)
+
+
+def _task4_external_expected_final(base, *, seed_source_path=None):
+    repository, capture, contract, source = _task4_real_inputs()
+    root = _new_run_root(base)
+    module.init_run_state(root, _task_identity_fields(repository), bootstrap_imports=[])
+    capture_path = base / "documents.json"
+    capture_path.write_bytes(module.canonical_json_bytes(capture))
+    capture_path.chmod(0o600)
+    seed_source_path = repository / _TASK4_SEED if seed_source_path is None else seed_source_path
+    source_contract = module.parse_canonical_json(module._read_ordinary(seed_source_path))
+    if source_contract != contract:
+        raise AssertionError("external fixture seed source differs from tracked contract")
+    contract_path = base / "dispositions.json"
+    contract_path.write_bytes(module.canonical_json_bytes(source_contract))
+    contract_path.chmod(0o644)
+    inventory_path = base / "expected.json"
+    expected = module.capture_expected_plan_spec_inventory(repository, capture, contract, spec_commit=_TASK4_S)
+    inventory_path.write_bytes(module.canonical_json_bytes(expected))
+    inventory_path.chmod(0o644)
+    if stat.S_IMODE(contract_path.stat().st_mode) != 0o644:
+        raise AssertionError("temporary CLI seed must exercise ordinary 0644 mode")
+    args = ["documents-expected-final", "--repository", str(repository), "--capture", str(capture_path),
+            "--dispositions", str(contract_path), "--spec-commit", _TASK4_S]
+    def state():
+        index_path = Path(module._run_git(repository, ["rev-parse", "--path-format=absolute", "--git-path", "index"]).decode("utf-8").strip())
+        return (index_path.read_bytes(),
+                module._run_git(repository, ["for-each-ref", "--format=%(refname) %(objectname)"]),
+                {p: (repository / p).read_bytes() for p in list(source) + [
+                    _TASK4_SEED, "scripts/qinao_convergence_audit.py", "scripts/test_qinao_convergence_audit.py"]})
+    before = state()
+    for mode, payload in [
+            (["--emit-inventory"], module.canonical_json_bytes(expected)),
+            (["--render-patch"], module.render_expected_plan_spec_patch(source, contract)),
+            (["--verify-inventory", str(inventory_path)], module.canonical_json_bytes(expected))]:
+        completed = _external_ledger_sterile(root, repository, args + mode)
+        if completed.stdout != payload:
+            raise AssertionError("external expected-final bytes drift: " + mode[0])
+    for invalid in ([], ["--emit-inventory", "--render-patch"],
+                    ["--emit-inventory", "--output", str(base / "forbidden")],
+                    ["--emit-inventory", "--H", _TASK4_C]):
+        with contextlib.redirect_stderr(io.StringIO()):
+            try:
+                module.main(args + invalid)
+            except SystemExit as exc:
+                if exc.code != 2:
+                    raise
+            else:
+                raise AssertionError("invalid expected-final CLI accepted")
+    if state() != before or (base / "forbidden").exists():
+        raise AssertionError("expected-final CLI changed tracked files/index/refs")
+    return {"command": "documents-expected-final", "recordDigest": expected["recordDigest"]}
+
+
 class DocumentInventoryTests(_ModuleRequired):
     @staticmethod
     def _real_commit(repository, tree, parents, message):
@@ -25885,6 +26440,7 @@ class ArchitectureHardeningTests(_ModuleRequired):
             "protected": ("_command_protected", "plain", ""),
             "topology": ("_command_topology", "plain", ""),
             "documents-capture": ("_command_documents_capture", "plain", ""),
+            "documents-expected-final": ("_command_documents_expected_final", "plain", ""),
             "documents-verify": ("_command_documents_verify", "plain", ""),
             "documents-lint": ("_command_documents_lint", "plain", ""),
             "diff-inventory": ("_command_diff_inventory", "plain", ""),
@@ -25952,7 +26508,7 @@ class ArchitectureHardeningTests(_ModuleRequired):
             frozenset(expected_inner_routes),
         )
         expected_surfaces = frozenset(expected_routes)
-        self.assertEqual(len(expected_surfaces), 38)
+        self.assertEqual(len(expected_surfaces), 39)
         self.assertEqual(module.PUBLIC_CLI_SURFACES, expected_surfaces)
         for handler_name, _style, auxiliary_name in expected_routes.values():
             self.assertTrue(callable(getattr(module, handler_name)))
@@ -26221,6 +26777,7 @@ class ArchitectureHardeningTests(_ModuleRequired):
             "snapshot-git-state", "frontier-start", "frontier-complete",
             "recover-captures", "protected", "topology",
             "documents-capture", "documents-verify", "documents-lint",
+            "documents-expected-final",
             "diff-inventory", "review-assignment-verify",
             "validate-remote-advertisement", "remote-object-revisions",
             "remote-object-disclosure", "secret-scan-worktree",
@@ -27316,7 +27873,7 @@ class FullRecoveryTests(_ModuleRequired):
 
     def test_all_public_surfaces_execute_non_help_semantics(self):
         expected = set(INDEPENDENT_PUBLIC_SURFACE_CASES)
-        self.assertEqual(len(expected), 37)
+        self.assertEqual(len(expected), 38)
         projections = {}
         child_pids = set()
         for command_name in sorted(expected):
@@ -27336,7 +27893,7 @@ class FullRecoveryTests(_ModuleRequired):
                 child_pids.add(projection["pid"])
                 projections[command_name] = projection
         self.assertEqual(set(projections), expected)
-        self.assertEqual(len(child_pids), 37)
+        self.assertEqual(len(child_pids), 38)
 
     def test_remaining_plain_cli_routes_execute_non_help_semantics(self):
         class BinaryStdout:

@@ -329,6 +329,7 @@ PUBLIC_COMMAND_ROUTE_SPEC = MappingProxyType(
         "protected": ("_command_protected", "plain", ""),
         "topology": ("_command_topology", "plain", ""),
         "documents-capture": ("_command_documents_capture", "plain", ""),
+        "documents-expected-final": ("_command_documents_expected_final", "plain", ""),
         "documents-verify": ("_command_documents_verify", "plain", ""),
         "documents-lint": ("_command_documents_lint", "plain", ""),
         "diff-inventory": ("_command_diff_inventory", "plain", ""),
@@ -35017,6 +35018,284 @@ def verify_document_transform(
     return final
 
 
+
+# Closed Task 4 source profile: immutable identities and reviewed dispositions.
+_TASK4_SOURCE_PROFILE = (
+    ("docs/superpowers/plans/2026-04-18-l1-l5-vertical-chain.md", "4cfb49a9680a869ece4a4c9306f728a289283189", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-19-l13-evolution-governance-spine-stage-1.md", "4e8c6a5d5d3abecc5f77100dc773e4aacee57744", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-19-l6-presence-spine-stage-1.md", "dbe8001128beec66a4ce869dfd28ad614b8d0508", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-20-l13-candidate-nursery-activation-stage-2.md", "a66e3755092a38cdc5302a48573881c7d0eed851", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-20-l13-evolution-furnace-full-body-master-spec-and-roadmap.md", "eb2cfdd90dd3e3cca1d199bf83cecfd8cadd76ff", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-20-l13-shadow-trial-theater-stage-3.md", "5707a30ce150c178fce4927e450a8498bd3945cb", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-04-20-l13-version-arboretum-retraction-furnace-stage-4.md", "f0c5ddc92492db36e3190deb6e46b8804348590b", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-architecture-convergence-master.md", "f991607ed749a161300c632f7512f878cfc903f0", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-contracts-layercell.md", "ec08d766a774657a15385fa55880b2c65cb31d17", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-runtime-replay-certification.md", "5fd41311f4e48993c7bd4ef89f9204f75e5a9c33", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-semantic-statelake-context.md", "7f234b388239d72dd3df842fdf318814441d9f93", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-silicon-execution-spine.md", "d78915f18b5ba0702dab959355f0b34fa0fe0952", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-15-iphone-air-sovereign-release-effects.md", "a2eff59752dddec5d8f245062bba20d57e76c742", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-07-19-qinao-coreai-agent-controlled-document-convergence.md", "0b75dc69fe4c64c3977e35cceef57f2d0f4dcea2", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-artifact-mesh-w1-task0.md", "6347a4a3527989b5f8d81427495bcb656df2fcfe", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-authority-ledger-and-cw-evidence.md", "87670a961c19dea47713f99ef582ff3e1839cc6f", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-bootstrap-verifier-and-admission-lineage.md", "6fbc59a212d7a0768f61c1d3ad369f0f300d9756", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-c0-provenance-and-safe-import.md", "2eba8758a549caed16832c01797236785dcc1ef8", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-clean-candidate-reconstruction-and-controlled-convergence.md", "5ed4a503dedb8aee583c21d01ae818b188c5f89f", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-23-qinao-w0-safety-and-k4-proof.md", "4ad1f20dda9b7261844c2de79efbacf2cc06f505", "historical-only", "historical-source-marker"),
+    ("docs/superpowers/plans/2026-07-29-qinao-dual-space-automation-controlled-convergence.md", "3c32def5329705fa193150f3bbb74332d759ba2c", "supersede", "forward-development-control"),
+    ("docs/superpowers/plans/2026-08-24-qinao-p0-execution-containment.md", "dc39773c6172a230022282a53e10f0fc3dea6f64", "historical-only", "historical-evidence"),
+    ("docs/superpowers/plans/2026-08-29-qinao-a03-source-identity-freeze-and-authority-gate.md", "e2c42adaecaa7c3e83406ea2d3e623e633622326", "historical-only", "historical-evidence"),
+    ("docs/superpowers/plans/2026-08-29-qinao-git-only-convergence-and-lightweight-pr.md", "113db5a316dc624035a6c1b82aa77d5954121fcb", "unrelated", "current-reviewed-plan"),
+    ("docs/superpowers/specs/2026-04-18-l1-l5-vertical-chain-design.md", "a71a512a3f3bf3e113bc3ce3acdf135323662def", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-19-l13-evolution-governance-spine-stage-1-design.md", "2fff4202ac21289e13c33630809d34076e44fd13", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-19-l6-presence-spine-stage-1-design.md", "8464b0f89bc9c465dc6fae9b7866b1ab9cc5b3d3", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-19-l8-temporal-memory-field-stage-1-design.md", "41a181b89629f30f22acb7adba1d059466a72961", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-20-l13-candidate-nursery-activation-stage-2-design.md", "783bf0831a97c2dd3c8632bcf95d223f959e6707", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-20-l13-evolution-furnace-full-body-master-design.md", "b4052f2244ec7f5931e653852a4e9dd32fb359d3", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-20-l13-shadow-trial-theater-stage-3-design.md", "99a56a65e7bc1a2c7937d170107e4d85a8c82f91", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-04-20-l13-version-arboretum-retraction-furnace-stage-4-design.md", "f9a8c18b11817347cb564f8c1d2199b97356034c", "unrelated", "unrelated-product-scope"),
+    ("docs/superpowers/specs/2026-07-14-iphone-air-future-apple-silicon-architecture-design.md", "6c3f999ddd610e320ac02d3d89584aaa1f6e1279", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-17-k3-budget-provider-contract-addendum-design.md", "c24709091780c033ba7e2c75b69c3a37d4c51cc8", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-19-qinao-coreai-agent-context-memory-rsi-design.md", "83c132fabdb0f434852b2b3d9afffd0890192adf", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-22-qinao-model-independent-app-agent-self-design.md", "d1f4f5a707e2e54b1e9d5b61ab5eb63de29bf6d4", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-23-qinao-convergence-correction-and-clean-candidate-design.md", "e65b3a5a270403a42b02a341c73700b78ec1ab1e", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-23-qinao-governed-learning-plane-data-flywheel-thinking-design.md", "75a34022593ea2d85405021e75272d7c7f0c2af1", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-24-qinao-dynamic-agent-graph-workflow-design.md", "e2c59656f9eb184efc3ab933fe442c9dd0b7d507", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-07-29-qinao-dual-space-automation-apple-ecosystem-design.md", "bbc586cb5787d872f8980f95a766f8afa90f9221", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-08-02-qinao-biomimetic-sovereign-agent-system-design.md", "f3d4186769fd0119a418097fea8821d597770189", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-08-10-qinao-global-invariant-firewall-and-recovery-design.md", "887c23a28fb9098d86d252aa8b6dc9153380738b", "supersede", "forward-development-control"),
+    ("docs/superpowers/specs/2026-08-24-qinao-p0-execution-containment-design.md", "33bdd35425f114984479ec74215bef02c873b751", "historical-only", "historical-evidence"),
+    ("docs/superpowers/specs/2026-08-28-qinao-recovery-spine-and-deep-scan-closure-design.md", "84346d35c8f366dca792f0c2e9fdbfb5161dc584", "historical-only", "historical-evidence"),
+    ("docs/superpowers/specs/2026-08-29-qinao-single-developer-git-and-lightweight-pr-design.md", "7212afb0b29d83d8695ab8ae1b7f042b87400863", "unrelated", "current-policy"),
+    ("docs/superpowers/specs/qinao-owner-ledger-v1.json", "64834006f035a21300d64d0fc41b945f75b10c52", "historical-only", "historical-evidence"),
+)
+_TASK4_REVIEW_REASONS = {
+    "current-policy": "current-policy",
+    "current-reviewed-plan": "current-reviewed-plan",
+    "unrelated-product-scope": "Unrelated product/runtime scope; preserve the exact source blob under the reviewed Task4 disposition.",
+    "historical-source-marker": "Pre-existing exact historical-only registry marker; preserve the source blob without a second pointer.",
+    "historical-evidence": "Preserve historical evidence unchanged under the reviewed Task4 disposition; do not infer completed work or current authority from this classification.",
+    "forward-development-control": "Contains forward development-control gates retired by the approved single-owner Git route and has no pre-existing historical-only marker."
+}
+_TASK4_IDENTITIES = {
+    "C": ("91bfb4c851279235ccde2ec21902c6a4c83555ee", "3a1674651a95e91b321b637b801db66d71e6fafb"),
+    "mergeBase": ("243c083f345f3586ef226020d42af4653b31a62a", "90533f698f86cef275106509bc4e7241cbd60d88"),
+    "parent4a": ("4a9298db261bcfda97ea1748baad65649156ba66", "22382c1de6680a263ec4a2f4a6c989c0f0e6e220"),
+    "parentD": ("e602fe41ca74efad44ef00a3a34c930cfe41e2ce", "611485101ef1c843bf1173ebd22e986e2a10a910"),
+    "S": ("fba300fc9e040d2f5d9d08cd158fa3321dc36b93", "6e23fba9f09edcc56eb9692ef76df0006d8c2d4a"),
+}
+_TASK4_HISTORICAL_SPANS = {
+    "docs/superpowers/plans/2026-08-24-qinao-p0-execution-containment.md": (
+        (2543, 482, "747b5e3f079d859f60f8e4a3eb667accf7bb9ec4d0b511f9895bf2c8c709b333"),),
+    "docs/superpowers/plans/2026-08-29-qinao-a03-source-identity-freeze-and-authority-gate.md": (
+        (81, 905, "3bc7fe8a5825d9b762444db6dd39be886e968e38f3139ea1d85b402711982870"),),
+    "docs/superpowers/specs/2026-08-24-qinao-p0-execution-containment-design.md": (
+        (41, 665, "8a502283a1ebe7d8ada42ab3261d59694d01115a03d36500d50663d455c12723"),),
+    "docs/superpowers/specs/2026-08-28-qinao-recovery-spine-and-deep-scan-closure-design.md": (
+        (74, 197, "c30fc56408ac2a9a67912be542d92df39d9717eff051545c963083fc08af076a"),
+        (1056, 365, "4d777c89d1bdc5f4b5f6f0f3c917524057ec0b501523bdb84ba1809781219a23")),
+    "docs/superpowers/specs/qinao-owner-ledger-v1.json": (
+        (0, 80033, "27b05cc556e1403183c3a17c1a79253b877f8f4cda0b283964e25a7c90b75e77"),),
+}
+_TASK4_TRANSFORM = "insert-qinao-git-only-forward-pointer-v1"
+
+
+def _task4_expected_documents(source, contract):
+    """Validate the frozen source/seed and derive transient shared final bytes."""
+    verify_document_disposition_contract(source, contract)
+    if list(source) != [row[0] for row in _TASK4_SOURCE_PROFILE]:
+        raise AuditError("Task 4 source path order/set drift")
+    seen_oids = set()
+    result = []
+    historical_marker = b"> **QINAO-PLAN-REGISTRY-V1: SUPERSEDED_HISTORICAL**\n"
+    annex_marker = b"> **QINAO-PLAN-REGISTRY-V1: ACTIVE_TASKS_0_2_ANNEX**\n"
+    annex = "docs/superpowers/plans/2026-07-29-qinao-dual-space-automation-controlled-convergence.md"
+    for (path, oid, disposition, reason_code), seed in zip(_TASK4_SOURCE_PROFILE, contract["entries"]):
+        item = source[path]
+        payload = item["bytes"]
+        if (item["mode"] != "100644" or item["oid"] != oid or oid in seen_oids
+                or _git_object_id("blob", payload, 40) != oid):
+            raise AuditError("Task 4 source object drift: " + path)
+        seen_oids.add(oid)
+        if (seed["disposition"] != disposition
+                or seed["reviewReason"] != _TASK4_REVIEW_REASONS[reason_code]):
+            raise AuditError("Task 4 frozen disposition/reviewReason drift: " + path)
+        evidence = []
+        if path.endswith(".md"):
+            lines = payload.splitlines(keepends=True)
+            if not lines or not re.fullmatch(rb"# [^\r\n]+\n", lines[0]):
+                raise AuditError("Task 4 source H1 drift: " + path)
+            evidence.append("line:1:sha256:" + _sha256(lines[0]))
+            if reason_code == "historical-source-marker":
+                if len(lines) < 3 or lines[2] != historical_marker:
+                    raise AuditError("Task 4 historical source marker drift: " + path)
+                evidence.append(historical_marker.decode("ascii"))
+            elif historical_marker in lines:
+                raise AuditError("Task 4 unclassified historical source marker: " + path)
+            if path == annex:
+                if len(lines) < 3 or lines[2] != annex_marker:
+                    raise AuditError("Task 4 active annex marker drift")
+                evidence.append(annex_marker.decode("ascii"))
+        for offset, length, digest in _TASK4_HISTORICAL_SPANS.get(path, ()):
+            span = payload[offset:offset + length]
+            if len(span) != length or _sha256(span) != digest:
+                raise AuditError("Task 4 historical source evidence drift: " + path)
+            evidence.append("bytes:%d:%d:sha256:%s" % (offset, length, digest))
+        pointer = qinao_forward_pointer(path) if disposition == "supersede" else None
+        final = expected_final_bytes(payload, disposition, pointer)
+        verify_document_transform(payload, final, disposition, pointer)
+        result.append((path, item, seed, reason_code, evidence, final))
+    return result
+
+
+def capture_expected_plan_spec_inventory(repository, capture, contract, *, spec_commit):
+    """Sole no-H constructor, reopening immutable history, never HEAD/worktree."""
+    repository = Path(repository)
+    if spec_commit != _TASK4_IDENTITIES["S"][0]:
+        raise AuditError("Task 4 spec commit drift")
+    capture = _verify_documents_capture_record(capture)
+    identities = {}
+    for role, (oid, tree) in _TASK4_IDENTITIES.items():
+        if role != "S" and capture[role] != oid:
+            raise AuditError("Task 4 immutable " + role + " drift")
+        try:
+            observed_tree = _ascii_git_line(
+                repository, ["rev-parse", "--verify", oid + "^{tree}"],
+                "Task 4 immutable tree",
+            )
+        except AuditError as exc:
+            raise AuditError("Task 4 missing immutable object: " + oid) from exc
+        if observed_tree != tree:
+            raise AuditError("Task 4 immutable tree drift: " + role)
+        identities[role] = oid
+        identities[role + "Tree"] = tree
+    topology = _GitTopologyAdapter(repository)
+    if topology.ordered_parents(identities["C"]) != [identities["parent4a"], identities["parentD"]]:
+        raise AuditError("Task 4 C ordered parents drift")
+    if _run_git(repository, ["merge-base", "--all", identities["parent4a"], identities["parentD"]]) != (identities["mergeBase"] + "\n").encode("ascii"):
+        raise AuditError("Task 4 unique merge base drift")
+    if topology.ordered_parents(spec_commit) != ["5f17569d902da9d7a024c99158c44cbb72c34131"]:
+        raise AuditError("Task 4 spec commit parent drift")
+    if not topology.is_ancestor("5c87355d5870b8559cadbe3105adbbb86f2008e7", spec_commit):
+        raise AuditError("Task 4 required design ancestry drift")
+    if topology.ordered_parents(identities["parentD"]) != [spec_commit]:
+        raise AuditError("Task 4 D sole spec parent drift")
+    plan = "docs/superpowers/plans/2026-08-29-qinao-git-only-convergence-and-lightweight-pr.md"
+    path_b64 = base64.b64encode(plan.encode("ascii")).decode("ascii")
+    raw_delta = _run_git(repository, [
+        "diff", "--raw", "-z", "--full-index", "--no-abbrev", "--no-renames",
+        "--no-ext-diff", "--no-textconv", spec_commit, identities["parentD"], "--",
+    ])
+    if parse_raw_diff_z(raw_delta, "sha1") != [RawDiffEntry(
+            "000000", "100644", "0" * 40, "113db5a316dc624035a6c1b82aa77d5954121fcb",
+            "A", path_b64, path_b64)]:
+        raise AuditError("Task 4 complete S-to-D plan-only delta drift")
+    regenerated = capture_documents_contract(
+        repository, C=identities["C"], merge_base=identities["mergeBase"],
+        parent_4a=identities["parent4a"], parent_D=identities["parentD"],
+    )
+    if regenerated != capture:
+        raise AuditError("Task 4 source capture cannot be reopened")
+    source = capture_plan_spec_inventory(repository, identities["C"])
+    documents = _task4_expected_documents(source, contract)
+    three_way = {row["path"]: row for row in regenerated["threeWay"]["entries"]}
+    for role in ("S", "parentD", "C"):
+        objects = _parse_ls_tree_z(_run_git(repository, [
+            "ls-tree", "-z", "--full-tree", identities[role], "--", QINAO_SUPERSEDING_DOCUMENT,
+        ]))
+        if objects != {QINAO_SUPERSEDING_DOCUMENT.encode("ascii"):
+                       ("100644", "blob", "7212afb0b29d83d8695ab8ae1b7f042b87400863")}:
+            raise AuditError("Task 4 approved specification object drift: " + role)
+        payload = _run_git(repository, ["cat-file", "blob", objects[QINAO_SUPERSEDING_DOCUMENT.encode("ascii")][2]])
+        if payload != source[QINAO_SUPERSEDING_DOCUMENT]["bytes"]:
+            raise AuditError("Task 4 approved specification bytes drift: " + role)
+    entries, source_projection, final_projection = [], [], []
+    for path, item, seed, reason_code, evidence, final in documents:
+        raw = path.encode("ascii", "strict")
+        encoded = base64.b64encode(raw).decode("ascii")
+        objects = {key: dict(three_way[path][key]) for key in (
+            "mergeBaseObject", "parent1Object", "parent2Object")}
+        if reason_code == "historical-source-marker" and objects["parent1Object"] != {
+                "mode": "100644", "type": "blob", "oid": item["oid"]}:
+            raise AuditError("Task 4 historical 4a source object drift: " + path)
+        row = dict(
+            pathB64=encoded, displayPath=path, sourceMode="100644", sourceType="blob",
+            sourceBlobOid=item["oid"], sourceSha256=_sha256(item["bytes"]), **objects,
+            disposition=seed["disposition"], reasonCode=reason_code, reviewReason=seed["reviewReason"],
+            sourceLineEvidence=evidence, permittedTransformation=seed["permittedTransformation"],
+            expectedFinalPathB64=encoded, expectedFinalMode="100644", expectedFinalType="blob",
+            expectedFinalBlobOid=_git_object_id("blob", final, 40), expectedFinalSha256=_sha256(final),
+        )
+        entries.append(row)
+        source_projection.append(dict(pathB64=encoded, mode="100644", type="blob",
+            blobOid=row["sourceBlobOid"], sha256=row["sourceSha256"], **objects))
+        final_projection.append(dict(pathB64=encoded, mode="100644", type="blob",
+            blobOid=row["expectedFinalBlobOid"], sha256=row["expectedFinalSha256"]))
+    paths_digest = _sha256(b"".join(path.encode("ascii") + b"\0" for path, *_ in documents))
+    return _self_digest_record(dict(
+        schemaVersion="qinao.plan-spec-source-final.v1", **identities,
+        supersedingPath=QINAO_SUPERSEDING_DOCUMENT,
+        specBlobOid="7212afb0b29d83d8695ab8ae1b7f042b87400863",
+        sourceCaptureDigest=regenerated["recordDigest"],
+        dispositionDigest=_sha256(canonical_json_bytes(contract)),
+        entryCount=len(entries), entries=entries,
+        sourcePathListSha256=paths_digest, expectedFinalPathListSha256=paths_digest,
+        sourceRecordsSha256=_sha256(canonical_json_bytes(source_projection)),
+        expectedFinalRecordsSha256=_sha256(canonical_json_bytes(final_projection)),
+        pointerTransformId=_TASK4_TRANSFORM,
+        pointerBytesSha256={role: _sha256(qinao_forward_pointer(
+            "docs/superpowers/" + role + "/placeholder.md")) for role in ("plans", "specs")},
+    ))
+
+
+def verify_expected_plan_spec_inventory(repository, capture, contract, expected, *, spec_commit):
+    """Reject closed-shape or caller-rehashed drift by regenerating every field."""
+    expected = _require_mapping(expected, "Task 4 expected inventory")
+    regenerated = capture_expected_plan_spec_inventory(
+        repository, capture, contract, spec_commit=spec_commit)
+    if set(expected) != set(regenerated):
+        raise AuditError("Task 4 expected inventory root field drift")
+    _verify_self_digest(expected)
+    rows = expected.get("entries")
+    if not isinstance(rows, list) or len(rows) != len(regenerated["entries"]):
+        raise AuditError("Task 4 expected inventory entries count drift")
+    for actual, wanted in zip(rows, regenerated["entries"]):
+        actual = _require_mapping(actual, "Task 4 expected entry")
+        if set(actual) != set(wanted):
+            raise AuditError("Task 4 expected entry field drift")
+        for field in wanted:
+            if actual[field] != wanted[field] or type(actual[field]) is not type(wanted[field]):
+                raise AuditError("Task 4 expected entry " + field + " drift: " + wanted["displayPath"])
+    for field in regenerated:
+        if expected[field] != regenerated[field] or type(expected[field]) is not type(regenerated[field]):
+            raise AuditError("Task 4 expected inventory " + field + " drift")
+    return regenerated
+
+
+def render_expected_plan_spec_patch(source, contract):
+    """Pure, frozen 17-insertion apply_patch output; never writes a path."""
+    documents = _task4_expected_documents(source, contract)
+    hunks = []
+    for path, item, seed, _reason, _evidence, final in documents:
+        if seed["disposition"] != "supersede":
+            continue
+        payload = item["bytes"]
+        boundary = payload.index(b"\n") + 1
+        insertion_length = len(final) - len(payload)
+        insertion = final[boundary:boundary + insertion_length]
+        if final[:boundary] + final[boundary + insertion_length:] != payload:
+            raise AuditError("Task 4 renderer is not insertion-only")
+        if any(char in path for char in "\r\n\0") or not path.isascii():
+            raise AuditError("Task 4 patch header drift")
+        hunk = b"*** Update File: " + path.encode("ascii") + b"\n@@\n "
+        hunk += payload[:boundary]
+        hunk += b"".join(b"+" + line for line in insertion.splitlines(keepends=True))
+        hunk += b" " + payload[boundary:].split(b"\n", 1)[0] + b"\n"
+        hunks.append(hunk)
+    if len(hunks) != 17:
+        raise AuditError("Task 4 patch hunk count drift")
+    return b"*** Begin Patch\n" + b"".join(hunks) + b"*** End Patch\n"
+
+
 def merge_inventory_maps(
     base: Mapping[bytes, bytes],
     left: Mapping[bytes, bytes],
@@ -47354,6 +47633,37 @@ def _command_documents_capture(argv: Sequence[str]) -> int:
         parent_D=options.parent_D,
     )
     return _persist_result(options.output, record)
+
+
+def _command_documents_expected_final(argv: Sequence[str]) -> int:
+    parser = argparse.ArgumentParser(prog="documents-expected-final", allow_abbrev=False)
+    parser.add_argument("--repository", required=True)
+    parser.add_argument("--capture", required=True)
+    parser.add_argument("--dispositions", required=True)
+    parser.add_argument("--spec-commit", required=True)
+    modes = parser.add_mutually_exclusive_group(required=True)
+    modes.add_argument("--emit-inventory", action="store_true")
+    modes.add_argument("--render-patch", action="store_true")
+    modes.add_argument("--verify-inventory")
+    options = parser.parse_args(list(argv))
+    repository = Path(options.repository)
+    capture = _read_record(options.capture)
+    # Tracked JSON uses ordinary Git checkout modes, not private ledger modes.
+    contract = parse_canonical_json(_read_ordinary(Path(options.dispositions)))
+    if options.verify_inventory is not None:
+        return _emit_canonical(verify_expected_plan_spec_inventory(
+            repository, capture, contract,
+            parse_canonical_json(_read_ordinary(Path(options.verify_inventory))),
+            spec_commit=options.spec_commit))
+    inventory = capture_expected_plan_spec_inventory(
+        repository, capture, contract, spec_commit=options.spec_commit)
+    if options.render_patch:
+        patch = render_expected_plan_spec_patch(
+            capture_plan_spec_inventory(repository, inventory["C"]), contract)
+        sys.stdout.buffer.write(patch)
+        sys.stdout.buffer.flush()
+        return 0
+    return _emit_canonical(inventory)
 
 
 def _verify_inventory_record(record: Mapping[str, Any]) -> Dict[str, Any]:
