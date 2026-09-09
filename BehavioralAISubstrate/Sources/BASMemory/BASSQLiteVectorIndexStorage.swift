@@ -266,9 +266,10 @@ public actor BASSQLiteVectorIndexStorage {
         return try Self.countAll(db: db)
     }
 
-    /// Bulk-fetch all entries (for preload at session start)。
-    /// Order: insertion order via `created_at_ms` ASC fallback to
-    /// `atom_id` ASC for stable deterministic replay。
+    /// Best-effort bulk-fetch of all entries (for legacy preload at session start)。
+    /// Order: `atom_id` ASC for stable deterministic replay。
+    /// An empty default is not proof that an authoritative recovery scan completed;
+    /// use `allEntriesOrThrow()` for that contract.
     public func allEntries() async -> [BASVectorIndexEntry] {
         guard let db else { return [] }
         do { return try Self.fetchAll(db: db) }
@@ -308,6 +309,17 @@ public actor BASSQLiteVectorIndexStorage {
             }
         }
         return loaded
+    }
+
+    /// Authoritative all-or-nothing startup merge. The durable scan must complete and
+    /// the full batch must validate before the destination changes. Existing destination
+    /// entries absent from the durable batch are retained; this is an upsert, not replace-all.
+    public func preloadOrThrow(
+        into index: BASVectorIndex
+    ) async throws -> Int {
+        let entries = try await allEntriesOrThrow()
+        try await index.upsertAll(entries)
+        return entries.count
     }
 
     // MARK: - Schema setup
@@ -560,7 +572,8 @@ public actor BASSQLiteVectorIndexStorage {
         }
         defer { sqlite3_finalize(stmt) }
         var out: [BASVectorIndexEntry] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var stepRC = sqlite3_step(stmt)
+        while stepRC == SQLITE_ROW {
             let atomID = readText(stmt, 0)
             // Use a 5-col window starting from index 1
             // (skip atom_id which we already read)
@@ -569,6 +582,12 @@ public actor BASSQLiteVectorIndexStorage {
                 atomID: atomID,
                 offset: 1)
             out.append(entry)
+            stepRC = sqlite3_step(stmt)
+        }
+        guard stepRC == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
         }
         return out
     }

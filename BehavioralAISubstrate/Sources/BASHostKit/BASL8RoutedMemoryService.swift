@@ -92,6 +92,14 @@ public typealias BASMetalCosineTopKSeam =
     @Sendable (_ query: [Float], _ corpus: [Float], _ dim: Int, _ k: Int)
         -> [(rowIndex: Int, score: Float)]?
 
+/// Shape failures that make a durable embedding unusable by the configured
+/// routed-memory query space. Zero vectors are valid; only exact dimension and
+/// finite components are required.
+public enum BASRoutedMemoryRecoveryError: Error, Equatable, Sendable {
+    case embeddingDimensionMismatch(atomID: String, expected: Int, got: Int)
+    case nonFiniteEmbedding(atomID: String)
+}
+
 public struct BASRoutedMemoryPersistence: Sendable {
     public let loadAllAtoms: @Sendable () async -> [BASGovernedMemory]
     public let admitAtom: @Sendable (BASGovernedMemory) async -> Void
@@ -102,6 +110,13 @@ public struct BASRoutedMemoryPersistence: Sendable {
     /// path UPSERTS each self-populated atom's embedding — so embeddings survive restart too.
     public let loadEmbedding: (@Sendable (_ atomID: String) async -> [Float]?)?
     public let upsertEmbedding: (@Sendable (_ atomID: String, _ embedding: [Float], _ domain: String) async -> Void)?
+    /// Additive strict siblings. A host that can surface durable read errors should
+    /// provide these; the factory prefers them over the legacy best-effort hooks. Errors
+    /// already swallowed inside a legacy callback cannot be recovered by this layer.
+    public let loadAllAtomsOrThrow:
+        (@Sendable () async throws -> [BASGovernedMemory])?
+    public let loadEmbeddingOrThrow:
+        (@Sendable (_ atomID: String) async throws -> [Float]?)?
     /// chapter 一千〇六十二 / WS3 — OPTIONAL host-injected cosineTopK seam (the perf-fast L8 retrieve
     /// takeover, ADR-036). nil ⇒ the orchestrated score-all path (byte-equal-off, ADR-014). When wired,
     /// the host backs it with a cosineTopK-capable routed index (`BASRoutedVectorIndexStorage`) for the
@@ -128,6 +143,10 @@ public struct BASRoutedMemoryPersistence: Sendable {
         atomStore: any BASMemoryAtomStore,
         loadEmbedding: (@Sendable (String) async -> [Float]?)? = nil,
         upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil,
+        loadAllAtomsOrThrow:
+            (@Sendable () async throws -> [BASGovernedMemory])? = nil,
+        loadEmbeddingOrThrow:
+            (@Sendable (String) async throws -> [Float]?)? = nil,
         cosineTopKSync: (@Sendable (_ query: [Float], _ k: Int)
             -> [(atomID: String, score: Float)])? = nil,
         globalRecall: BASGlobalRecallSeam? = nil,
@@ -139,6 +158,8 @@ public struct BASRoutedMemoryPersistence: Sendable {
         self.atomStore = atomStore
         self.loadEmbedding = loadEmbedding
         self.upsertEmbedding = upsertEmbedding
+        self.loadAllAtomsOrThrow = loadAllAtomsOrThrow
+        self.loadEmbeddingOrThrow = loadEmbeddingOrThrow
         self.cosineTopKSync = cosineTopKSync
         self.globalRecall = globalRecall
         self.metalCosineTopK = metalCosineTopK
@@ -202,9 +223,10 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     /// production; `lexicalEmbed(...)` is the model-free default.
     public typealias SyncEmbed = @Sendable (String) -> [Float]
 
-    /// Async source of the atoms to materialize into the retrieval snapshot. The host wires this
-    /// to its concrete store (e.g. `{ (try? await sqliteStore.allAtoms()) ?? [] }`); the bulk-read
-    /// is intentionally NOT on the `BASMemoryAtomStore` protocol, so it is supplied as a closure.
+    /// Legacy best-effort source of the atoms to materialize into the retrieval snapshot. A host
+    /// that needs read failures to preserve the prior snapshot must also provide the throwing
+    /// sibling; an error swallowed here cannot be reconstructed by `refreshOrThrow()`.
+    /// The bulk-read is intentionally NOT on `BASMemoryAtomStore`, so it is supplied as a closure.
     public typealias LoadAllAtoms = @Sendable () async -> [BASGovernedMemory]
 
     // MARK: - Injected dependencies
@@ -249,12 +271,18 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     /// so recall survives restart (with a `loadAllAtoms` that reads the same store). The host wires
     /// this (BASHostKit can't take a concrete-store generic); nil ⇒ pure in-memory (no persistence).
     private let admitAtom: (@Sendable (BASGovernedMemory) async -> Void)?
-    /// Phase 2 — OPTIONAL durable vector-index consumption. `loadEmbedding` reads a persisted vector
-    /// (atomID-keyed) so `refresh()` can skip the CoreML re-embed; `upsertEmbedding` writes each
-    /// self-populated atom's vector so it survives restart. Both nil ⇒ Phase-1 re-embed-on-refresh.
-    /// Touched ONLY in async refresh()/drainIntents() — never in the sync retrieve() hot path (ch883).
+    /// Phase 2 — OPTIONAL durable vector-index consumption. The legacy `loadEmbedding` reads a
+    /// persisted vector (atomID-keyed) so `refresh()` can skip the CoreML re-embed;
+    /// `upsertEmbedding` writes each self-populated atom's vector so it survives restart. Hosts that
+    /// need read failures to abort recovery must also provide `loadEmbeddingOrThrow`. Both load
+    /// hooks nil ⇒ Phase-1 re-embed-on-refresh. Touched ONLY in async refresh()/drainIntents() —
+    /// never in the sync retrieve() hot path (ch883).
     private let loadEmbedding: (@Sendable (String) async -> [Float]?)?
     private let upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)?
+    private let loadAllAtomsOrThrow:
+        (@Sendable () async throws -> [BASGovernedMemory])?
+    private let loadEmbeddingOrThrow:
+        (@Sendable (String) async throws -> [Float]?)?
     /// chapter 一千〇六十二 / WS3 — OPTIONAL host-injected perf-fast retrieve seam. When wired,
     /// `retrieve()` ranks via the index's integrated cosine top-K (1 FFI call returning
     /// (atomID, score)) instead of scoring every snapshot atom in Swift. nil ⇒ the orchestrated
@@ -301,6 +329,10 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         admitAtom: (@Sendable (BASGovernedMemory) async -> Void)? = nil,
         loadEmbedding: (@Sendable (String) async -> [Float]?)? = nil,
         upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil,
+        loadAllAtomsOrThrow:
+            (@Sendable () async throws -> [BASGovernedMemory])? = nil,
+        loadEmbeddingOrThrow:
+            (@Sendable (String) async throws -> [Float]?)? = nil,
         cosineTopKSync: (@Sendable (_ query: [Float], _ k: Int)
             -> [(atomID: String, score: Float)])? = nil,
         globalRecall: BASGlobalRecallSeam? = nil,
@@ -319,6 +351,8 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         self.admitAtom = admitAtom
         self.loadEmbedding = loadEmbedding
         self.upsertEmbedding = upsertEmbedding
+        self.loadAllAtomsOrThrow = loadAllAtomsOrThrow
+        self.loadEmbeddingOrThrow = loadEmbeddingOrThrow
         self.cosineTopKSync = cosineTopKSync
         self.globalRecall = globalRecall
         self.metalCosineTopK = metalCosineTopK
@@ -567,11 +601,113 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
 
     // MARK: - Async session-boundary operations
 
-    /// Rebuild the retrieval snapshot from the atom store. Runs off the turn hot path (call at session
-    /// start / between turns). Each atom's embedding is LOADED from the durable vector index when one
-    /// is wired and present (dimension-consistent) — avoiding a CoreML re-embed; otherwise it is
-    /// computed via the SYNC embedder and lazily BACKFILLED into the index for next time.
+    /// Best-effort compatibility refresh. Legacy-only loaders retain their historical
+    /// semantics. When an authoritative loader is configured, a read/shape failure keeps
+    /// the last complete snapshot instead of publishing an empty or partial replacement.
     public func refresh() async {
+        if loadAllAtomsOrThrow != nil || loadEmbeddingOrThrow != nil {
+            _ = try? await refreshOrThrow()
+            return
+        }
+        await refreshLegacy()
+    }
+
+    /// Rebuild the retrieval snapshot from one complete set of durable reads. All atom and vector
+    /// reads finish before any fallback embedding, repair backfill, or single snapshot publication.
+    /// Strict hooks take precedence; a legacy callback cannot expose an error it already swallowed.
+    /// This is not a transaction across the atom and vector databases, nor across concurrent refresh
+    /// calls. A host should invoke it serially at a session boundary while related writes are quiescent.
+    @discardableResult
+    public func refreshOrThrow() async throws -> Int {
+        let governed: [BASGovernedMemory]
+        if let loadAllAtomsOrThrow {
+            governed = try await loadAllAtomsOrThrow()
+        } else {
+            governed = await loadAllAtoms()
+        }
+
+        var loaded: [(record: BASGovernedMemory, persisted: [Float]?)] = []
+        loaded.reserveCapacity(governed.count)
+        for record in governed {
+            let id = record.id.uuidString
+            let persisted: [Float]?
+            if let loadEmbeddingOrThrow {
+                persisted = try await loadEmbeddingOrThrow(id)
+            } else if let loadEmbedding {
+                persisted = await loadEmbedding(id)
+            } else {
+                persisted = nil
+            }
+            loaded.append((record, persisted))
+        }
+
+        for item in loaded {
+            if let persisted = item.persisted {
+                try validateRecoveryEmbedding(
+                    persisted,
+                    atomID: item.record.id.uuidString
+                )
+            }
+        }
+
+        var entries: [SnapshotEntry] = []
+        var backfills: [(id: String, embedding: [Float], domain: String)] = []
+        entries.reserveCapacity(loaded.count)
+        backfills.reserveCapacity(loaded.count)
+        for item in loaded {
+            let atom = Self.memoryAtom(from: item.record)
+            let id = atom.memoryID
+            let embedding: [Float]
+            if let persisted = item.persisted {
+                embedding = persisted
+            } else {
+                let computed = syncEmbed(atom.summary)
+                try validateRecoveryEmbedding(computed, atomID: id)
+                embedding = computed
+                if upsertEmbedding != nil {
+                    backfills.append((id, computed, item.record.sourceType))
+                }
+            }
+            entries.append(SnapshotEntry(
+                atomID: id,
+                domain: item.record.sourceType,
+                embedding: embedding,
+                atom: atom
+            ))
+        }
+
+        if let upsertEmbedding {
+            for backfill in backfills {
+                await upsertEmbedding(
+                    backfill.id,
+                    backfill.embedding,
+                    backfill.domain
+                )
+            }
+        }
+        withLock { snapshot = entries }
+        return entries.count
+    }
+
+    private func validateRecoveryEmbedding(
+        _ embedding: [Float],
+        atomID: String
+    ) throws {
+        guard embedding.count == embeddingDimension else {
+            throw BASRoutedMemoryRecoveryError.embeddingDimensionMismatch(
+                atomID: atomID,
+                expected: embeddingDimension,
+                got: embedding.count
+            )
+        }
+        guard embedding.allSatisfy(\.isFinite) else {
+            throw BASRoutedMemoryRecoveryError.nonFiniteEmbedding(atomID: atomID)
+        }
+    }
+
+    /// Historical nonthrowing path for callers that only supplied best-effort hooks.
+    /// A dimension miss remains an intentional fallback/backfill request.
+    private func refreshLegacy() async {
         let governed = await loadAllAtoms()
         var entries: [SnapshotEntry] = []
         entries.reserveCapacity(governed.count)

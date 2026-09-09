@@ -245,8 +245,9 @@ public struct BASCognitiveOSBundle: Sendable {
     /// Optional SQLite-backed vector storage (G4, M849)。
     /// Only populated when caller passed
     /// `options.vectorIndexSQLiteURL`。Caller calls
-    /// `vectorIndexStorage.preload(into: vectorIndex)` at
-    /// session start to restore index from disk。
+    /// `vectorIndexStorage.preloadOrThrow(into: vectorIndex)` at
+    /// session start for authoritative recovery from disk. The legacy
+    /// `preload(into:)` sibling remains best-effort.
     public let vectorIndexStorage:
         BASSQLiteVectorIndexStorage?
 

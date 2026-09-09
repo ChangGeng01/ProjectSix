@@ -363,8 +363,10 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
 
     // MARK: - Convenience surface (parity with in-memory store)
 
-    /// Total number of atoms in the database. Mirrors
+    /// Best-effort total number of atoms in the database. Mirrors
     /// `BASInMemoryMemoryAtomStore.count`.
+    /// The default `0` is not proof that an authoritative recovery read completed;
+    /// use `countOrThrow()` when completeness matters.
     public var count: Int {
         get async {
             guard let db else { return 0 }
@@ -382,8 +384,10 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         return try Self.countAtoms(db: db)
     }
 
-    /// All atom IDs currently stored. Mirrors
+    /// Best-effort set of atom IDs currently stored. Mirrors
     /// `BASInMemoryMemoryAtomStore.allIDs`.
+    /// The default empty set is not proof that an authoritative recovery read completed;
+    /// use `allIDsOrThrow()` when completeness matters.
     public var allIDs: Set<String> {
         get async {
             guard let db else { return [] }
@@ -664,8 +668,15 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         }
         defer { sqlite3_finalize(stmt) }
         var ids: Set<String> = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var stepRC = sqlite3_step(stmt)
+        while stepRC == SQLITE_ROW {
             ids.insert(readText(stmt, 0))
+            stepRC = sqlite3_step(stmt)
+        }
+        guard stepRC == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
         }
         return ids
     }
@@ -688,7 +699,8 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         }
         defer { sqlite3_finalize(stmt) }
         var atoms: [BASGovernedMemory] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var stepRC = sqlite3_step(stmt)
+        while stepRC == SQLITE_ROW {
             let atomID = readText(stmt, 0)
             let json = readText(stmt, 1)
             guard let data = json.data(using: .utf8) else {
@@ -704,6 +716,12 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
                 throw StorageError.decodeFailed(
                     atomID: atomID, message: "\(error)")
             }
+            stepRC = sqlite3_step(stmt)
+        }
+        guard stepRC == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
         }
         return atoms
     }

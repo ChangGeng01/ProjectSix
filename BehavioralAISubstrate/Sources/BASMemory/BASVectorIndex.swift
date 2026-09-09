@@ -279,6 +279,37 @@ public actor BASVectorIndex {
         entries[entry.atomID] = entry
     }
 
+    /// Atomically merge a batch using the same ordering and replacement semantics as
+    /// repeated `upsert(_:)` calls. Every entry is validated against a staged dimension
+    /// before any state changes, so a rejected row leaves both Float32 state and the
+    /// dimension shared with the parallel int8 index unchanged.
+    public func upsertAll(
+        _ newEntries: [BASVectorIndexEntry]
+    ) throws {
+        var stagedDimension = boundDimension
+        for entry in newEntries {
+            try validateFinite(entry)
+            if let stagedDimension {
+                guard entry.normalizedEmbedding.dimension == stagedDimension
+                else {
+                    throw BASVectorIndexError.dimensionMismatch(
+                        expected: stagedDimension,
+                        got: entry.normalizedEmbedding.dimension)
+                }
+            } else {
+                stagedDimension = entry.normalizedEmbedding.dimension
+            }
+        }
+
+        boundDimension = stagedDimension
+        for entry in newEntries {
+            if entries[entry.atomID] == nil {
+                orderedIDs.append(entry.atomID)
+            }
+            entries[entry.atomID] = entry
+        }
+    }
+
     /// Remove entry by atomID。Returns true if removed,false if
     /// absent。
     @discardableResult

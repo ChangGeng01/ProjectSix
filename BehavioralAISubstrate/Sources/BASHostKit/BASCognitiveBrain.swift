@@ -570,6 +570,14 @@ public actor BASCognitiveBrain {
         await routedMemory?.refresh()
     }
 
+    /// Authoritative session-start recovery for hosts that configured throwing
+    /// persistence hooks. The routed service preserves its last complete snapshot
+    /// on failure and this sibling propagates the original typed error to the host.
+    @discardableResult
+    public func refreshMemoryOrThrow() async throws -> Int {
+        try await routedMemory?.refreshOrThrow() ?? 0
+    }
+
     /// Flush the routed memory's queued writes — self-populated atom admits (durable, one provenance
     /// event each) plus promote/freeze governance — to its store, returning what was persisted.
     /// No-op returning zeros unless the routed vector backend is active AND a host wired a store.

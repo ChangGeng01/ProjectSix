@@ -1147,52 +1147,20 @@ final class BASEnduranceAppController: ObservableObject {
                 // path is unchanged); the engine is rebuilt from it at startup + synced per turn.
                 var globalSeam: BASGlobalRecallSeam? = nil
                 if globalRecallEnabled {
-                    let engine = try BASRoutedVectorIndexStorage(inMemory: ())
-                    let resolver = BASGlobalRecallResolver(cap: globalRecallCap)
+                    let recovered = try await BASGlobalRecallRecovery.recover(
+                        atomStore: store,
+                        vectorStorage: vindex,
+                        expectedDimension: BASMiniLMEmbeddingProvider.embeddingDim,
+                        requestedCap: globalRecallCap)
                     let pin = BASL8RoutedMemoryService.Parameters.atomSource
-                    let durableAtoms = (try? await store.allAtoms()) ?? []
-                    let durableEntries = await vindex.allEntries()
-                    let entryByID = Dictionary(
-                        durableEntries.map { ($0.atomID, $0) }, uniquingKeysWith: { a, _ in a })
-                    // Load only the NEWEST `cap` durable atoms into the engine+resolver (recency — the
-                    // FIFO keeps the newest); mark EVERY durable atom "seen" so the per-turn delta-sync
-                    // handles only NEW atoms (monotonic, no churn). `allAtoms()` is created-ASC, so the
-                    // suffix is the newest. A newest-window atom missing its vector is left UNSEEN so the
-                    // per-turn sync retries it once the embedding lands (no resolver-only strand).
-                    let newest = durableAtoms.suffix(globalRecallCap)
-                    let newestIDs = Set(newest.map { $0.id.uuidString })
-                    for record in durableAtoms where !newestIDs.contains(record.id.uuidString) {
-                        globalRecallSynced.insert(record.id.uuidString)   // older than window — excluded
-                    }
-                    for record in newest {
-                        let id = record.id.uuidString
-                        guard let e = entryByID[id] else { continue }     // no vector → retried next turn
-                        do {
-                            _ = try await engine.upsert(BASVectorIndexEntry(
-                                atomID: id, normalizedEmbedding: e.normalizedEmbedding, domain: pin))
-                            resolver.put(id: id,                          // newest.count ≤ cap ⇒ no evict
-                                atom: BASL8RoutedMemoryService.memoryAtom(from: record),
-                                domain: record.sourceType)
-                            globalRecallSynced.insert(id)
-                        } catch {
-                            await emitBoth("⚠️ ADR-037 engine upsert failed id=\(id): \(error)")
-                        }
-                    }
-                    globalRecallEngine = engine
-                    globalRecallResolver = resolver
-                    let corpus = await engine.totalCount
+                    globalRecallEngine = recovered.engine
+                    globalRecallResolver = recovered.resolver
+                    globalRecallSynced = recovered.syncedAtomIDs
+                    globalSeam = recovered.seam
+                    let corpus = await recovered.engine.totalCount
                     await emitBoth(
-                        "📍 ADR-037 global recall ACTIVE corpus=\(corpus) resolver=\(resolver.count) " +
+                        "📍 ADR-037 global recall ACTIVE corpus=\(corpus) resolver=\(recovered.resolver.count) " +
                         "cap=\(globalRecallCap) domain=\(pin)")
-                    globalSeam = BASGlobalRecallSeam(
-                        cosineTopK: { [engine, pin, resolver] q, k in
-                            resolver.assertNotWriting()   // no-op in release; guards the ENGINE read too
-                            return (try? engine.cosineTopKAtomIDsSync(forDomain: pin, query: q, k: k)) ?? []
-                        },
-                        atomForID: { [resolver] id in
-                            resolver.assertNotWriting()   // no-op in release; guards the resolver read
-                            return resolver.lookupSync(id: id)
-                        })
                 } else {
                     await emitBoth("📍 ADR-037 global recall OFF (BAS_GLOBAL_RECALL!=1)")
                 }
@@ -1272,6 +1240,11 @@ final class BASEnduranceAppController: ObservableObject {
                                 providerVersion: Self.embeddingProviderVersion).normalized,
                             domain: domain))
                     },
+                    loadAllAtomsOrThrow: { try await store.allAtoms() },
+                    loadEmbeddingOrThrow: {
+                        try await vindex.entryOrThrow(forID: $0)?
+                            .normalizedEmbedding.vector
+                    },
                     globalRecall: globalSeam,
                     metalCosineTopK: metalTopKSeam)
             } else {
@@ -1284,7 +1257,16 @@ final class BASEnduranceAppController: ObservableObject {
                 : "📍 ch1061 memory backend = legacy Jaccard (MiniLM unavailable)")
             brain = try await BASCognitiveBrain.makeWithDefaults(
                 memoryEmbed: memoryEmbed,
+                memoryEmbedDim: BASMiniLMEmbeddingProvider.embeddingDim,
                 memoryPersistence: memoryPersistence)
+            if let vindex = memoryVectorIndex {
+                let preloaded = try await brain.refreshMemoryOrThrow()
+                let vidxEntries = try await vindex.totalCountOrThrow()
+                await emitBoth(
+                    "📍 ch1063 memory reload-at-start store_atoms=\(preloaded) " +
+                    "vector_index_entries=\(vidxEntries) " +
+                    "(>0 on 2nd launch over same container = cross-restart durable content + embeddings)")
+            }
         } catch {
             let msg = "Brain init failed: \(error)"
             await emitBoth("⚠️ ch1025 \(msg)")
@@ -1346,22 +1328,6 @@ final class BASEnduranceAppController: ObservableObject {
             } else {
                 await emitBoth("📍 ch1025 effort-loop requested but MiniLM unavailable — staying OFF")
             }
-        }
-
-        // ch1063 — CROSS-RESTART proof: reload the durable store into the routed snapshot at start.
-        // store_atoms is 0 on launch #1 over a fresh container, and >0 on launch #2 over the SAME
-        // container — i.e. a prior run's self-populated memory survived an app restart.
-        if let store = memoryStore {
-            await brain.refreshMemory()
-            // audit devicetestapp MED-3: O(1) SELECT COUNT, not an O(N) full-store materialization
-            // just to read the count (cross-restart growth otherwise scales this load every run).
-            let preloaded = (try? await store.countOrThrow()) ?? 0
-            let vidxEntries = (memoryVectorIndex != nil)
-                ? await memoryVectorIndex!.totalCount : 0
-            await emitBoth(
-                "📍 ch1063 memory reload-at-start store_atoms=\(preloaded) " +
-                "vector_index_entries=\(vidxEntries) " +
-                "(>0 on 2nd launch over same container = cross-restart durable content + embeddings)")
         }
 
         // ch 1025.6 — REAL fabric pipeline(closes the last
