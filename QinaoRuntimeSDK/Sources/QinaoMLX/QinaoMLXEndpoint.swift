@@ -5,7 +5,12 @@ import BASHostKit   // observe→DISPOSE: BASLLMNeuralCoreService.adjudicating (
 import BASAppleAdapters   // charter T4: BASMiniLMEmbeddingProvider is edge-injected here
 import QinaoLoop
 
-/// M222 — public factory for the Qinao + MLX (downloaded Gemma)
+enum MLXEndpointSelection {
+    case manifest(BASModelCapabilityManifest, capBytes: Int)
+    case explicit(QinaoMLXModel)
+}
+
+/// M222 — public factory for the Qinao + MLX open-weight runtime
 /// host configuration.
 ///
 /// ## Why this exists
@@ -13,8 +18,9 @@ import QinaoLoop
 /// Mirrors `QinaoAppleFoundation.makeAppleFoundationEndpoint(...)`
 /// — a one-call helper that wires a Qinao-owned model identity
 /// (`QinaoMLXModel`) through `MLXOrganAdapter` into a
-/// `QinaoOrganEndpoint`. Hosts wanting downloaded Gemma weights
-/// add three lines:
+/// `QinaoOrganEndpoint`. The no-model overload resolves the BAS
+/// production manifest; explicit experiments continue to pass a
+/// `QinaoMLXModel`:
 ///
 /// ```swift
 /// import QinaoMLX
@@ -41,16 +47,14 @@ import QinaoLoop
 /// the seam. `scripts/check_mlx_redaction.sh` enforces this.
 public extension QinaoLoop {
 
-    /// One-call factory wiring downloaded MLX Gemma weights behind
-    /// a `QinaoOrganEndpoint`.
+    /// Construct the BAS manifest-selected production MLX endpoint.
     ///
-    /// First call against a cold cache downloads the model
-    /// (~1.4–3 GB depending on `model`); second call hits the
-    /// local cache and returns in seconds.
+    /// Selection is exact: an unknown manifest model is refused, and a
+    /// non-positive or insufficient active hard cap is refused before model
+    /// loading. This estimated admission check avoids a known load-time
+    /// jetsam path; it is not an OS heap guarantee or device-performance proof.
     ///
     /// - Parameters:
-    ///   - model: which Gemma variant to load. Default
-    ///     `.gemma4E4B` (newest architecture; recommended).
     ///   - progressHandler: receives `Progress` updates during the
     ///     Hugging Face download. Defaults to ignored. Sample-app
     ///     hosts pass a closure that updates a SwiftUI binding so
@@ -60,14 +64,82 @@ public extension QinaoLoop {
     /// - Throws: any error from the model download or load path —
     ///   network failures, disk-full, corrupted weights, etc.
     static func makeMLXEndpoint(
-        model: QinaoMLXModel = .gemma4E4B,
         progressHandler: @Sendable @escaping (Progress) -> Void
             = { _ in }
     ) async throws -> any QinaoOrganEndpoint {
-        let entry = model.catalogEntry
-        let adapter = MLXOrganAdapter(model: entry)
-        try await adapter.loadModel(
+        let capBytes = BASMLXMemoryModel.resolvedActiveHardCapBytes()
+            ?? BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes
+        return try await _makeMLXEndpoint(
+            activeHardCapBytes: capBytes,
             progressHandler: progressHandler)
+    }
+
+    /// Construct an explicitly selected MLX experiment endpoint. This overload
+    /// preserves the existing model mapping and legacy memory policy for every
+    /// `QinaoMLXModel` choice; it never participates in manifest defaulting.
+    static func makeMLXEndpoint(
+        model: QinaoMLXModel,
+        progressHandler: @Sendable @escaping (Progress) -> Void
+            = { _ in }
+    ) async throws -> any QinaoOrganEndpoint {
+        try await _makeMLXEndpoint(
+            selection: .explicit(model),
+            progressHandler: progressHandler)
+    }
+
+    internal static func _makeMLXEndpoint(
+        activeHardCapBytes capBytes: Int,
+        progressHandler: @Sendable @escaping (Progress) -> Void = { _ in },
+        loadModel: @Sendable @escaping (
+            MLXOrganAdapter,
+            @Sendable @escaping (Progress) -> Void
+        ) async throws -> Void = { adapter, progressHandler in
+            try await adapter.loadModel(progressHandler: progressHandler)
+        }
+    ) async throws -> any QinaoOrganEndpoint {
+        try await _makeMLXEndpoint(
+            selection: .manifest(
+                BASModelManifestRegistry.productionDefault,
+                capBytes: capBytes),
+            progressHandler: progressHandler,
+            loadModel: loadModel)
+    }
+
+    internal static func _makeMLXEndpoint(
+        selection: MLXEndpointSelection,
+        progressHandler: @Sendable @escaping (Progress) -> Void = { _ in },
+        loadModel: @Sendable @escaping (
+            MLXOrganAdapter,
+            @Sendable @escaping (Progress) -> Void
+        ) async throws -> Void = { adapter, progressHandler in
+            try await adapter.loadModel(progressHandler: progressHandler)
+        }
+    ) async throws -> any QinaoOrganEndpoint {
+        let adapter: MLXOrganAdapter
+        switch selection {
+        case .manifest(let manifest, let capBytes):
+            let entry = try MLXModelCatalog.entry(for: manifest)
+            guard capBytes > 0,
+                  manifest.peakBytesEstimate > 0,
+                  manifest.peakBytesEstimate <= capBytes else {
+                throw BASOrganError.providerUnavailable(
+                    reason: "manifest-model-exceeds-active-cap")
+            }
+            let policy = MLXMemoryPolicy(
+                enforceMemoryAdmission: true,
+                activeHardCapBytes: capBytes)
+            adapter = MLXOrganAdapter(model: entry, memoryPolicy: policy)
+        case .explicit(let model):
+            adapter = MLXOrganAdapter(model: model.catalogEntry)
+        }
+
+        try await loadModel(adapter, progressHandler)
+        return await _composeMLXEndpoint(adapter: adapter)
+    }
+
+    private static func _composeMLXEndpoint(
+        adapter: MLXOrganAdapter
+    ) async -> any QinaoOrganEndpoint {
         let registry = BASOrganRegistry()
         // observe→DISPOSE (Line A): route the live organ through the factual-belief adjudicator. Default-OFF
         // (`BAS_FACTUAL_ADJUDICATE` unset) ⇒ returns `adapter` byte-equal; ON ⇒ the streaming-capable wrapper,
@@ -87,11 +159,10 @@ public extension QinaoLoop {
 
     /// Throughput-first MLX factory.
     ///
-    /// This is deliberately a separate entry point from
-    /// `makeMLXEndpoint(...)`: the public default stays the
-    /// quality-oriented Gemma 4 E4B path, while hosts that want the
-    /// fastest certified on-device lane can opt into the Llama
-    /// 3.2 3B target with its Llama 3.2 1B speculative draft.
+    /// This is deliberately a separate entry point from the
+    /// manifest-selected production factory. Hosts that want the fastest
+    /// certified on-device lane can explicitly opt into the Llama 3.2 3B
+    /// target with its Llama 3.2 1B speculative draft.
     ///
     /// The endpoint also maps both Qinao roles to the greedy
     /// deterministic preset, because MLX greedy speculative decoding
@@ -154,7 +225,7 @@ public extension QinaoLoop {
     /// type is opaque-ish (consumers see it but don't need to name
     /// any vendored MLX type).
     static func makeLoRATrainer(
-        model: QinaoMLXModel = .gemma4E2B,
+        model: QinaoMLXModel,
         configuration: MLXLoRATrainer.Configuration =
             MLXLoRATrainer.Configuration()
     ) -> MLXLoRATrainer {
@@ -166,7 +237,7 @@ public extension QinaoLoop {
 
 /// Qinao-owned model identity. Mirrors the three `mlx-community`
 /// 4-bit Gemma variants the substrate ships in
-/// `MLXModelCatalog.defaultEntries` without leaking any BAS or MLX
+/// `MLXModelCatalog.certifiedEntries` without leaking any BAS or MLX
 /// type names into Qinao public surface.
 ///
 /// New variants are added here in lockstep with
@@ -178,7 +249,7 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
     /// Gemma 4 E4B instruction-tuned, 4-bit quantized (M235).
     /// Newest Gemma architecture; same effective ~4B parameter
     /// count as Gemma 3n E4B but with Gemma 4 improvements.
-    /// **Recommended default for QinaoSampleApp** (M235).
+    /// Certified explicit choice retained for picker compatibility.
     case gemma4E4B = "gemma-4-e4b-it-4bit"
 
     /// Gemma 4 E2B instruction-tuned, 4-bit quantized (M235).
@@ -191,7 +262,7 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
     case gemma3_4B = "gemma-3-4b-it-4bit"
 
     // MARK: - availableAlternatives (stable-arch fallbacks — EXPERIMENTAL tier, host opt-in)
-    // Mirror `MLXModelCatalog.availableAlternatives` (Llama 3.2 / Qwen2.5). NOT in `defaultEntries`;
+    // Mirror `MLXModelCatalog.availableAlternatives` (Llama 3.2 / Qwen2.5). NOT in `certifiedEntries`;
     // `certificationTier` reports them "experimental". Distinct EOS tokens (Llama `<|eot_id|>`, Qwen
     // `<|im_end|>`) live in the catalog entries — `catalogEntry` returns those verbatim.
 
@@ -255,11 +326,11 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
         }
     }
 
-    /// Advisory certification tier for UI / audit labeling — `"certified"` for the on-device-certified default
+    /// Advisory certification tier for UI / audit labeling — `"certified"` for the on-device-certified
     /// Gemma entries, `"experimental"` for the `availableAlternatives` (Llama/Qwen). Computed from the live
     /// catalog so it can never drift. A `String` (not a BAS enum) to keep the substrate-redaction seam clean.
     public var certificationTier: String {
-        MLXModelCatalog.defaultEntries.contains { $0.providerID == catalogEntry.providerID }
+        MLXModelCatalog.certifiedEntries.contains { $0.providerID == catalogEntry.providerID }
             ? "certified" : "experimental"
     }
 
@@ -281,8 +352,8 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
     public var supportsSpeculativeDecoding: Bool { speculativeDraft != nil }
 
     /// The SPECULATION-OPTIMAL pick: greedy speculative decoding on this model is ON-DEVICE CERTIFIED `enable`
-    /// (Llama-3.2 3B↔1B — bytewise-correct, ~31% faster, fits the default memory cap; 2 devices, n=100). The
-    /// quality default (`gemma4E4B`) is unchanged — its pair does not fit 8 GB, so speculation stays dormant
-    /// there. A latency-prioritizing host picks THIS model and the certified fast lane engages automatically.
+    /// (Llama-3.2 3B↔1B — bytewise-correct, ~31% faster, fits the default memory cap; 2 devices, n=100).
+    /// This pointer does not alter the BAS production manifest. An explicit Gemma E4B experiment remains
+    /// speculation-dormant because its pair does not fit 8 GB; a latency-prioritizing host picks THIS model.
     public static var speculativeOptimal: QinaoMLXModel { .llama3_2_3B }
 }

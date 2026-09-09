@@ -28,7 +28,7 @@ final class BASSessionLaneTests: XCTestCase {
         // eviction "drop" an already-gone key (a no-op that fails to reduce
         // the count). The _dropFusedTranscript funnel is the single removal
         // source; this pins the invariant across seed / drop / clearAll.
-        let a = MLXOrganAdapter()
+        let a = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         for i in 0..<5 { await a._seedFusedTranscriptForTest("k\(i)") }
         let order1 = await a._fusedTranscriptOrderForTest
         let keys1 = await a._fusedTranscriptKeysForTest

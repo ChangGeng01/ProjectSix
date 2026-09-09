@@ -11,13 +11,13 @@ import XCTest
 ///   - draft() honestly throws "not loaded yet" with a stable
 ///     reason code that downstream callers can pattern-match
 ///   - currentCapacity reports underPressure with a stable reason
-///   - the catalog ships exactly the three default Gemma entries
+///   - the catalog identifies exactly the three certified Gemma entries
 ///     hosts can rely on
 final class MLXOrganAdapterTests: XCTestCase {
 
     // MARK: - 1. Descriptor
 
-    func testDescriptorPicksUpCatalogIdentityByDefault() async {
+    func testDescriptorPicksUpExplicitCatalogIdentity() async {
         let adapter = MLXOrganAdapter(
             model: MLXModelCatalog.gemma4_E4B_4bit)
         XCTAssertEqual(
@@ -49,7 +49,7 @@ final class MLXOrganAdapterTests: XCTestCase {
     // MARK: - 2. Draft path is honestly unavailable in M220
 
     func testDraftThrowsProviderUnavailableWhenModelNotLoaded() async {
-        let adapter = MLXOrganAdapter()
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         let request = BASOrganRequest(
             requestID: "req-1",
             role: .core,
@@ -165,7 +165,7 @@ final class MLXOrganAdapterTests: XCTestCase {
     // MARK: - 3. Capacity
 
     func testCapacityReportsUnderPressureWithStableReason() async {
-        let adapter = MLXOrganAdapter()
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         let cap = await adapter.currentCapacity()
         XCTAssertTrue(cap.underPressure)
         XCTAssertEqual(cap.availableInputTokens, 0)
@@ -178,14 +178,12 @@ final class MLXOrganAdapterTests: XCTestCase {
 
     // MARK: - 4. Catalog stability
 
-    func testDefaultCatalogShipsCanonicalGemmaEntries() {
-        let entries = MLXModelCatalog.defaultEntries
-        // M236 retired Gemma 3n entries; the catalog is now Gemma
-        // 4 e4b/e2b (recommended) + Gemma 3 4B (long-context
-        // outlier).
+    func testCertifiedCatalogShipsCanonicalGemmaEntriesInOrder() {
+        let entries = MLXModelCatalog.certifiedEntries
+        // M236 retired Gemma 3n entries; certification covers Gemma
+        // 4 e4b/e2b plus the Gemma 3 4B long-context outlier.
         XCTAssertEqual(entries.count, 3)
-        let ids = Set(entries.map(\.id))
-        XCTAssertEqual(ids, [
+        XCTAssertEqual(entries.map(\.id), [
             "mlx-community/gemma-4-e4b-it-4bit",
             "mlx-community/gemma-4-e2b-it-4bit",
             "mlx-community/gemma-3-4b-it-4bit"
@@ -197,7 +195,7 @@ final class MLXOrganAdapterTests: XCTestCase {
         // Every entry must declare at least one of these so
         // generation stops at the reply boundary.
         let validTerminators = ["<end_of_turn>", "<turn|>"]
-        for entry in MLXModelCatalog.defaultEntries {
+        for entry in MLXModelCatalog.certifiedEntries {
             let hasOne = entry.extraEOSTokens.contains(where: {
                 validTerminators.contains($0)
             })
@@ -234,7 +232,7 @@ final class MLXOrganAdapterTests: XCTestCase {
     }
 
     func testCatalogProviderIDsAreUniqueAndStable() {
-        let providers = MLXModelCatalog.defaultEntries
+        let providers = MLXModelCatalog.certifiedEntries
             .map(\.providerID)
         XCTAssertEqual(
             Set(providers).count, providers.count,
@@ -242,12 +240,10 @@ final class MLXOrganAdapterTests: XCTestCase {
             "(audit logs rely on them as primary keys)")
     }
 
-    // MARK: - 5. Default pick is the recommended one
+    // MARK: - 5. Explicit model construction
 
-    func testInitDefaultsToGemma4E4B() async {
-        // M236 retired Gemma 3n; default is now Gemma 4 E4B
-        // (newest architecture, recommended for new hosts).
-        let adapter = MLXOrganAdapter()
+    func testExplicitInitUsesGemma4E4B() async {
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         XCTAssertEqual(
             adapter.model, MLXModelCatalog.gemma4_E4B_4bit)
     }
@@ -260,7 +256,7 @@ final class MLXOrganAdapterTests: XCTestCase {
     /// the suite green while changing every real inference.
     #if canImport(MLXLLM)
     func testGenerateParametersScoutPresetUsesLowTemperature() async {
-        let adapter = MLXOrganAdapter()
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         let params = await adapter._generateParameters(for: .scout)
         XCTAssertEqual(
             params.temperature, Float(BASOrganPreset.scout.temperature),
@@ -273,7 +269,7 @@ final class MLXOrganAdapterTests: XCTestCase {
     }
 
     func testGenerateParametersCorePresetUsesMidTemperature() async {
-        let adapter = MLXOrganAdapter()
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         let params = await adapter._generateParameters(for: .core)
         XCTAssertEqual(
             params.temperature, Float(BASOrganPreset.core.temperature),
@@ -290,7 +286,7 @@ final class MLXOrganAdapterTests: XCTestCase {
         // deterministic than `.core`. If they ever produce equal
         // GenerateParameters, the architecture's two-tier organ
         // contract has silently collapsed.
-        let adapter = MLXOrganAdapter()
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         let scout = await adapter._generateParameters(for: .scout)
         let core = await adapter._generateParameters(for: .core)
         XCTAssertNotEqual(
@@ -307,7 +303,7 @@ final class MLXOrganAdapterTests: XCTestCase {
     // never nil. (再查: the on-device iter=1 freeze was a zero-token Metal/GPU eval hang,
     // handled by the feed-forward gate + projection sanitization, not this token cap.)
     func testGenerateParametersFallsBackToPresetBudgetByDefault() async {
-        let adapter = MLXOrganAdapter()  // default descriptor maxOutputTokens = 4096
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         let params = await adapter._generateParameters(for: .core)
         XCTAssertEqual(
             params.maxTokens, BASOrganPreset.core.maxOutputTokens,
@@ -316,7 +312,7 @@ final class MLXOrganAdapterTests: XCTestCase {
     }
 
     func testGenerateParametersHonorsExplicitPerRequestCap() async {
-        let adapter = MLXOrganAdapter()
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         let params = await adapter._generateParameters(
             for: .core, maxOutputTokens: 256)
         XCTAssertEqual(
@@ -331,7 +327,7 @@ final class MLXOrganAdapterTests: XCTestCase {
     // verbatim — a silent drop here would make the device A/B knobs
     // (BAS_KV_BITS / BAS_MAX_KV_SIZE) measure nothing.
     func testGenerateParametersKVLeversDefaultNil() async {
-        let adapter = MLXOrganAdapter()
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         let params = await adapter._generateParameters(for: .core)
         XCTAssertNil(params.kvBits,
             "default kvCacheBits=nil must leave vendor kvBits nil (no " +
@@ -342,7 +338,10 @@ final class MLXOrganAdapterTests: XCTestCase {
     }
 
     func testGenerateParametersKVLeversOptInFlowThrough() async {
-        let adapter = MLXOrganAdapter(kvCacheBits: 4, maxKVSize: 1024)
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E4B_4bit,
+            kvCacheBits: 4,
+            maxKVSize: 1024)
         let params = await adapter._generateParameters(for: .core)
         XCTAssertEqual(params.kvBits, 4,
             "opt-in kvCacheBits must reach GenerateParameters.kvBits")
@@ -352,7 +351,9 @@ final class MLXOrganAdapterTests: XCTestCase {
     }
 
     func testGenerateParametersCustomDescriptorMaxBoundsDecode() async {
-        let adapter = MLXOrganAdapter(maxOutputTokens: 512)
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E4B_4bit,
+            maxOutputTokens: 512)
         let params = await adapter._generateParameters(for: .core)
         XCTAssertEqual(
             params.maxTokens, 512,
@@ -615,7 +616,7 @@ final class MLXOrganAdapterTests: XCTestCase {
         // §11.8). Pin the default value AND that it flows from the
         // single named constant, so a future edit to either surfaces
         // here rather than silently changing the certified ceiling.
-        let adapter = MLXOrganAdapter()
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         XCTAssertEqual(
             adapter.cacheLimitBytes,
             MLXOrganAdapter.defaultCacheLimitBytes)
@@ -630,13 +631,17 @@ final class MLXOrganAdapterTests: XCTestCase {
         // `nil` must restore upstream/unbounded behavior — the cap is
         // a ceiling, and callers (e.g. larger-RAM hosts, A/B vs the
         // unbounded default) must be able to turn it OFF explicitly.
-        let adapter = MLXOrganAdapter(cacheLimitBytes: nil)
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E4B_4bit,
+            cacheLimitBytes: nil)
         XCTAssertNil(adapter.cacheLimitBytes)
     }
 
     func testCacheLimitHonorsExplicitOverride() async {
         let custom = 384 * 1024 * 1024
-        let adapter = MLXOrganAdapter(cacheLimitBytes: custom)
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E4B_4bit,
+            cacheLimitBytes: custom)
         XCTAssertEqual(adapter.cacheLimitBytes, custom)
     }
 
@@ -672,23 +677,23 @@ final class MLXOrganAdapterTests: XCTestCase {
 
     func testLlamaEntryProviderIDDoesNotCollideWithCatalog() {
         // Audit logs key on providerID; the Llama entry must not
-        // collide with any default Gemma entry.
-        let defaultIDs = Set(
-            MLXModelCatalog.defaultEntries.map(\.providerID))
+        // collide with any certified Gemma entry.
+        let certifiedIDs = Set(
+            MLXModelCatalog.certifiedEntries.map(\.providerID))
         XCTAssertFalse(
-            defaultIDs.contains(
+            certifiedIDs.contains(
                 MLXModelCatalog.llama3_2_3B_4bit.providerID),
-            "Llama providerID collides with a default entry")
+            "Llama providerID collides with a certified entry")
     }
 
-    func testLlamaEntryIsNotInDefaultCatalog() {
+    func testLlamaEntryIsNotCertified() {
         // Honesty pin (ADR-038 audit MEDIUM): the Llama entry is an
-        // available alternative, NOT a shipped default — it is not
-        // on-device certified, so it must stay out of defaultEntries.
-        let defaultIDs = Set(MLXModelCatalog.defaultEntries.map(\.id))
+        // available alternative, not a certified selection — it is not
+        // on-device certified, so it must stay out of certifiedEntries.
+        let certifiedIDs = Set(MLXModelCatalog.certifiedEntries.map(\.id))
         XCTAssertFalse(
-            defaultIDs.contains(MLXModelCatalog.llama3_2_3B_4bit.id),
-            "Llama 3.2 is an opt-in alternative, not a default")
+            certifiedIDs.contains(MLXModelCatalog.llama3_2_3B_4bit.id),
+            "Llama 3.2 is an opt-in alternative, not certified")
     }
 
     // MARK: - 11. Stable-architecture fallback SDK surface (#2)
@@ -717,11 +722,11 @@ final class MLXOrganAdapterTests: XCTestCase {
             "mlx-community/Llama-3.2-1B-Instruct-4bit",
             "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
         ])
-        let defaultIDs = Set(MLXModelCatalog.defaultEntries.map(\.id))
+        let certifiedIDs = Set(MLXModelCatalog.certifiedEntries.map(\.id))
         for alt in MLXModelCatalog.availableAlternatives {
             XCTAssertFalse(
-                defaultIDs.contains(alt.id),
-                "\(alt.id) is an opt-in alternative — must NOT be a certified default")
+                certifiedIDs.contains(alt.id),
+                "\(alt.id) is an opt-in alternative — must NOT be certified")
         }
     }
 
@@ -743,12 +748,12 @@ final class MLXOrganAdapterTests: XCTestCase {
         let providers = MLXModelCatalog.allEntries.map(\.providerID)
         XCTAssertEqual(
             Set(providers).count, providers.count,
-            "providerIDs must be unique across defaults + alternatives")
+            "providerIDs must be unique across certified entries + alternatives")
         XCTAssertEqual(
             MLXModelCatalog.allEntries.count,
-            MLXModelCatalog.defaultEntries.count
+            MLXModelCatalog.certifiedEntries.count
                 + MLXModelCatalog.availableAlternatives.count,
-            "allEntries = defaults + alternatives (no overlap, no drop)")
+            "allEntries = certified entries + alternatives (no overlap, no drop)")
     }
 
     // MARK: - 12. Draft-container lifecycle guards (U1 governor seam — audit 2026-06-12)

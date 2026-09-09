@@ -1,5 +1,8 @@
 import XCTest
+import BASOrgan
+import BASMLXAdapter
 @testable import QinaoMLX
+@testable import QinaoLoop
 
 /// M222 — coverage for the public `QinaoMLX` façade.
 ///
@@ -8,18 +11,56 @@ import XCTest
 /// These tests pin the Qinao-side API shape that is callable
 /// without ever touching Hugging Face:
 ///
-///   - `QinaoMLXModel` covers the three default Gemma entries
+///   - `QinaoMLXModel` covers the three certified Gemma entries
 ///     the substrate ships (M236: Gemma 4 e4b + e2b + Gemma 3 4B).
 ///   - Each model has a stable display name and providerID.
-///   - The default pick is the recommended `.gemma4E4B`.
+///   - The no-model factory follows the BAS production manifest.
 ///   - `Codable` round-trips so hosts can persist user choice.
 final class QinaoMLXEndpointTests: XCTestCase {
 
+    private actor LoadSpy {
+        struct Call: Sendable, Equatable {
+            let modelID: String
+            let providerID: String
+            let enforcesAdmission: Bool
+            let activeHardCapBytes: Int?
+        }
+
+        private(set) var calls: [Call] = []
+
+        func record(
+            modelID: String,
+            providerID: String,
+            enforcesAdmission: Bool,
+            activeHardCapBytes: Int?
+        ) {
+            calls.append(.init(
+                modelID: modelID,
+                providerID: providerID,
+                enforcesAdmission: enforcesAdmission,
+                activeHardCapBytes: activeHardCapBytes))
+        }
+    }
+
+    private enum InjectedLoadError: Error, Equatable {
+        case failed
+    }
+
+    private func endpointProviderID(
+        _ endpoint: any QinaoOrganEndpoint
+    ) throws -> String {
+        let registryEndpoint = try XCTUnwrap(
+            endpoint as? BASOrganRegistryEndpoint)
+        return try XCTUnwrap(
+            registryEndpoint.providerID,
+            "constructed registry endpoint must bind a provider ID")
+    }
+
     // MARK: - 1. Catalog completeness
 
-    func testAllCasesShipsDefaultsPlusAlternatives() {
+    func testAllCasesShipsCertifiedChoicesPlusAlternatives() {
         let cases = QinaoMLXModel.allCases
-        // 3 certified default Gemma entries + 4 experimental availableAlternatives (Llama/Qwen) = 7.
+        // 3 certified Gemma entries + 4 experimental availableAlternatives (Llama/Qwen) = 7.
         XCTAssertEqual(cases.count, 7)
         XCTAssertEqual(
             Set(cases),
@@ -86,18 +127,146 @@ final class QinaoMLXEndpointTests: XCTestCase {
         }
     }
 
-    // MARK: - 5. Recommended default
+    // MARK: - 5. Manifest-selected construction
 
-    func testGemma4E4BIsTheRecommendedDefault() {
-        // Asserted by the makeMLXEndpoint(model:progressHandler:)
-        // signature default. Pinning it here so any future change
-        // to the recommended model gets a visible test diff. M236
-        // promoted Gemma 4 E4B over the retired Gemma 3n E4B.
-        let signatureDefault: QinaoMLXModel = .gemma4E4B
-        XCTAssertEqual(
-            signatureDefault, .gemma4E4B,
-            "recommended default must remain Gemma 4 E4B until a " +
-            "subsequent milestone explicitly retires it")
+    func testManifestFactoryLoadsOnlyQwenAndBindsItsProviderIdentity() async throws {
+        let manifest = BASModelManifestRegistry.productionDefault
+        let spy = LoadSpy()
+
+        let endpoint = try await QinaoLoop._makeMLXEndpoint(
+            activeHardCapBytes: manifest.peakBytesEstimate,
+            loadModel: { adapter, _ in
+                await spy.record(
+                    modelID: adapter.model.id,
+                    providerID: adapter.model.providerID,
+                    enforcesAdmission: adapter.memoryPolicy.enforceMemoryAdmission,
+                    activeHardCapBytes: adapter.memoryPolicy.activeHardCapBytes)
+            })
+
+        let calls = await spy.calls
+        XCTAssertEqual(calls, [.init(
+            modelID: "mlx-community/Qwen3.5-4B-4bit",
+            providerID: "mlx.qwen3_5.4b.4bit",
+            enforcesAdmission: true,
+            activeHardCapBytes: manifest.peakBytesEstimate)])
+        XCTAssertEqual(try endpointProviderID(endpoint), "mlx.qwen3_5.4b.4bit")
+    }
+
+    func testExplicitGemmaFactoryStaysExplicitAndLoadsOnlyOnce() async throws {
+        let spy = LoadSpy()
+
+        let endpoint = try await QinaoLoop._makeMLXEndpoint(
+            selection: .explicit(.gemma4E4B),
+            loadModel: { adapter, _ in
+                await spy.record(
+                    modelID: adapter.model.id,
+                    providerID: adapter.model.providerID,
+                    enforcesAdmission: adapter.memoryPolicy.enforceMemoryAdmission,
+                    activeHardCapBytes: adapter.memoryPolicy.activeHardCapBytes)
+            })
+
+        let calls = await spy.calls
+        XCTAssertEqual(calls, [.init(
+            modelID: "mlx-community/gemma-4-e4b-it-4bit",
+            providerID: "mlx.gemma4.e4b.it.4bit",
+            enforcesAdmission: false,
+            activeHardCapBytes: nil)])
+        XCTAssertEqual(try endpointProviderID(endpoint), "mlx.gemma4.e4b.it.4bit")
+    }
+
+    func testManifestFactoryCapBoundaryRejectsBeforeLoadWithoutFallback() async throws {
+        let manifest = BASModelManifestRegistry.productionDefault
+        let acceptingSpy = LoadSpy()
+        _ = try await QinaoLoop._makeMLXEndpoint(
+            selection: .manifest(manifest, capBytes: manifest.peakBytesEstimate),
+            loadModel: { adapter, _ in
+                await acceptingSpy.record(
+                    modelID: adapter.model.id,
+                    providerID: adapter.model.providerID,
+                    enforcesAdmission: adapter.memoryPolicy.enforceMemoryAdmission,
+                    activeHardCapBytes: adapter.memoryPolicy.activeHardCapBytes)
+            })
+        let acceptedCalls = await acceptingSpy.calls
+        XCTAssertEqual(acceptedCalls.count, 1)
+
+        for cap in [manifest.peakBytesEstimate - 1, 0, -1] {
+            let refusingSpy = LoadSpy()
+            do {
+                _ = try await QinaoLoop._makeMLXEndpoint(
+                    selection: .manifest(manifest, capBytes: cap),
+                    loadModel: { adapter, _ in
+                        await refusingSpy.record(
+                            modelID: adapter.model.id,
+                            providerID: adapter.model.providerID,
+                            enforcesAdmission: adapter.memoryPolicy.enforceMemoryAdmission,
+                            activeHardCapBytes: adapter.memoryPolicy.activeHardCapBytes)
+                    })
+                XCTFail("cap \(cap) must refuse the manifest model")
+            } catch BASOrganError.providerUnavailable(let reason) {
+                XCTAssertEqual(reason, "manifest-model-exceeds-active-cap")
+            } catch {
+                XCTFail("expected providerUnavailable for cap \(cap), got \(error)")
+            }
+            let refusedCalls = await refusingSpy.calls
+            XCTAssertTrue(refusedCalls.isEmpty)
+        }
+    }
+
+    func testUnknownManifestRejectsBeforeLoadWithoutFallback() async {
+        let manifest = BASModelCapabilityManifest(
+            modelID: "mlx-community/unknown-task6-model",
+            architecture: .trimmableAttention,
+            draft: .none,
+            quantBits: 4,
+            peakBytesEstimate: 1,
+            contextCapTokens: 1)
+        let spy = LoadSpy()
+
+        do {
+            _ = try await QinaoLoop._makeMLXEndpoint(
+                selection: .manifest(manifest, capBytes: 1),
+                loadModel: { adapter, _ in
+                    await spy.record(
+                        modelID: adapter.model.id,
+                        providerID: adapter.model.providerID,
+                        enforcesAdmission: adapter.memoryPolicy.enforceMemoryAdmission,
+                        activeHardCapBytes: adapter.memoryPolicy.activeHardCapBytes)
+                })
+            XCTFail("an unknown manifest model must be refused")
+        } catch let error as MLXModelCatalog.LookupError {
+            XCTAssertEqual(
+                error,
+                .unknownModelID("mlx-community/unknown-task6-model"))
+        } catch {
+            XCTFail("expected unknown-model lookup error, got \(error)")
+        }
+        let calls = await spy.calls
+        XCTAssertTrue(calls.isEmpty)
+    }
+
+    func testInjectedLoadErrorPropagatesWithoutSecondLoad() async {
+        let manifest = BASModelManifestRegistry.productionDefault
+        let spy = LoadSpy()
+
+        do {
+            _ = try await QinaoLoop._makeMLXEndpoint(
+                selection: .manifest(manifest, capBytes: manifest.peakBytesEstimate),
+                loadModel: { adapter, _ in
+                    await spy.record(
+                        modelID: adapter.model.id,
+                        providerID: adapter.model.providerID,
+                        enforcesAdmission: adapter.memoryPolicy.enforceMemoryAdmission,
+                        activeHardCapBytes: adapter.memoryPolicy.activeHardCapBytes)
+                    throw InjectedLoadError.failed
+                })
+            XCTFail("the injected load error must propagate")
+        } catch let error as InjectedLoadError {
+            XCTAssertEqual(error, .failed)
+        } catch {
+            XCTFail("expected injected load error, got \(error)")
+        }
+        let calls = await spy.calls
+        XCTAssertEqual(calls.count, 1)
     }
 
     func testMaxThroughputModelIsSpeculativeOptimal() {
@@ -117,11 +286,11 @@ final class QinaoMLXEndpointTests: XCTestCase {
             let expected = certified.contains(model) ? "certified" : "experimental"
             XCTAssertEqual(
                 model.certificationTier, expected,
-                "\(model) tier must be \(expected) (defaults=certified, alternatives=experimental)")
+                "\(model) tier must be \(expected) (certified entries vs experimental alternatives)")
         }
         XCTAssertTrue(
             QinaoMLXModel.allCases.contains { $0.certificationTier == "certified" },
-            "at least one certified default must exist")
+            "at least one certified model must exist")
         XCTAssertTrue(
             QinaoMLXModel.allCases.contains { $0.certificationTier == "experimental" },
             "at least one experimental alternative must exist")

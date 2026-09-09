@@ -28,7 +28,7 @@ final class BASMLXSeatRoutingH21Tests: XCTestCase {
     }
 
     func testSeatRequestRoutesToMultiTurnThroughPurposeEntry() async throws {
-        let adapter = MLXOrganAdapter()
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
         let seat = req("seat-A")
         let noSeat = req(nil)
 

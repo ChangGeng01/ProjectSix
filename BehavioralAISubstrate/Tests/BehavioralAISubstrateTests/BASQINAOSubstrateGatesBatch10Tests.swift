@@ -352,10 +352,13 @@ final class BASQINAOSubstrateGatesBatch10Tests: XCTestCase {
         "lifting the cap to 8 GB ADMITS E4B (4314 MB) — the gate relaxes as budget grows")
 
     // 5) The adapter actually wires this opt-in (config-level invariant): enforceMemoryAdmission ON is reflected
-    //    on the constructed adapter; OFF is the byte-equal default. Mirrors MLXMemoryPolicyTests construction.
-    let off = MLXOrganAdapter()
-    XCTAssertFalse(off.enforceMemoryAdmission, "default adapter is warn-only (byte-equal-off)")
-    let on = MLXOrganAdapter(enforceMemoryAdmission: true, activeHardCapBytes: 8_000 * mib)
+    //    on the constructed adapter; OFF is the byte-equal memory-policy default. Mirrors MLXMemoryPolicyTests.
+    let off = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
+    XCTAssertFalse(off.enforceMemoryAdmission, "default memory policy is warn-only (byte-equal-off)")
+    let on = MLXOrganAdapter(
+        model: MLXModelCatalog.gemma4_E4B_4bit,
+        enforceMemoryAdmission: true,
+        activeHardCapBytes: 8_000 * mib)
     XCTAssertTrue(on.enforceMemoryAdmission, "opt-in admission flag is honoured on the adapter")
     XCTAssertEqual(on.activeHardCapBytes, 8_000 * mib, "host-supplied ActiveHard cap is honoured on the adapter")
 

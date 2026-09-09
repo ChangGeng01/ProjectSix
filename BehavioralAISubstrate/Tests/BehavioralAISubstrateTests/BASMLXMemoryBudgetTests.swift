@@ -131,23 +131,4 @@ final class BASMLXMemoryBudgetTests: XCTestCase {
             "under an 8 GB cap E4B (4314 MB) admits")
     }
 
-    func testRecommendedDefaultIsE2BOnConstrainedIPhoneAirElseE4B() {
-        // tests-arch ④ device-robust (2026-07-11): pin the CONSTRAINED-cap logic with an EXPLICIT
-        // cap. The no-arg default now resolves to the entitlement-aware LIVE cap (缝7), so on the
-        // real entitled iPhone Air (~6.29 GB) recommendedDefault() correctly returns E4B — the
-        // "constrained ⇒ E2B" premise only holds against the measured constrained cap this asserts.
-        XCTAssertEqual(
-            MLXModelCatalog.recommendedDefault(forActiveHardCapBytes: BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes),
-            MLXModelCatalog.gemma4_E2B_4bit,
-            "at the measured (constrained) iPhone Air cap, the recommended default is E2B (E4B jetsams)")
-        XCTAssertEqual(
-            MLXModelCatalog.recommendedDefault(forActiveHardCapBytes: 8_000 * mib),
-            MLXModelCatalog.gemma4_E4B_4bit,
-            "under an 8 GB cap the richer E4B is recommended")
-        // Additive only: the hardcoded default catalog entry is unchanged (byte-equal-off).
-        XCTAssertEqual(
-            MLXModelCatalog.defaultEntries.first,
-            MLXModelCatalog.gemma4_E4B_4bit,
-            "recommendedDefault() must NOT mutate the pinned defaultEntries ordering")
-    }
 }

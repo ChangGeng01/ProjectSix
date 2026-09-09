@@ -503,6 +503,7 @@ let package = Package(
                 // (SampleSession caching + ContentView snapshot).
                 "QinaoSample",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
+                .product(name: "BASMLXAdapter", package: "BehavioralAISubstrate"),
                 // M178 — env-gated end-to-end test (`QINAO_FM_E2E=1`)
                 // wires `AppleFoundationOrganAdapter` through a
                 // host-style `QinaoOrganEndpoint` conformance and

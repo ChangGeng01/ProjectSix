@@ -3,7 +3,7 @@ import Foundation
 /// Cohesive grouping of the six flat memory/cache/KV/admission opt-in knobs that used to be loose parameters on
 /// `MLXOrganAdapter.init`. A value type so a host configures memory in ONE place instead of threading six
 /// parameters. **Byte-equal-off (ADR-014):** `MLXMemoryPolicy()` reproduces today's exact adapter defaults
-/// field-for-field, so `MLXOrganAdapter(memoryPolicy: MLXMemoryPolicy())` == the bare `MLXOrganAdapter()`.
+/// field-for-field when both adapter constructor forms receive the same explicit catalog entry.
 public struct MLXMemoryPolicy: Sendable, Equatable {
 
     /// MLX free-buffer pool ceiling (bytes) to apply on load, or nil to leave unbounded. The ADR-038

@@ -491,13 +491,13 @@ existing test target. Only files with actual affected references need edits;
 the others are verification scope. Unlisted concrete compile callers require
 a narrow root ruling before edits, not a broad migration.
 
-- [ ] **Step 1 — preserve the real failure.** Run only
+- [x] **Step 1 — preserve the real failure.** Run only
   `BASProviderBoundaryTests/testProductionDefaultComesFromManifestOnly` on the
   handed-back BAS scratch before edits. Preserve its actual catalog-default and
   competing-recommendation assertion failure. No full baseline rerun. Then add
   focused lookup/construction tests; test API absence via a temporary compilable
   stub if needed, never count a compiler error as behavioral RED.
-- [ ] **Step 2 — separate selection from certification.** Implement this exact
+- [x] **Step 2 — separate selection from certification.** Implement this exact
   lookup contract in the existing catalog, with an Equatable local error type:
 
   ```swift
@@ -523,7 +523,7 @@ a narrow root ruling before edits, not a broad migration.
   identity, not artifact provenance or certification of arbitrary manifest facts.
   Preserve explicit local-only experiment entries without adding them to a
   published/default catalog merely to satisfy this lookup.
-- [ ] **Step 3 — explicit adapter and legacy callers.** Remove only the default
+- [x] **Step 3 — explicit adapter and legacy callers.** Remove only the default
   value from both `model: MLXModelCatalog.Entry` constructor parameters. Keep
   their other parameters/delegation unchanged. Migrate every affected test and
   the named probe to the model its assertions actually concern, normally explicit
@@ -541,7 +541,7 @@ a narrow root ruling before edits, not a broad migration.
   for an explicit suitable selection, not a removed recommendation API. Keep
   all explicit Qinao enum raw values/Codable identity and LoRA training targets;
   `makeLoRATrainer(model:configuration:)` simply requires its model argument.
-- [ ] **Step 4 — real manifest-to-factory path.** Add the no-model public
+- [x] **Step 4 — real manifest-to-factory path.** Add the no-model public
   overload and make the current enum overload explicit-only. Both must use one
   small internal selected-entry composition path, preserving actual load,
   wrapper, prewarm, registration and Task5 exact descriptor-ID binding. Do not
@@ -571,7 +571,7 @@ a narrow root ruling before edits, not a broad migration.
   or pick Gemma on refusal. Keep legacy explicit-experiment memory policy and
   named throughput behavior unchanged. The estimated check is not an OS heap
   guarantee or proof of actual device performance.
-- [ ] **Step 5 — behavioral tests and compatibility.** Replace the old W0
+- [x] **Step 5 — behavioral tests and compatibility.** Replace the old W0
   catalog-list/recommendation assertions with actual manifest -> exact entry ->
   adapter identity/EOS assertions, not deletion of the default invariant. Cover:
   default Qwen, known explicit Gemma manifest, unknown ID typed refusal, both
@@ -585,7 +585,7 @@ a narrow root ruling before edits, not a broad migration.
   Preserve existing enum round-trip/picker/cache, memory rejection/dual-residency,
   speculation and unsupported-framework controls. No network/model loading in
   these tests; no opt-in E2E activation.
-- [ ] **Step 6 — verify and hand back.** The sole implementer owns BAS scratch
+- [x] **Step 6 — verify and hand back.** The sole implementer owns BAS scratch
   `/private/tmp/qinao-bas-native-test-1329bde3` and Qinao scratch
   `/private/tmp/qinao-sdk-native-test-7806dc5a` serially. Use Xcode-beta27,
   `--build-system native` and the real MLX_METAL_PATH already recorded in Task3.
@@ -604,3 +604,178 @@ It already passes an explicit adapter entry, so this API migration does not
 change it. Reconcile that selector and misleading experiment labels in a later
 bounded device-host follow-through before claiming end-to-end default convergence.
 The two full Qinao provider-inversion/shared-operation failures remain open.
+
+Task6 acceptance: focused111 BAS +26 Qinao tests passed without failures or
+skips. Independent review required an exact typed unknown-model error assertion;
+root authorized the already-used local BASMLXAdapter product as a direct test
+dependency in QinaoRuntimeSDK/Package.swift. No external dependency/version/lock
+changed. The repaired test rejected an unrelated CancellationError; restored12
+tests and scoped re-review passed. Root's fresh post-review4 BAS +12 Qinao tests
+passed, both exit0. See ../validation/2026-09-09-manifest-selected-mlx-default.md
+for source identity and verification limitations.
+
+## Task 7: Protect recent current-brain records from automatic retention
+
+Begin only after Task6 source/scratch handback, accepted review and commit.
+This fixes exact DS1 occurrence `occ_a2e754149cb4be652cb65b36`, not all
+retention backends. Root and an independent read-only investigator traced the
+two selectors and their real SwiftData delete/save consumers at601ef287.
+The user explicitly requires at least three days of persistence. The current
+60-update/40-checkpoint caps can delete minute-old records under ordinary writes.
+
+**Invariant and compatibility:** every record with `createdAt >= now - 72 hours`
+is protected from automatic count/age pruning, inclusively. The existing count
+becomes a soft target while protected records exceed it. Preserve the default
+60/40 counts and14/30day optional windows, public function signatures, the
+different existing equal-time ordering rules, checkpoint dedup/linkage,
+writer results/save callbacks and explicit user deletion. The minimum age
+must not interfere with `revokeCheckpoints(for:)`. No authenticated retention
+service, new quota/admission authority, snapshot catalog or model work belongs
+in this patch. It does not promise storage-failure survival or permanent pins.
+
+**Files and interfaces:**
+
+- Add one internal helper at
+  `BehavioralAISubstrate/Sources/BASMemory/BASMinimumRecoveryRetention.swift`.
+  It receives already canonically ordered `(id, createdAt)` values and returns
+  retained IDs; it does not sort, delete, persist or access the clock itself.
+- Modify only the retained-ID selection bodies and directly relevant public
+  documentation in `CurrentBrainPersistenceCore.swift` and `EvolutionCore.swift`
+  in the same module. Preserve both existing sorting implementations.
+- Modify the existing test files under
+  `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/`:
+  `BASCurrentBrainPersistenceCoreTests.swift`, `BASEvolutionCoreTests.swift`,
+  `BASAppleCurrentBrainUpdateWriterTests.swift`, and
+  `BASAppleEvolutionCheckpointWriterTests.swift`.
+- Read and run unchanged composition controls in
+  `BASAppleCurrentBrainCommitterTests.swift`,
+  `BASAppleCurrentBrainHostLifecycleRuntimeTests.swift`, and
+  `BASAppleCurrentBrainBootstrapTests.swift`. A demonstrated affected assertion
+  outside the four editable test files requires a narrow root ruling.
+- Actual writers/committer remain unchanged; their deletion decisions must be
+  corrected through the real shared planner boundary, not a test-only helper.
+
+- [ ] **Step 1 — actual behavioral RED.** In the existing update-planner
+  regression at lines44-90, preserve its two minute-old fixtures, one stale
+  fixture and `maxEntries: 1`, but require both recent IDs:
+
+  ```swift
+  #expect(retained == Set([
+      UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+      UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+  ]))
+  ```
+
+  Rename the test to describe minimum-age protection, then run only
+  `BASCurrentBrainPersistenceCoreTests` against the existing implementation.
+  Record the expected missing-recent-ID assertion failure and the legitimate
+  input-normalization control. No whole-baseline repeat or compiler-error RED.
+
+- [ ] **Step 2 — one small selection policy.** Implement the following shared
+  selection, retaining each caller's canonical order before mapping the tuples:
+
+  ```swift
+  import Foundation
+
+  enum BASMinimumRecoveryRetention {
+      static let interval: TimeInterval = 72 * 60 * 60
+
+      static func retainedIDs<ID: Hashable>(
+          in ordered: [(id: ID, createdAt: Date)],
+          now: Date,
+          maxEntries: Int,
+          retentionInterval: TimeInterval
+      ) -> Set<ID> {
+          let floor = now.addingTimeInterval(-interval)
+          let protected = Set(ordered.filter { $0.createdAt >= floor }.map(\.id))
+          let optionalInterval = retentionInterval.isNaN || retentionInterval < 0
+              ? 0 : retentionInterval
+          let eligible: [(id: ID, createdAt: Date)]
+          if optionalInterval == .infinity {
+              eligible = ordered
+          } else {
+              let optionalFloor = now.addingTimeInterval(-optionalInterval)
+              eligible = ordered.filter { $0.createdAt >= optionalFloor }
+          }
+          return protected.union(eligible.prefix(max(0, maxEntries)).map(\.id))
+      }
+  }
+  ```
+
+  Both public functions call this helper with their existing ordered records,
+  `now`, count and interval. Document intentional policy: negative count means
+  no optional older records; zero/negative/NaN/negative-infinite intervals
+  grant no optional age window beyond the mandatory floor. Positive infinity
+  preserves no-age-expiry intent, still subject to the soft count beyond the
+  floor. Future records remain protected as before; clock attestation, invalid
+  record-date repair and timestamp clamping are outside this finite patch.
+
+- [ ] **Step 3 — planner regressions and truthful old controls.** For each
+  public planner, exercise these values through its actual public function:
+
+  - Default61fresh updates /41distinct fresh checkpoints retain all IDs.
+  - `maxEntries: 0` and a one-hour interval: exactly72hours old and future
+    records survive; a record older by one second does not.
+  - Counts0,-1 and1 preserve fresh records; a positive small cap with one
+    protected record selects only the newest eligible older allowance.
+  - Equal-time older records preserve UUID-string ascending for updates and
+    ID descending for checkpoints. Include older candidates within14/30days
+    plus a record outside that window, preserving age cleanup.
+  - Intervals0,-1,NaN,-infinity cannot remove protected records; +infinity
+    retains an old record when the count has room. Use an independent literal
+    259200seconds in boundary expectations, not only the helper constant.
+
+  Keep the existing update-writer/evolution-writer count-cleanup controls by
+  aging their evicted fixtures beyond72hours and keeping them within the
+  configured optional window. Retain a separate fresh-over-cap assertion.
+  Preserve checkpoint dedup assertions and the existing recent-record explicit
+  forget regression. Do not remove coverage or simply lower expected counts.
+
+- [ ] **Step 4 — actual disk persistence and reopen.** Add one test beside each
+  existing writer fixture, using its actual exported writer. Each test uses
+  one unique temporary directory, explicit fixture-only schema and no CloudKit:
+
+  ```swift
+  let schema = Schema([UpdateWriterFixture.self])
+  let configuration = ModelConfiguration(
+      schema: schema, url: storeURL, cloudKitDatabase: .none)
+  let container = try ModelContainer(for: schema, configurations: [configuration])
+  let context = ModelContext(container)
+  ```
+
+  The checkpoint test uses `EvolutionCheckpointFixture.self` instead. The SDK
+  interface confirms both initializers; runtime success is not yet established.
+  Seed60fresh update fixtures plus one older than14days, then invoke public
+  `persist` for fresh update61 with defaults. For checkpoints seed40fresh
+  fixtures plus one older than30days, then invoke public `record` for a distinct
+  41st fingerprint so dedup cannot bypass selection. Save failures must fail
+  the test via `onSaveError`, not be ignored. Assert exact fresh ID sets and
+  removal of the intentionally expired fixture.
+
+  Scope and release all first container/context/model/result references;
+  reopen a new container using the same schema, URL and configuration. Fetch
+  from the new context and verify the61/41 fresh IDs and content fields, new
+  checkpoint identity, and absence of the expired fixture. Do not label a
+  second context on the same container as a cold reopen. Delete only the
+  test-owned directory including sidecars afterward; report cleanup failures
+  using Testing.Issue.record rather than swallowing them. No user database,
+  default app container, iCloud, real provider, model or device access.
+
+- [ ] **Step 5 — focused verification and handback.** Use handed-back BAS
+  native scratch `/private/tmp/qinao-bas-native-test-1329bde3`, Xcode-beta27 and
+  the retained real MLX_METAL_PATH. Run all seven named suites with:
+
+  ```text
+  swift test --package-path BehavioralAISubstrate --build-system native
+    --scratch-path /private/tmp/qinao-bas-native-test-1329bde3
+    --filter 'BASCurrentBrainPersistenceCoreTests|BASEvolutionCoreTests|BASAppleCurrentBrainUpdateWriterTests|BASAppleEvolutionCheckpointWriterTests|BASAppleCurrentBrainCommitterTests|BASAppleCurrentBrainHostLifecycleRuntimeTests|BASAppleCurrentBrainBootstrapTests'
+  ```
+
+  Record actual selected counts for XCTest and Swift Testing, all failures,
+  skips and full logs. A compile failure, zero selected tests or skipped disk
+  regression is not proof of the fix. Inspect the complete diff and direct
+  callers, preserve the original RED and legitimate cleanup/deletion controls,
+  then hand back `task-7-report.md` and the exact source patch. Root owns fresh
+  independent review, final verification, commit and upload. No staging,
+  commit/push, subagents, scans, full baseline repeat, dependency or toolchain
+  changes within the implementation. DS3 is still separately authorized.

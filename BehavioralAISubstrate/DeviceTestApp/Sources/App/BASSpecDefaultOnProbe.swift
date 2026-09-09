@@ -8,7 +8,7 @@
 //    fit gate → temp-gated shouldSpeculate routes greedy requests — had only host tests. This probe runs THAT
 //    path: a bare speculativeOptimalTarget adapter (must auto-engage; greedy streamDraft AND the non-streaming
 //    draft() both speculative) byte-compared + timed against an explicit `.off` adapter, plus the dormancy check
-//    (a bare default-Gemma adapter must report willEngageSpeculation=false WITHOUT loading anything).
+//    (an explicitly selected Gemma experiment must report willEngageSpeculation=false WITHOUT loading anything).
 //    AUDIT-4 disclosure: the probe's two adapters share the PROCESS-GLOBAL MLXRuntimeConfig — the auto adapter's
 //    UNION cache cap (768MB, .explicitOverride) is set first, and the later .off adapter's 512MB .adapterDefault
 //    is rejected (first-write policy) — so the baseline also ran under 768MB. Byte-equal by doctrine (the cap is
@@ -53,9 +53,27 @@ enum BASSpecDefaultOnProbe {
         defer { fileLog.close() }
         fileLog.emit("📊 spec-defaulton START decode_cap=\(decodeCap)")
 
-        // Dormancy check FIRST (no load — pure config): the DEFAULT Gemma target must NOT plan to engage.
-        let gemmaDefault = MLXOrganAdapter()   // the actual shipping default (Gemma4 E4B target)
-        fileLog.emit("📊 spec-defaulton gemma-default will_engage=\(gemmaDefault.willEngageSpeculation) "
+        // Construction-only production observation: resolve the exact BAS manifest entry and mirror the
+        // factory's admission policy without calling loadModel (no download and no model residency).
+        do {
+            let manifest = BASModelManifestRegistry.productionDefault
+            let entry = try MLXModelCatalog.entry(for: manifest)
+            let cap = BASMLXMemoryModel.resolvedActiveHardCapBytes()
+                ?? BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes
+            let productionConstruction = MLXOrganAdapter(
+                model: entry,
+                memoryPolicy: MLXMemoryPolicy(
+                    enforceMemoryAdmission: true,
+                    activeHardCapBytes: cap))
+            fileLog.emit("📊 spec-defaulton manifest-construction-only model_id=\(productionConstruction.model.id) "
+                + "provider_id=\(productionConstruction.descriptor.providerID) cap_bytes=\(cap) loaded=false")
+        } catch {
+            fileLog.emit("📊 spec-defaulton manifest-construction-only refused=\(error) loaded=false")
+        }
+
+        // Dormancy experiment FIRST (no load — pure config): explicitly selected Gemma E4B must NOT plan to engage.
+        let gemmaExperiment = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
+        fileLog.emit("📊 spec-defaulton gemma-explicit-experiment will_engage=\(gemmaExperiment.willEngageSpeculation) "
             + "(expected false — pair exceeds the fit budget; stays single-model)")
 
         do {
@@ -102,9 +120,10 @@ enum BASSpecDefaultOnProbe {
                 + "draft_byte_identical=%d/%d spec_stream_ms=%.0f spec_draft_ms=%.0f base_ms=%.0f",
                 streamMatches, prompts.count, draftMatches, prompts.count, specMean, draftMean, baseMean))
             let verified = streamMatches == prompts.count && draftMatches == prompts.count
-                && active && failReason == nil && !gemmaDefault.willEngageSpeculation
+                && active && failReason == nil && !gemmaExperiment.willEngageSpeculation
             fileLog.emit("📊 spec-defaulton FINAL verified=\(verified) "
-                + "(default auto path: plan→load→engage→byte-identical, Gemma dormant; n=1 device per run)")
+                + "(auto speculation path: plan→load→engage→byte-identical, explicit Gemma experiment dormant; "
+                + "n=1 device per run)")
         } catch {
             fileLog.emit("📊 spec-defaulton FINAL verified=false error=\(error)")
         }

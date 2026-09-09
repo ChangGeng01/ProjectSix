@@ -1,8 +1,9 @@
 import Foundation
+import BASOrgan
 
 /// M220 — known-good MLX model identifiers for the Qinao runtime.
-/// M236 retired Gemma 3n entries. The CERTIFIED defaults are Gemma 4
-/// + Gemma 3 4B (`defaultEntries`); standard-architecture stable
+/// M236 retired Gemma 3n entries. The certified entries are Gemma 4
+/// + Gemma 3 4B (`certifiedEntries`); standard-architecture stable
 /// fallbacks (Llama 3.2, Qwen2.5) are exposed as host-opt-in
 /// `availableAlternatives` (ADR-038) — see those members for the
 /// honest cert scope. `allEntries` = both, for SDK pickers.
@@ -15,7 +16,7 @@ import Foundation
 /// Three 4-bit instruction-tuned text-only models, suitable for
 /// on-device chat:
 ///
-/// - `gemma4_E4B_4bit` — Gemma 4 E4B, the **recommended default**.
+/// - `gemma4_E4B_4bit` — Gemma 4 E4B, a certified explicit choice.
 ///   Newest architecture; ~4B effective parameter count. Note the
 ///   turn terminator is `<turn|>` (not `<end_of_turn>`).
 /// - `gemma4_E2B_4bit` — Gemma 4 E2B, the smallest variant.
@@ -28,6 +29,10 @@ import Foundation
 /// The struct is `Sendable` value-type so hosts can store it in
 /// snapshots or audit ledgers without ownership concerns.
 public struct MLXModelCatalog: Sendable, Equatable {
+
+    public enum LookupError: Error, Equatable {
+        case unknownModelID(String)
+    }
 
     public struct Entry: Sendable, Equatable, Hashable, Codable {
         /// Hugging Face repository identifier
@@ -77,7 +82,7 @@ public struct MLXModelCatalog: Sendable, Equatable {
     }
 
     /// Gemma 4 E4B instruction-tuned, 4-bit quantized.
-    /// **Recommended default for QinaoSampleApp.**
+    /// Certified for hosts that select it explicitly.
     public static let gemma4_E4B_4bit = Entry(
         id: "mlx-community/gemma-4-e4b-it-4bit",
         providerID: "mlx.gemma4.e4b.it.4bit",
@@ -115,7 +120,7 @@ public struct MLXModelCatalog: Sendable, Equatable {
     /// wedges Gemma-3n (Llama ran 20/20 where Gemma wedged at ~3) — so it is the **stable-architecture
     /// fallback** exposed for hosts that want to avoid the Gemma-3n wedge class entirely. Llama 3 turn
     /// terminator is `<|eot_id|>`. (Available, host opt-in — see `availableAlternatives`; not in the certified
-    /// `defaultEntries`.)
+    /// `certifiedEntries`.)
     public static let llama3_2_3B_4bit = Entry(
         id: "mlx-community/Llama-3.2-3B-Instruct-4bit",
         providerID: "mlx.llama3_2.3b.it.4bit",
@@ -125,7 +130,7 @@ public struct MLXModelCatalog: Sendable, Equatable {
     /// Qwen2.5 3B instruction-tuned, 4-bit. Another STANDARD-architecture (ChatML) stable fallback alongside
     /// Llama — different vendor/tokenizer, same "no Gemma-3n variable-shape accumulation" property. Qwen uses
     /// the ChatML turn terminator `<|im_end|>`. (Available, host opt-in — see `availableAlternatives`; not yet
-    /// on-device certified, so not in `defaultEntries`.)
+    /// on-device certified, so not in `certifiedEntries`.)
     public static let qwen2_5_3B_4bit = Entry(
         id: "mlx-community/Qwen2.5-3B-Instruct-4bit",
         providerID: "mlx.qwen2_5.3b.it.4bit",
@@ -151,7 +156,7 @@ public struct MLXModelCatalog: Sendable, Equatable {
     /// is stripped by `Qwen35Model.sanitize`). ChatML `<|im_end|>`. Load the v12 adapter via
     /// `loadAdapter(from:, configuration: .init(rank: 4, scale: 12.0), numLayers: 16)`.
     /// MEMORY: a 4B GDN + MambaCache on the 8 GB A19 is UNVALIDATED — host dry-run first; watch jetsam.
-    /// (Available, host opt-in; not yet on-device certified, so not in `defaultEntries`.)
+    /// (Available, host opt-in; not yet on-device certified, so not in `certifiedEntries`.)
     public static let qwen3_5_4B_4bit = Entry(
         id: "mlx-community/Qwen3.5-4B-4bit",
         providerID: "mlx.qwen3_5.4b.4bit",
@@ -304,45 +309,21 @@ public struct MLXModelCatalog: Sendable, Equatable {
         extraEOSTokens: [],
         localDirectoryName: "models/Granite-4.0-H-Tiny-4bit-DWQ")
 
-    /// Default Gemma entries, in the order they should appear in UI pickers. Gemma 4 leads (newest +
-    /// recommended); Gemma 3 4B trails as the long-context outlier. These are the ON-DEVICE-CERTIFIED picks.
-    public static let defaultEntries: [Entry] = [
+    /// On-device-certified Gemma entries, in their established picker order.
+    /// Certification is evidence about these choices; it does not select the
+    /// production default, which is owned by `BASModelManifestRegistry`.
+    public static let certifiedEntries: [Entry] = [
         gemma4_E4B_4bit,
         gemma4_E2B_4bit,
         gemma3_4B_it_4bit
     ]
 
-    /// Data-grounded constrained-device default selector (2026-06-12 dual-device run). The catalog's nominal
-    /// default is `gemma4_E4B_4bit`, but on a ≤~12 GB iPhone-class device E4B JETSAMS at weight-load (2 deaths
-    /// on deviceB — responses=0, never reached the first token) while E2B survives (peak 3114 MB / 261 MB
-    /// headroom under the ~3376 MB cap). A host that knows its device's per-process jetsam cap can ask for the
-    /// richest default that ADMITS under it instead of blindly loading E4B and dying mid-load.
-    ///
-    /// Purely additive: does NOT change `defaultEntries` or the hardcoded `MLXOrganAdapter` default
-    /// (byte-equal-off, ADR-014) — a host OPTS IN to device-aware selection.
-    ///
-    /// - Parameter capBytes: the device's per-process jetsam (ActiveHard) cap. Defaults to the measured iPhone
-    ///   Air value; a larger-RAM host passes its own (where E4B admits and is returned).
-    /// - Returns: `gemma4_E4B_4bit` where it fits under the cap, else `gemma4_E2B_4bit` (the measured survivor).
-    public static func recommendedDefault(
-        forActiveHardCapBytes capBytes: Int =
-            BASMLXMemoryModel.resolvedActiveHardCapBytes()             // 缝7: entitlement-aware
-                ?? BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes
-    ) -> Entry {
-        if !BASMLXMemoryBudget.wouldExceedActiveHardCap(
-            targetProviderID: gemma4_E4B_4bit.providerID,
-            capBytes: capBytes) {
-            return gemma4_E4B_4bit
-        }
-        return gemma4_E2B_4bit
-    }
-
     /// **Stable-architecture fallbacks** exposed to the product/SDK face (ADR-038): standard-arch LLMs that
     /// avoid the Gemma-3n variable-shape cache-pool wedge class. **Honest scope (R1 / 亏的不要上):** these are
-    /// *available, host opt-in* options — NOT yet on-device certified to the same bar as `defaultEntries`
+    /// *available, host opt-in* options — NOT yet on-device certified to the same bar as `certifiedEntries`
     /// (Llama: 20/20 in the §11.5 A/B but not a full endurance cert; Qwen: not yet exercised on-device). A host
     /// that hits the Gemma-3n wedge can switch to one of these via the catalog without waiting on the
-    /// cache-cap fix. Kept OUT of `defaultEntries` precisely so "default" stays = "certified".
+    /// cache-cap fix. Kept OUT of `certifiedEntries` so availability is not confused with certification.
     public static let availableAlternatives: [Entry] = [
         llama3_2_3B_4bit,
         qwen2_5_3B_4bit,
@@ -351,9 +332,21 @@ public struct MLXModelCatalog: Sendable, Equatable {
         qwen2_5_1_5B_4bit
     ]
 
-    /// Every selectable entry (certified defaults + opt-in alternatives) for SDK pickers that want to surface
-    /// the full set. Order: certified defaults first, then alternatives.
-    public static let allEntries: [Entry] = defaultEntries + availableAlternatives
+    /// Every published selectable entry (certified choices + opt-in alternatives) for SDK pickers that want to
+    /// surface the full set. Explicit local-only experiment entries remain outside this published view.
+    public static let allEntries: [Entry] = certifiedEntries + availableAlternatives
+
+    /// Resolve the exact published catalog entry named by a BAS capability
+    /// manifest. This maps identity only; it does not infer artifact provenance
+    /// or promote the manifest's facts into certification evidence.
+    public static func entry(
+        for manifest: BASModelCapabilityManifest
+    ) throws -> Entry {
+        guard let entry = allEntries.first(where: { $0.id == manifest.modelID }) else {
+            throw LookupError.unknownModelID(manifest.modelID)
+        }
+        return entry
+    }
 
     /// 结构大重构 — Phase 3: curated same-family TARGET → DRAFT speculative-decoding pairings. A target's value is
     /// the recommended SMALLER same-tokenizer-family draft to co-resident for speculative decoding. Keyed by the
@@ -380,10 +373,9 @@ public struct MLXModelCatalog: Sendable, Equatable {
     /// `enable` (Llama-3.2 3B↔1B: token-identity bytewise-verified, ~31% latency win, dual peak 2533 MB — fits
     /// the default per-process cap; 100 paired records / 2 devices; Docs/SPEC_DECODE_CERT_RESULTS.md).
     ///
-    /// HONEST TRADE (the default target is deliberately NOT changed): `gemma4_E4B_4bit` stays the quality
-    /// default, but its dual residency does NOT fit 8 GB, so greedy speculation stays dormant there. A host that
-    /// prioritizes LATENCY over the Gemma quality tier constructs its adapter with THIS entry — the auto-resolved
-    /// 1B draft engages and greedy turns get the certified speedup. Quality-vs-speed is the host's election;
-    /// this constant just makes the certified fast lane discoverable.
+    /// HONEST TRADE: this pointer does not change the BAS production manifest or select an adapter model.
+    /// An explicit Gemma E4B quality experiment remains speculation-dormant because its dual residency does not
+    /// fit 8 GB. A host that prioritizes latency constructs its adapter with THIS entry; the auto-resolved 1B
+    /// draft engages and greedy turns get the certified speedup. Quality-vs-speed remains the host's election.
     public static let speculativeOptimalTarget: Entry = llama3_2_3B_4bit
 }

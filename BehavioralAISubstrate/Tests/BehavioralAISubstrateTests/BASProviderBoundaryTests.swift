@@ -88,27 +88,44 @@ final class BASProviderBoundaryTests: XCTestCase {
             "SILICON-W0-VIOLATIONS \(violations.sorted())")
     }
 
-    func testProductionDefaultComesFromManifestOnly() {
-        let manifestDefaultID = BASModelManifestRegistry.productionDefault.modelID
+    func testProductionDefaultComesFromManifestOnly() throws {
+        let manifest = BASModelManifestRegistry.productionDefault
+        let manifestDefaultID = manifest.modelID
         XCTAssertEqual(
             manifestDefaultID,
             BASModelManifestRegistry.qwen35_4B_4bit.modelID)
 
-        let catalogDefaultIDs = MLXModelCatalog.defaultEntries.map(\.id)
-        let catalogRecommendationID = MLXModelCatalog.recommendedDefault(
-            forActiveHardCapBytes: Int.max
-        ).id
+        let entry = try MLXModelCatalog.entry(for: manifest)
+        let adapter = MLXOrganAdapter(model: entry)
+        XCTAssertEqual(entry.id, "mlx-community/Qwen3.5-4B-4bit")
+        XCTAssertEqual(entry.providerID, "mlx.qwen3_5.4b.4bit")
+        XCTAssertEqual(entry.extraEOSTokens, ["<|im_end|>"])
+        XCTAssertEqual(adapter.model, entry)
+        XCTAssertEqual(adapter.descriptor.providerID, "mlx.qwen3_5.4b.4bit")
+        XCTAssertEqual(adapter.descriptor.certificationTier, .experimental)
+    }
 
-        var violations: [String] = []
-        if catalogDefaultIDs != [manifestDefaultID] {
-            violations.append("model.manifest-invocation.catalog-default")
-        }
-        if catalogRecommendationID != manifestDefaultID {
-            violations.append("model.manifest-invocation.competing-recommendation")
-        }
+    func testKnownExplicitGemmaManifestResolvesExactCatalogEntry() throws {
+        let entry = try MLXModelCatalog.entry(
+            for: BASModelManifestRegistry.gemma4_E4B_4bit)
 
-        XCTAssertTrue(
-            violations.isEmpty,
-            "SILICON-W0-VIOLATIONS \(violations.sorted())")
+        XCTAssertEqual(entry, MLXModelCatalog.gemma4_E4B_4bit)
+        XCTAssertEqual(entry.extraEOSTokens, ["<turn|>"])
+    }
+
+    func testUnknownManifestModelIDHasTypedRefusal() {
+        let manifest = BASModelCapabilityManifest(
+            modelID: "mlx-community/unknown-task6-model",
+            architecture: .trimmableAttention,
+            draft: .none,
+            quantBits: 4,
+            peakBytesEstimate: 1,
+            contextCapTokens: 1)
+
+        XCTAssertThrowsError(try MLXModelCatalog.entry(for: manifest)) { error in
+            XCTAssertEqual(
+                error as? MLXModelCatalog.LookupError,
+                .unknownModelID("mlx-community/unknown-task6-model"))
+        }
     }
 }

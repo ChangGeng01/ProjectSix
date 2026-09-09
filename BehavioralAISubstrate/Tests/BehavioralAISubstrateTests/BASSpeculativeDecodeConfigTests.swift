@@ -165,8 +165,10 @@ final class BASSpeculativeDecodeConfigTests: XCTestCase {
         // And it actually engages under the default fit budget (the whole point of the pointer).
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.speculativeOptimalTarget)
         XCTAssertTrue(adapter.willEngageSpeculation)
-        // The DEFAULT target stays Gemma (quality default unchanged — the honest trade is documented).
-        XCTAssertEqual(MLXOrganAdapter().model, MLXModelCatalog.gemma4_E4B_4bit)
+        // Existing Gemma dormancy experiments remain an explicit quality-target choice.
+        XCTAssertEqual(
+            MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit).model,
+            MLXModelCatalog.gemma4_E4B_4bit)
     }
 
     #if canImport(MLXLLM)

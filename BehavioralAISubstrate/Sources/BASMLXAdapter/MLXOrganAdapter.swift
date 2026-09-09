@@ -633,7 +633,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     #endif
 
     public init(
-        model: MLXModelCatalog.Entry = MLXModelCatalog.gemma4_E4B_4bit,
+        model: MLXModelCatalog.Entry,
         providerID: String? = nil,
         providerName: String? = nil,
         supportsStreaming: Bool = true,
@@ -692,19 +692,18 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             maxOutputTokens: maxOutputTokens,
             runsOnDevice: true,
             supportedRoles: supportedRoles,
-            // ADR-041 §D — matrix metadata: MLX is the open-weight on-device lane. The default Gemma entries are
+            // ADR-041 §D — matrix metadata: MLX is the open-weight on-device lane. The certified Gemma entries are
             // on-device certified; the Llama/Qwen `availableAlternatives` are experimental.
             providerKind: .mlx,
-            certificationTier: MLXModelCatalog.defaultEntries.contains { $0.providerID == model.providerID }
+            certificationTier: MLXModelCatalog.certifiedEntries.contains { $0.providerID == model.providerID }
                 ? .certified : .experimental)
     }
 
     /// Convenience init grouping the six memory/cache/KV/admission knobs into one `MLXMemoryPolicy` instead of
-    /// six flat parameters. Delegates to the designated init — `MLXOrganAdapter(memoryPolicy: MLXMemoryPolicy())`
-    /// is byte-identical to the bare `MLXOrganAdapter()`. `memoryPolicy` is required (no default) so it never
-    /// collides with the zero-arg designated init.
+    /// six flat parameters. Delegates to the designated init; when both forms receive the same explicit model,
+    /// `MLXMemoryPolicy()` reproduces the flat initializer's memory defaults exactly.
     public init(
-        model: MLXModelCatalog.Entry = MLXModelCatalog.gemma4_E4B_4bit,
+        model: MLXModelCatalog.Entry,
         providerID: String? = nil,
         providerName: String? = nil,
         supportsStreaming: Bool = true,
@@ -835,7 +834,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 throw BASOrganError.providerUnavailable(
                     reason: "model \(model.providerID) projected peak footprint exceeds the device jetsam "
                         + "cap (\(cap / (1024 * 1024)) MB) — would SIGKILL at load; pick a smaller model "
-                        + "(see MLXModelCatalog.recommendedDefault(forActiveHardCapBytes:))")
+                        + "by passing an explicit suitable MLXModelCatalog.Entry")
             }
         }
 
