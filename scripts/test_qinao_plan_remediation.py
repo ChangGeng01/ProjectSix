@@ -70,9 +70,6 @@ NONEMPTY_XCODE = ROOT / "scripts/run_nonempty_xcode_test.py"
 IOS27_FLOOR = ROOT / "BehavioralAISubstrate/scripts/check-ios27-floor.sh"
 QINAO_PACKAGE = ROOT / "QinaoRuntimeSDK/Package.swift"
 QINAO_TEST_DIRECTORY = ROOT / "QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests"
-ORDINARY_WORKFLOW = ROOT / ".github/workflows/test.yml"
-PROTECTED_WORKFLOW = ROOT / ".github/workflows/qinao-wave-admission.yml"
-WORKFLOW_META_TEST = ROOT / "scripts/test_test_workflow_owner_ledger.py"
 SOURCE_REVIEW_LEDGER_START = "#### QINAO-SOURCE-REVIEW-CLOSURE-V1"
 SOURCE_REVIEW_LEDGER_END = "#### END QINAO-SOURCE-REVIEW-CLOSURE-V1"
 SOURCE_REVIEW_IDS = {
@@ -1492,7 +1489,7 @@ class QinaoPlanRemediationTests(unittest.TestCase):
         self.assertIn("case tag, maximumCount", missed_run)
         self.assertIn("exactKeySet(", missed_run)
 
-    def test_w0_bootstrap_tools_and_ci_module_sets_are_nonvacuous(self) -> None:
+    def test_w0_bootstrap_tool_inputs_remain_nonvacuous(self) -> None:
         expected_paths = (
             "scripts/run_nonempty_xcode_test.py",
             "scripts/test_run_nonempty_xcode_test.py",
@@ -1511,20 +1508,9 @@ class QinaoPlanRemediationTests(unittest.TestCase):
         self.assertIn("expected-set gate is evaluated even when both a file", task_one)
         self.assertIn("absent from the W1 path list", task_one)
 
-        modules = (
-            "scripts.test_run_nonempty_xcode_test",
-            "scripts.test_check_artifact_mesh_device_recovery",
-            "scripts.test_prepare_qinao_v2_wave_candidate",
-            "scripts.test_run_qinao_managed_convergence",
-        )
-        workflow_texts = (
-            ORDINARY_WORKFLOW.read_text(encoding="utf-8"),
-            PROTECTED_WORKFLOW.read_text(encoding="utf-8"),
-            WORKFLOW_META_TEST.read_text(encoding="utf-8"),
-        )
-        for module in modules:
-            for text in workflow_texts:
-                self.assertIn(module, text)
+        # The historical W0 inputs remain available. Their admission module
+        # list no longer defines ordinary product CI; that workflow is covered
+        # by test_test_workflow_owner_ledger.
 
     def test_device_lab_cross_process_seam_and_entitlements_are_closed(
         self,
