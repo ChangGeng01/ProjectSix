@@ -8,7 +8,7 @@
 #
 # ## Usage
 #
-#     pip3 install coremltools torch
+#     pip3 install coremltools 'torch>=2.10.0' packaging
 #     python3 train.py
 #     python3 convert.py
 #     # → produces BASContextClassifier.mlpackage
@@ -39,9 +39,10 @@ try:
     import torch
     import torch.nn as nn
     import coremltools as ct
+    from checkpoint_loader import load_classifier_checkpoint
 except ImportError:
     print("ERROR: missing deps. Run:")
-    print("  pip3 install torch coremltools")
+    print("  pip3 install 'torch>=2.10.0' packaging coremltools")
     sys.exit(1)
 
 # Re-define the model architecture identically to train.py
@@ -69,11 +70,7 @@ def main():
         sys.exit(1)
 
     # 1. Load checkpoint
-    ckpt = torch.load(
-        CHECKPOINT_PATH,
-        map_location="cpu",
-        weights_only=False,
-    )
+    ckpt = load_classifier_checkpoint(CHECKPOINT_PATH)
     num_buckets = ckpt["num_buckets"]
     hidden = ckpt["hidden"]
     num_classes = ckpt["num_classes"]

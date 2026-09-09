@@ -24,7 +24,7 @@
 # ## Environment (coreai-core has NO Python 3.14 wheel — use 3.12)
 #
 #     uv venv /tmp/coreai-cv --python 3.12
-#     uv pip install --python /tmp/coreai-cv/bin/python coreai-torch
+#     uv pip install --python /tmp/coreai-cv/bin/python coreai-torch 'torch>=2.10.0' packaging
 #     /tmp/coreai-cv/bin/python convert_coreai.py
 #     # → BASContextClassifier.aimodel  (copy into Sources/BASAppleAdapters/Resources/)
 #
@@ -42,9 +42,10 @@ try:
     import torch
     import coreai_torch
     from coreai_torch import TorchConverter
+    from checkpoint_loader import load_classifier_checkpoint
 except ImportError:
     print("ERROR: missing deps. In a Python 3.12 venv run:\n"
-          "  uv pip install coreai-torch")
+          "  uv pip install coreai-torch 'torch>=2.10.0' packaging")
     sys.exit(1)
 
 SCRIPT_DIR = Path(__file__).parent
@@ -73,7 +74,7 @@ def main() -> None:
         print(f"ERROR: checkpoint not found at {CHECKPOINT_PATH} — run train.py first")
         sys.exit(1)
 
-    ckpt = torch.load(CHECKPOINT_PATH, map_location="cpu", weights_only=False)
+    ckpt = load_classifier_checkpoint(CHECKPOINT_PATH)
     num_buckets = ckpt["num_buckets"]
     model = ContextClassifier(num_buckets, ckpt["hidden"], ckpt["num_classes"])
     model.load_state_dict(ckpt["state_dict"])
