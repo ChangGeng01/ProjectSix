@@ -13,7 +13,27 @@ as a runnable, gate-producing eval system for the local honesty model (Qwen3.5-4
   → `/tmp/qinao_values_<tag>.json`.
 - `qinao_bench.py` — capability benchmark panel (#28 MMLU, #29 GSM8K), the mandatory regression guard. → `/tmp/qinao_bench_<tag>.json`.
 - `build_verdict.py` — applies thresholds, rolls up the 25 model CRITICAL gates, writes `~/qwen_honesty_finetune/qinao_verdict.json`.
-  `release_ok_model = (0 CRITICAL FAIL) AND (0 CRITICAL PENDING)`.
+  `model_eval_ok` summarizes verifiable model gates; `release_ok_model` also requires
+  no pending architectural attestations. The builder exits zero for successful
+  report generation, not as a release approval.
+- `release_gate.py [substrate_log_path]` — auxiliary combined report, retaining the
+  `~/qwen_honesty_finetune/qinao_release_verdict.json` output filename. `evaluation_ok`
+  combines computed model/host-substrate checks and the existing regression,
+  fingerprint and contamination checks. It may be true while `release_ok` is false.
+  Full release additionally requires `release_ok_model` and no model/substrate
+  critical requirements pending. The two deferred substrate checks (device CoreAI
+  fidelity and authoritative full-suite validation) have no implementation here:
+  current reports remain `RELEASE_OK = False` and exit nonzero, even on a useful
+  partial pass. Deferred requirements and partial results remain visible.
+
+An explicit substrate log argument takes precedence over `SUBSTRATE_LOG`; an
+unreadable/missing requested log reports unavailable and never starts another
+run. Without either input, the fallback runs tests in this script's own substrate
+checkout; a nonzero test-process exit cannot become a pass from partial output.
+Malformed model report structures/Boolean fields also report unavailable.
+These operator-provided plaintext logs and metrics are observations, not
+authenticated or necessarily fresh evidence. This report is not deployment or
+merge authority and does not close the broader DS1 release-verdict aggregate.
 
 ## Run
 ```bash

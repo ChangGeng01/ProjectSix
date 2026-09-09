@@ -1,12 +1,17 @@
-"""QINAO Phase-3 — combined RELEASE GATE aggregator.
+"""QINAO Phase-3 — auxiliary combined evaluation report.
 
-Rolls the two QINAO halves into one release decision:
+Rolls the computable QINAO observations into a partial evaluation result:
 
-  release_ok = ALL(model_critical PASS)        # Local-Model 100  (build_verdict.py -> qinao_verdict.json)
+  evaluation_ok = model_eval_ok               # build_verdict.py -> qinao_verdict.json
            AND ALL(substrate_critical PASS)     # Substrate 100    (swift test --filter QINAO)
            AND never_worse                       # regression gate vs baseline
            AND data_fp_match                     # frozen eval-data sha256 manifest matches
            AND contamination_clean               # train/eval contamination probe clean
+
+Full release additionally requires release_ok_model and NO pending model/substrate
+CRITICAL requirements. The two deferred substrate checks have no implementation
+here, so current reports cannot assert release_ok or exit zero. Plaintext inputs
+are observations, not authenticated/current-run evidence or merge authority.
 
 The substrate half is read from a `swift test --filter QINAO` log (env SUBSTRATE_LOG or
 the first CLI arg); if none is given the script runs the suite itself. The 2 substrate
@@ -22,9 +27,10 @@ Usage:
 Writes ~/qwen_honesty_finetune/qinao_release_verdict.json + prints the report.
 """
 import json, os, re, subprocess, sys
+from pathlib import Path
 
 PRESERVE = os.path.expanduser("~/qwen_honesty_finetune")
-REPO = os.path.expanduser("~/Project/Project06/Project06/BehavioralAISubstrate")
+REPO = str(Path(__file__).resolve().parents[2])
 EXPECTED_SUBSTRATE_GATES = 98  # authored + green host gates (see QINAO_SUBSTRATE_GATE_MAP.md)
 
 # H23 (mega-audit F3, 2026-07-08): the data-fingerprint gate must re-verify the EVAL
@@ -50,22 +56,30 @@ DEFERRED_SUBSTRATE = {
 
 def load_json(path):
     try:
-        return json.load(open(path))
+        with open(path) as handle:
+            return json.load(handle)
     except (OSError, ValueError):
         return None
 
 
 def substrate_log_text(arg_path):
     """Return the substrate test log: explicit path, env, or run the suite."""
-    path = arg_path or os.environ.get("SUBSTRATE_LOG")
-    if path and os.path.exists(path):
-        return open(path, errors="replace").read(), f"log:{path}"
+    path = arg_path if arg_path is not None else os.environ.get("SUBSTRATE_LOG")
+    if path is not None:
+        try:
+            with open(path, errors="replace") as handle:
+                return handle.read(), f"log:{path}"
+        except OSError as error:
+            return "", f"unavailable: requested log {path!r}: {error}"
     env = dict(os.environ, DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer")
     try:
         out = subprocess.run(
             ["swift", "test", "--filter", "QINAO", "--disable-swift-testing"],
             cwd=REPO, env=env, capture_output=True, text=True, timeout=1800)
-        return out.stdout + out.stderr, "ran:swift test --filter QINAO"
+        source = "ran:swift test --filter QINAO"
+        if out.returncode != 0:
+            source = f"unavailable: swift test --filter QINAO exit {out.returncode}"
+        return out.stdout + out.stderr, source
     except (OSError, subprocess.TimeoutExpired) as e:
         return "", f"unavailable: {e}"
 
@@ -99,19 +113,48 @@ def parse_substrate(text):
 
 def model_section():
     v = load_json(os.path.join(PRESERVE, "qinao_verdict.json"))
-    if v is None:
+
+    def unavailable(reason):
         return {"available": False, "model_eval_ok": False,
-                "reason": "qinao_verdict.json absent — run build_verdict.py first"}, None
-    rows = {r["key"]: r for r in v.get("rows", [])}
-    # H23 (mega-audit, 2026-07-08): the model-critical component now keys on
-    # `model_eval_ok` (every gate the eval CAN adjudicate genuinely passes), NOT the
-    # tautologically-False `release_ok_model`. The architectural attestations (#88/#89/#92)
-    # a model eval structurally cannot verify are surfaced as an explicit DEFERRED line
-    # instead of silently pinning the whole gate red with no unblock path.
+                "release_ok_model": False,
+                "reason": f"qinao_verdict.json unavailable: {reason}"}, None
+
+    if not isinstance(v, dict):
+        return unavailable("absent, unreadable or invalid JSON object — run build_verdict.py first")
+    for field in ("model_eval_ok", "release_ok_model"):
+        if type(v.get(field)) is not bool:
+            return unavailable(f"invalid {field}: expected JSON Boolean")
+    for field in ("critical_pass", "critical_fail", "critical_attest", "critical_pending"):
+        if type(v.get(field)) is not int or v[field] < 0:
+            return unavailable(f"invalid {field}: expected nonnegative integer")
+    pending = v.get("attestations_pending")
+    if (not isinstance(pending, list)
+            or any(type(n) is not int or n <= 0 for n in pending)
+            or len(set(pending)) != len(pending)):
+        return unavailable("invalid attestations_pending: expected distinct positive gate numbers")
+    raw_rows = v.get("rows")
+    if not isinstance(raw_rows, list) or not raw_rows:
+        return unavailable("invalid rows: expected nonempty list")
+    rows = {}
+    for row in raw_rows:
+        if not isinstance(row, dict):
+            return unavailable("invalid row: expected object")
+        key, status = row.get("key"), row.get("status")
+        if not isinstance(key, str) or not key or key in rows:
+            return unavailable("invalid row key: expected unique nonempty string")
+        if not isinstance(status, str) or status not in {"PASS", "FAIL", "PENDING", "NOTE", "ATTEST"}:
+            return unavailable(f"invalid row status: {key}")
+        if "critical_gate" in row and type(row["critical_gate"]) is not bool:
+            return unavailable(f"invalid row critical_gate Boolean: {key}")
+        rows[key] = row
+    # Keep useful computed results distinct from the stronger model release claim.
     return {
         "available": True,
-        "model_eval_ok": bool(v.get("model_eval_ok")),
-        "attestations_pending": v.get("attestations_pending", []),
+        "model_eval_ok": v["model_eval_ok"] is True,
+        "release_ok_model": v["release_ok_model"] is True,
+        "attestations_pending": pending,
+        "critical_rows_pending": [key for key, row in rows.items()
+                                  if row.get("critical_gate") is True and row["status"] != "PASS"],
         "critical_pass": v.get("critical_pass"), "critical_fail": v.get("critical_fail"),
         "critical_attest": v.get("critical_attest"), "critical_pending": v.get("critical_pending"),
     }, rows
@@ -201,8 +244,7 @@ def gate_keys_in_text(text):
 
 def authored_gate_keys():
     """The set of substrate gate keys actually authored in the test suite (uncommented)."""
-    tests = os.path.join(os.path.dirname(REPO), "BehavioralAISubstrate", "Tests", "BehavioralAISubstrateTests") \
-        if not os.path.isdir(os.path.join(REPO, "Tests")) else os.path.join(REPO, "Tests", "BehavioralAISubstrateTests")
+    tests = os.path.join(REPO, "Tests", "BehavioralAISubstrateTests")
     keys = set()
     for root, _dirs, files in os.walk(tests):
         for fn in files:
@@ -227,7 +269,8 @@ def main():
     substrate["authored"] = len(authored)
     substrate["missing_keys"] = missing_keys
     substrate_ok = (
-        substrate["failures"] == 0
+        not src.startswith("unavailable:")
+        and substrate["failures"] == 0
         and substrate["executed"] is not None
         and substrate["n_gates_passed"] >= EXPECTED_SUBSTRATE_GATES
         and len(authored) > 0
@@ -238,16 +281,26 @@ def main():
 
     model_deferred = {
         f"model_attest_{n}": "architectural attestation a model eval cannot verify — "
-        "needs a deployment-level attestation channel (offline/sovereignty/traceability)"
+        "unverified offline/sovereignty/traceability requirement; this report cannot resolve it"
         for n in model.get("attestations_pending", [])
     }
-    release_ok = (
+    evaluation_ok = (
         model.get("model_eval_ok", False)
         and substrate_ok
         and all(v for v, _ in aux.values())
     )
+    release_ok = (
+        evaluation_ok
+        and model.get("release_ok_model") is True
+        and not model_deferred
+        and not model.get("critical_rows_pending")
+        and all(model.get(key) == 0 for key in
+                ("critical_fail", "critical_attest", "critical_pending"))
+        and not DEFERRED_SUBSTRATE
+    )
 
     verdict = {
+        "evaluation_ok": evaluation_ok,
         "release_ok": release_ok,
         "components": {
             "model_critical": model.get("model_eval_ok", False),
@@ -262,27 +315,32 @@ def main():
     }
     out_path = os.path.join(PRESERVE, "qinao_release_verdict.json")
     try:
-        json.dump(verdict, open(out_path, "w"), indent=1)
+        with open(out_path, "w") as handle:
+            json.dump(verdict, handle, indent=1)
     except OSError:
         out_path = "(not written — preserve dir absent)"
 
-    print("=== QINAO Phase-3 combined RELEASE GATE ===")
+    print("=== QINAO Phase-3 auxiliary EVALUATION REPORT ===")
     print(f"substrate source: {src}")
-    print(f"  model_critical      : {_mark(model['model_eval_ok'])}  "
+    print(f"  model_critical(eval): {_mark(model['model_eval_ok'])}  "
           f"(PASS {model.get('critical_pass')} / FAIL {model.get('critical_fail')} / "
           f"ATTEST {model.get('critical_attest')} / PEND {model.get('critical_pending')})"
           if model["available"] else f"  model_critical      : {_mark(False)}  ({model.get('reason')})")
-    print(f"  substrate_critical  : {_mark(substrate_ok)}  "
+    print(f"  substrate_host     : {_mark(substrate_ok)}  "
           f"(executed {substrate['executed']}, failures {substrate['failures']}, "
           f"gates PASS {substrate['n_gates_passed']}/{EXPECTED_SUBSTRATE_GATES})")
     for k, (v, ev) in aux.items():
         print(f"  {k:<19} : {_mark(v)}  ({ev})")
-    print(f"\nRELEASE_OK = {release_ok}")
+    print(f"\nEVALUATION_OK = {evaluation_ok}")
+    print(f"RELEASE_OK = {release_ok}")
+    print(f"model release_ok_model = {model.get('release_ok_model', False)}")
+    if model.get("critical_rows_pending"):
+        print(f"model CRITICAL rows not PASS: {model['critical_rows_pending']}")
     if model_deferred:
-        print(f"\nmodel CRITICAL deferred (architectural attestation, NOT counted as pass — needs deployment channel):")
+        print(f"\nmodel CRITICAL deferred (NOT counted as release pass):")
         for k, why in model_deferred.items():
             print(f"  - {k}: {why}")
-    print(f"\nsubstrate CRITICAL deferred (device/CI/missing-script, NOT counted as pass):")
+    print(f"\nsubstrate CRITICAL deferred (device/CI, NOT counted as release pass):")
     for k, why in DEFERRED_SUBSTRATE.items():
         print(f"  - {k}: {why}")
     print(f"\nwrote {out_path}")
