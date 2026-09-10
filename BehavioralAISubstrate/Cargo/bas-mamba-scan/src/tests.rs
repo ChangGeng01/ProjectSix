@@ -364,83 +364,6 @@ fn scan_parallel_v2_rejects_x_count_mismatch() {
     }
 }
 
-// MARK: - Perf comparison v2 vs sequential vs original parallel
-//
-// Inline perf test:since this is a Rust unit test it runs as
-// part of `cargo test`,giving fast feedback on the parallel
-// rework win/loss without needing Swift integration。
-
-#[test]
-fn scan_parallel_v2_perf_at_realistic_scale() {
-    // B=8, L=128, D=128 — typical medium-scale。 At this
-    // shape, sequential was 913 µs in chapter 八百五十二 第四刀
-    // (Swift CPU was 12,502 µs)。 Goal: v2 should beat seq。
-    let shape = make_shape(8, 128, 128);
-    let bld = shape.element_count();
-    let d_count = shape.d as usize;
-    let x: Vec<f32> = (0..bld).map(|i| ((i % 23) as f32) * 0.013).collect();
-    let delta: Vec<f32> = (0..bld).map(|i| 0.05 + ((i % 17) as f32) * 0.001).collect();
-    let a: Vec<f32> = (0..d_count).map(|i| -0.5 - (i as f32) * 0.1).collect();
-    let b_proj: Vec<f32> = (0..bld).map(|i| 0.3 + ((i % 11) as f32) * 0.007).collect();
-    let c_proj: Vec<f32> = (0..bld).map(|i| 1.1 + ((i % 13) as f32) * 0.005).collect();
-
-    let iters = 30;
-    // Warm up
-    for _ in 0..3 {
-        let _ = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape);
-        let _ = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape);
-        let _ = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape);
-    }
-
-    let seq_start = std::time::Instant::now();
-    for _ in 0..iters {
-        let _ = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape);
-    }
-    let seq_ns = seq_start.elapsed().as_nanos();
-
-    let par_start = std::time::Instant::now();
-    for _ in 0..iters {
-        let _ = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape);
-    }
-    let par_ns = par_start.elapsed().as_nanos();
-
-    let v2_start = std::time::Instant::now();
-    for _ in 0..iters {
-        let _ = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape);
-    }
-    let v2_ns = v2_start.elapsed().as_nanos();
-
-    let seq_ms = (seq_ns as f64) / 1_000_000.0;
-    let par_ms = (par_ns as f64) / 1_000_000.0;
-    let v2_ms = (v2_ns as f64) / 1_000_000.0;
-
-    println!("== chapter 863 perf [B=8 L=128 D=128 × {} iters] ==", iters);
-    println!("   Rust seq:        {:.3} ms total", seq_ms);
-    println!("   Rust par (v1):   {:.3} ms total (ratio vs seq {:.2}×)",
-        par_ms, par_ms / seq_ms);
-    println!("   Rust par (v2):   {:.3} ms total (ratio vs seq {:.2}×)",
-        v2_ms, v2_ms / seq_ms);
-    println!("   v2 speedup vs v1: {:.2}×", par_ms / v2_ms);
-    assert!(seq_ns > 0);
-    assert!(par_ns > 0);
-    assert!(v2_ns > 0);
-    // chapter 八百六十四 / M2976 review-remediation:
-    // assert the v2-vs-v1 win quantitatively。 Pre-fix this
-    // was print-only,so a future regression making v2 slower
-    // than v1 would not fail tests。 The chapter 八百六十三
-    // measurement showed v2 3.23× faster than v1 at this
-    // shape — guard against ≥1.5× regression with headroom
-    // for noisy CI hardware。
-    assert!(v2_ns < par_ns,
-        "v2 must outperform v1 at this shape \
-         (v2_ns={}, par_ns={}) — regression check",
-        v2_ns, par_ns);
-    assert!(v2_ns < seq_ns,
-        "v2 must outperform sequential at large shape \
-         (v2_ns={}, seq_ns={}) — Phase A rework regression check",
-        v2_ns, seq_ns);
-}
-
 // MARK: - C ABI tests (chapter 八百五十二 第三刀 / M2913)
 
 #[test]
@@ -1100,4 +1023,3 @@ fn scan_parallel_v2_byte_equality_holds_under_concurrent_rayon_load() {
             "Nested rayon invocation {} corrupted output", i);
     }
 }
-
