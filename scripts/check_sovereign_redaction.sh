@@ -59,7 +59,7 @@ if [[ "${QINAO_CI_DIAGNOSTICS:-0}" == 1 ]]; then
       while IFS= read -r -d '' module; do
         modules+=("$module")
       done < "$DIAGNOSTIC_DIR/first-pass/modules.list"
-      for module in "${modules[@]}"; do
+      for module in ${modules[@]+"${modules[@]}"}; do
         relative="${module#.build/}"
         destination="$DIAGNOSTIC_DIR/first-pass/modules/$relative"
         mkdir -p "$(dirname "$destination")"
@@ -72,7 +72,7 @@ if [[ "${QINAO_CI_DIAGNOSTICS:-0}" == 1 ]]; then
       while IFS= read -r -d '' graph; do
         graphs+=("$graph")
       done < "$DIAGNOSTIC_DIR/first-pass/graphs.list"
-      for graph in "${graphs[@]}"; do
+      for graph in ${graphs[@]+"${graphs[@]}"}; do
         relative="${graph#.build/}"
         destination="$DIAGNOSTIC_DIR/first-pass/graphs/$relative"
         mkdir -p "$(dirname "$destination")"
@@ -120,7 +120,7 @@ if [[ "${QINAO_CI_DIAGNOSTICS:-0}" == 1 ]]; then
       while IFS= read -r -d '' module; do
         modules+=("$module")
       done < "$DIAGNOSTIC_DIR/after-test-products/modules.list"
-      for module in "${modules[@]}"; do
+      for module in ${modules[@]+"${modules[@]}"}; do
         relative="${module#.build/}"
         destination="$DIAGNOSTIC_DIR/after-test-products/modules/$relative"
         mkdir -p "$(dirname "$destination")"
@@ -133,7 +133,7 @@ if [[ "${QINAO_CI_DIAGNOSTICS:-0}" == 1 ]]; then
       while IFS= read -r -d '' graph; do
         graphs+=("$graph")
       done < "$DIAGNOSTIC_DIR/after-test-products/graphs.list"
-      for graph in "${graphs[@]}"; do
+      for graph in ${graphs[@]+"${graphs[@]}"}; do
         relative="${graph#.build/}"
         destination="$DIAGNOSTIC_DIR/after-test-products/graphs/$relative"
         mkdir -p "$(dirname "$destination")"

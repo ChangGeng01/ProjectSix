@@ -90,15 +90,25 @@ case "$1" in
     count=1
     [[ ! -f "$GRAPH_ATTEMPT" ]] || count=$(( $(< "$GRAPH_ATTEMPT") + 1 ))
     printf '%s\n' "$count" > "$GRAPH_ATTEMPT"
-    /bin/mkdir -p .build/fixture/debug/Modules .build/fixture/symbolgraph
+    /bin/mkdir -p .build/fixture/debug/Modules
     if [[ "$count" == 1 ]]; then
-      printf 'original module' > .build/fixture/debug/Modules/QinaoRuntimeSDKPackageTests.swiftmodule
-      printf 'original graph' > .build/fixture/symbolgraph/QinaoRuntimeSDK.symbols.json
+      if [[ "${FIRST_EMIT_MODULE:-1}" == 1 ]]; then
+        printf 'original module' > .build/fixture/debug/Modules/QinaoRuntimeSDKPackageTests.swiftmodule
+      fi
+      if [[ "${FIRST_EMIT_GRAPH:-1}" == 1 ]]; then
+        /bin/mkdir -p .build/fixture/symbolgraph
+        printf 'original graph' > .build/fixture/symbolgraph/QinaoRuntimeSDK.symbols.json
+      fi
       printf 'first dump failed\n'
       exit "${GRAPH_RC:-0}"
     fi
-    printf 'retry module' > .build/fixture/debug/Modules/QinaoRuntimeSDKPackageTests.swiftmodule
-    printf 'retry graph' > .build/fixture/symbolgraph/QinaoRuntimeSDK.symbols.json
+    if [[ "${RETRY_EMIT_MODULE:-1}" == 1 ]]; then
+      printf 'retry module' > .build/fixture/debug/Modules/QinaoRuntimeSDKPackageTests.swiftmodule
+    fi
+    if [[ "${RETRY_EMIT_GRAPH:-1}" == 1 ]]; then
+      /bin/mkdir -p .build/fixture/symbolgraph
+      printf 'retry graph' > .build/fixture/symbolgraph/QinaoRuntimeSDK.symbols.json
+    fi
     printf 'retry dump output\n'
     exit "${RETRY_RC:-0}"
     ;;
@@ -170,6 +180,10 @@ exit "${SCANNER_RC:-0}"
             "GRAPH_RC": "0",
             "BUILD_RC": "0",
             "RETRY_RC": "0",
+            "FIRST_EMIT_MODULE": "1",
+            "FIRST_EMIT_GRAPH": "1",
+            "RETRY_EMIT_MODULE": "1",
+            "RETRY_EMIT_GRAPH": "1",
             "TEE_RC": "0",
             "CP_RC": "0",
             "MV_RC": "0",
@@ -431,6 +445,65 @@ class CIFailureDiagnosticsTests(unittest.TestCase):
         self.assertEqual(self.fx.graph_bytes(diag, "after-test-products"), b"retry graph")
         self.assertEqual(self.fx.module_bytes(diag, "first-pass"), b"original module")
         self.assertEqual(self.fx.module_bytes(diag, "after-test-products"), b"retry module")
+
+    def test_empty_graph_diagnostic_collections_preserve_failure_and_complete_after_phase(self) -> None:
+        cases = (
+            dict(first_emit_module=0, first_emit_graph=0,
+                 retry_emit_module=0, retry_emit_graph=0),
+            dict(first_emit_module=0, first_emit_graph=1,
+                 retry_emit_module=0, retry_emit_graph=0),
+            dict(first_emit_module=1, first_emit_graph=0,
+                 retry_emit_module=1, retry_emit_graph=1),
+        )
+        expected_calls = [
+            "package --build-system native dump-symbol-graph",
+            "build --build-system native --build-tests --verbose",
+            "package --build-system native --verbose dump-symbol-graph",
+        ]
+        for case in cases:
+            with self.subTest(case=case):
+                fx = DiagnosticsFixture()
+                try:
+                    result = fx.run_graph(
+                        ci=True, graph_rc=71, build_rc=0, retry_rc=0, **case,
+                    )
+                    self.assertEqual(result.returncode, 1, result.stderr)
+                    self.assertNotIn("unbound variable", result.stderr)
+                    self.assertEqual(fx.scanner_calls(), [])
+                    self.assertEqual(fx.swift_calls(), expected_calls)
+                    diag = fx.diagnostics("qinao-symbolgraph-diagnostics.*")[0]
+                    self.assertEqual(
+                        (diag / "first-pass/dump.log").read_text(),
+                        "first dump failed\n",
+                    )
+                    self.assertEqual((diag / "exits.txt").read_text().splitlines(), [
+                        "first_dump=71",
+                        "preservation=0",
+                        "build_tests=0",
+                        "retry_dump=0",
+                        "after_preservation=0",
+                    ])
+                    phase_flags = (
+                        ("first-pass", "modules", case["first_emit_module"]),
+                        ("first-pass", "graphs", case["first_emit_graph"]),
+                        ("after-test-products", "modules", case["retry_emit_module"]),
+                        ("after-test-products", "graphs", case["retry_emit_graph"]),
+                    )
+                    for phase, collection, emitted in phase_flags:
+                        listing = diag / phase / f"{collection}.list"
+                        self.assertTrue(listing.is_file(), listing)
+                        if not emitted:
+                            self.assertEqual(listing.read_bytes(), b"")
+                    if case["first_emit_module"]:
+                        self.assertEqual(fx.module_bytes(diag, "first-pass"), b"original module")
+                    if case["first_emit_graph"]:
+                        self.assertEqual(fx.graph_bytes(diag, "first-pass"), b"original graph")
+                    if case["retry_emit_module"]:
+                        self.assertEqual(fx.module_bytes(diag, "after-test-products"), b"retry module")
+                    if case["retry_emit_graph"]:
+                        self.assertEqual(fx.graph_bytes(diag, "after-test-products"), b"retry graph")
+                finally:
+                    fx.cleanup()
 
     def test_graph_build_and_retry_failures_are_recorded_separately(self) -> None:
         result = self.fx.run_graph(ci=True, graph_rc=45, build_rc=46, retry_rc=47)
