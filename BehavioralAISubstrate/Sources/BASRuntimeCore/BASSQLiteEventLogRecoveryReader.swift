@@ -16,6 +16,54 @@ struct BASSQLiteEventLogRecoveryReader {
         self.db = db
     }
 
+    /// Reads one already-selected session identity after enforcing its public
+    /// UTF-8 byte budget with the same incremental preflight as recovery reads.
+    func sessionIdentity(
+        rowID: Int64,
+        storedType: String,
+        maximumUTF8Bytes: Int
+    ) throws -> (value: String, utf8ByteCount: Int) {
+        guard storedType == "text" else {
+            throw BASEventLogSessionDiscoveryError.malformedIdentity
+        }
+        let byteCount = try columnUTF8Length(
+            table: "event_log",
+            column: "session_id",
+            rowID: rowID,
+            isText: true,
+            textEncoding: try databaseTextEncoding(),
+            cutoff: maximumUTF8Bytes,
+            malformedError: BASEventLogSessionDiscoveryError.malformedIdentity,
+            exceededError: BASEventLogSessionDiscoveryError.sessionIDByteLimitExceeded)
+        let sql = "SELECT session_id FROM event_log WHERE rowid = ?"
+        let statement = try prepare(sql)
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_bind_int64(statement, 1, rowID) == SQLITE_OK else {
+            throw BASSQLiteEventLogStorage.StorageError.prepareFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        let stepRC = sqlite3_step(statement)
+        if stepRC == SQLITE_DONE {
+            throw BASEventLogSessionDiscoveryError.malformedIdentity
+        }
+        guard stepRC == SQLITE_ROW else { throw stepError(sql) }
+        guard sqlite3_column_type(statement, 0) == SQLITE_TEXT else {
+            throw BASEventLogSessionDiscoveryError.malformedIdentity
+        }
+        let data: Data
+        do {
+            data = try textData(statement, 0)
+        } catch {
+            throw BASEventLogSessionDiscoveryError.malformedIdentity
+        }
+        guard let value = String(data: data, encoding: .utf8),
+              value.utf8.count == byteCount else {
+            throw BASEventLogSessionDiscoveryError.malformedIdentity
+        }
+        guard sqlite3_step(statement) == SQLITE_DONE else { throw stepError(sql) }
+        return (value, byteCount)
+    }
+
     func read(
         sessionID: String,
         limits: BASEventLogRecoveryReadLimits,
@@ -597,8 +645,8 @@ struct BASSQLiteEventLogRecoveryReader {
         isText: Bool,
         textEncoding: DatabaseTextEncoding,
         cutoff: Int,
-        malformedError: BASEventLogRecoveryReadError,
-        exceededError: BASEventLogRecoveryReadError
+        malformedError: any Error,
+        exceededError: any Error
     ) throws -> Int {
         var handle: OpaquePointer?
         let openRC = sqlite3_blob_open(
@@ -640,8 +688,8 @@ struct BASSQLiteEventLogRecoveryReader {
         storedBytes: Int,
         littleEndian: Bool,
         cutoff: Int,
-        malformedError: BASEventLogRecoveryReadError,
-        exceededError: BASEventLogRecoveryReadError
+        malformedError: any Error,
+        exceededError: any Error
     ) throws -> Int {
         if storedBytes > 0, cutoff == 0 { throw exceededError }
         guard storedBytes.isMultiple(of: 2) else {

@@ -79,7 +79,9 @@ import CryptoKit
 /// `StorageError`。Per chapter 一百九十一 M91 doctrine,integrity
 /// outranks availability — a corrupt store is surfaced rather
 /// than silently truncated。
-public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryReading {
+public actor BASSQLiteEventLogStorage:
+    BASEventLogStorage, BASEventLogRecoveryReading, BASEventLogSessionDiscovering
+{
 
     // MARK: - Errors
 
@@ -110,17 +112,13 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
     /// the payload_format column。
     public static let schemaVersion: Int = 3
 
-    // deep-audit runtimecore-b LOW #8 (2026-07-13): the three `nonisolated(unsafe) static var`
-    // flags below are SET-ONCE CONFIGURATION — a host sets them BEFORE the first store opens, and
-    // they are not mutated at runtime thereafter. Each is snapshotted into instance state at init
-    // (append() reads the instance copies, not these globals), so the only-dangerous combination
-    // (a torn binary-payload + integrity-chain pairing) is structurally impossible. The remaining
-    // exposure is a purely formal data race on set-before-init config; a lock on this per-open read
-    // path would add overhead for no real safety, so the contract is documented rather than locked.
-    // If a host ever needs to flip these at runtime, that use is unsupported without adding a lock.
+    // Legacy compatibility flags. The no-configuration initializer intentionally rereads the write
+    // flags per append and the integrity-check flag at open because existing callers and tests rely
+    // on those transitions. App/runtime callers that require immutable policy use the explicit
+    // BASSQLiteEventLogConfiguration initializer instead.
 
     /// 先稳 P2 — OPT-IN (default off): run `PRAGMA integrity_check` at open + throw if corrupt. Off by
-    /// default (full-DB scan ⇒ boot latency). SET-ONCE before first init (see note above).
+    /// default (full-DB scan ⇒ boot latency). Read by each legacy initializer.
     public nonisolated(unsafe) static var runIntegrityCheckOnOpen: Bool = false
 
     /// chapter 七百三十二 第三刀 — opt-in feature flag controlling
@@ -152,6 +150,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
 
     private let nowMs: @Sendable () -> Int64
     private nonisolated let closeObserver: (@Sendable () -> Void)?
+    private let configuration: BASSQLiteEventLogConfiguration?
 
     /// ADR-040 — set once the integrity sidecar table has been ensured for this handle (lazy create on the first
     /// chained append, so a flag-off store never touches the DB). Actor-isolated instance state.
@@ -176,14 +175,28 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
             closeObserver: nil)
     }
 
+    public init(
+        databaseURL: URL,
+        configuration: BASSQLiteEventLogConfiguration
+    ) throws {
+        try self.init(
+            databaseURL: databaseURL,
+            nowMs: BASEventLogRecoveryRetention.systemNowMs,
+            closeObserver: nil,
+            configuration: configuration)
+    }
+
     init(
         databaseURL: URL,
         nowMs: @escaping @Sendable () -> Int64,
-        closeObserver: (@Sendable () -> Void)? = nil
+        closeObserver: (@Sendable () -> Void)? = nil,
+        configuration: BASSQLiteEventLogConfiguration? = nil,
+        connectionSetup: ((OpaquePointer) -> Void)? = nil
     ) throws {
         self.databaseURL = databaseURL
         self.nowMs = nowMs
         self.closeObserver = closeObserver
+        self.configuration = configuration
         self.db = nil
 
         var handle: OpaquePointer?
@@ -212,7 +225,11 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
         // makes a write block-and-retry internally (up to 5s) rather than throwing SQLITE_BUSY + losing the
         // append. Mirrors BASSovereignLedgerStorage.
         try Self.runExec(db: handle, sql: "PRAGMA busy_timeout=5000;")
-        try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
+        if let configuration {
+            try configuration.apply(to: handle)
+        } else {
+            try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
+        }
         // #16 删除教义 (mega-audit, 2026-07-08): secure_delete zeroes freed pages
         // at delete time — default-on, BAS_SECURE_DELETE=0 kill-switch.
         if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
@@ -222,8 +239,10 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
         // zeroes NEW deletions; VACUUM once rewrites the file, dropping pre-fix
         // plaintext). Marker-gated ⇒ steady-state cost is one SELECT. Outside any txn.
         BASSQLiteSecureDelete.runOneTimeLegacyVacuum(db: handle)
-        try Self.runExec(
-            db: handle, sql: "PRAGMA synchronous=NORMAL;")
+        if configuration == nil {
+            try Self.runExec(
+                db: handle, sql: "PRAGMA synchronous=NORMAL;")
+        }
         // M891 fix (post-deep-audit):tighter auto-checkpoint to
         // bound WAL growth on long-running iPhone sessions。
         // Default 1000 pages × 4KB ≈ 4MB before checkpoint。
@@ -250,9 +269,13 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
                 db: handle, migrationNowMs: nowMs)
         }
         try Self.verifySchemaVersion(db: handle)
-        if Self.runIntegrityCheckOnOpen {
+        if configuration?.runIntegrityCheckOnOpen
+            ?? Self.runIntegrityCheckOnOpen
+        {
             try Self.assertIntegrity(db: handle)   // 先稳 P2 — opt-in proactive corruption scan
         }
+        // Internal, synchronous, non-owning seam for real-handle SQLite fault injection.
+        connectionSetup?(handle)
         self.db = handle
         transferred = true
     }
@@ -309,8 +332,10 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
         // rowIntegrityChainEnabled AGAIN — a concurrent flip between the two reads could write a BINARY
         // payload row (chain-off path) AND a chain row (chain-on path), which the binary path is meant to
         // exclude. Threading one snapshot makes a single append internally consistent.
-        let useBinarySnapshot = Self.useBinaryPayload
-        let chainOn = Self.rowIntegrityChainEnabled
+        let useBinarySnapshot = configuration?.useBinaryPayload
+            ?? Self.useBinaryPayload
+        let chainOn = configuration?.rowIntegrityChainEnabled
+            ?? Self.rowIntegrityChainEnabled
         try Self.runExec(db: db, sql: "BEGIN IMMEDIATE;")
         do {
             // Idempotent retry: if event_id exists, return its sequenceNumber + wasNew=false.
@@ -402,6 +427,18 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
             integrity: integrity)
     }
 
+    public func recoverySessionPage(
+        prefix: String,
+        after: String?,
+        limits: BASEventLogSessionDiscoveryLimits
+    ) async throws -> BASEventLogSessionPage {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try BASSQLiteEventLogSessionDiscoveryReader(db: db).read(
+            prefix: prefix, after: after, limits: limits)
+    }
+
     /// Red-team GAP-3b (tamper-evidence on REPLAY) — assert a session's events are CONTIGUOUS by
     /// `sequence_number` (each = previous + 1, no gaps, no duplicates), throwing `corruptedRow` on the first
     /// discontinuity, then return the decoded entries. The default reads (`events` / `eventsOrThrow`) return
@@ -466,7 +503,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
                 sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, sessionID)
+        try bindText(stmt, 1, sessionID, sql: sql)
         var out: [(eventID: String, seq: Int64)] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             out.append((eventID: readText(stmt, 0), seq: sqlite3_column_int64(stmt, 1)))
@@ -569,7 +606,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
             throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, sessionID)
+        try bindText(stmt, 1, sessionID, sql: sql)
         if sqlite3_step(stmt) == SQLITE_ROW { return readText(stmt, 0) }
         return ""
     }
@@ -608,11 +645,11 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
             throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, eventID)
-        bindText(stmt, 2, sessionID)
+        try bindText(stmt, 1, eventID, sql: sql)
+        try bindText(stmt, 2, sessionID, sql: sql)
         sqlite3_bind_int64(stmt, 3, seq)
-        bindText(stmt, 4, rowHash)
-        bindText(stmt, 5, prevHash)
+        try bindText(stmt, 4, rowHash, sql: sql)
+        try bindText(stmt, 5, prevHash, sql: sql)
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw StorageError.stepFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
@@ -627,7 +664,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
             throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, sessionID)
+        try bindText(stmt, 1, sessionID, sql: sql)
         var out: [String: (rowHash: String, prevHash: String)] = [:]
         while sqlite3_step(stmt) == SQLITE_ROW {
             out[readText(stmt, 0)] = (rowHash: readText(stmt, 1), prevHash: readText(stmt, 2))
@@ -942,7 +979,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
             throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, name)
+        try bindText(stmt, 1, name, sql: sql)
         let rc = sqlite3_step(stmt)
         if rc == SQLITE_ROW { return true }
         if rc == SQLITE_DONE { return false }
@@ -1112,13 +1149,13 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
             format = 1
         }
 
-        bindText(stmt, 1, entry.eventID)
-        bindText(stmt, 2, entry.sessionID)
+        try bindText(stmt, 1, entry.eventID, sql: sql)
+        try bindText(stmt, 2, entry.sessionID, sql: sql)
         sqlite3_bind_int64(stmt, 3, entry.sequenceNumber)
         sqlite3_bind_int64(stmt, 4, entry.timestampMs)
-        bindText(stmt, 5, entry.kind.rawValue)
-        bindText(stmt, 6, entry.riskBand.rawValue)
-        bindText(stmt, 7, payloadJson)
+        try bindText(stmt, 5, entry.kind.rawValue, sql: sql)
+        try bindText(stmt, 6, entry.riskBand.rawValue, sql: sql)
+        try bindText(stmt, 7, payloadJson, sql: sql)
         sqlite3_bind_int(stmt, 8, format)
         if let blob = payloadBlob {
             _ = blob.withUnsafeBytes { rb -> Int32 in
@@ -1352,7 +1389,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
                 message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, eventID)
+        try bindText(stmt, 1, eventID, sql: sql)
         let stepRC = sqlite3_step(stmt)
         if stepRC == SQLITE_DONE { return nil }
         guard stepRC == SQLITE_ROW else {
@@ -1423,8 +1460,8 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
                 message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, sessionID)
-        bindText(stmt, 2, sessionID)
+        try bindText(stmt, 1, sessionID, sql: sql)
+        try bindText(stmt, 2, sessionID, sql: sql)
         guard sqlite3_step(stmt) == SQLITE_ROW else {
             throw StorageError.stepFailed(
                 sql: sql,
@@ -1469,7 +1506,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
                 sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, sessionID)
+        try bindText(stmt, 1, sessionID, sql: sql)
         sqlite3_bind_int64(stmt, 2, seq)
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw StorageError.stepFailed(
@@ -1500,7 +1537,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
                 message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, sessionID)
+        try bindText(stmt, 1, sessionID, sql: sql)
         var out: [BASEventLogEntry] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             let id = readText(stmt, 0)
@@ -1672,10 +1709,33 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryRe
     fileprivate static func bindText(
         _ stmt: OpaquePointer,
         _ index: Int32,
-        _ value: String
-    ) {
-        sqlite3_bind_text(
-            stmt, index, value, -1, SQLITE_TRANSIENT)
+        _ value: String,
+        sql: String
+    ) throws {
+        let byteCount = value.utf8.count
+        guard byteCount <= Int(Int32.max) else {
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: "text parameter \(index) exceeds SQLite's Int32 byte limit")
+        }
+        let bytes = value.utf8CString
+        let rc = bytes.withUnsafeBufferPointer { buffer in
+            sqlite3_bind_text(
+                stmt,
+                index,
+                buffer.baseAddress!,
+                Int32(byteCount),
+                SQLITE_TRANSIENT)
+        }
+        guard rc == SQLITE_OK else {
+            let message: String
+            if let db = sqlite3_db_handle(stmt) {
+                message = String(cString: sqlite3_errmsg(db))
+            } else {
+                message = "sqlite3_bind_text rc=\(rc)"
+            }
+            throw StorageError.prepareFailed(sql: sql, message: message)
+        }
     }
 
     fileprivate static func readText(
