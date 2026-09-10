@@ -19,7 +19,7 @@ struct BASMemoryDerivationCoreTests {
                     actionID: "decideTomorrow",
                     actionTitle: "Tomorrow Box",
                     note: "I want these shoes after a rough day.",
-                    createdAt: date("2026-04-08T22:10:00+10:00")
+                    createdAt: try localEventDate("2026-04-08T22:10:00+10:00", hour: 22, minute: 10)
                 ),
                 BASCheckEventMemoryInput(
                     id: "2",
@@ -28,7 +28,7 @@ struct BASMemoryDerivationCoreTests {
                     actionID: "decideTomorrow",
                     actionTitle: "Tomorrow Box",
                     note: "I want these shoes after a rough day.",
-                    createdAt: date("2026-04-07T22:45:00+10:00")
+                    createdAt: try localEventDate("2026-04-07T22:45:00+10:00", hour: 22, minute: 45)
                 ),
                 BASCheckEventMemoryInput(
                     id: "3",
@@ -37,7 +37,7 @@ struct BASMemoryDerivationCoreTests {
                     actionID: "decideTomorrow",
                     actionTitle: "Tomorrow Box",
                     note: "I want these shoes after a rough day.",
-                    createdAt: date("2026-04-06T23:05:00+10:00")
+                    createdAt: try localEventDate("2026-04-06T23:05:00+10:00", hour: 23, minute: 5)
                 )
             ],
             comparativeRecords: [
@@ -67,6 +67,32 @@ struct BASMemoryDerivationCoreTests {
             $0.id == "semantic.pattern.late_session" &&
             $0.promotionPolicy == .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
         }))
+    }
+
+    @Test("late-session derivation respects local day/night boundaries", arguments: [5, 6, 20, 21])
+    func lateSessionBoundaries(hour: Int) throws {
+        let minute = (hour == 5 || hour == 20) ? 59 : 0
+        let instant = try localEventDate("2026-04-08T12:00:00Z", hour: hour, minute: minute)
+        #expect(Calendar.current.component(.hour, from: instant) == hour)
+        #expect(Calendar.current.component(.minute, from: instant) == minute)
+        let events = (1...3).map { index in
+            BASCheckEventMemoryInput(
+                id: "boundary-\(index)", scenarioID: "buy", scenarioTitle: "Buy",
+                actionID: "decideTomorrow", actionTitle: "Tomorrow Box",
+                note: "Boundary fixture", createdAt: instant
+            )
+        }
+        let drafts = BASMemoryDraftCompiler.derive(BASMemoryDerivationRequest(
+            cues: [], checkEvents: events, comparativeRecords: [], reflectiveRecords: [], now: instant
+        ))
+        let late = drafts.first { $0.id == "semantic.pattern.late_session" }
+        let expectedLate = hour == 5 || hour == 21
+        #expect((late != nil) == expectedLate)
+        if expectedLate {
+            let pattern = try #require(late)
+            #expect(pattern.evidenceCount == 3)
+            #expect(pattern.promotionPolicy == .repeated(minConfirmationCount: 2, minEvidenceCount: 3))
+        }
     }
 
     @Test("draft compiler keeps situational drafts candidate-only and preserves Chinese retrieval tags")
@@ -400,5 +426,12 @@ struct BASMemoryDerivationCoreTests {
 
     private func date(_ value: String) -> Date {
         ISO8601DateFormatter().date(from: value) ?? .distantPast
+    }
+
+    private func localEventDate(_ value: String, hour: Int, minute: Int) throws -> Date {
+        let anchor = try #require(ISO8601DateFormatter().date(from: value))
+        return try #require(Calendar.current.date(
+            bySettingHour: hour, minute: minute, second: 0, of: anchor
+        ))
     }
 }

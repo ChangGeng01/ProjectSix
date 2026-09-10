@@ -69,12 +69,12 @@ typed recovery error distinguishing invalid limits, exceeded bounds, malformed/
 unsupported records and missing/invalid integrity. Existing SQLite prepare/step
 errors may propagate; errors must not contain stored prompt/payload text.
 
-- [ ] **RED:** exercise the new public capability with a real SQLite database.
+- [x] **RED:** exercise the new public capability with a real SQLite database.
   For the initial missing-API compile phase, label it honestly; after adding the
   minimum declaration, show a behavioral RED (e.g. excess count/bytes must throw,
   but an initial forwarding implementation returns rows). No production stub may
   remain. Assert actual returned entries and typed failures, not source text.
-- [ ] **Implement complete bounded read.** One synchronous read transaction on
+- [x] **Implement complete bounded read.** One synchronous read transaction on
   the actor-owned connection, no await/reentrancy during it. Preflight at most
   count+1 rows using integer lengths/type/format metadata, not copied payloads.
   Charge actual UTF-8/blob byte lengths, including every variable-length identity
@@ -90,7 +90,7 @@ errors may propagate; errors must not contain stored prompt/payload text.
   A second bounded SELECT in the same snapshot decodes all rows; terminal step
   must be SQLITE_DONE in every query. SQL errors after rows fail the entire read.
   COMMIT only on success, ROLLBACK on every error; never return a partial array.
-- [ ] **Decode faithfully.** Support both existing JSON1 and binary2 formats.
+- [x] **Decode faithfully.** Support both existing JSON1 and binary2 formats.
   Unknown/null formats, invalid UTF-8, malformed payload/envelope, invalid typed
   identity/sequence and row/payload identity mismatch fail explicitly. SQL text
   binding/reading is length-aware (embedded NUL must not silently truncate).
@@ -100,14 +100,14 @@ errors may propagate; errors must not contain stored prompt/payload text.
   strict-mode factoring is allowed if legacy defaults/behavior stay unchanged;
   preserve valid legacy forms, or explicitly refuse genuinely ambiguous records.
   Do not invent lost values, re-sign or rewrite them. No broad codec refactor.
-- [ ] **Existing-chain option.** For recordedChain, obtain only bounded matching
+- [x] **Existing-chain option.** For recordedChain, obtain only bounded matching
   sidecar evidence in the same read transaction; check identity/session/sequence,
   strict hash shapes and existing semantic hashes/links. Missing evidence and
   orphan/deleted event evidence fail. Legitimate prefix pruning remains valid.
   No unbounded helper call hidden inside the bounded reader. Keep keyless-chain
   limitations explicit: not authentication against the database owner, not proof
   of an externally anchored undeleted tail. No sidecar creation during read.
-- [ ] **Tests:** JSON/binary valid full-field round trips and empty session;
+- [x] **Tests:** JSON/binary valid full-field round trips and empty session;
   exact count/per-row/total boundaries and +1; multibyte UTF-8, NUL identity,
   invalid limits/overflow; oversized malformed payload rejected before decode;
   malformed later JSON/binary envelope/unknown format fails with no prefix;
@@ -117,14 +117,14 @@ errors may propagate; errors must not contain stored prompt/payload text.
   no brain/provider dependency. Test snapshot consistency using a real second
   connection if a deterministic fixture is feasible; do not add a public test
   seam or a general fault framework. Test helpers stay in test utilities.
-- [ ] **Verify:** iterate focused new tests, then one covering invocation of
+- [x] **Verify:** iterate focused new tests, then one covering invocation of
   BASEventLogRecoveryReadingTests, BASEventLogIngestionRetentionTests,
   BASEventLogIngestionMigrationTests, BASEventLogBinaryDecodeSafetyTests,
   BASEventLogTamperRedTeamTests and BASSQLiteEventLogDualWriteInvariantTests.
   Use the existing native BAS scratch and same-source metallib, with automatic
   dependency resolution disabled and model opt-ins unset, as in task21-report.
   Existing warnings remain disclosed; no full-suite rerun or cache clean.
-- [ ] **Handback:** concise actual commands/counts/exits and complete retained
+- [x] **Handback:** concise actual commands/counts/exits and complete retained
   log paths; source-only frozen diff, self-review and explicit limitations in
   existing solo workspace/task-23-report.md. Root performs independent review.
 
@@ -137,3 +137,14 @@ errors may propagate; errors must not contain stored prompt/payload text.
 | Strict / legacy decoder | strict rejects uncertainty without changing legacy callers |
 | Reader / App lifecycle | provider-free primitive; does not claim App wiring is done |
 | Existing retention / this read | no prune/write-policy changes or shorter retention |
+
+## Accepted bounded result
+
+Implemented in `dd6bdde50a0625bec32cefd865f8e8fb72ba80da`. Fix-round1 independent
+review addressed both Important findings with no new findings; the amended
+six-suite run passed62tests. Existing native warnings remain. Ambiguous binary
+records are explicitly refused by the strict API, not recovered by guessing.
+The optional deterministic second-connection mutation fixture was not feasible
+without a new pause seam; no such concurrency-test claim is made. Actual App
+startup, task/output persistence and fresh-process recovery remain outside this
+completed primitive and still required for overall readiness.
