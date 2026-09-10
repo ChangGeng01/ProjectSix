@@ -48,6 +48,10 @@
             default = "YES"
             reference = "container:Device2HrFuzz.xctestplan">
          </TestPlanReference>
+         <TestPlanReference
+            default = "NO"
+            reference = "container:KeychainRegression.xctestplan">
+         </TestPlanReference>
       </TestPlans>
       <MacroExpansion>
          <BuildableReference

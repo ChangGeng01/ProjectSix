@@ -14,19 +14,17 @@ import Security
 /// layers accept a `BASSovereignEd25519KeyPair` as a raw input —
 /// the host is responsible for producing + holding that keypair.
 ///
-/// In a real deployment the **private key must never leave the
-/// Keychain**. Loading it into process memory as a raw
-/// `Curve25519.Signing.PrivateKey` is a violation of iOS/macOS
-/// security posture: a compromised process can read the raw bytes
-/// and forge entries indistinguishable from the real signer.
-///
-/// `BASSovereignKeychainBinding` closes that gap. It wraps the
-/// Security.framework APIs for storing/loading/deleting the Ed25519
-/// private key by a `(service, account)` identifier pair. The
-/// private-key raw bytes are stored as a `kSecClassGenericPassword`
-/// item whose data blob is the 32-byte Ed25519 seed; on load the
-/// binding reconstructs the `PrivateKey` via
+/// `BASSovereignKeychainBinding` wraps Security.framework APIs for
+/// storing/loading/deleting the Ed25519 private key by a
+/// `(service, account)` identifier pair. The private-key raw bytes
+/// are stored as a `kSecClassGenericPassword` item whose data blob
+/// is the 32-byte Ed25519 seed. Loading exports that seed into this
+/// process and reconstructs the `PrivateKey` via
 /// `Curve25519.Signing.PrivateKey(rawRepresentation:)`.
+///
+/// This is Keychain-backed custody, not nonexportable Secure Enclave
+/// signing. An authorized or compromised host process can observe
+/// the raw seed while storing or loading it and can forge signatures.
 ///
 /// Why `kSecClassGenericPassword` rather than `kSecClassKey`?
 /// CryptoKit's Keychain-native key types use RSA / EC-P256 / EC-P384
@@ -37,7 +35,14 @@ import Security
 /// by the same Keychain access controls (Device Unlock, passcode
 /// require, biometric, etc.) as native key-class items; the
 /// abstraction level in the Security framework is different but the
-/// protection is the same.
+/// protection is the same while the item is at rest.
+///
+/// Fresh items on iOS and other Data Protection Keychain platforms
+/// use `WhenUnlockedThisDeviceOnly`. That blocks migration to a
+/// different device, but does not claim to prevent every backup or
+/// same-device restoration path. Native macOS retains the existing
+/// unqualified file-backed Keychain behavior and does not establish
+/// `ThisDeviceOnly` enforcement.
 ///
 /// ## Non-Darwin fallback
 ///
@@ -77,6 +82,11 @@ public struct BASSovereignKeychainBinding: Sendable {
         /// parsed as a 32-byte Ed25519 seed. Indicates corruption,
         /// wrong item class, or a breakage in the storage contract.
         case malformedKeychainItem(reason: String)
+
+        /// An existing item was readable but its protection policy
+        /// is not eligible for an in-place write. This is a local
+        /// refusal, not an OSStatus and not an item-not-found result.
+        case unsupportedItemPolicy(reason: String)
     }
 
     /// Identifier namespace for the Keychain item. Convention:
@@ -98,9 +108,12 @@ public struct BASSovereignKeychainBinding: Sendable {
     // MARK: - Store
 
     /// Write the Ed25519 private key's raw 32-byte seed to the
-    /// Keychain under the binding's `(service, account)`. If an
-    /// item already exists at the same identifier the call replaces
-    /// it in place (`SecItemUpdate` semantics).
+    /// Keychain under the binding's `(service, account)`. An eligible
+    /// existing item is updated in place with seed data only
+    /// (`SecItemUpdate` semantics). On Data Protection platforms,
+    /// an existing item whose accessibility is legacy, missing,
+    /// malformed, or unknown is left unchanged and throws
+    /// `.unsupportedItemPolicy`.
     ///
     /// Returns `.platformUnavailable` when Security framework is
     /// not importable.
@@ -109,22 +122,47 @@ public struct BASSovereignKeychainBinding: Sendable {
     ) throws {
         #if canImport(Security)
         let seed = keyPair.privateKey.rawRepresentation
-        // Check for existing item first.
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
         var existing: AnyObject?
+
+        #if os(macOS) && !targetEnvironment(macCatalyst)
         let findStatus = SecItemCopyMatching(
             query as CFDictionary, &existing)
+        let existingAccessibility: String? = nil
+        #else
+        var findQuery = query
+        findQuery[kSecReturnAttributes as String] = true
+        findQuery[kSecMatchLimit as String] = kSecMatchLimitOne
+        let findStatus = SecItemCopyMatching(
+            findQuery as CFDictionary, &existing)
+        let existingAccessibility: String?
         if findStatus == errSecSuccess {
-            // Item exists — update its kSecValueData in place.
+            guard let attributes = existing as? [String: Any] else {
+                throw KeychainError.unsupportedItemPolicy(
+                    reason: "missing-attributes")
+            }
+            existingAccessibility = try Self.accessibilityForExistingItem(
+                attributes)
+        } else {
+            existingAccessibility = nil
+        }
+        #endif
+
+        if findStatus == errSecSuccess {
+            var updateQuery = query
+            if let existingAccessibility {
+                updateQuery[kSecAttrAccessible as String] =
+                    existingAccessibility
+            }
             let updateAttrs: [String: Any] = [
                 kSecValueData as String: seed
             ]
             let updateStatus = SecItemUpdate(
-                query as CFDictionary,
+                updateQuery as CFDictionary,
                 updateAttrs as CFDictionary)
             guard updateStatus == errSecSuccess else {
                 throw KeychainError.osStatus(
@@ -132,14 +170,11 @@ public struct BASSovereignKeychainBinding: Sendable {
                     reasonCode: "keychain-update-failed")
             }
         } else if findStatus == errSecItemNotFound {
-            // Not present — add fresh.
             var addQuery = query
             addQuery[kSecValueData as String] = seed
-            // MED-5 (mega-audit 2026-07-07): the Ed25519 signing seed is the audit
-            // ledger's root credential ("can forge any entry"). Default generic-password
-            // accessibility (WhenUnlocked) MIGRATES via encrypted device backup to a new
-            // machine — breaking the per-device signing identity the docstring promises.
-            // Pin to ThisDeviceOnly so the seed never leaves this device via backup.
+            // On Data Protection platforms this prevents migration
+            // to a different device. Native macOS's unqualified
+            // backend does not provide that enforcement guarantee.
             addQuery[kSecAttrAccessible as String] =
                 kSecAttrAccessibleWhenUnlockedThisDeviceOnly
             let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
@@ -157,6 +192,48 @@ public struct BASSovereignKeychainBinding: Sendable {
         throw KeychainError.platformUnavailable
         #endif
     }
+
+    #if canImport(Security)
+    /// Returns the observed accessibility eligible for an exact,
+    /// data-only update. Opaque access-control metadata is neither
+    /// interpreted nor replaced.
+    static func accessibilityForExistingItem(
+        _ attributes: [String: Any]
+    ) throws -> String {
+        guard let rawAccessibility =
+                attributes[kSecAttrAccessible as String]
+        else {
+            throw KeychainError.unsupportedItemPolicy(
+                reason: "missing-accessibility")
+        }
+        guard let accessibility = rawAccessibility as? String else {
+            throw KeychainError.unsupportedItemPolicy(
+                reason: "malformed-accessibility")
+        }
+
+        let suitableAccessibilities: [String] = [
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String,
+            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly as String
+        ]
+        if suitableAccessibilities.contains(accessibility) {
+            return accessibility
+        }
+
+        let legacyAccessibilities: [String] = [
+            kSecAttrAccessibleWhenUnlocked as String,
+            kSecAttrAccessibleAfterFirstUnlock as String,
+            kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String,
+            "dk",  // kSecAttrAccessibleAlways
+            "dku"  // kSecAttrAccessibleAlwaysThisDeviceOnly
+        ]
+        if legacyAccessibilities.contains(accessibility) {
+            throw KeychainError.unsupportedItemPolicy(
+                reason: "legacy-accessibility")
+        }
+        throw KeychainError.unsupportedItemPolicy(
+            reason: "unknown-accessibility")
+    }
+    #endif
 
     // MARK: - Load
 

@@ -1262,6 +1262,7 @@
 		B19B86B83DC609E46C1854FE /* BASBundledFactCorpusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F39BC3F587499D27696F29BB /* BASBundledFactCorpusTests.swift */; };
 		B19D569F2013C3572E029CC5 /* BASExperienceWarmTaxDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A302BC1A5102127073C2CA03 /* BASExperienceWarmTaxDeviceTests.swift */; };
 		B1CC09FB57041A5CD792E4ED /* BASEventLogSeqHighWaterMarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F47D7F3D0165C9F18203779 /* BASEventLogSeqHighWaterMarkTests.swift */; };
+		A11E0C10C0FFEE0000000011 /* BASEventLogTestClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11E0C10F11E000000000011 /* BASEventLogTestClock.swift */; };
 		B1DCDE5432528A5C08F22E58 /* BASMPSGraphRotaryEmbeddingKernelCacheWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D24C951C73F5CC1BD1F2E5 /* BASMPSGraphRotaryEmbeddingKernelCacheWiringTests.swift */; };
 		B229AD3F11670EC284EDD037 /* M304HumanAnchorAndSealConsumptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ABD8B84104B50F47F8661EC /* M304HumanAnchorAndSealConsumptionTests.swift */; };
 		B23D28E65B17BE70BA399170 /* BASTurnRuntimeStageLedgerValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF5DA6C7D9C7BB24C867C97D /* BASTurnRuntimeStageLedgerValidationTests.swift */; };
@@ -2869,6 +2870,7 @@
 		986D5FF109D57B11DD966950 /* M388WatcherHintRedLineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M388WatcherHintRedLineTests.swift; sourceTree = "<group>"; };
 		9873A9023C5E84B114FF5E66 /* BASVectorIndexNonFiniteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASVectorIndexNonFiniteTests.swift; sourceTree = "<group>"; };
 		98900834A257F622688C3701 /* BASEventLogTamperRedTeamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASEventLogTamperRedTeamTests.swift; sourceTree = "<group>"; };
+		A11E0C10F11E000000000011 /* BASEventLogTestClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASEventLogTestClock.swift; sourceTree = "<group>"; };
 		98EC82FF60A9FCED501AD9A7 /* BASChapter603ChatCompletionsAdapterCodableProofTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter603ChatCompletionsAdapterCodableProofTests.swift; sourceTree = "<group>"; };
 		98F9D7CE6E280CE06F0F12D5 /* BASMTPPlannerIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASMTPPlannerIntegrationTests.swift; sourceTree = "<group>"; };
 		9924376357BFBD47EE37F2E1 /* BASBiomimeticTurnObserverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASBiomimeticTurnObserverTests.swift; sourceTree = "<group>"; };
@@ -4506,6 +4508,7 @@
 				DED38589CB9CDE46FC88C025 /* BASEventLogReplayItemKindTests.swift */,
 				7F47D7F3D0165C9F18203779 /* BASEventLogSeqHighWaterMarkTests.swift */,
 				6D5832E38809B967BF2AAE50 /* BASEventLogSessionPaginationTests.swift */,
+				A11E0C10F11E000000000011 /* BASEventLogTestClock.swift */,
 				98900834A257F622688C3701 /* BASEventLogTamperRedTeamTests.swift */,
 				F9C105A065536ED6ED96949A /* BASEventLogTests.swift */,
 				66E1D312F03D1E5FC5D311C3 /* BASEventPayloadKindTests.swift */,
@@ -6443,6 +6446,7 @@
 				950C317855114A054A03B616 /* BASEventLogReplayItemKindTests.swift in Sources */,
 				B1CC09FB57041A5CD792E4ED /* BASEventLogSeqHighWaterMarkTests.swift in Sources */,
 				B6ADAE8524758FED14D4C060 /* BASEventLogSessionPaginationTests.swift in Sources */,
+				A11E0C10C0FFEE0000000011 /* BASEventLogTestClock.swift in Sources */,
 				19F46193AF59639F589521BC /* BASEventLogTamperRedTeamTests.swift in Sources */,
 				9E4565F96580F0007B88CD13 /* BASEventLogTests.swift in Sources */,
 				588FD0CAB8353F82377DCC6A /* BASEventPayloadKindTests.swift in Sources */,

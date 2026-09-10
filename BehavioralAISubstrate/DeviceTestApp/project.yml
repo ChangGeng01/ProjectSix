@@ -203,3 +203,5 @@ schemes:
       testPlans:
         - path: Device2HrFuzz.xctestplan
           defaultPlan: false
+        - path: KeychainRegression.xctestplan
+          defaultPlan: false

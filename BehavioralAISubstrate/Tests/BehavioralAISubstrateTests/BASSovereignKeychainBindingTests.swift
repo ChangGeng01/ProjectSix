@@ -5,6 +5,88 @@ import Security
 #endif
 @testable import BASSovereign
 
+#if os(macOS)
+private enum NativeKeychainInteractionError: Error, Equatable {
+    case securityStatus(operation: String, status: OSStatus)
+    case interactionStillEnabled
+    case restorationWriteFailed(status: OSStatus)
+    case restorationReadFailed(status: OSStatus)
+    case restorationReadbackMismatch(expected: Bool, actual: Bool)
+}
+
+private final class NativeKeychainInteractionController {
+    typealias Read = () -> (status: OSStatus, value: Bool)
+    typealias Write = (Bool) -> OSStatus
+
+    private let read: Read
+    private let write: Write
+    private var priorValue: Bool?
+
+    var hasRestorationOwnership: Bool { priorValue != nil }
+
+    init(read: @escaping Read, write: @escaping Write) {
+        self.read = read
+        self.write = write
+    }
+
+    func disableInteraction() throws {
+        let prior = read()
+        guard prior.status == errSecSuccess else {
+            throw NativeKeychainInteractionError.securityStatus(
+                operation: "read-prior-interaction",
+                status: prior.status)
+        }
+        priorValue = prior.value
+
+        let disableStatus = write(false)
+        guard disableStatus == errSecSuccess else {
+            try recoverFromSetupFailure(.securityStatus(
+                operation: "disable-interaction",
+                status: disableStatus))
+        }
+
+        let disabled = read()
+        guard disabled.status == errSecSuccess else {
+            try recoverFromSetupFailure(.securityStatus(
+                operation: "read-disabled-interaction",
+                status: disabled.status))
+        }
+        guard !disabled.value else {
+            try recoverFromSetupFailure(.interactionStillEnabled)
+        }
+    }
+
+    func restoreInteraction() throws {
+        guard let priorValue else { return }
+
+        let restoreStatus = write(priorValue)
+        guard restoreStatus == errSecSuccess else {
+            throw NativeKeychainInteractionError.restorationWriteFailed(
+                status: restoreStatus)
+        }
+
+        let restored = read()
+        guard restored.status == errSecSuccess else {
+            throw NativeKeychainInteractionError.restorationReadFailed(
+                status: restored.status)
+        }
+        guard restored.value == priorValue else {
+            throw NativeKeychainInteractionError.restorationReadbackMismatch(
+                expected: priorValue,
+                actual: restored.value)
+        }
+        self.priorValue = nil
+    }
+
+    private func recoverFromSetupFailure(
+        _ setupError: NativeKeychainInteractionError
+    ) throws -> Never {
+        try restoreInteraction()
+        throw setupError
+    }
+}
+#endif
+
 /// M93a — Keychain binding tests for the sovereign audit ledger's
 /// Ed25519 private key.
 ///
@@ -44,7 +126,201 @@ import Security
 /// - Non-Darwin: every method returns `.platformUnavailable`.
 final class BASSovereignKeychainBindingTests: XCTestCase {
 
+    #if os(macOS)
+    private var nativeInteractionController:
+        NativeKeychainInteractionController?
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        let controller = NativeKeychainInteractionController(
+            read: {
+                var allowed = DarwinBoolean(false)
+                let status = SecKeychainGetUserInteractionAllowed(&allowed)
+                return (status, allowed.boolValue)
+            },
+            write: { allowed in
+                SecKeychainSetUserInteractionAllowed(allowed)
+            })
+        nativeInteractionController = controller
+        try controller.disableInteraction()
+    }
+
+    override func tearDownWithError() throws {
+        if let nativeInteractionController {
+            try nativeInteractionController.restoreInteraction()
+            self.nativeInteractionController = nil
+        }
+        try super.tearDownWithError()
+    }
+
+    func testNativeInteractionSetupFailureRestoresAndClearsOwnership()
+        throws {
+        var reads: [(OSStatus, Bool)] = [
+            (errSecSuccess, true),
+            (-25_291, false),
+            (errSecSuccess, true)
+        ]
+        var writes: [Bool] = []
+        var writeStatuses: [OSStatus] = [errSecSuccess, errSecSuccess]
+        let controller = NativeKeychainInteractionController(
+            read: { reads.removeFirst() },
+            write: { value in
+                writes.append(value)
+                return writeStatuses.removeFirst()
+            })
+
+        XCTAssertThrowsError(try controller.disableInteraction()) { error in
+            XCTAssertEqual(
+                error as? NativeKeychainInteractionError,
+                .securityStatus(
+                    operation: "read-disabled-interaction",
+                    status: -25_291))
+        }
+        XCTAssertEqual(writes, [false, true])
+        XCTAssertFalse(controller.hasRestorationOwnership)
+    }
+
+    func testNativeInteractionRestoreWriteFailureKeepsOwnershipForRetry()
+        throws {
+        var reads: [(OSStatus, Bool)] = [
+            (errSecSuccess, true),
+            (errSecSuccess, true),
+            (errSecSuccess, true)
+        ]
+        var writeStatuses: [OSStatus] = [errSecSuccess, -50, errSecSuccess]
+        let controller = NativeKeychainInteractionController(
+            read: { reads.removeFirst() },
+            write: { _ in writeStatuses.removeFirst() })
+
+        XCTAssertThrowsError(try controller.disableInteraction()) { error in
+            XCTAssertEqual(
+                error as? NativeKeychainInteractionError,
+                .restorationWriteFailed(status: -50))
+        }
+        XCTAssertTrue(controller.hasRestorationOwnership)
+
+        try controller.restoreInteraction()
+        XCTAssertFalse(controller.hasRestorationOwnership)
+    }
+
+    func testNativeInteractionRestoreMismatchKeepsOwnershipForRetry()
+        throws {
+        var reads: [(OSStatus, Bool)] = [
+            (errSecSuccess, true),
+            (errSecSuccess, true),
+            (errSecSuccess, false),
+            (errSecSuccess, true)
+        ]
+        var writeStatuses: [OSStatus] = [
+            errSecSuccess,
+            errSecSuccess,
+            errSecSuccess
+        ]
+        let controller = NativeKeychainInteractionController(
+            read: { reads.removeFirst() },
+            write: { _ in writeStatuses.removeFirst() })
+
+        XCTAssertThrowsError(try controller.disableInteraction()) { error in
+            XCTAssertEqual(
+                error as? NativeKeychainInteractionError,
+                .restorationReadbackMismatch(expected: true, actual: false))
+        }
+        XCTAssertTrue(controller.hasRestorationOwnership)
+
+        try controller.restoreInteraction()
+        XCTAssertFalse(controller.hasRestorationOwnership)
+    }
+    #endif
+
     // MARK: - Fixtures
+
+    #if os(iOS)
+    private struct KeychainFixtureItem {
+        let data: Data
+        let attributes: [String: Any]
+    }
+
+    private enum KeychainFixtureError: Error {
+        case securityStatus(operation: String, status: OSStatus)
+        case unexpectedResultType(String)
+        case missingData
+    }
+
+    private func exactTupleQuery(
+        service: String,
+        account: String
+    ) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+    }
+
+    private func addFixture(
+        service: String,
+        account: String,
+        seed: Data,
+        accessibility: CFString
+    ) throws {
+        var query = exactTupleQuery(service: service, account: account)
+        query[kSecValueData as String] = seed
+        query[kSecAttrAccessible as String] = accessibility
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw KeychainFixtureError.securityStatus(
+                operation: "add", status: status)
+        }
+    }
+
+    private func readFixture(
+        service: String,
+        account: String
+    ) throws -> KeychainFixtureItem {
+        var query = exactTupleQuery(service: service, account: account)
+        query[kSecReturnData as String] = true
+        query[kSecReturnAttributes as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess else {
+            throw KeychainFixtureError.securityStatus(
+                operation: "read", status: status)
+        }
+        guard let attributes = result as? [String: Any] else {
+            throw KeychainFixtureError.unexpectedResultType(
+                String(reflecting: type(of: result)))
+        }
+        guard let data = attributes[kSecValueData as String] as? Data else {
+            throw KeychainFixtureError.missingData
+        }
+        return KeychainFixtureItem(data: data, attributes: attributes)
+    }
+
+    private func deleteFixtureAndVerifyAbsent(
+        service: String,
+        account: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let query = exactTupleQuery(service: service, account: account)
+        let deleteStatus = SecItemDelete(query as CFDictionary)
+        XCTAssertTrue(
+            deleteStatus == errSecSuccess || deleteStatus == errSecItemNotFound,
+            "fixture cleanup failed with OSStatus \(deleteStatus)",
+            file: file,
+            line: line)
+
+        var result: AnyObject?
+        let findStatus = SecItemCopyMatching(query as CFDictionary, &result)
+        XCTAssertEqual(
+            findStatus,
+            errSecItemNotFound,
+            "fixture tuple remained after cleanup",
+            file: file,
+            line: line)
+    }
+    #endif
 
     private func uniqueBinding(
         _ label: String = #function
@@ -101,6 +377,15 @@ final class BASSovereignKeychainBindingTests: XCTestCase {
             original.publicKey.rawRepresentation,
             loaded.publicKey.rawRepresentation,
             "public key must also round-trip")
+        #if os(iOS)
+        let stored = try readFixture(
+            service: binding.service,
+            account: binding.account)
+        XCTAssertEqual(stored.data, original.privateKey.rawRepresentation)
+        XCTAssertEqual(
+            stored.attributes[kSecAttrAccessible as String] as? String,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String)
+        #endif
         #else
         throw XCTSkip("Security framework not available on this platform")
         #endif
@@ -125,8 +410,303 @@ final class BASSovereignKeychainBindingTests: XCTestCase {
             "second store replaces first")
         XCTAssertFalse(signaturesMatch(first, loaded),
             "first store no longer resolvable")
+        #if os(iOS)
+        let stored = try readFixture(
+            service: binding.service,
+            account: binding.account)
+        XCTAssertEqual(stored.data, second.privateKey.rawRepresentation)
+        XCTAssertEqual(
+            stored.attributes[kSecAttrAccessible as String] as? String,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String)
+        #endif
         #else
         throw XCTSkip("Security framework not available")
+        #endif
+    }
+
+    func testStoreExistingLegacyItemRefusesWithoutChangingKeyOrPolicy()
+        throws {
+        #if os(iOS)
+        let service = "com.qinao.sovereign.ed25519.tests.legacy"
+        let cases: [(CFString, Bool)] = [
+            (kSecAttrAccessibleWhenUnlocked, false),
+            (kSecAttrAccessibleAfterFirstUnlock, true)
+        ]
+
+        for (accessibility, useReplacement) in cases {
+            let account = "task11-\(UUID().uuidString)"
+            let binding = BASSovereignKeychainBinding(
+                service: service,
+                account: account)
+            let original = BASSovereignEd25519KeyPair.generate()
+            var ownsFixture = false
+            defer {
+                if ownsFixture {
+                    deleteFixtureAndVerifyAbsent(
+                        service: service,
+                        account: account)
+                }
+            }
+
+            try addFixture(
+                service: service,
+                account: account,
+                seed: original.privateKey.rawRepresentation,
+                accessibility: accessibility)
+            ownsFixture = true
+
+            let initial = try readFixture(service: service, account: account)
+            XCTAssertEqual(
+                initial.data,
+                original.privateKey.rawRepresentation)
+            XCTAssertEqual(
+                initial.attributes[kSecAttrAccessible as String] as? String,
+                accessibility as String)
+            let loadedBefore = try binding.load()
+            XCTAssertEqual(
+                loadedBefore.publicKey.rawRepresentation,
+                original.publicKey.rawRepresentation)
+
+            let attempted = useReplacement
+                ? BASSovereignEd25519KeyPair.generate()
+                : loadedBefore
+            XCTAssertThrowsError(try binding.store(keyPair: attempted)) { error in
+                XCTAssertEqual(
+                    error as? BASSovereignKeychainBinding.KeychainError,
+                    .unsupportedItemPolicy(reason: "legacy-accessibility"))
+            }
+
+            let final = try readFixture(service: service, account: account)
+            XCTAssertEqual(
+                final.data,
+                original.privateKey.rawRepresentation)
+            XCTAssertEqual(
+                final.attributes[kSecAttrAccessible as String] as? String,
+                accessibility as String)
+
+            let loadedAfter = try binding.load()
+            XCTAssertEqual(
+                loadedAfter.privateKey.rawRepresentation,
+                original.privateKey.rawRepresentation)
+            let message = Data("legacy-policy-repair".utf8)
+            let signature = try loadedAfter.privateKey.signature(for: message)
+            XCTAssertTrue(
+                original.publicKey.isValidSignature(signature, for: message))
+            var callbacks = 0
+            let provisioned = try binding.provisionOrLoad { _ in callbacks += 1 }
+            XCTAssertEqual(callbacks, 0)
+            XCTAssertEqual(
+                provisioned.publicKey.rawRepresentation,
+                original.publicKey.rawRepresentation)
+        }
+        #else
+        throw XCTSkip("iOS Data Protection Keychain regression only")
+        #endif
+    }
+
+    func testAccessibilityPolicyAcceptsSuitableClassesWithOpaqueAccessControl()
+        throws {
+        #if canImport(Security)
+        var accessControlError: Unmanaged<CFError>?
+        let candidate = SecAccessControlCreateWithFlags(
+            nil,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            [.userPresence],
+            &accessControlError)
+        if let accessControlError {
+            XCTFail(
+                "access-control fixture creation failed: "
+                    + String(describing: accessControlError.takeRetainedValue()))
+        }
+        let accessControl = try XCTUnwrap(candidate)
+
+        let unlockedAttributes: [String: Any] = [
+            kSecAttrAccessible as String:
+                kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            kSecAttrAccessControl as String: accessControl
+        ]
+        XCTAssertEqual(
+            try BASSovereignKeychainBinding.accessibilityForExistingItem(
+                unlockedAttributes),
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String)
+
+        let passcodeAttributes: [String: Any] = [
+            kSecAttrAccessible as String:
+                kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+            kSecAttrAccessControl as String: accessControl
+        ]
+        XCTAssertEqual(
+            try BASSovereignKeychainBinding.accessibilityForExistingItem(
+                passcodeAttributes),
+            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly as String)
+        #else
+        throw XCTSkip("Security framework not available")
+        #endif
+    }
+
+    func testAccessibilityPolicyRejectsLegacyMissingUnknownAndMalformedValues()
+        throws {
+        #if canImport(Security)
+        let legacyValues: [String] = [
+            kSecAttrAccessibleWhenUnlocked as String,
+            kSecAttrAccessibleAfterFirstUnlock as String,
+            kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String,
+            "dk",  // kSecAttrAccessibleAlways
+            "dku"  // kSecAttrAccessibleAlwaysThisDeviceOnly
+        ]
+        for accessibility in legacyValues {
+            XCTAssertThrowsError(
+                try BASSovereignKeychainBinding.accessibilityForExistingItem([
+                    kSecAttrAccessible as String: accessibility
+                ])) { error in
+                    XCTAssertEqual(
+                        error as? BASSovereignKeychainBinding.KeychainError,
+                        .unsupportedItemPolicy(
+                            reason: "legacy-accessibility"))
+                }
+        }
+
+        let rejected: [([String: Any], String)] = [
+            ([:], "missing-accessibility"),
+            ([kSecAttrAccessible as String: 7], "malformed-accessibility"),
+            ([kSecAttrAccessible as String: "future-accessibility"],
+             "unknown-accessibility")
+        ]
+        for (attributes, reason) in rejected {
+            XCTAssertThrowsError(
+                try BASSovereignKeychainBinding.accessibilityForExistingItem(
+                    attributes)) { error in
+                    XCTAssertEqual(
+                        error as? BASSovereignKeychainBinding.KeychainError,
+                        .unsupportedItemPolicy(reason: reason))
+                }
+        }
+        #else
+        throw XCTSkip("Security framework not available")
+        #endif
+    }
+
+    func testStoreExistingSuitableItemUpdatesDataAndIsolatesExactTuple()
+        throws {
+        #if os(iOS)
+        let service = "com.qinao.sovereign.ed25519.tests.suitable"
+        let targetAccount = "target-\(UUID().uuidString)"
+        let otherAccount = "other-\(UUID().uuidString)"
+        let original = BASSovereignEd25519KeyPair.generate()
+        let replacement = BASSovereignEd25519KeyPair.generate()
+        let other = BASSovereignEd25519KeyPair.generate()
+        var ownsTarget = false
+        var ownsOther = false
+        defer {
+            if ownsTarget {
+                deleteFixtureAndVerifyAbsent(
+                    service: service,
+                    account: targetAccount)
+            }
+            if ownsOther {
+                deleteFixtureAndVerifyAbsent(
+                    service: service,
+                    account: otherAccount)
+            }
+        }
+
+        try addFixture(
+            service: service,
+            account: targetAccount,
+            seed: original.privateKey.rawRepresentation,
+            accessibility: kSecAttrAccessibleWhenUnlockedThisDeviceOnly)
+        ownsTarget = true
+        try addFixture(
+            service: service,
+            account: otherAccount,
+            seed: other.privateKey.rawRepresentation,
+            accessibility: kSecAttrAccessibleWhenUnlockedThisDeviceOnly)
+        ownsOther = true
+
+        let binding = BASSovereignKeychainBinding(
+            service: service,
+            account: targetAccount)
+        try binding.store(keyPair: replacement)
+
+        let updated = try readFixture(
+            service: service,
+            account: targetAccount)
+        XCTAssertEqual(updated.data, replacement.privateKey.rawRepresentation)
+        XCTAssertEqual(
+            updated.attributes[kSecAttrAccessible as String] as? String,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String)
+        let isolated = try readFixture(
+            service: service,
+            account: otherAccount)
+        XCTAssertEqual(isolated.data, other.privateKey.rawRepresentation)
+        XCTAssertEqual(
+            isolated.attributes[kSecAttrAccessible as String] as? String,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String)
+
+        let loaded = try binding.load()
+        XCTAssertEqual(
+            loaded.privateKey.rawRepresentation,
+            replacement.privateKey.rawRepresentation)
+        let message = Data("suitable-policy-update".utf8)
+        let signature = try loaded.privateKey.signature(for: message)
+        XCTAssertTrue(
+            replacement.publicKey.isValidSignature(signature, for: message))
+        var callbacks = 0
+        let provisioned = try binding.provisionOrLoad { _ in callbacks += 1 }
+        XCTAssertEqual(callbacks, 0)
+        XCTAssertEqual(
+            provisioned.publicKey.rawRepresentation,
+            replacement.publicKey.rawRepresentation)
+        #else
+        throw XCTSkip("iOS Data Protection Keychain regression only")
+        #endif
+    }
+
+    func testMalformedStoredSeedDoesNotProvisionOrChangeItem() throws {
+        #if os(iOS)
+        let service = "com.qinao.sovereign.ed25519.tests.malformed"
+        let account = "task11-\(UUID().uuidString)"
+        let malformed = Data(repeating: 0xA5, count: 31)
+        var ownsFixture = false
+        defer {
+            if ownsFixture {
+                deleteFixtureAndVerifyAbsent(
+                    service: service,
+                    account: account)
+            }
+        }
+        try addFixture(
+            service: service,
+            account: account,
+            seed: malformed,
+            accessibility: kSecAttrAccessibleWhenUnlockedThisDeviceOnly)
+        ownsFixture = true
+
+        let binding = BASSovereignKeychainBinding(
+            service: service,
+            account: account)
+        let expected = BASSovereignKeychainBinding.KeychainError
+            .malformedKeychainItem(reason: "ed25519-seed-length-31-not-32")
+        XCTAssertThrowsError(try binding.load()) { error in
+            XCTAssertEqual(
+                error as? BASSovereignKeychainBinding.KeychainError,
+                expected)
+        }
+        var callbacks = 0
+        XCTAssertThrowsError(
+            try binding.provisionOrLoad { _ in callbacks += 1 }) { error in
+                XCTAssertEqual(
+                    error as? BASSovereignKeychainBinding.KeychainError,
+                    expected)
+            }
+        XCTAssertEqual(callbacks, 0)
+        let final = try readFixture(service: service, account: account)
+        XCTAssertEqual(final.data, malformed)
+        XCTAssertEqual(
+            final.attributes[kSecAttrAccessible as String] as? String,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String)
+        #else
+        throw XCTSkip("iOS Data Protection Keychain regression only")
         #endif
     }
 
@@ -247,6 +827,25 @@ final class BASSovereignKeychainBindingTests: XCTestCase {
             .malformedKeychainItem(reason: "long")
         XCTAssertEqual(d, e)
         XCTAssertNotEqual(d, f)
+
+        let g: BASSovereignKeychainBinding.KeychainError =
+            .unsupportedItemPolicy(reason: "legacy-accessibility")
+        let h: BASSovereignKeychainBinding.KeychainError =
+            .unsupportedItemPolicy(reason: "legacy-accessibility")
+        let i: BASSovereignKeychainBinding.KeychainError =
+            .unsupportedItemPolicy(reason: "missing-accessibility")
+        XCTAssertEqual(g, h)
+        XCTAssertNotEqual(g, i)
+    }
+
+    func testUnsupportedItemPolicyErrorCodableRoundTrips() throws {
+        let expected = BASSovereignKeychainBinding.KeychainError
+            .unsupportedItemPolicy(reason: "legacy-accessibility")
+        let encoded = try JSONEncoder().encode(expected)
+        let decoded = try JSONDecoder().decode(
+            BASSovereignKeychainBinding.KeychainError.self,
+            from: encoded)
+        XCTAssertEqual(decoded, expected)
     }
 
     // MARK: - 8. Non-Darwin fallback contract
