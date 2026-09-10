@@ -35,17 +35,139 @@ fi
 
 cd "$PKG_DIR"
 
-# M173 — use a per-invocation tmpdir so two parallel CI jobs on the
-# same host don't race on a shared `/tmp/qinao_symbolgraph.log`.
-SYMBOLGRAPH_LOG="$(mktemp -t qinao_symbolgraph.XXXXXX)"
-trap 'rm -f "$SYMBOLGRAPH_LOG"' EXIT
+if [[ "${QINAO_CI_DIAGNOSTICS:-0}" == 1 ]]; then
+  : "${RUNNER_TEMP:?check_sovereign_redaction: RUNNER_TEMP is required in CI diagnostic mode}"
+  DIAGNOSTIC_DIR="$(mktemp -d "$RUNNER_TEMP/qinao-symbolgraph-diagnostics.XXXXXX")"
+  mkdir -p "$DIAGNOSTIC_DIR/first-pass"
+  SYMBOLGRAPH_LOG="$DIAGNOSTIC_DIR/first-pass/dump.log"
 
-# Generate a fresh symbol graph so stale builds can't mask a regression.
-swift package ${swift_backend_args[@]+"${swift_backend_args[@]}"} dump-symbol-graph >"$SYMBOLGRAPH_LOG" 2>&1 || {
-  echo "check_sovereign_redaction: symbol graph emission failed" >&2
-  cat "$SYMBOLGRAPH_LOG" >&2
-  exit 1
-}
+  set +e
+  swift package ${swift_backend_args[@]+"${swift_backend_args[@]}"} dump-symbol-graph >"$SYMBOLGRAPH_LOG" 2>&1
+  graph_rc=$?
+  if ! printf 'first_dump=%s\n' "$graph_rc" > "$DIAGNOSTIC_DIR/exits.txt"; then
+    echo "check_sovereign_redaction: could not write diagnostic exits" >&2
+  fi
+
+  if [[ "$graph_rc" != 0 ]]; then
+    (
+      set -euo pipefail
+      mkdir -p "$DIAGNOSTIC_DIR/first-pass/modules" "$DIAGNOSTIC_DIR/first-pass/graphs"
+
+      modules=()
+      find .build -type f -path '*/debug/Modules/QinaoRuntimeSDKPackageTests.swiftmodule*' \
+        -print0 > "$DIAGNOSTIC_DIR/first-pass/modules.list" 2>/dev/null
+      while IFS= read -r -d '' module; do
+        modules+=("$module")
+      done < "$DIAGNOSTIC_DIR/first-pass/modules.list"
+      for module in "${modules[@]}"; do
+        relative="${module#.build/}"
+        destination="$DIAGNOSTIC_DIR/first-pass/modules/$relative"
+        mkdir -p "$(dirname "$destination")"
+        cp "$module" "$destination"
+      done
+
+      graphs=()
+      find .build -type d -name symbolgraph -print0 \
+        > "$DIAGNOSTIC_DIR/first-pass/graphs.list" 2>/dev/null
+      while IFS= read -r -d '' graph; do
+        graphs+=("$graph")
+      done < "$DIAGNOSTIC_DIR/first-pass/graphs.list"
+      for graph in "${graphs[@]}"; do
+        relative="${graph#.build/}"
+        destination="$DIAGNOSTIC_DIR/first-pass/graphs/$relative"
+        mkdir -p "$(dirname "$destination")"
+        mv "$graph" "$destination"
+      done
+    )
+    preservation_rc=$?
+    if ! printf 'preservation=%s\n' "$preservation_rc" >> "$DIAGNOSTIC_DIR/exits.txt"; then
+      echo "check_sovereign_redaction: could not record preservation exit" >&2
+    fi
+
+    if [[ "$preservation_rc" != 0 ]]; then
+      echo "check_sovereign_redaction: first-pass preservation failed" >&2
+      cat "$SYMBOLGRAPH_LOG" >&2
+      exit 1
+    fi
+
+    mkdir -p "$DIAGNOSTIC_DIR/after-test-products/modules" \
+      "$DIAGNOSTIC_DIR/after-test-products/graphs"
+    staging_rc=$?
+    if [[ "$staging_rc" != 0 ]]; then
+      if ! printf 'after_staging=%s\n' "$staging_rc" >> "$DIAGNOSTIC_DIR/exits.txt"; then
+        echo "check_sovereign_redaction: could not record staging exit" >&2
+      fi
+      echo "check_sovereign_redaction: after-test-products staging failed" >&2
+      cat "$SYMBOLGRAPH_LOG" >&2
+      exit 1
+    fi
+    swift build ${swift_backend_args[@]+"${swift_backend_args[@]}"} --build-tests --verbose \
+      > "$DIAGNOSTIC_DIR/after-test-products/build.log" 2>&1
+    build_rc=$?
+    swift package ${swift_backend_args[@]+"${swift_backend_args[@]}"} --verbose dump-symbol-graph \
+      > "$DIAGNOSTIC_DIR/after-test-products/dump.log" 2>&1
+    retry_rc=$?
+    if ! printf 'build_tests=%s\nretry_dump=%s\n' "$build_rc" "$retry_rc" \
+      >> "$DIAGNOSTIC_DIR/exits.txt"; then
+      echo "check_sovereign_redaction: could not record diagnostic command exits" >&2
+    fi
+
+    (
+      set -euo pipefail
+      modules=()
+      find .build -type f -path '*/debug/Modules/QinaoRuntimeSDKPackageTests.swiftmodule*' \
+        -print0 > "$DIAGNOSTIC_DIR/after-test-products/modules.list" 2>/dev/null
+      while IFS= read -r -d '' module; do
+        modules+=("$module")
+      done < "$DIAGNOSTIC_DIR/after-test-products/modules.list"
+      for module in "${modules[@]}"; do
+        relative="${module#.build/}"
+        destination="$DIAGNOSTIC_DIR/after-test-products/modules/$relative"
+        mkdir -p "$(dirname "$destination")"
+        cp "$module" "$destination"
+      done
+
+      graphs=()
+      find .build -type d -name symbolgraph -print0 \
+        > "$DIAGNOSTIC_DIR/after-test-products/graphs.list" 2>/dev/null
+      while IFS= read -r -d '' graph; do
+        graphs+=("$graph")
+      done < "$DIAGNOSTIC_DIR/after-test-products/graphs.list"
+      for graph in "${graphs[@]}"; do
+        relative="${graph#.build/}"
+        destination="$DIAGNOSTIC_DIR/after-test-products/graphs/$relative"
+        mkdir -p "$(dirname "$destination")"
+        cp -R "$graph" "$destination"
+      done
+    )
+    after_preservation_rc=$?
+    if ! printf 'after_preservation=%s\n' "$after_preservation_rc" >> "$DIAGNOSTIC_DIR/exits.txt"; then
+      echo "check_sovereign_redaction: could not record after-test-products preservation exit" >&2
+    fi
+
+    echo "check_sovereign_redaction: symbol graph emission failed; retained diagnostics follow" >&2
+    cat "$SYMBOLGRAPH_LOG" >&2
+    cat "$DIAGNOSTIC_DIR/after-test-products/build.log" >&2
+    cat "$DIAGNOSTIC_DIR/after-test-products/dump.log" >&2
+    if [[ "$after_preservation_rc" != 0 ]]; then
+      echo "check_sovereign_redaction: after-test-products preservation failed" >&2
+    fi
+    exit 1
+  fi
+  set -e
+else
+  # M173 — use a per-invocation tmpdir so two parallel CI jobs on the
+  # same host don't race on a shared `/tmp/qinao_symbolgraph.log`.
+  SYMBOLGRAPH_LOG="$(mktemp -t qinao_symbolgraph.XXXXXX)"
+  trap 'rm -f "$SYMBOLGRAPH_LOG"' EXIT
+
+  # Generate a fresh symbol graph so stale builds can't mask a regression.
+  swift package ${swift_backend_args[@]+"${swift_backend_args[@]}"} dump-symbol-graph >"$SYMBOLGRAPH_LOG" 2>&1 || {
+    echo "check_sovereign_redaction: symbol graph emission failed" >&2
+    cat "$SYMBOLGRAPH_LOG" >&2
+    exit 1
+  }
+fi
 
 SYMBOL_DIR="$(ls -d "$PKG_DIR"/.build/*/symbolgraph 2>/dev/null | head -n 1 || true)"
 if [[ -z "$SYMBOL_DIR" ]]; then

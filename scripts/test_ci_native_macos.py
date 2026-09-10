@@ -13,6 +13,7 @@ from scripts.test_test_workflow_owner_ledger import ORDINARY_WORKFLOW, _parse_ya
 
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts/prepare_ci_mlx_metallib.sh"
+TEST_RUNNER = ROOT / "scripts/run_ci_swift_tests.sh"
 
 
 class MlxMetallibFixture:
@@ -31,6 +32,9 @@ class MlxMetallibFixture:
         self.github_env.touch()
         if HELPER.exists():
             shutil.copy2(HELPER, self.scripts / HELPER.name)
+        if TEST_RUNNER.exists():
+            shutil.copy2(TEST_RUNNER, self.scripts / TEST_RUNNER.name)
+        (self.root / "QinaoRuntimeSDK").mkdir()
 
         vendor = (
             self.root
@@ -41,6 +45,7 @@ class MlxMetallibFixture:
 
         (self.commands / "bash").symlink_to("/bin/bash")
         (self.commands / "dirname").symlink_to("/usr/bin/dirname")
+        (self.commands / "tee").symlink_to("/usr/bin/tee")
         self.make_command(
             "mktemp",
             """
@@ -355,9 +360,10 @@ printf 'swift %s\n' "$*" >> "$CALLS"
 """,
                     )
                     test_step = next(step for step in steps if step.get("name") in {"BAS test", "Qinao test"})
+                    product_cwd = fx.root / test_step.get("working-directory", "")
                     product_result = subprocess.run(
                         ["/bin/bash", "-e", "-c", test_step["run"]],
-                        cwd=fx.root,
+                        cwd=product_cwd,
                         env=fx.environment(MLX_METAL_PATH=mlx_path),
                         capture_output=True,
                         text=True,
@@ -374,7 +380,10 @@ printf 'swift %s\n' "$*" >> "$CALLS"
 
     def test_boundary_job_selects_native_without_unused_metal_preparation(self) -> None:
         job = _parse_yaml(ORDINARY_WORKFLOW.read_text())["jobs"]["boundary-checks"]
-        self.assertEqual(job.get("env"), {"QINAO_SWIFT_BUILD_SYSTEM": "native"})
+        self.assertEqual(job.get("env"), {
+            "QINAO_SWIFT_BUILD_SYSTEM": "native",
+            "QINAO_CI_DIAGNOSTICS": "1",
+        })
         names = [step.get("name") for step in job["steps"]]
         self.assertNotIn("Prepare Metal compiler", names)
         helper = next(step for step in job["steps"] if step.get("name") == "CI contract and iOS floor helper tests")

@@ -19,12 +19,14 @@ ORDINARY_WORKFLOW = PROJECT_ROOT / ".github/workflows/test.yml"
 PROTECTED_WORKFLOW = PROJECT_ROOT / ".github/workflows/qinao-wave-admission.yml"
 PINNED_CHECKOUT = "11bd71901bbe5b1630ceea73d27597364c9af683"
 PINNED_SETUP_PYTHON = "a309ff8b426b58ec0e2a45f0f869d46889d02405"
+PINNED_UPLOAD_ARTIFACT = "ea165f8d65b6e75b540449e92b4886f43607fa02"
 PRIMARY_PYTHON_VERSION = "3.14.5"
 ORDINARY_WORKFLOW_NAME = "Test + boundary checks"
 WORKFLOW_TOP_LEVEL_FIELDS = {"name", "on", "permissions", "jobs"}
 ALLOWED_EXTERNAL_USES = {
     f"actions/checkout@{PINNED_CHECKOUT}",
     f"actions/setup-python@{PINNED_SETUP_PYTHON}",
+    f"actions/upload-artifact@{PINNED_UPLOAD_ARTIFACT}",
 }
 ORDINARY_EVENTS = {
     "push": {"branches": ["main", "m605-chapter-*", "decode-*"]},
@@ -63,6 +65,21 @@ def _mlx_metallib_preparation() -> dict[str, str]:
     }
 
 
+def _failure_upload(name: str, artifact: str, path: str) -> dict[str, Any]:
+    return {
+        "name": name,
+        "if": "failure()",
+        "uses": f"actions/upload-artifact@{PINNED_UPLOAD_ARTIFACT}",
+        "with": {
+            "name": f"{artifact}-${{{{ github.run_id }}}}-${{{{ github.run_attempt }}}}",
+            "path": f"${{{{ runner.temp }}}}/{path}",
+            "if-no-files-found": "warn",
+            "retention-days": 7,
+            "compression-level": 6,
+        },
+    }
+
+
 # These are the product commands CI must actually execute, not admission inputs.
 PRODUCT_STEPS = {
     "bas-tests": [
@@ -70,14 +87,19 @@ PRODUCT_STEPS = {
         _setup_python(),
         _metal_preparation(resolver="xcrun"),
         _mlx_metallib_preparation(),
-        {"name": "BAS test", "run": "swift test --build-system native --package-path BehavioralAISubstrate"},
+        {"name": "BAS test", "run": "bash scripts/run_ci_swift_tests.sh bas"},
+        _failure_upload("Upload BAS XCTest failure diagnostics", "bas-xctest",
+                        "bas-xctest-diagnostics.*"),
     ],
     "qinao-tests": [
         _xcode27_selection(),
         _setup_python(),
         _metal_preparation(resolver="xcrun"),
         _mlx_metallib_preparation(),
-        {"name": "Qinao test", "working-directory": "QinaoRuntimeSDK", "run": "swift test --build-system native"},
+        {"name": "Qinao test", "working-directory": "QinaoRuntimeSDK",
+         "run": "bash ../scripts/run_ci_swift_tests.sh qinao"},
+        _failure_upload("Upload Qinao XCTest failure diagnostics", "qinao-xctest",
+                        "qinao-xctest-diagnostics.*"),
     ],
     "samplehost-tests": [
         _xcode27_selection("macosx iphonesimulator"),
@@ -103,6 +125,8 @@ PRODUCT_STEPS = {
         _xcode27_selection(),
         {"name": "Qinao import boundaries", "run": "bash scripts/check_qinao_import_boundaries.sh"},
         {"name": "Sovereign redaction", "run": "bash scripts/check_sovereign_redaction.sh"},
+        _failure_upload("Upload Qinao symbol graph failure diagnostics", "qinao-symbolgraph",
+                        "qinao-symbolgraph-diagnostics.*"),
         {"name": "SDK import boundaries", "run": "bash scripts/check_sdk_import_boundaries.sh"},
         {"name": "Substrate residuals", "run": "bash scripts/check_substrate_residuals.sh"},
         {"name": "Cross-language schema parity", "run": "python3 scripts/check_chenglu_schema_parity.py"},
@@ -113,7 +137,7 @@ PRODUCT_STEPS = {
                    "python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger "
                    "BehavioralAISubstrate.scripts.test_check_ios27_floor "
                    "scripts.test_boundary_tool_errors scripts.test_ci_metal_toolchain "
-                   "scripts.test_ci_native_macos\n",
+                   "scripts.test_ci_native_macos scripts.test_ci_failure_diagnostics\n",
         },
     ],
     "python-fuzz": [
@@ -514,7 +538,10 @@ def validate_ordinary_workflow(text: str) -> list[str]:
             "timeout-minutes": timeout, "permissions": {"contents": "read"},
         }
         if name == "boundary-checks":
-            expected_context["env"] = {"QINAO_SWIFT_BUILD_SYSTEM": "native"}
+            expected_context["env"] = {
+                "QINAO_SWIFT_BUILD_SYSTEM": "native",
+                "QINAO_CI_DIAGNOSTICS": "1",
+            }
         _require(errors, _strict_yaml_equal(context, expected_context),
                  f"ordinary job {name} exact execution context")
         steps = job.get("steps")
@@ -576,6 +603,7 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
                              "CI contract and iOS floor helper tests")
         self.assertIn("scripts.test_boundary_tool_errors", helper["run"].split())
         self.assertIn("scripts.test_ci_native_macos", helper["run"].split())
+        self.assertIn("scripts.test_ci_failure_diagnostics", helper["run"].split())
         self.assertIn("command -v rg", helper["run"])
 
     def test_apple_jobs_prepare_required_native_prerequisites(self) -> None:
@@ -595,7 +623,7 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
         self.assertNotIn("Prepare Metal compiler", {step.get("name") for step in boundary_steps})
         self.assertEqual(
             document["jobs"]["boundary-checks"].get("env"),
-            {"QINAO_SWIFT_BUILD_SYSTEM": "native"},
+            {"QINAO_SWIFT_BUILD_SYSTEM": "native", "QINAO_CI_DIAGNOSTICS": "1"},
         )
         helper = _named_step(document["jobs"]["boundary-checks"],
                              "CI contract and iOS floor helper tests")
@@ -628,6 +656,7 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
         for old, new in ((" scripts.test_boundary_tool_errors", ""),
                          (" scripts.test_ci_metal_toolchain", ""),
                          (" scripts.test_ci_native_macos", ""),
+                         (" scripts.test_ci_failure_diagnostics", ""),
                          ("command -v rg", "command -v rg || true"),
                          ("command -v rg\n", "")):
             changed = json.loads(json.dumps(document))
@@ -746,7 +775,8 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
                         "BehavioralAISubstrate.scripts.test_check_ios27_floor",
                         "scripts.test_boundary_tool_errors",
                         "scripts.test_ci_metal_toolchain",
-                        "scripts.test_ci_native_macos"])
+                        "scripts.test_ci_native_macos",
+                        "scripts.test_ci_failure_diagnostics"])
                 else:
                     self.assertNotEqual(result.returncode, 0)
                     self.assertFalse(calls.exists())
