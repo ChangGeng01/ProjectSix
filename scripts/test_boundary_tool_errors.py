@@ -145,6 +145,7 @@ class BoundaryFixture:
 
     def run(self, script: str, *, env: Optional[Dict[str, str]] = None, fallback: bool = False) -> subprocess.CompletedProcess[str]:
         merged = os.environ.copy()
+        merged.pop("QINAO_SWIFT_BUILD_SYSTEM", None)
         base_path = "/usr/bin:/bin:/usr/sbin:/sbin" if fallback else os.environ["PATH"]
         merged["PATH"] = f"{self.root / 'commands'}:{base_path}"
         if REAL_RG:
@@ -380,6 +381,113 @@ class BoundaryToolErrorTests(unittest.TestCase):
                 result = self.fx.run("check_qinao_import_boundaries.sh", env=env)
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertNotIn("check passed", (result.stdout + result.stderr).lower())
+
+    def test_qinao_backend_choice_reaches_build_and_symbol_emission_in_order(self) -> None:
+        shutil.copy2(
+            SCRIPT_DIR / "check_sovereign_redaction.sh",
+            self.fx.root / "scripts/check_sovereign_redaction.sh",
+        )
+        swift_calls = self.fx.root / "swift-calls.txt"
+        self.fx.make_command(
+            "swift",
+            textwrap.dedent(
+                """\
+                printf '%s\n' "$*" >> "$SWIFT_CALLS"
+                case "$*" in
+                  build|"build --build-system native")
+                    [[ "${SWIFT_FAIL_ON:-}" != build ]] || exit 77
+                    ;;
+                  "package dump-symbol-graph"|"package --build-system native dump-symbol-graph")
+                    [[ "${SWIFT_FAIL_ON:-}" != package ]] || exit 78
+                    graph=.build/fixture/symbolgraph/QinaoCore.symbols.json
+                    mkdir -p "${graph%/*}"
+                    printf '%s\n' '{"module":{"name":"QinaoCore"},"symbols":[]}' > "$graph"
+                    ;;
+                  *) exit 64 ;;
+                esac
+                """
+            ),
+        )
+        self.fx.make_script("check_sdk_import_boundaries.sh", "exit 0")
+
+        for choice, expected in (
+            (None, ["build", "package dump-symbol-graph"]),
+            ("default", ["build", "package dump-symbol-graph"]),
+            (
+                "native",
+                [
+                    "build --build-system native",
+                    "package --build-system native dump-symbol-graph",
+                ],
+            ),
+        ):
+            with self.subTest(choice=choice):
+                swift_calls.unlink(missing_ok=True)
+                env = {"SWIFT_CALLS": str(swift_calls)}
+                if choice is not None:
+                    env["QINAO_SWIFT_BUILD_SYSTEM"] = choice
+                result = self.fx.run("check_qinao_import_boundaries.sh", env=env)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(swift_calls.read_text().splitlines(), expected)
+
+    def test_invalid_qinao_backend_is_rejected_before_build_or_emission(self) -> None:
+        swift_calls = self.fx.root / "swift-calls.txt"
+        self.fx.make_command("swift", 'printf "%s\\n" "$*" >> "$SWIFT_CALLS"')
+        for choice in ("", "xcode", "native extra"):
+            with self.subTest(choice=choice):
+                swift_calls.unlink(missing_ok=True)
+                result = self.fx.run(
+                    "check_qinao_import_boundaries.sh",
+                    env={
+                        "QINAO_SWIFT_BUILD_SYSTEM": choice,
+                        "SWIFT_CALLS": str(swift_calls),
+                    },
+                )
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertFalse(swift_calls.exists())
+                self.assertIn("QINAO_SWIFT_BUILD_SYSTEM", result.stderr)
+
+    def test_native_backend_build_and_emission_failures_remain_fatal(self) -> None:
+        shutil.copy2(
+            SCRIPT_DIR / "check_sovereign_redaction.sh",
+            self.fx.root / "scripts/check_sovereign_redaction.sh",
+        )
+        swift_calls = self.fx.root / "swift-calls.txt"
+        self.fx.make_command(
+            "swift",
+            textwrap.dedent(
+                """\
+                printf '%s\n' "$*" >> "$SWIFT_CALLS"
+                [[ "$*" != "build --build-system native" || "$SWIFT_FAIL_ON" != build ]] || exit 77
+                [[ "$*" != "package --build-system native dump-symbol-graph" || "$SWIFT_FAIL_ON" != package ]] || exit 78
+                if [[ "$*" == "package --build-system native dump-symbol-graph" ]]; then
+                  graph=.build/fixture/symbolgraph/QinaoCore.symbols.json
+                  mkdir -p "${graph%/*}"
+                  printf '%s\n' '{"module":{"name":"QinaoCore"},"symbols":[]}' > "$graph"
+                fi
+                """
+            ),
+        )
+        self.fx.make_script("check_sdk_import_boundaries.sh", "exit 0")
+        for failure in ("build", "package"):
+            with self.subTest(failure=failure):
+                swift_calls.unlink(missing_ok=True)
+                result = self.fx.run(
+                    "check_qinao_import_boundaries.sh",
+                    env={
+                        "QINAO_SWIFT_BUILD_SYSTEM": "native",
+                        "SWIFT_CALLS": str(swift_calls),
+                        "SWIFT_FAIL_ON": failure,
+                    },
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("check passed", (result.stdout + result.stderr).lower())
+                calls = swift_calls.read_text().splitlines()
+                expected = [
+                    "build --build-system native",
+                    "package --build-system native dump-symbol-graph",
+                ]
+                self.assertEqual(calls, expected)
 
     def test_output_creation_failure_is_fatal(self) -> None:
         bad_tmp = self.fx.root / "does-not-exist" / "tmp"

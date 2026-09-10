@@ -15,6 +15,16 @@
 
 set -euo pipefail
 
+swift_backend_args=()
+case "${QINAO_SWIFT_BUILD_SYSTEM-default}" in
+  default) ;;
+  native) swift_backend_args=(--build-system native) ;;
+  *)
+    echo "check_sovereign_redaction: QINAO_SWIFT_BUILD_SYSTEM must be default or native" >&2
+    exit 2
+    ;;
+esac
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PKG_DIR="$ROOT/QinaoRuntimeSDK"
 
@@ -31,7 +41,7 @@ SYMBOLGRAPH_LOG="$(mktemp -t qinao_symbolgraph.XXXXXX)"
 trap 'rm -f "$SYMBOLGRAPH_LOG"' EXIT
 
 # Generate a fresh symbol graph so stale builds can't mask a regression.
-swift package dump-symbol-graph >"$SYMBOLGRAPH_LOG" 2>&1 || {
+swift package ${swift_backend_args[@]+"${swift_backend_args[@]}"} dump-symbol-graph >"$SYMBOLGRAPH_LOG" 2>&1 || {
   echo "check_sovereign_redaction: symbol graph emission failed" >&2
   cat "$SYMBOLGRAPH_LOG" >&2
   exit 1

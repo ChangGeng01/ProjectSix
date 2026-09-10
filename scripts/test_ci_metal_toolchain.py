@@ -170,6 +170,72 @@ echo "fixture direct Metal compiler"
             ],
         )
 
+    def test_xcrun_resolver_skips_unused_direct_launcher_probe(self) -> None:
+        result, calls = self.run_fixture(
+            "bash scripts/ensure_ci_metal_toolchain.sh --resolver xcrun macosx",
+            {"DIRECT_RC_BEFORE": "69", "DIRECT_RC_AFTER": "69"},
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            calls,
+            [
+                "xcode-select -p",
+                "xcrun --sdk macosx metal --version",
+                "product",
+            ],
+        )
+
+    def test_xcrun_resolver_installs_once_and_rechecks_only_sdk_probes(self) -> None:
+        result, calls = self.run_fixture(
+            "bash scripts/ensure_ci_metal_toolchain.sh --resolver xcrun macosx iphonesimulator",
+            {"MISSING_BEFORE": "macosx"},
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            calls,
+            [
+                "xcode-select -p",
+                "xcrun --sdk macosx metal --version",
+                "xcrun --sdk iphonesimulator metal --version",
+                "xcodebuild -downloadComponent MetalToolchain",
+                "xcrun --sdk macosx metal --version",
+                "xcrun --sdk iphonesimulator metal --version",
+                "product",
+            ],
+        )
+
+    def test_xcrun_resolver_post_install_failure_remains_fatal(self) -> None:
+        result, calls = self.run_fixture(
+            "bash scripts/ensure_ci_metal_toolchain.sh --resolver xcrun macosx",
+            {"MISSING_BEFORE": "macosx", "MISSING_AFTER": "macosx"},
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("product", calls)
+        self.assertNotIn("metal --version", calls)
+        self.assertEqual(calls.count("xcrun --sdk macosx metal --version"), 2)
+        self.assertEqual(
+            calls.count("xcodebuild -downloadComponent MetalToolchain"), 1
+        )
+        self.assertIn(
+            "Metal compiler unavailable for macosx after component preparation",
+            result.stderr,
+        )
+
+    def test_explicit_selected_xcode_resolver_preserves_direct_launcher_checks(self) -> None:
+        result, calls = self.run_fixture(
+            "bash scripts/ensure_ci_metal_toolchain.sh --resolver selected-xcode macosx"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            calls,
+            [
+                "xcode-select -p",
+                "metal --version",
+                "xcrun --sdk macosx metal --version",
+                "product",
+            ],
+        )
+
     def test_download_failure_stops_without_reprobe_or_product(self) -> None:
         result, calls = self.run_fixture(
             "bash scripts/ensure_ci_metal_toolchain.sh macosx",
@@ -227,6 +293,10 @@ echo "fixture direct Metal compiler"
             "macosx invalid",
             "'macosx iphonesimulator'",
             "--help",
+            "--resolver",
+            "--resolver unknown macosx",
+            "--resolver xcrun",
+            "macosx --resolver xcrun",
         ):
             with self.subTest(arguments=arguments):
                 result, calls = self.run_fixture(
@@ -285,7 +355,6 @@ echo "fixture direct Metal compiler"
             "bas-tests",
             "qinao-tests",
             "samplehost-tests",
-            "boundary-checks",
         ):
             steps = [
                 step
@@ -308,9 +377,16 @@ echo "fixture direct Metal compiler"
                         "xcrun --sdk iphonesimulator metal --version" in calls,
                         job == "samplehost-tests",
                     )
+                    if job != "samplehost-tests":
+                        self.assertNotIn("metal --version", calls)
                     self.assertEqual(
                         calls.count("xcodebuild -downloadComponent MetalToolchain"), 1
                     )
+
+        boundary_names = {
+            step.get("name") for step in jobs["boundary-checks"]["steps"]
+        }
+        self.assertNotIn("Prepare Metal compiler", boundary_names)
 
 
 if __name__ == "__main__":

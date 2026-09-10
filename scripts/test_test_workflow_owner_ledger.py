@@ -40,22 +40,44 @@ def _xcode27_selection(sdks: str = "macosx") -> dict[str, str]:
             f"bash scripts/check_ci_xcode27.sh {sdks}\n"}
 
 
-def _metal_preparation(sdks: str = "macosx") -> dict[str, str]:
+def _metal_preparation(
+    sdks: str = "macosx", *, resolver: str | None = None,
+) -> dict[str, str]:
+    resolver_args = f"--resolver {resolver} " if resolver else ""
     return {"name": "Prepare Metal compiler",
-            "run": f"bash scripts/ensure_ci_metal_toolchain.sh {sdks}"}
+            "run": f"bash scripts/ensure_ci_metal_toolchain.sh {resolver_args}{sdks}"}
+
+
+def _setup_python() -> dict[str, Any]:
+    return {
+        "name": "Setup Python",
+        "uses": f"actions/setup-python@{PINNED_SETUP_PYTHON}",
+        "with": {"python-version": PRIMARY_PYTHON_VERSION},
+    }
+
+
+def _mlx_metallib_preparation() -> dict[str, str]:
+    return {
+        "name": "Prepare MLX metallib",
+        "run": "bash scripts/prepare_ci_mlx_metallib.sh",
+    }
 
 
 # These are the product commands CI must actually execute, not admission inputs.
 PRODUCT_STEPS = {
     "bas-tests": [
         _xcode27_selection(),
-        _metal_preparation(),
-        {"name": "BAS test", "run": "swift test --package-path BehavioralAISubstrate"},
+        _setup_python(),
+        _metal_preparation(resolver="xcrun"),
+        _mlx_metallib_preparation(),
+        {"name": "BAS test", "run": "swift test --build-system native --package-path BehavioralAISubstrate"},
     ],
     "qinao-tests": [
         _xcode27_selection(),
-        _metal_preparation(),
-        {"name": "Qinao test", "working-directory": "QinaoRuntimeSDK", "run": "swift test"},
+        _setup_python(),
+        _metal_preparation(resolver="xcrun"),
+        _mlx_metallib_preparation(),
+        {"name": "Qinao test", "working-directory": "QinaoRuntimeSDK", "run": "swift test --build-system native"},
     ],
     "samplehost-tests": [
         _xcode27_selection("macosx iphonesimulator"),
@@ -79,7 +101,6 @@ PRODUCT_STEPS = {
     ],
     "boundary-checks": [
         _xcode27_selection(),
-        _metal_preparation(),
         {"name": "Qinao import boundaries", "run": "bash scripts/check_qinao_import_boundaries.sh"},
         {"name": "Sovereign redaction", "run": "bash scripts/check_sovereign_redaction.sh"},
         {"name": "SDK import boundaries", "run": "bash scripts/check_sdk_import_boundaries.sh"},
@@ -91,7 +112,8 @@ PRODUCT_STEPS = {
             "run": "set -e\ncommand -v rg\n"
                    "python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger "
                    "BehavioralAISubstrate.scripts.test_check_ios27_floor "
-                   "scripts.test_boundary_tool_errors scripts.test_ci_metal_toolchain\n",
+                   "scripts.test_boundary_tool_errors scripts.test_ci_metal_toolchain "
+                   "scripts.test_ci_native_macos\n",
         },
     ],
     "python-fuzz": [
@@ -487,10 +509,14 @@ def validate_ordinary_workflow(text: str) -> list[str]:
             continue
         display_name, timeout = JOB_NAMES_AND_TIMEOUTS[name]
         context = {key: value for key, value in job.items() if key != "steps"}
-        _require(errors, _strict_yaml_equal(context, {
+        expected_context: dict[str, Any] = {
             "name": display_name, "runs-on": "xcode-27" if name in APPLE_JOBS else "macos-latest",
             "timeout-minutes": timeout, "permissions": {"contents": "read"},
-        }), f"ordinary job {name} exact execution context")
+        }
+        if name == "boundary-checks":
+            expected_context["env"] = {"QINAO_SWIFT_BUILD_SYSTEM": "native"}
+        _require(errors, _strict_yaml_equal(context, expected_context),
+                 f"ordinary job {name} exact execution context")
         steps = job.get("steps")
         if not isinstance(steps, list) or not steps:
             errors.append(f"ordinary job {name} has nonempty steps")
@@ -498,9 +524,11 @@ def validate_ordinary_workflow(text: str) -> list[str]:
         _validate_checkout(errors, steps[0], fetch_depth=0)
         _require(errors, _strict_yaml_equal(steps[1:], PRODUCT_STEPS[name]),
                  f"ordinary job {name} executes required product steps")
-        if name == "python-fuzz":
+        if name in {"bas-tests", "qinao-tests", "python-fuzz"}:
             _validate_setup_python(
-                errors, steps[1] if len(steps) > 1 else {}, name="Setup Python",
+                errors,
+                _named_step(job, "Setup Python") if isinstance(job, dict) else {},
+                name="Setup Python",
             )
     return errors
 
@@ -547,17 +575,25 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
         helper = _named_step(document["jobs"]["boundary-checks"],
                              "CI contract and iOS floor helper tests")
         self.assertIn("scripts.test_boundary_tool_errors", helper["run"].split())
+        self.assertIn("scripts.test_ci_native_macos", helper["run"].split())
         self.assertIn("command -v rg", helper["run"])
 
-    def test_apple_jobs_prepare_metal_before_product_commands(self) -> None:
+    def test_apple_jobs_prepare_required_native_prerequisites(self) -> None:
         document = _parse_yaml(_read(ORDINARY_WORKFLOW))
-        for name in ("bas-tests", "qinao-tests", "samplehost-tests", "boundary-checks"):
+        for name in ("bas-tests", "qinao-tests"):
             with self.subTest(job=name):
                 steps = document["jobs"][name]["steps"]
-                self.assertEqual(steps[2]["name"], "Prepare Metal compiler")
-                sdks = "macosx iphonesimulator" if name == "samplehost-tests" else "macosx"
-                self.assertEqual(steps[2]["run"],
-                                 f"bash scripts/ensure_ci_metal_toolchain.sh {sdks}")
+                self.assertEqual(steps[2]["name"], "Setup Python")
+                self.assertEqual(steps[3], _metal_preparation(resolver="xcrun"))
+                self.assertEqual(steps[4], _mlx_metallib_preparation())
+        sample_steps = document["jobs"]["samplehost-tests"]["steps"]
+        self.assertEqual(sample_steps[2], _metal_preparation("macosx iphonesimulator"))
+        boundary_steps = document["jobs"]["boundary-checks"]["steps"]
+        self.assertNotIn("Prepare Metal compiler", {step.get("name") for step in boundary_steps})
+        self.assertEqual(
+            document["jobs"]["boundary-checks"].get("env"),
+            {"QINAO_SWIFT_BUILD_SYSTEM": "native"},
+        )
         helper = _named_step(document["jobs"]["boundary-checks"],
                              "CI contract and iOS floor helper tests")
         self.assertIn("scripts.test_ci_metal_toolchain", helper["run"].split())
@@ -588,6 +624,7 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
         self.assertTrue(validate_ordinary_workflow(json.dumps(changed)))
         for old, new in ((" scripts.test_boundary_tool_errors", ""),
                          (" scripts.test_ci_metal_toolchain", ""),
+                         (" scripts.test_ci_native_macos", ""),
                          ("command -v rg", "command -v rg || true"),
                          ("command -v rg\n", "")):
             changed = json.loads(json.dumps(document))
@@ -705,7 +742,8 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
                         "scripts.test_test_workflow_owner_ledger",
                         "BehavioralAISubstrate.scripts.test_check_ios27_floor",
                         "scripts.test_boundary_tool_errors",
-                        "scripts.test_ci_metal_toolchain"])
+                        "scripts.test_ci_metal_toolchain",
+                        "scripts.test_ci_native_macos"])
                 else:
                     self.assertNotEqual(result.returncode, 0)
                     self.assertFalse(calls.exists())
@@ -1138,12 +1176,12 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
         parts = workflow.split(anchor)
         self.assertEqual(
             len(parts),
-            2,
-            "ordinary CI must contain exactly one Python 3.14.5 setups",
+            4,
+            "ordinary CI must contain exactly three Python 3.14.5 setups",
         )
         self.assertNoContractErrors(validate_ordinary_workflow(workflow))
 
-        for occurrence in range(1):
+        for occurrence in range(3):
             for replacement in (
                 '          python-version: "3.12"\n',
                 '          python-version: "3.14"\n',
@@ -1178,7 +1216,7 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
             document = _parse_yaml(_read(path))
             for job_name, step in _run_steps(document):
                 bodies.append((path.name, job_name, str(step.get("run"))))
-        self.assertEqual(len(bodies), 21)
+        self.assertEqual(len(bodies), 22)
         for workflow, job, body in bodies:
             with self.subTest(workflow=workflow, job=job):
                 result = subprocess.run(

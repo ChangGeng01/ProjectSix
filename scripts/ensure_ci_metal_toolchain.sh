@@ -2,6 +2,19 @@
 # Hosted CI prerequisite; unlike check_ci_xcode27.sh this may download a component.
 # https://webkit.org/build-tools/ documents Apple's Metal Toolchain installation.
 set -euo pipefail
+resolver="selected-xcode"
+if [[ "${1:-}" == "--resolver" ]]; then
+  if (( $# < 2 )); then
+    echo "A resolver value is required after --resolver" >&2
+    exit 2
+  fi
+  resolver="$2"
+  shift 2
+  case "$resolver" in
+    xcrun|selected-xcode) ;;
+    *) echo "Unsupported CI Metal resolver: $resolver" >&2; exit 2 ;;
+  esac
+fi
 if (( $# == 0 )); then
   echo "At least one SDK name is required" >&2
   exit 2
@@ -25,7 +38,7 @@ fi
 metal_launcher="${developer_dir%/}/Toolchains/XcodeDefault.xctoolchain/usr/bin/metal"
 
 needs_component=false
-if ! "$metal_launcher" --version; then
+if [[ "$resolver" == "selected-xcode" ]] && ! "$metal_launcher" --version; then
   needs_component=true
 fi
 for sdk in "$@"; do
@@ -43,7 +56,7 @@ if ! xcodebuild -downloadComponent MetalToolchain; then
   exit 1
 fi
 verification_failed=false
-if ! "$metal_launcher" --version; then
+if [[ "$resolver" == "selected-xcode" ]] && ! "$metal_launcher" --version; then
   echo "Selected Xcode Metal launcher unavailable after component preparation: $metal_launcher" >&2
   verification_failed=true
 fi

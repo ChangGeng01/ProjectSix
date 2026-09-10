@@ -25,6 +25,16 @@
 
 set -euo pipefail
 
+swift_backend_args=()
+case "${QINAO_SWIFT_BUILD_SYSTEM-default}" in
+  default) ;;
+  native) swift_backend_args=(--build-system native) ;;
+  *)
+    echo "check_qinao_import_boundaries: QINAO_SWIFT_BUILD_SYSTEM must be default or native" >&2
+    exit 2
+    ;;
+esac
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
@@ -137,7 +147,7 @@ fi
 # ---- 4. Build must succeed ----
 (
   cd "$PKG_DIR"
-  if ! swift build >"$TEMP_DIR/qinao-build.log" 2>&1; then
+  if ! swift build ${swift_backend_args[@]+"${swift_backend_args[@]}"} >"$TEMP_DIR/qinao-build.log" 2>&1; then
     echo "QinaoRuntimeSDK failed to build:" >&2
     tail -40 "$TEMP_DIR/qinao-build.log" >&2
     exit 1

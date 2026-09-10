@@ -36,10 +36,16 @@ jobs:
           set -e
           sudo xcode-select -s /Applications/Xcode.app
           bash scripts/check_ci_xcode27.sh macosx
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.5"
       - name: Prepare Metal compiler
-        run: bash scripts/ensure_ci_metal_toolchain.sh macosx
+        run: bash scripts/ensure_ci_metal_toolchain.sh --resolver xcrun macosx
+      - name: Prepare MLX metallib
+        run: bash scripts/prepare_ci_mlx_metallib.sh
       - name: BAS test
-        run: swift test --package-path BehavioralAISubstrate
+        run: swift test --build-system native --package-path BehavioralAISubstrate
 
   qinao-tests:
     name: QinaoRuntimeSDK XCTest
@@ -60,11 +66,17 @@ jobs:
           set -e
           sudo xcode-select -s /Applications/Xcode.app
           bash scripts/check_ci_xcode27.sh macosx
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.5"
       - name: Prepare Metal compiler
-        run: bash scripts/ensure_ci_metal_toolchain.sh macosx
+        run: bash scripts/ensure_ci_metal_toolchain.sh --resolver xcrun macosx
+      - name: Prepare MLX metallib
+        run: bash scripts/prepare_ci_mlx_metallib.sh
       - name: Qinao test
         working-directory: QinaoRuntimeSDK
-        run: swift test
+        run: swift test --build-system native
 
   samplehost-tests:
     name: SampleHost iOS XCTest
@@ -115,6 +127,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    env:
+      QINAO_SWIFT_BUILD_SYSTEM: native
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -128,8 +142,6 @@ jobs:
           set -e
           sudo xcode-select -s /Applications/Xcode.app
           bash scripts/check_ci_xcode27.sh macosx
-      - name: Prepare Metal compiler
-        run: bash scripts/ensure_ci_metal_toolchain.sh macosx
       - name: Qinao import boundaries
         run: bash scripts/check_qinao_import_boundaries.sh
       - name: Sovereign redaction
@@ -146,7 +158,7 @@ jobs:
         run: |
           set -e
           command -v rg
-          python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger BehavioralAISubstrate.scripts.test_check_ios27_floor scripts.test_boundary_tool_errors scripts.test_ci_metal_toolchain
+          python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger BehavioralAISubstrate.scripts.test_check_ios27_floor scripts.test_boundary_tool_errors scripts.test_ci_metal_toolchain scripts.test_ci_native_macos
 
   python-fuzz:
     name: Python pytest fuzz tests
