@@ -53,15 +53,25 @@ public enum BASCognitiveOSBuilder {
     ///   opted into; nil for disabled primitives
     /// - Throws: re-throws SQLite construction errors when
     ///   any `*SQLiteURL` open fails
+    ///
+    /// An explicitly injected event log overrides both the
+    /// event-log enable flag and SQLite URL. The URL is not
+    /// opened when an instance is supplied.
     public static func build(
-        options: BASCognitiveOSBundleOptions
+        options: BASCognitiveOSBundleOptions,
+        eventLog injectedEventLog:
+            (any BASEventLogStorage)? = nil
     ) throws -> BASCognitiveOSBundle {
         // Empty bundle if all flags disabled
-        if options == .allDisabled {
+        if options == .allDisabled
+            && injectedEventLog == nil
+        {
             return .empty
         }
         return try build(
-            options: options, embeddingProvider: nil)
+            options: options,
+            embeddingProvider: nil,
+            eventLog: injectedEventLog)
     }
 
     /// chapter 八百八十二 / M3095 — Gap 2 wiring。 Overload that
@@ -73,7 +83,9 @@ public enum BASCognitiveOSBuilder {
     public static func build(
         options: BASCognitiveOSBundleOptions,
         embeddingProvider:
-            (any BASMemory.BASEmbeddingProvider)?
+            (any BASMemory.BASEmbeddingProvider)?,
+        eventLog injectedEventLog:
+            (any BASEventLogStorage)? = nil
     ) throws -> BASCognitiveOSBundle {
         // Empty-options shortcut still works,but only if
         // embeddingProvider is also nil + RAG flag is off。
@@ -81,6 +93,7 @@ public enum BASCognitiveOSBuilder {
         // other primitives,so fall through to the full path。
         if options == .allDisabled
             && embeddingProvider == nil
+            && injectedEventLog == nil
             && !options.enableRAGRetrieval
         {
             return .empty
@@ -88,7 +101,9 @@ public enum BASCognitiveOSBuilder {
 
         // Event log
         let eventLog: (any BASEventLogStorage)?
-        if options.enableEventLog {
+        if let injectedEventLog {
+            eventLog = injectedEventLog
+        } else if options.enableEventLog {
             if let url = options.eventLogSQLiteURL {
                 eventLog =
                     try BASSQLiteEventLogStorage(

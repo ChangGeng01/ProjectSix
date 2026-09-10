@@ -68,7 +68,8 @@ extension BASCognitiveBrain {
         // wants durable admit must keep the concrete service and call them at session boundaries
         // itself. Reload is in-process (the event store replays content empty). See
         // `BASRoutedMemoryPersistence` + `BASL8RoutedMemoryService` for the full honest scope.
-        memoryPersistence: BASRoutedMemoryPersistence? = nil
+        memoryPersistence: BASRoutedMemoryPersistence? = nil,
+        eventLog: (any BASEventLogStorage)? = nil
     ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions(
@@ -76,6 +77,7 @@ extension BASCognitiveBrain {
                 enableUserState: true,
                 enableVectorIndex: true,
                 enableKnowledgeGraph: true),
+            eventLog: eventLog,
             memoryEmbed: memoryEmbed,
             memoryEmbedDim: memoryEmbedDim,
             memoryPersistence: memoryPersistence,
@@ -183,7 +185,8 @@ extension BASCognitiveBrain {
             (any BASHostProfileServicing)? = nil,
         healthSnapshotHistoryCapacity: Int = 0,
         healthSnapshotAutoCaptureEvery: Int = 0,
-        metalSignalThreshold: Double? = nil
+        metalSignalThreshold: Double? = nil,
+        eventLog: (any BASEventLogStorage)? = nil
     ) async throws -> BASCognitiveBrain {
         let sqlTracker = BASMemoryUsageTracker()
         let sqlStore = BASSQLBrainHistoryStore(
@@ -214,7 +217,8 @@ extension BASCognitiveBrain {
                 healthSnapshotHistoryCapacity,
             healthSnapshotAutoCaptureEvery:
                 healthSnapshotAutoCaptureEvery,
-            metalSignalThreshold: metalSignalThreshold)
+            metalSignalThreshold: metalSignalThreshold,
+            eventLog: eventLog)
     }
 
     /// Construction with custom bundle options (e.g.

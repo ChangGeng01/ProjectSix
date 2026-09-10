@@ -55,6 +55,48 @@ final class BASCognitiveOSBuilderTests: XCTestCase {
         XCTAssertNil(bundle.knowledgeGraph)
     }
 
+    func testInjectedEventLogSurvivesBothEmptyShortcutsByIdentity() throws {
+        let log = BASInMemoryEventLogStorage()
+        let first = try BASCognitiveOSBuilder.build(
+            options: .allDisabled, eventLog: log)
+        let second = try BASCognitiveOSBuilder.build(
+            options: .allDisabled,
+            embeddingProvider: nil,
+            eventLog: log)
+        for bundle in [first, second] {
+            XCTAssertEqual(bundle.populatedCount, 1)
+            let actual = try XCTUnwrap(
+                bundle.eventLog
+                    as? BASInMemoryEventLogStorage)
+            XCTAssertTrue(actual === log)
+        }
+    }
+
+    func testInjectedEventLogOverridesSQLiteURLWithoutOpeningIt() throws {
+        let url = try XCTUnwrap(tempDir)
+            .appendingPathComponent(
+                "missing/events.sqlite")
+        let log = BASInMemoryEventLogStorage()
+        for enabled in [false, true] {
+            let bundle = try BASCognitiveOSBuilder.build(
+                options: BASCognitiveOSBundleOptions(
+                    enableEventLog: enabled,
+                    eventLogSQLiteURL: url),
+                eventLog: log)
+            let actual = try XCTUnwrap(
+                bundle.eventLog
+                    as? BASInMemoryEventLogStorage)
+            XCTAssertTrue(actual === log)
+            XCTAssertFalse(
+                FileManager.default.fileExists(
+                    atPath: url.path))
+            XCTAssertFalse(
+                FileManager.default.fileExists(
+                    atPath: url.deletingLastPathComponent()
+                        .path))
+        }
+    }
+
     func testEmptyBundleConvenience() {
         let bundle = BASCognitiveOSBundle.empty
         XCTAssertTrue(bundle.isEmpty)

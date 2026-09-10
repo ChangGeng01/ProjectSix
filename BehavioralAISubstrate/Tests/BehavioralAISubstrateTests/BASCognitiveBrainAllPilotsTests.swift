@@ -12,6 +12,7 @@
 import XCTest
 @testable import BASHostKit
 @testable import BASMemory
+@testable import BASRuntimeCore
 @testable import BASRustCoreBridge
 @testable import BASMetalSubstrate
 
@@ -33,6 +34,18 @@ final class BASCognitiveBrainAllPilotsTests: XCTestCase {
         XCTAssertTrue(status.rustActive)
         XCTAssertTrue(status.cxxActive)
         XCTAssertTrue(status.metalActive)
+    }
+
+    func testMakeWithAllPilotsForwardsInjectedEventLog()
+        async throws
+    {
+        let log = BASInMemoryEventLogStorage()
+        let brain = try await BASCognitiveBrain
+            .makeWithAllPilots(eventLog: log)
+        let bundle = await brain.bundle
+        let actual = try XCTUnwrap(
+            bundle.eventLog as? BASInMemoryEventLogStorage)
+        XCTAssertTrue(actual === log)
     }
 
     func testMakeWithDefaultsStillBareBrain() async throws {

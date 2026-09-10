@@ -47,6 +47,37 @@ final class BASCognitiveBrainFacadeIntegrationTests: XCTestCase {
             "Default bundle must have knowledge graph")
     }
 
+    func testMakeWithDefaultsUsesInjectedEventLogForBundleAndEngine()
+        async throws
+    {
+        let log = BASInMemoryEventLogStorage()
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults(eventLog: log)
+        let bundle = await brain.bundle
+        let actual = try XCTUnwrap(
+            bundle.eventLog as? BASInMemoryEventLogStorage)
+        XCTAssertTrue(actual === log)
+
+        let result = await brain.process(
+            "compile the swift package")
+        let entries = await log.events(
+            forSession: result.runtimeTrace.sessionID)
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertEqual(
+            entries.map(\.kind),
+            [.substrateAudit, .substrateAudit])
+        XCTAssertEqual(
+            entries.map(\.actions),
+            [["turn-start"], ["turn-complete"]])
+        XCTAssertEqual(
+            entries.map(\.sequenceNumber), [0, 1])
+        XCTAssertEqual(
+            Set(entries.map(\.eventID)).count, 2)
+        XCTAssertTrue(entries.allSatisfy {
+            $0.source == "turn-runtime-engine"
+        })
+    }
+
     // MARK: - 2. process(_ input:) returns non-nil
 
     func testProcessStringInputReturnsResult() async throws {

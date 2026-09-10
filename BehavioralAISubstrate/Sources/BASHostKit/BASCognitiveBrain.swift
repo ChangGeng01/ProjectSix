@@ -335,6 +335,7 @@ public actor BASCognitiveBrain {
     /// operation。
     public init(
         options: BASCognitiveOSBundleOptions,
+        eventLog: (any BASEventLogStorage)? = nil,
         // Step-2 flip injection (see makeWithDefaults): a sync embedder ⇒ self-populating routed
         // vector memory; nil ⇒ legacy BASMLMemoryService (byte-equal-off / R1).
         memoryEmbed: (@Sendable (String) -> [Float])? = nil,
@@ -356,7 +357,7 @@ public actor BASCognitiveBrain {
         metalSignalThreshold: Double? = nil
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
-            .build(options: options)
+            .build(options: options, eventLog: eventLog)
         self.summaryHistoryCapacity =
             max(0, summaryHistoryCapacity)
         self.sqlHistoryStore = sqlHistoryStore
