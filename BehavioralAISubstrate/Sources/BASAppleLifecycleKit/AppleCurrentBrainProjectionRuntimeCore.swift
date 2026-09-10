@@ -40,9 +40,9 @@ public enum BASAppleCurrentBrainProjectionRuntimeExecutor {
         force: Bool,
         cacheState: BASAppleMemoryProjectionRefreshCacheState,
         cached: () -> BASAppleProjectionRefreshResult<Projection>?,
-        refresh: () -> BASAppleProjectionRefreshResult<Projection>
-    ) -> BASAppleProjectionRefreshResult<Projection> {
-        BASAppleMemoryProjectionRefreshExecutor.resolve(
+        refresh: () throws -> BASAppleProjectionRefreshResult<Projection>
+    ) rethrows -> BASAppleProjectionRefreshResult<Projection> {
+        try BASAppleMemoryProjectionRefreshExecutor.resolve(
             force: force,
             cacheState: cacheState,
             cached: cached,
@@ -54,10 +54,10 @@ public enum BASAppleCurrentBrainProjectionRuntimeExecutor {
         forceProjectionRefresh: Bool = false,
         cacheState: BASAppleMemoryProjectionRefreshCacheState,
         cached: () -> BASAppleProjectionRefreshResult<Projection>?,
-        refresh: () -> BASAppleProjectionRefreshResult<Projection>,
+        refresh: () throws -> BASAppleProjectionRefreshResult<Projection>,
         execute: (Projection) -> CurrentBrain
-    ) -> BASAppleCurrentBrainProjectionRuntimeResult<CurrentBrain, Projection> {
-        let projectionOutcome = resolveProjection(
+    ) rethrows -> BASAppleCurrentBrainProjectionRuntimeResult<CurrentBrain, Projection> {
+        let projectionOutcome = try resolveProjection(
             force: forceProjectionRefresh,
             cacheState: cacheState,
             cached: cached,

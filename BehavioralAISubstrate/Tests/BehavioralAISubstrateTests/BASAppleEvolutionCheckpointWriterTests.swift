@@ -842,10 +842,10 @@ struct BASAppleEvolutionCheckpointWriterTests {
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let caller = ModelContext(container)
-        let io = CurrentBrainPersistenceFaultIO()
+        let io = ApplePersistenceFaultIO()
         io.failFetch = { _ in true }
 
-        #expect(throws: CurrentBrainPersistenceFixtureFault.fetch) {
+        #expect(throws: ApplePersistenceFixtureFault.fetch) {
             let _: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
                 try BASAppleEvolutionCheckpointWriter.setApprovalState(
                     .automatic,
@@ -877,10 +877,10 @@ struct BASAppleEvolutionCheckpointWriterTests {
         ))
         try seed.save()
         let caller = ModelContext(container)
-        let io = CurrentBrainPersistenceFaultIO()
+        let io = ApplePersistenceFaultIO()
         io.failFetch = { _ in true }
 
-        #expect(throws: CurrentBrainPersistenceFixtureFault.fetch) {
+        #expect(throws: ApplePersistenceFixtureFault.fetch) {
             let _: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
                 try BASAppleEvolutionCheckpointWriter.record(
                     input: input,
@@ -917,7 +917,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
             sourceID: "caller-pending"
         ))
         caller.insert(pending)
-        let io = CurrentBrainPersistenceFaultIO()
+        let io = ApplePersistenceFaultIO()
 
         let result: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             try BASAppleEvolutionCheckpointWriter.record(
@@ -940,10 +940,10 @@ struct BASAppleEvolutionCheckpointWriterTests {
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let caller = ModelContext(container)
-        let io = CurrentBrainPersistenceFaultIO()
+        let io = ApplePersistenceFaultIO()
         io.failSave = true
 
-        #expect(throws: CurrentBrainPersistenceFixtureFault.save) {
+        #expect(throws: ApplePersistenceFixtureFault.save) {
             let _: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
                 try BASAppleEvolutionCheckpointWriter.record(
                     input: checkpointInput("record-save-failure"),
@@ -972,10 +972,10 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )))
         try seed.save()
         let caller = ModelContext(container)
-        let io = CurrentBrainPersistenceFaultIO()
+        let io = ApplePersistenceFaultIO()
         io.failSave = true
 
-        #expect(throws: CurrentBrainPersistenceFixtureFault.save) {
+        #expect(throws: ApplePersistenceFixtureFault.save) {
             let _: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
                 try BASAppleEvolutionCheckpointWriter.setApprovalState(
                     .automatic,
@@ -1007,7 +1007,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )))
         try seed.save()
         let caller = ModelContext(container)
-        let io = CurrentBrainPersistenceFaultIO()
+        let io = ApplePersistenceFaultIO()
         io.failSave = true
         let request = BASForgetRequest(
             requestID: "forget.revocation-target",
@@ -1017,7 +1017,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
             verified: false
         )
 
-        #expect(throws: CurrentBrainPersistenceFixtureFault.save) {
+        #expect(throws: ApplePersistenceFixtureFault.save) {
             let _: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
                 try BASAppleEvolutionCheckpointWriter.revokeCheckpoints(
                     for: request,

@@ -57,14 +57,14 @@ public enum BASAppleCurrentBrainCommitter {
             checkpointRetentionInterval: checkpointRetentionInterval,
             updateLimit: updateLimit,
             updateRetentionInterval: updateRetentionInterval,
-            using: BASAppleCurrentBrainLivePersistenceIO()
+            using: BASAppleLivePersistenceIO()
         )
     }
 
     static func commit<
         Update: BASAppleCurrentBrainUpdateEntity,
         Checkpoint: BASAppleEvolutionCheckpointEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         modeName: String,
         sourceID: String,
@@ -84,7 +84,7 @@ public enum BASAppleCurrentBrainCommitter {
             brainState: brainState
         )
 
-        return try BASAppleCurrentBrainPersistenceTransaction.perform(
+        return try BASApplePersistenceTransaction.perform(
             selectedBy: context,
             using: io
         ) { owned in

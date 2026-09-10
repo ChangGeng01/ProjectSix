@@ -31,13 +31,13 @@ public enum BASAppleCurrentBrainUpdateWriter {
             in: context,
             maxEntries: maxEntries,
             retentionInterval: retentionInterval,
-            using: BASAppleCurrentBrainLivePersistenceIO()
+            using: BASAppleLivePersistenceIO()
         )
     }
 
     static func persist<
         Update: BASAppleCurrentBrainUpdateEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         _ fields: BASCurrentBrainUpdateStoredFields,
         in context: ModelContext,
@@ -45,7 +45,7 @@ public enum BASAppleCurrentBrainUpdateWriter {
         retentionInterval: TimeInterval = BASCurrentBrainPersistenceApplier.defaultRetentionInterval,
         using io: IO
     ) throws -> BASAppleCurrentBrainUpdateWriteResult<Update> {
-        try BASAppleCurrentBrainPersistenceTransaction.perform(
+        try BASApplePersistenceTransaction.perform(
             selectedBy: context,
             using: io
         ) { owned in
@@ -61,7 +61,7 @@ public enum BASAppleCurrentBrainUpdateWriter {
 
     static func stage<
         Update: BASAppleCurrentBrainUpdateEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         _ fields: BASCurrentBrainUpdateStoredFields,
         in context: ModelContext,

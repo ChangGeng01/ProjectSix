@@ -3,6 +3,8 @@ import XCTest
 @testable import BASHostKit
 
 final class BASHostKitTests: XCTestCase {
+    private enum ProjectionRefreshFailure: Error { case failed }
+
     private struct FixedVitalMonitor: BASVitalMonitorServicing {
         let deviceState: BASDeviceState
 
@@ -2331,6 +2333,90 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(publishedNotice, "resolved activation")
         XCTAssertEqual(committedBrain, "brain")
         XCTAssertEqual(committedSession, "session")
+    }
+
+    func testResolveProjectionRefreshFailureDoesNotCommitProjectionOrClearDirtyState() {
+        let runtime = makeGenericRuntime()
+        var committedProjection: String?
+        var dirtyFlag = true
+        var publishedNotice: String?
+
+        XCTAssertThrowsError(
+            try runtime.resolveProjectionRefresh(
+                using: { throw ProjectionRefreshFailure.failed },
+                commitProjection: { (projection: String) in committedProjection = projection },
+                setProjectionDirty: { dirtyFlag = $0 },
+                publishNotice: { publishedNotice = $0 }
+            )
+        )
+        XCTAssertNil(committedProjection)
+        XCTAssertTrue(dirtyFlag)
+        XCTAssertNil(publishedNotice)
+    }
+
+    func testResolveCurrentBrainProjectionFailureDoesNotCommitProjectionOrBrain() {
+        let runtime = makeGenericRuntime()
+        var committedProjection: String?
+        var dirtyFlag = true
+        var committedBrain: String?
+
+        XCTAssertThrowsError(
+            try runtime.resolveCurrentBrainProjection(
+                using: { throw ProjectionRefreshFailure.failed },
+                commitProjection: { (projection: String) in committedProjection = projection },
+                setProjectionDirty: { dirtyFlag = $0 },
+                publishNotice: { _ in },
+                commitCurrentBrain: { (brain: String) in committedBrain = brain }
+            )
+        )
+        XCTAssertNil(committedProjection)
+        XCTAssertTrue(dirtyFlag)
+        XCTAssertNil(committedBrain)
+    }
+
+    func testResolveAndActivateSessionFailureDoesNotRunActivationOrCommitState() {
+        let runtime = makeGenericRuntime()
+        var actions: [String] = []
+        var dirtyFlag = true
+
+        XCTAssertThrowsError(
+            try runtime.resolveAndActivateSession(
+                session: "session",
+                using: { throw ProjectionRefreshFailure.failed },
+                loadBrainState: { (_: String, _: String) in actions.append("load") },
+                commitProjection: { (_: String) in actions.append("projection") },
+                setProjectionDirty: { dirtyFlag = $0 },
+                publishNotice: { _ in actions.append("notice") },
+                commitCurrentBrain: { (_: String) in actions.append("brain") },
+                commitSession: { (_: String) in actions.append("session") }
+            )
+        )
+        XCTAssertTrue(actions.isEmpty)
+        XCTAssertTrue(dirtyFlag)
+    }
+
+    func testExecuteLifecyclePhaseFailureStopsCurrentBrainAndEntryConsumption() {
+        let runtime = makeGenericRuntime()
+        var actions: [String] = []
+
+        XCTAssertThrowsError(
+            try runtime.executeLifecyclePhase(
+                .initialAppearance,
+                refreshMemoryProjection: {
+                    actions.append("projection")
+                    throw ProjectionRefreshFailure.failed
+                },
+                refreshCurrentBrain: { actions.append("brain:\($0)") },
+                presentPendingReflection: { actions.append("reflection") },
+                consumeHandoff: { "handoff" },
+                handleHandoff: { actions.append("handoff:\($0)") },
+                consumePendingRequest: { "pending" },
+                handlePendingRequest: { actions.append("pending:\($0)") },
+                restoreActiveWorkspace: { actions.append("restore") },
+                refreshPredictedIntervention: { actions.append("prediction") }
+            )
+        )
+        XCTAssertEqual(actions, ["projection"])
     }
 
     func testReopenHeldItemAppliesFollowUpSuggestion() {

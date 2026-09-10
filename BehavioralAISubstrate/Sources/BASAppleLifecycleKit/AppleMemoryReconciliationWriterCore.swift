@@ -12,17 +12,14 @@ public protocol BASAppleCandidateMemoryEntity: BASAppleCandidateMemoryMutable, P
     var basSnapshot: BASExistingCandidateMemorySnapshot { get }
 }
 
-public struct BASAppleMemoryReconciliationWriteResult<
-    Governed: BASAppleGovernedMemoryEntity,
-    Candidate: BASAppleCandidateMemoryEntity
-> {
-    public let orderedRecords: [Governed]
-    public let candidates: [Candidate]
+public struct BASAppleMemoryReconciliationWriteResult: Sendable {
+    public let orderedRecords: [BASGovernedMemoryStoredFields]
+    public let candidates: [BASCandidateMemoryStoredFields]
     public let outcome: BASAppleMemoryPersistenceOutcome
 
     public init(
-        orderedRecords: [Governed],
-        candidates: [Candidate],
+        orderedRecords: [BASGovernedMemoryStoredFields],
+        candidates: [BASCandidateMemoryStoredFields],
         outcome: BASAppleMemoryPersistenceOutcome
     ) {
         self.orderedRecords = orderedRecords
@@ -37,11 +34,74 @@ public enum BASAppleMemoryReconciliationWriter {
         Candidate: BASAppleCandidateMemoryEntity
     >(
         _ request: BASAppleMemoryPersistenceRequest,
+        recordType: Governed.Type,
+        candidateType: Candidate.Type,
+        in context: ModelContext
+    ) throws -> BASAppleMemoryReconciliationWriteResult {
+        try reconcile(
+            request,
+            recordType: recordType,
+            candidateType: candidateType,
+            in: context,
+            using: BASAppleLivePersistenceIO()
+        )
+    }
+
+    static func reconcile<
+        Governed: BASAppleGovernedMemoryEntity,
+        Candidate: BASAppleCandidateMemoryEntity,
+        IO: BASApplePersistenceIO
+    >(
+        _ request: BASAppleMemoryPersistenceRequest,
+        recordType: Governed.Type,
+        candidateType: Candidate.Type,
         in context: ModelContext,
-        onSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleMemoryReconciliationWriteResult<Governed, Candidate> {
-        let existingRecords = fetchRecords(in: context) as [Governed]
-        let existingCandidates = fetchCandidates(in: context) as [Candidate]
+        using io: IO
+    ) throws -> BASAppleMemoryReconciliationWriteResult {
+        try BASApplePersistenceTransaction.perform(
+            selectedBy: context,
+            using: io
+        ) { owned in
+            try stage(
+                request,
+                recordType: recordType,
+                candidateType: candidateType,
+                in: owned,
+                using: io
+            )
+        }
+    }
+
+    static func stage<
+        Governed: BASAppleGovernedMemoryEntity,
+        Candidate: BASAppleCandidateMemoryEntity,
+        IO: BASApplePersistenceIO
+    >(
+        _ request: BASAppleMemoryPersistenceRequest,
+        recordType: Governed.Type,
+        candidateType: Candidate.Type,
+        in context: ModelContext,
+        using io: IO
+    ) throws -> BASAppleMemoryReconciliationWriteResult {
+        let existingRecords = try io.fetch(recordType, in: context)
+        let existingCandidates = try io.fetch(candidateType, in: context)
+        return stage(
+            request,
+            existingRecords: existingRecords,
+            existingCandidates: existingCandidates,
+            in: context
+        )
+    }
+
+    static func stage<
+        Governed: BASAppleGovernedMemoryEntity,
+        Candidate: BASAppleCandidateMemoryEntity
+    >(
+        _ request: BASAppleMemoryPersistenceRequest,
+        existingRecords: [Governed],
+        existingCandidates: [Candidate],
+        in context: ModelContext
+    ) -> BASAppleMemoryReconciliationWriteResult {
         let outcome = BASAppleMemoryPersistenceAdapter.reconcile(
             BASAppleMemoryPersistenceRequest(
                 drafts: request.drafts,
@@ -53,47 +113,53 @@ public enum BASAppleMemoryReconciliationWriter {
             )
         )
 
-        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
-        var recordsByID = Dictionary(existingRecords.map { ($0.basID, $0) }, uniquingKeysWith: { _, last in last })
-        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
-        var candidatesByID = Dictionary(existingCandidates.map { ($0.basID, $0) }, uniquingKeysWith: { _, last in last })
+        var recordsByID = Dictionary(
+            existingRecords.map { ($0.basID, $0) },
+            uniquingKeysWith: { _, last in last }
+        )
+        var candidatesByID = Dictionary(
+            existingCandidates.map { ($0.basID, $0) },
+            uniquingKeysWith: { _, last in last }
+        )
 
         for mutation in outcome.recordMutations {
             apply(mutation, in: context, recordsByID: &recordsByID)
         }
-
         for mutation in outcome.candidateMutations {
             apply(mutation, in: context, candidatesByID: &candidatesByID)
         }
 
-        do {
-            try context.save()
-        } catch {
-            onSaveError?(error)
-        }
-
-        let orderedRecords = canonicalOrder(
-            Array(recordsByID.values),
-            orderedRecordIDs: outcome.orderedRecordIDs
+        return makeReceipt(
+            outcome: outcome,
+            records: Array(recordsByID.values),
+            candidates: Array(candidatesByID.values)
         )
+    }
+
+    static func makeReceipt<
+        Governed: BASAppleGovernedMemoryEntity,
+        Candidate: BASAppleCandidateMemoryEntity
+    >(
+        outcome: BASAppleMemoryPersistenceOutcome,
+        records: [Governed],
+        candidates: [Candidate]
+    ) -> BASAppleMemoryReconciliationWriteResult {
+        let orderedRecords = canonicalOrder(
+            records,
+            orderedIDs: outcome.orderedRecordIDs,
+            id: \.basID
+        ).map { BASGovernedMemoryStoredFields(snapshot: $0.basSnapshot) }
+        let orderedCandidates = canonicalOrder(
+            candidates,
+            orderedIDs: outcome.orderedCandidateIDs,
+            id: \.basID
+        ).map { BASCandidateMemoryStoredFields(snapshot: $0.basSnapshot) }
 
         return BASAppleMemoryReconciliationWriteResult(
             orderedRecords: orderedRecords,
-            candidates: Array(candidatesByID.values),
+            candidates: orderedCandidates,
             outcome: outcome
         )
-    }
-
-    private static func fetchRecords<Record: BASAppleGovernedMemoryEntity>(
-        in context: ModelContext
-    ) -> [Record] {
-        (try? context.fetch(FetchDescriptor<Record>())) ?? []
-    }
-
-    private static func fetchCandidates<Record: BASAppleCandidateMemoryEntity>(
-        in context: ModelContext
-    ) -> [Record] {
-        (try? context.fetch(FetchDescriptor<Record>())) ?? []
     }
 
     private static func apply<Record: BASAppleGovernedMemoryEntity>(
@@ -146,22 +212,21 @@ public enum BASAppleMemoryReconciliationWriter {
         }
     }
 
-    private static func canonicalOrder<Record: BASAppleGovernedMemoryEntity>(
+    private static func canonicalOrder<Record: PersistentModel>(
         _ records: [Record],
-        orderedRecordIDs: [String]
+        orderedIDs: [String],
+        id: (Record) -> String
     ) -> [Record] {
-        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let ordering = Dictionary(
-            orderedRecordIDs.enumerated().map { ($0.element, $0.offset) },
+            orderedIDs.enumerated().map { ($0.element, $0.offset) },
             uniquingKeysWith: { first, _ in first }
         )
         return records.sorted { lhs, rhs in
-            let lhsIndex = ordering[lhs.basID] ?? Int.max
-            let rhsIndex = ordering[rhs.basID] ?? Int.max
-            if lhsIndex == rhsIndex {
-                return lhs.basID < rhs.basID
-            }
-            return lhsIndex < rhsIndex
+            let lhsID = id(lhs)
+            let rhsID = id(rhs)
+            let lhsIndex = ordering[lhsID] ?? Int.max
+            let rhsIndex = ordering[rhsID] ?? Int.max
+            return lhsIndex == rhsIndex ? lhsID < rhsID : lhsIndex < rhsIndex
         }
     }
 }

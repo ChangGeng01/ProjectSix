@@ -6,12 +6,12 @@ import Testing
 @testable import BASMemory
 @testable import BASPolicy
 
-enum CurrentBrainPersistenceFixtureFault: Error, Equatable {
+enum ApplePersistenceFixtureFault: Error, Equatable {
     case fetch
     case save
 }
 
-final class CurrentBrainPersistenceFaultIO: BASAppleCurrentBrainPersistenceIO {
+final class ApplePersistenceFaultIO: BASApplePersistenceIO {
     var failFetch: ((Any.Type) -> Bool)?
     var failSave = false
     var saveCallCount = 0
@@ -25,7 +25,7 @@ final class CurrentBrainPersistenceFaultIO: BASAppleCurrentBrainPersistenceIO {
         contexts.append(context)
         fetchedTypes.append(type)
         if failFetch?(type) == true {
-            throw CurrentBrainPersistenceFixtureFault.fetch
+            throw ApplePersistenceFixtureFault.fetch
         }
         return try context.fetch(FetchDescriptor<Model>())
     }
@@ -34,7 +34,7 @@ final class CurrentBrainPersistenceFaultIO: BASAppleCurrentBrainPersistenceIO {
         contexts.append(context)
         saveCallCount += 1
         if failSave {
-            throw CurrentBrainPersistenceFixtureFault.save
+            throw ApplePersistenceFixtureFault.save
         }
         try context.save()
     }
@@ -184,7 +184,7 @@ struct BASAppleCurrentBrainCommitterTests {
             )
         )
 
-        let io = CurrentBrainPersistenceFaultIO()
+        let io = ApplePersistenceFaultIO()
         let result: BASAppleCurrentBrainCommitWriteResult<CommitterUpdateFixture, CommitterCheckpointFixture> =
             try BASAppleCurrentBrainCommitter.commit(
                 modeName: "primary",
@@ -222,14 +222,14 @@ struct BASAppleCurrentBrainCommitterTests {
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let caller = ModelContext(container)
-        let io = CurrentBrainPersistenceFaultIO()
+        let io = ApplePersistenceFaultIO()
         io.failFetch = {
             ObjectIdentifier($0) == ObjectIdentifier(CommitterUpdateFixture.self)
         }
         let now = Date(timeIntervalSince1970: 1_744_322_201)
         let brainState = makeBrainState(now: now)
 
-        #expect(throws: CurrentBrainPersistenceFixtureFault.fetch) {
+        #expect(throws: ApplePersistenceFixtureFault.fetch) {
             let _: BASAppleCurrentBrainCommitWriteResult<CommitterUpdateFixture, CommitterCheckpointFixture> =
                 try BASAppleCurrentBrainCommitter.commit(
                     modeName: "primary",
@@ -260,12 +260,12 @@ struct BASAppleCurrentBrainCommitterTests {
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let caller = ModelContext(container)
-        let io = CurrentBrainPersistenceFaultIO()
+        let io = ApplePersistenceFaultIO()
         io.failSave = true
         let now = Date(timeIntervalSince1970: 1_744_322_202)
         let brainState = makeBrainState(now: now)
 
-        #expect(throws: CurrentBrainPersistenceFixtureFault.save) {
+        #expect(throws: ApplePersistenceFixtureFault.save) {
             let _: BASAppleCurrentBrainCommitWriteResult<CommitterUpdateFixture, CommitterCheckpointFixture> =
                 try BASAppleCurrentBrainCommitter.commit(
                     modeName: "primary",

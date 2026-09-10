@@ -137,8 +137,8 @@ public struct BASHostRuntime: Sendable {
 
     public func executeLifecyclePhase<Envelope, PendingRequest>(
         _ phase: BASHostLifecyclePhase,
-        refreshMemoryProjection: () -> Void,
-        refreshCurrentBrain: (String) -> Void,
+        refreshMemoryProjection: () throws -> Void,
+        refreshCurrentBrain: (String) throws -> Void,
         presentPendingReflection: () -> Void,
         consumeHandoff: () -> Envelope?,
         handleHandoff: (Envelope) -> Void,
@@ -147,8 +147,8 @@ public struct BASHostRuntime: Sendable {
         restoreActiveWorkspace: () -> Void,
         refreshPredictedIntervention: () -> Void,
         syncWidgetSnapshot: () -> Void = {}
-    ) {
-        BASAppleAppLifecycleOrchestrationExecutor.execute(
+    ) rethrows {
+        try BASAppleAppLifecycleOrchestrationExecutor.execute(
             phase: phase.bootstrapPhase,
             behavior: configuration.lifecycleBehavior.bootstrapBehavior,
             refreshMemoryProjection: refreshMemoryProjection,
@@ -193,13 +193,13 @@ public struct BASHostRuntime: Sendable {
     }
 
     public func resolveProjectionRefresh<Projection>(
-        using resolver: () -> BASAppleProjectionRefreshResult<Projection>,
+        using resolver: () throws -> BASAppleProjectionRefreshResult<Projection>,
         commitProjection: (Projection) -> Void,
         setProjectionDirty: (Bool) -> Void,
         publishNotice: (String) -> Void
-    ) {
+    ) rethrows {
         commitProjectionRefresh(
-            outcome: resolver(),
+            outcome: try resolver(),
             commitProjection: commitProjection,
             setProjectionDirty: setProjectionDirty,
             publishNotice: publishNotice
@@ -223,14 +223,14 @@ public struct BASHostRuntime: Sendable {
     }
 
     public func resolveCurrentBrainProjection<CurrentBrain, Projection>(
-        using resolver: () -> BASAppleCurrentBrainProjectionRuntimeResult<CurrentBrain, Projection>,
+        using resolver: () throws -> BASAppleCurrentBrainProjectionRuntimeResult<CurrentBrain, Projection>,
         commitProjection: (Projection) -> Void,
         setProjectionDirty: (Bool) -> Void,
         publishNotice: (String) -> Void,
         commitCurrentBrain: (CurrentBrain) -> Void
-    ) {
+    ) rethrows {
         commitCurrentBrainProjection(
-            outcome: resolver(),
+            outcome: try resolver(),
             commitProjection: commitProjection,
             setProjectionDirty: setProjectionDirty,
             publishNotice: publishNotice,
@@ -262,17 +262,17 @@ public struct BASHostRuntime: Sendable {
 
     public func resolveAndActivateSession<Session, CurrentBrain, Projection>(
         session: Session,
-        using resolver: () -> BASAppleCurrentBrainProjectionRuntimeResult<CurrentBrain, Projection>,
+        using resolver: () throws -> BASAppleCurrentBrainProjectionRuntimeResult<CurrentBrain, Projection>,
         loadBrainState: (Session, CurrentBrain) -> Void,
         commitProjection: (Projection) -> Void,
         setProjectionDirty: (Bool) -> Void,
         publishNotice: (String) -> Void,
         commitCurrentBrain: (CurrentBrain) -> Void,
         commitSession: (Session) -> Void
-    ) {
+    ) rethrows {
         activateSession(
             session: session,
-            outcome: resolver(),
+            outcome: try resolver(),
             loadBrainState: loadBrainState,
             commitProjection: commitProjection,
             setProjectionDirty: setProjectionDirty,

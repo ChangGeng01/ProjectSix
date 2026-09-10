@@ -10,10 +10,10 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
         in context: ModelContext,
         recordType: Governed.Type,
         candidateType: Candidate.Type
-    ) -> BASAppleProjectionGovernanceSnapshot {
+    ) throws -> BASAppleProjectionGovernanceSnapshot {
         governanceSnapshot(
-            records: (try? context.fetch(FetchDescriptor<Governed>())) ?? [],
-            candidates: (try? context.fetch(FetchDescriptor<Candidate>())) ?? []
+            records: try context.fetch(FetchDescriptor<Governed>()),
+            candidates: try context.fetch(FetchDescriptor<Candidate>())
         )
     }
 
@@ -50,12 +50,39 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
         )
     }
 
+    public static func governanceSnapshot(
+        records: [BASGovernedMemoryStoredFields],
+        candidates: [BASCandidateMemoryStoredFields]
+    ) -> BASAppleProjectionGovernanceSnapshot {
+        let candidateDescriptors = candidates.map { candidate in
+            descriptor(
+                retrievalTags: candidate.retrievalTags,
+                evidenceCount: candidate.evidenceCount
+            )
+        }
+        return BASAppleProjectionGovernanceSnapshot(
+            totalRecordCount: records.count,
+            totalCandidateCount: candidates.count,
+            pendingCandidateCount: candidates.filter { $0.status == .pending }.count,
+            promotedCandidateCount: candidates.filter { $0.status == .promoted }.count,
+            deferredCandidateCount: candidates.filter { $0.lastGovernanceDecision == .deferred }.count,
+            admittedCandidateCount: candidates.filter { $0.lastGovernanceDecision == .admit }.count,
+            externallyRefreshedCandidateCount: candidateDescriptors.filter(\.requiresExternalRefresh).count,
+            quarantinedObservationCount: candidateDescriptors.filter {
+                $0.contaminationState == .quarantined
+            }.count,
+            evidenceCaveatedCandidateCount: candidateDescriptors.filter {
+                $0.evidenceState == .caveated
+            }.count
+        )
+    }
+
     public static func fetchProjectionRecords<Governed: BASAppleGovernedMemoryEntity>(
         in context: ModelContext,
         recordType: Governed.Type,
         limit: Int? = nil
-    ) -> [Governed] {
-        let records = (try? context.fetch(FetchDescriptor<Governed>())) ?? []
+    ) throws -> [Governed] {
+        let records = try context.fetch(FetchDescriptor<Governed>())
         let ordered = records.sorted { lhs, rhs in
             if lhs.basPriority == rhs.basPriority {
                 if lhs.basLastConfirmedAt == rhs.basLastConfirmedAt {
@@ -73,8 +100,8 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
         in context: ModelContext,
         candidateType: Candidate.Type,
         limit: Int? = nil
-    ) -> [Candidate] {
-        let candidates = ((try? context.fetch(FetchDescriptor<Candidate>())) ?? [])
+    ) throws -> [Candidate] {
+        let candidates = try context.fetch(FetchDescriptor<Candidate>())
             .filter { $0.basStatus == .pending }
             .sorted { lhs, rhs in
                 if lhs.basPriority == rhs.basPriority {
@@ -95,24 +122,37 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
         limit: Int? = nil,
         timestamp: (Entry) -> Date,
         stableID: (Entry) -> String = { String(describing: $0.persistentModelID) }
+    ) throws -> [Entry] {
+        selectProjectionTemporalEntries(
+            try context.fetch(FetchDescriptor<Entry>()),
+            limit: limit,
+            timestamp: timestamp,
+            stableID: stableID
+        )
+    }
+
+    static func selectProjectionTemporalEntries<Entry: PersistentModel>(
+        _ entries: [Entry],
+        limit: Int? = nil,
+        timestamp: (Entry) -> Date,
+        stableID: (Entry) -> String = { String(describing: $0.persistentModelID) }
     ) -> [Entry] {
-        let entries = ((try? context.fetch(FetchDescriptor<Entry>())) ?? [])
-            .sorted { lhs, rhs in
-                if timestamp(lhs) == timestamp(rhs) {
-                    return stableID(lhs) < stableID(rhs)
-                }
-                return timestamp(lhs) > timestamp(rhs)
+        let ordered = entries.sorted { lhs, rhs in
+            if timestamp(lhs) == timestamp(rhs) {
+                return stableID(lhs) < stableID(rhs)
             }
-        guard let limit else { return entries }
-        return Array(entries.prefix(limit))
+            return timestamp(lhs) > timestamp(rhs)
+        }
+        guard let limit else { return ordered }
+        return Array(ordered.prefix(limit))
     }
 
     public static func fetchProjectionCheckEvents<Event: BASAppleCheckEventMemoryEntity>(
         in context: ModelContext,
         eventType: Event.Type,
         limit: Int? = nil
-    ) -> [Event] {
-        fetchProjectionTemporalEntries(
+    ) throws -> [Event] {
+        try fetchProjectionTemporalEntries(
             in: context,
             entryType: eventType,
             limit: limit,
@@ -125,8 +165,8 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
         in context: ModelContext,
         comparativeType: Comparative.Type,
         limit: Int? = nil
-    ) -> [Comparative] {
-        fetchProjectionTemporalEntries(
+    ) throws -> [Comparative] {
+        try fetchProjectionTemporalEntries(
             in: context,
             entryType: comparativeType,
             limit: limit,
@@ -138,8 +178,8 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
         in context: ModelContext,
         reflectiveType: Reflective.Type,
         limit: Int? = nil
-    ) -> [Reflective] {
-        fetchProjectionTemporalEntries(
+    ) throws -> [Reflective] {
+        try fetchProjectionTemporalEntries(
             in: context,
             entryType: reflectiveType,
             limit: limit,

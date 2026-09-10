@@ -309,7 +309,7 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         context.insert(promotedCaveated)
         try context.save()
 
-        let snapshot = BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
+        let snapshot = try BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
             in: context,
             recordType: SelectionGovernedFixture.self,
             candidateType: SelectionCandidateFixture.self
@@ -338,12 +338,12 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         context.insert(SelectionCandidateFixture(id: "candidate-z", priority: 0.95, lastObservedAt: now, status: .promoted, governanceDecision: .admit))
         try context.save()
 
-        let records = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
+        let records = try BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
             in: context,
             recordType: SelectionGovernedFixture.self,
             limit: 2
         )
-        let candidates = BASAppleMemoryProjectionSelectionAdapter.fetchPendingProjectionCandidates(
+        let candidates = try BASAppleMemoryProjectionSelectionAdapter.fetchPendingProjectionCandidates(
             in: context,
             candidateType: SelectionCandidateFixture.self
         )
@@ -364,30 +364,30 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         context.insert(SelectionReflectiveFixture(prompt: "reflective-a", updatedAt: now))
         try context.save()
 
-        let checks = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionCheckEvents(
+        let checks = try BASAppleMemoryProjectionSelectionAdapter.fetchProjectionCheckEvents(
             in: context,
             eventType: SelectionCheckEventFixture.self
         )
-        let comparativeRecords = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionComparativeRecords(
+        let comparativeRecords = try BASAppleMemoryProjectionSelectionAdapter.fetchProjectionComparativeRecords(
             in: context,
             comparativeType: SelectionComparativeFixture.self
         )
-        let reflectiveRecords = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionReflectiveRecords(
+        let reflectiveRecords = try BASAppleMemoryProjectionSelectionAdapter.fetchProjectionReflectiveRecords(
             in: context,
             reflectiveType: SelectionReflectiveFixture.self
         )
-        let genericChecks = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
+        let genericChecks = try BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
             in: context,
             entryType: SelectionCheckEventFixture.self,
             timestamp: { $0.basCheckEventMemoryInput.createdAt },
             stableID: { $0.basCheckEventMemoryInput.id }
         )
-        let genericBalances = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
+        let genericBalances = try BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
             in: context,
             entryType: SelectionComparativeFixture.self,
             timestamp: { $0.basComparativeMemoryInput.updatedAt }
         )
-        let genericMirrors = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
+        let genericMirrors = try BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
             in: context,
             entryType: SelectionReflectiveFixture.self,
             timestamp: { $0.basReflectiveMemoryInput.updatedAt }

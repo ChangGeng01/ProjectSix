@@ -3,6 +3,8 @@ import Testing
 
 @Suite("BASApple Lifecycle Bootstrap Executor")
 struct BASAppleLifecycleBootstrapExecutorTests {
+    private enum RefreshFailure: Error, Equatable { case failed }
+
     @Test("executor preserves generic initial appearance action order")
     func executorPreservesGenericInitialAppearanceActionOrder() {
         var calls: [String] = []
@@ -95,5 +97,106 @@ struct BASAppleLifecycleBootstrapExecutorTests {
             "refresh",
             "bootstrap:reflective:resume this:filtered:sceneActive"
         ])
+    }
+
+    @Test("lifecycle bootstrap stops before current brain and later actions after projection failure")
+    func lifecycleBootstrapStopsAfterProjectionFailure() {
+        var calls: [String] = []
+        #expect(throws: RefreshFailure.failed) {
+            try BASAppleLifecycleBootstrapExecutor.execute(
+                phase: .initialAppearance,
+                refreshMemoryProjection: {
+                    calls.append("projection")
+                    throw RefreshFailure.failed
+                },
+                refreshCurrentBrain: { calls.append("brain:\($0)") },
+                presentPendingReflection: { calls.append("reflection") },
+                consumePendingLaunchRequest: { calls.append("pending") },
+                restoreActiveWorkspace: { calls.append("restore") },
+                refreshPredictedIntervention: { calls.append("prediction") }
+            )
+        }
+        #expect(calls == ["projection"])
+    }
+
+    @Test("lifecycle bootstrap propagates current brain failure before later actions")
+    func lifecycleBootstrapStopsAfterCurrentBrainFailure() {
+        var calls: [String] = []
+        #expect(throws: RefreshFailure.failed) {
+            try BASAppleLifecycleBootstrapExecutor.execute(
+                phase: .initialAppearance,
+                refreshMemoryProjection: { calls.append("projection") },
+                refreshCurrentBrain: {
+                    calls.append("brain:\($0)")
+                    throw RefreshFailure.failed
+                },
+                presentPendingReflection: { calls.append("reflection") },
+                consumePendingLaunchRequest: { calls.append("pending") },
+                restoreActiveWorkspace: { calls.append("restore") },
+                refreshPredictedIntervention: { calls.append("prediction") }
+            )
+        }
+        #expect(calls == ["projection", "brain:launch"])
+    }
+
+    @Test("session priming does not bootstrap or publish after projection failure")
+    func sessionPrimingStopsAfterProjectionFailure() {
+        var calls: [String] = []
+        #expect(throws: RefreshFailure.failed) {
+            _ = try BASAppleCurrentBrainRuntimeExecutor.primeSession(
+                modeID: "primary",
+                promptFragments: ["wait"],
+                retrievalMode: "filtered",
+                refreshMemoryProjection: {
+                    calls.append("projection")
+                    throw RefreshFailure.failed
+                },
+                bootstrapCurrentBrain: { _ in
+                    calls.append("brain")
+                    return "brain"
+                },
+                afterBootstrap: { _ in calls.append("after") }
+            )
+        }
+        #expect(calls == ["projection"])
+    }
+
+    @Test("session priming propagates bootstrap failure without after-bootstrap publication")
+    func sessionPrimingStopsAfterBootstrapFailure() {
+        var calls: [String] = []
+        #expect(throws: RefreshFailure.failed) {
+            _ = try BASAppleCurrentBrainRuntimeExecutor.primeSession(
+                modeID: "primary",
+                promptFragments: ["wait"],
+                retrievalMode: "filtered",
+                refreshMemoryProjection: { calls.append("projection") },
+                bootstrapCurrentBrain: { _ in
+                    calls.append("brain")
+                    throw RefreshFailure.failed
+                },
+                afterBootstrap: { _ in calls.append("after") }
+            )
+        }
+        #expect(calls == ["projection", "brain"])
+    }
+
+    @Test("active brain refresh does not bootstrap after projection failure")
+    func activeBrainRefreshStopsAfterProjectionFailure() {
+        var bootstrapCallCount = 0
+        #expect(throws: RefreshFailure.failed) {
+            _ = try BASAppleCurrentBrainRuntimeExecutor.refreshActiveBrain(
+                promptFragmentsByModeID: [:],
+                modePriority: ["primary"],
+                taskGraphModeID: nil,
+                taskGraphPromptSeed: nil,
+                retrievalModesByModeID: [:],
+                refreshMemoryProjection: { throw RefreshFailure.failed },
+                bootstrapCurrentBrain: { _ in
+                    bootstrapCallCount += 1
+                    return "brain"
+                }
+            )
+        }
+        #expect(bootstrapCallCount == 0)
     }
 }

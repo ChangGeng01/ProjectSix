@@ -56,6 +56,28 @@ public struct BASGovernedMemoryStoredFields: Codable, Equatable, Sendable {
         self.lastReviewedAt = lastReviewedAt
         self.tierID = tierID
     }
+
+    public init(snapshot: BASExistingGovernedMemorySnapshot) {
+        self.init(
+            id: snapshot.id,
+            typeID: snapshot.typeID,
+            topic: snapshot.topic,
+            headline: snapshot.headline,
+            value: snapshot.value,
+            confidence: snapshot.confidence,
+            priority: snapshot.priority,
+            source: snapshot.source,
+            lastConfirmedAt: snapshot.lastConfirmedAt,
+            decayPolicy: snapshot.decayPolicy,
+            retrievalTags: snapshot.retrievalTags,
+            evidenceCount: snapshot.evidenceCount,
+            observationCount: snapshot.observationCount,
+            provenanceSummary: snapshot.provenanceSummary,
+            lifecycleState: snapshot.lifecycleState,
+            lastReviewedAt: snapshot.lastReviewedAt,
+            tierID: snapshot.tierID
+        )
+    }
 }
 
 public struct BASCandidateMemoryStoredFields: Codable, Equatable, Sendable {
@@ -126,37 +148,9 @@ public struct BASCandidateMemoryStoredFields: Codable, Equatable, Sendable {
         self.governanceReason = governanceReason
         self.tierID = tierID
     }
-}
 
-public enum BASMemoryPersistenceApplier {
-    public static func governedFields(
-        from snapshot: BASExistingGovernedMemorySnapshot
-    ) -> BASGovernedMemoryStoredFields {
-        BASGovernedMemoryStoredFields(
-            id: snapshot.id,
-            typeID: snapshot.typeID,
-            topic: snapshot.topic,
-            headline: snapshot.headline,
-            value: snapshot.value,
-            confidence: snapshot.confidence,
-            priority: snapshot.priority,
-            source: snapshot.source,
-            lastConfirmedAt: snapshot.lastConfirmedAt,
-            decayPolicy: snapshot.decayPolicy,
-            retrievalTags: canonicalTags(snapshot.retrievalTags),
-            evidenceCount: snapshot.evidenceCount,
-            observationCount: snapshot.observationCount,
-            provenanceSummary: snapshot.provenanceSummary,
-            lifecycleState: snapshot.lifecycleState,
-            lastReviewedAt: snapshot.lastReviewedAt,
-            tierID: snapshot.tierID
-        )
-    }
-
-    public static func candidateFields(
-        from snapshot: BASExistingCandidateMemorySnapshot
-    ) -> BASCandidateMemoryStoredFields {
-        BASCandidateMemoryStoredFields(
+    public init(snapshot: BASExistingCandidateMemorySnapshot) {
+        self.init(
             id: snapshot.id,
             typeID: snapshot.typeID,
             topic: snapshot.topic,
@@ -168,7 +162,7 @@ public enum BASMemoryPersistenceApplier {
             firstObservedAt: snapshot.firstObservedAt,
             lastObservedAt: snapshot.lastObservedAt,
             decayPolicy: snapshot.decayPolicy,
-            retrievalTags: canonicalTags(snapshot.retrievalTags),
+            retrievalTags: snapshot.retrievalTags,
             evidenceCount: snapshot.evidenceCount,
             confirmationCount: snapshot.confirmationCount,
             lastObservationFingerprint: snapshot.lastObservationFingerprint,
@@ -179,6 +173,24 @@ public enum BASMemoryPersistenceApplier {
             governanceReason: snapshot.governanceReason,
             tierID: snapshot.tierID
         )
+    }
+}
+
+public enum BASMemoryPersistenceApplier {
+    public static func governedFields(
+        from snapshot: BASExistingGovernedMemorySnapshot
+    ) -> BASGovernedMemoryStoredFields {
+        var fields = BASGovernedMemoryStoredFields(snapshot: snapshot)
+        fields.retrievalTags = canonicalTags(fields.retrievalTags)
+        return fields
+    }
+
+    public static func candidateFields(
+        from snapshot: BASExistingCandidateMemorySnapshot
+    ) -> BASCandidateMemoryStoredFields {
+        var fields = BASCandidateMemoryStoredFields(snapshot: snapshot)
+        fields.retrievalTags = canonicalTags(fields.retrievalTags)
+        return fields
     }
 
     public static func canonicalGovernedOrder(

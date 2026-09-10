@@ -87,51 +87,52 @@ public enum BASAppleMemoryProjectionAdapter {
     }
 
     public static func compileProjection<
-        Governed: BASAppleGovernedMemoryEntity,
-        Candidate: BASAppleCandidateMemoryEntity,
-        Event: BASAppleProjectionEventSource
+        Governed: Collection,
+        Candidate: Collection,
+        Event: Collection
     >(
-        records: [Governed],
-        candidates: [Candidate],
-        events: [Event],
+        records: Governed,
+        candidates: Candidate,
+        events: Event,
         governanceSnapshot: BASAppleProjectionGovernanceSnapshot? = nil,
         memoryTrustBehavior: BASMemoryTrustBehavior = .generic
-    ) -> BASBrainProjection {
+    ) -> BASBrainProjection
+    where Governed.Element == BASGovernedMemoryStoredFields,
+          Candidate.Element == BASCandidateMemoryStoredFields,
+          Event.Element == BASProjectionEventInput {
         compile(
             BASBrainProjectionCompileRequest(
                 records: records.map { record in
-                    let snapshot = record.basSnapshot
                     return BASProjectionGovernedMemoryInput(
-                        id: snapshot.id,
-                        typeID: snapshot.typeID,
-                        headline: snapshot.headline,
-                        confidence: snapshot.confidence,
-                        sourceID: snapshot.source.rawValue,
-                        lastConfirmedAt: snapshot.lastConfirmedAt,
-                        lifecycleStateID: snapshot.lifecycleState.rawValue,
-                        tierID: snapshot.tierID,
-                        provenanceSummary: snapshot.provenanceSummary
+                        id: record.id,
+                        typeID: record.typeID,
+                        headline: record.headline,
+                        confidence: record.confidence,
+                        sourceID: record.source.rawValue,
+                        lastConfirmedAt: record.lastConfirmedAt,
+                        lifecycleStateID: record.lifecycleState.rawValue,
+                        tierID: record.tierID,
+                        provenanceSummary: record.provenanceSummary
                     )
                 },
                 candidates: candidates.map { candidate in
-                    let snapshot = candidate.basSnapshot
                     return BASProjectionCandidateInput(
-                        id: snapshot.id,
-                        typeID: snapshot.typeID,
-                        headline: snapshot.headline,
-                        confidence: snapshot.confidence,
-                        priority: snapshot.priority,
-                        sourceID: snapshot.source.rawValue,
-                        retrievalTags: snapshot.retrievalTags,
-                        lastObservedAt: snapshot.lastObservedAt,
-                        decayPolicyID: snapshot.decayPolicy.rawValue,
-                        statusID: snapshot.status.rawValue,
-                        governanceDecisionID: snapshot.lastGovernanceDecision.rawValue,
-                        evidenceCount: snapshot.evidenceCount,
-                        provenanceSummary: snapshot.provenanceSummary
+                        id: candidate.id,
+                        typeID: candidate.typeID,
+                        headline: candidate.headline,
+                        confidence: candidate.confidence,
+                        priority: candidate.priority,
+                        sourceID: candidate.source.rawValue,
+                        retrievalTags: candidate.retrievalTags,
+                        lastObservedAt: candidate.lastObservedAt,
+                        decayPolicyID: candidate.decayPolicy.rawValue,
+                        statusID: candidate.status.rawValue,
+                        governanceDecisionID: candidate.lastGovernanceDecision.rawValue,
+                        evidenceCount: candidate.evidenceCount,
+                        provenanceSummary: candidate.provenanceSummary
                     )
                 },
-                events: events.map(\.basProjectionEventInput),
+                events: Array(events),
                 governanceSnapshot: governanceSnapshot.map {
                     BASProjectionGovernanceInput(
                         totalRecordCount: $0.totalRecordCount,
@@ -243,11 +244,11 @@ public enum BASAppleMemoryDraftDerivationAdapter {
         comparativeRecordType: Comparative.Type,
         reflectiveRecordType: Reflective.Type,
         behavior: BASMemoryDerivationBehavior = .generic
-    ) -> [BASDerivedMemoryDraft] {
-        let cues = (try? context.fetch(FetchDescriptor<Cue>())) ?? []
-        let checkEvents = (try? context.fetch(FetchDescriptor<Event>())) ?? []
-        let comparativeRecords = (try? context.fetch(FetchDescriptor<Comparative>())) ?? []
-        let reflectiveRecords = (try? context.fetch(FetchDescriptor<Reflective>())) ?? []
+    ) throws -> [BASDerivedMemoryDraft] {
+        let cues = try context.fetch(FetchDescriptor<Cue>())
+        let checkEvents = try context.fetch(FetchDescriptor<Event>())
+        let comparativeRecords = try context.fetch(FetchDescriptor<Comparative>())
+        let reflectiveRecords = try context.fetch(FetchDescriptor<Reflective>())
 
         return deriveDrafts(
             cues: cues,

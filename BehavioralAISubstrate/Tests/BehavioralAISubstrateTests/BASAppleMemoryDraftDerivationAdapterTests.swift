@@ -188,7 +188,7 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
         comparativeRecords.forEach(context.insert)
         reflectiveRecords.forEach(context.insert)
 
-        let actual = BASAppleMemoryDraftDerivationAdapter.deriveDrafts(
+        let actual = try BASAppleMemoryDraftDerivationAdapter.deriveDrafts(
             in: context,
             now: now,
             cueType: DraftCueFixture.self,

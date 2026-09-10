@@ -283,10 +283,10 @@ struct BASAppleCurrentBrainUpdateWriterTests {
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let caller = ModelContext(container)
-        let io = CurrentBrainPersistenceFaultIO()
+        let io = ApplePersistenceFaultIO()
         io.failFetch = { _ in true }
 
-        #expect(throws: CurrentBrainPersistenceFixtureFault.fetch) {
+        #expect(throws: ApplePersistenceFixtureFault.fetch) {
             let _: BASAppleCurrentBrainUpdateWriteResult<UpdateWriterFixture> =
                 try BASAppleCurrentBrainUpdateWriter.persist(
                     updateFields("read-failure"),
@@ -325,9 +325,9 @@ struct BASAppleCurrentBrainUpdateWriterTests {
         let pendingInsert = UpdateWriterFixture(fields: updateFields("caller-only-insert"))
         caller.insert(pendingInsert)
 
-        let io = CurrentBrainPersistenceFaultIO()
+        let io = ApplePersistenceFaultIO()
         io.failSave = true
-        #expect(throws: CurrentBrainPersistenceFixtureFault.save) {
+        #expect(throws: ApplePersistenceFixtureFault.save) {
             let _: BASAppleCurrentBrainUpdateWriteResult<UpdateWriterFixture> =
                 try BASAppleCurrentBrainUpdateWriter.persist(
                     updateFields("private-write"),

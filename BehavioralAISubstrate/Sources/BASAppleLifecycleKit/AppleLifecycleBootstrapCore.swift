@@ -126,20 +126,20 @@ public enum BASAppleLifecycleBootstrapExecutor {
     public static func execute(
         phase: BASAppleLifecycleBootstrapPhase,
         behavior: BASAppleLifecycleBootstrapBehavior = .generic,
-        refreshMemoryProjection: () -> Void,
-        refreshCurrentBrain: (String) -> Void,
+        refreshMemoryProjection: () throws -> Void,
+        refreshCurrentBrain: (String) throws -> Void,
         presentPendingReflection: () -> Void,
         consumePendingLaunchRequest: () -> Void,
         restoreActiveWorkspace: () -> Void,
         refreshPredictedIntervention: () -> Void,
         syncWidgetSnapshot: () -> Void = {}
-    ) {
+    ) rethrows {
         for action in BASAppleLifecycleBootstrapPlanner.actions(for: phase, behavior: behavior) {
             switch action.kind {
             case .refreshMemoryProjection:
-                refreshMemoryProjection()
+                try refreshMemoryProjection()
             case .refreshCurrentBrain:
-                refreshCurrentBrain(
+                try refreshCurrentBrain(
                     action.bootstrapTriggerID ?? BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue
                 )
             case .presentPendingReflection:
@@ -205,12 +205,12 @@ public enum BASAppleCurrentBrainRuntimeExecutor {
         modeID: String,
         promptFragments: [String],
         retrievalMode: String,
-        refreshMemoryProjection: () -> Void,
-        bootstrapCurrentBrain: (BASAppleCurrentBrainRuntimePlan) -> CurrentBrain,
+        refreshMemoryProjection: () throws -> Void,
+        bootstrapCurrentBrain: (BASAppleCurrentBrainRuntimePlan) throws -> CurrentBrain,
         afterBootstrap: (CurrentBrain) -> Void
-    ) -> CurrentBrain {
-        refreshMemoryProjection()
-        let currentBrain = bootstrapCurrentBrain(
+    ) rethrows -> CurrentBrain {
+        try refreshMemoryProjection()
+        let currentBrain = try bootstrapCurrentBrain(
             BASAppleCurrentBrainRuntimePlanner.sessionBootstrapPlan(
                 modeID: modeID,
                 promptFragments: promptFragments,
@@ -229,11 +229,11 @@ public enum BASAppleCurrentBrainRuntimeExecutor {
         retrievalModesByModeID: [String: String],
         triggerID: String = BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue,
         behavior: BASAppleLifecycleBootstrapBehavior = .generic,
-        refreshMemoryProjection: () -> Void,
-        bootstrapCurrentBrain: (BASAppleCurrentBrainRuntimePlan) -> CurrentBrain
-    ) -> CurrentBrain {
-        refreshMemoryProjection()
-        return bootstrapCurrentBrain(
+        refreshMemoryProjection: () throws -> Void,
+        bootstrapCurrentBrain: (BASAppleCurrentBrainRuntimePlan) throws -> CurrentBrain
+    ) rethrows -> CurrentBrain {
+        try refreshMemoryProjection()
+        return try bootstrapCurrentBrain(
             BASAppleCurrentBrainRuntimePlanner.activeRefreshPlan(
                 promptFragmentsByModeID: promptFragmentsByModeID,
                 modePriority: modePriority,

@@ -42,13 +42,13 @@ public enum BASAppleEvolutionCheckpointWriter {
             createdAt: createdAt,
             maxEntries: maxEntries,
             retentionInterval: retentionInterval,
-            using: BASAppleCurrentBrainLivePersistenceIO()
+            using: BASAppleLivePersistenceIO()
         )
     }
 
     static func record<
         Checkpoint: BASAppleEvolutionCheckpointEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         input: BASEvolutionCheckpointInput,
         in context: ModelContext,
@@ -57,7 +57,7 @@ public enum BASAppleEvolutionCheckpointWriter {
         retentionInterval: TimeInterval = BASEvolutionCheckpointPlanner.defaultRetentionInterval,
         using io: IO
     ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
-        try BASAppleCurrentBrainPersistenceTransaction.perform(
+        try BASApplePersistenceTransaction.perform(
             selectedBy: context,
             using: io
         ) { owned in
@@ -74,7 +74,7 @@ public enum BASAppleEvolutionCheckpointWriter {
 
     static func stageRecord<
         Checkpoint: BASAppleEvolutionCheckpointEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         input: BASEvolutionCheckpointInput,
         in context: ModelContext,
@@ -142,13 +142,13 @@ public enum BASAppleEvolutionCheckpointWriter {
             lineageSummary,
             for: checkpointID,
             in: context,
-            using: BASAppleCurrentBrainLivePersistenceIO()
+            using: BASAppleLivePersistenceIO()
         )
     }
 
     static func attachLineageSummary<
         Checkpoint: BASAppleEvolutionCheckpointEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         _ lineageSummary: BASEvolutionLineageSummary,
         for checkpointID: String,
@@ -170,19 +170,19 @@ public enum BASAppleEvolutionCheckpointWriter {
         try attachLineageSummary(
             lineageSummary,
             in: context,
-            using: BASAppleCurrentBrainLivePersistenceIO()
+            using: BASAppleLivePersistenceIO()
         )
     }
 
     static func attachLineageSummary<
         Checkpoint: BASAppleEvolutionCheckpointEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         _ lineageSummary: BASEvolutionLineageSummary,
         in context: ModelContext,
         using io: IO
     ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
-        try BASAppleCurrentBrainPersistenceTransaction.perform(
+        try BASApplePersistenceTransaction.perform(
             selectedBy: context,
             using: io
         ) { owned in
@@ -219,13 +219,13 @@ public enum BASAppleEvolutionCheckpointWriter {
             lineageSummary,
             for: checkpointID,
             in: context,
-            using: BASAppleCurrentBrainLivePersistenceIO()
+            using: BASAppleLivePersistenceIO()
         )
     }
 
     static func setLineageSummary<
         Checkpoint: BASAppleEvolutionCheckpointEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         _ lineageSummary: BASEvolutionLineageSummary?,
         for checkpointID: String,
@@ -253,13 +253,13 @@ public enum BASAppleEvolutionCheckpointWriter {
             approvalState,
             for: checkpointID,
             in: context,
-            using: BASAppleCurrentBrainLivePersistenceIO()
+            using: BASAppleLivePersistenceIO()
         )
     }
 
     static func setApprovalState<
         Checkpoint: BASAppleEvolutionCheckpointEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         _ approvalState: BASEvolutionApprovalState,
         for checkpointID: String,
@@ -285,19 +285,19 @@ public enum BASAppleEvolutionCheckpointWriter {
         try revokeCheckpoints(
             for: request,
             in: context,
-            using: BASAppleCurrentBrainLivePersistenceIO()
+            using: BASAppleLivePersistenceIO()
         )
     }
 
     static func revokeCheckpoints<
         Checkpoint: BASAppleEvolutionCheckpointEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         for request: BASForgetRequest,
         in context: ModelContext,
         using io: IO
     ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
-        try BASAppleCurrentBrainPersistenceTransaction.perform(
+        try BASApplePersistenceTransaction.perform(
             selectedBy: context,
             using: io
         ) { owned in
@@ -307,7 +307,7 @@ public enum BASAppleEvolutionCheckpointWriter {
 
     private static func stageRevocation<
         Checkpoint: BASAppleEvolutionCheckpointEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         for request: BASForgetRequest,
         in context: ModelContext,
@@ -374,14 +374,14 @@ public enum BASAppleEvolutionCheckpointWriter {
 
     private static func updateCheckpoint<
         Checkpoint: BASAppleEvolutionCheckpointEntity,
-        IO: BASAppleCurrentBrainPersistenceIO
+        IO: BASApplePersistenceIO
     >(
         checkpointID: String,
         in context: ModelContext,
         using io: IO,
         transform: (BASEvolutionCheckpointStoredFields) -> BASEvolutionCheckpointStoredFields
     ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
-        try BASAppleCurrentBrainPersistenceTransaction.perform(
+        try BASApplePersistenceTransaction.perform(
             selectedBy: context,
             using: io
         ) { owned in

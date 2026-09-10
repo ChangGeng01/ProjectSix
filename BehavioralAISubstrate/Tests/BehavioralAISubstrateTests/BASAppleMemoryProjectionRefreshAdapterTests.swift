@@ -395,29 +395,18 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
         let container = try makeContainer()
         let context = ModelContext(container)
         seedHistory(into: context, now: now)
+        try context.save()
 
         var rebuildCall: (Int, Int, Int, Int, Int)?
-        let refreshed = BASAppleMemoryProjectionRefreshAdapter.refreshProjection(
+        let refreshed = try BASAppleMemoryProjectionRefreshAdapter.refreshProjection(
             in: context,
             now: now,
-            governanceSnapshot: BASAppleProjectionGovernanceSnapshot(
-                totalRecordCount: 0,
-                totalCandidateCount: 0,
-                pendingCandidateCount: 0,
-                promotedCandidateCount: 0,
-                deferredCandidateCount: 0,
-                admittedCandidateCount: 0
-            ),
-            refreshGovernanceSnapshot: { governanceSnapshot(in: $0) },
+            recordType: RefreshGovernedFixture.self,
+            candidateType: RefreshCandidateFixture.self,
             cueType: RefreshCueFixture.self,
             checkEventType: RefreshCheckEventFixture.self,
             comparativeRecordType: RefreshComparativeFixture.self,
             reflectiveRecordType: RefreshReflectiveFixture.self,
-            fetchRecords: { fetchRecords(in: $0, limit: $1) },
-            fetchCandidates: { fetchCandidates(in: $0, limit: $1) },
-            fetchCheckEvents: { fetchCheckEvents(in: $0, limit: $1) },
-            fetchComparativeRecords: { fetchComparativeRecords(in: $0, limit: $1) },
-            fetchReflectiveRecords: { fetchReflectiveRecords(in: $0, limit: $1) },
             rebuildEmbeddings: { records, candidates, checkEvents, comparativeRecords, reflectiveRecords in
                 rebuildCall = (
                     records.count,
@@ -467,27 +456,15 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
         seedHistory(into: context, now: now)
         try context.save()
 
-        let refreshed = BASAppleMemoryProjectionRefreshAdapter.refreshProjection(
+        let refreshed = try BASAppleMemoryProjectionRefreshAdapter.refreshProjection(
             in: context,
             now: now,
-            governanceSnapshot: BASAppleProjectionGovernanceSnapshot(
-                totalRecordCount: 1,
-                totalCandidateCount: 0,
-                pendingCandidateCount: 0,
-                promotedCandidateCount: 0,
-                deferredCandidateCount: 0,
-                admittedCandidateCount: 0
-            ),
-            refreshGovernanceSnapshot: { governanceSnapshot(in: $0) },
+            recordType: RefreshGovernedFixture.self,
+            candidateType: RefreshCandidateFixture.self,
             cueType: RefreshCueFixture.self,
             checkEventType: RefreshCheckEventFixture.self,
             comparativeRecordType: RefreshComparativeFixture.self,
             reflectiveRecordType: RefreshReflectiveFixture.self,
-            fetchRecords: { fetchRecords(in: $0, limit: $1) },
-            fetchCandidates: { fetchCandidates(in: $0, limit: $1) },
-            fetchCheckEvents: { fetchCheckEvents(in: $0, limit: $1) },
-            fetchComparativeRecords: { fetchComparativeRecords(in: $0, limit: $1) },
-            fetchReflectiveRecords: { fetchReflectiveRecords(in: $0, limit: $1) },
             rebuildEmbeddings: { _, _, _, _, _ in }
         )
 
@@ -496,6 +473,112 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
         #expect(refreshed.diagnostics.recordCount == 1)
         #expect(refreshed.baseProjection.records.count == 1)
         #expect(refreshed.baseProjection.records.first?.content == "Keep it short.")
+    }
+
+    @Test("reconciliation does not return success when a real read-only store rejects its save")
+    func reconciliationDoesNotReturnSuccessWhenReadOnlyStoreRejectsSave() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bas-memory-read-only-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            do {
+                try FileManager.default.removeItem(at: directory)
+            } catch {
+                Issue.record("Failed to remove read-only governed-memory fixture directory: \(error)")
+            }
+        }
+
+        let storeURL = directory.appendingPathComponent("memory.store")
+        let schema = Schema([RefreshGovernedFixture.self, RefreshCandidateFixture.self])
+        let seed = RefreshGovernedFixture(
+            basID: "seed",
+            basTypeID: "profile",
+            basTopic: "seed",
+            basHeadline: "Seed",
+            basValue: "Committed seed",
+            basConfidence: 0.8,
+            basPriority: 0.8,
+            basSource: .archive,
+            basLastConfirmedAt: Date(timeIntervalSince1970: 1_744_200_000),
+            basDecayPolicy: .slow,
+            basRetrievalTags: ["seed"],
+            basEvidenceCount: 2,
+            basObservationCount: 2,
+            basProvenanceSummary: "Committed before reopening read-only.",
+            basLifecycleState: .active,
+            basLastReviewedAt: Date(timeIntervalSince1970: 1_744_200_000),
+            basTierID: "warm"
+        )
+
+        do {
+            let writable = ModelConfiguration(
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(for: schema, configurations: [writable])
+            let context = ModelContext(container)
+            context.insert(seed)
+            try context.save()
+        }
+
+        let reviewNow = Date(timeIntervalSince1970: 1_744_286_400)
+        var result: BASAppleMemoryReconciliationWriteResult?
+        var saveError: Error?
+        do {
+            let readOnly = ModelConfiguration(
+                schema: schema,
+                url: storeURL,
+                allowsSave: false,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(for: schema, configurations: [readOnly])
+            let caller = ModelContext(container)
+            do {
+                result = try BASAppleMemoryReconciliationWriter.reconcile(
+                    BASAppleMemoryPersistenceRequest(
+                        drafts: [
+                            BASDerivedMemoryDraft(
+                                id: "must-not-persist",
+                                typeID: "goal",
+                                topic: "strict-write",
+                                headline: "Must not return success",
+                                value: "A rejected save is not a successful reconciliation.",
+                                confidence: 0.9,
+                                priority: 0.9,
+                                sourceID: BASMemorySource.archive.rawValue,
+                                lastConfirmedAt: reviewNow,
+                                decayPolicyID: BASMemoryDecayPolicy.medium.rawValue,
+                                retrievalTags: ["strict-write"],
+                                evidenceCount: 2,
+                                provenanceSummary: "Real read-only SwiftData save failure fixture.",
+                                promotionPolicy: .immediate
+                            )
+                        ],
+                        existingRecords: [],
+                        existingCandidates: [],
+                        reviewNow: reviewNow
+                    ),
+                    recordType: RefreshGovernedFixture.self,
+                    candidateType: RefreshCandidateFixture.self,
+                    in: caller
+                )
+            } catch {
+                saveError = error
+            }
+        }
+
+        #expect(saveError != nil)
+        #expect(result == nil)
+
+        let writable = ModelConfiguration(
+            schema: schema,
+            url: storeURL,
+            cloudKitDatabase: .none
+        )
+        let reopened = try ModelContainer(for: schema, configurations: [writable])
+        let storedRecords = try ModelContext(reopened).fetch(FetchDescriptor<RefreshGovernedFixture>())
+        #expect(storedRecords.map(\.basID) == ["seed"])
     }
 
     private func makeContainer() throws -> ModelContainer {

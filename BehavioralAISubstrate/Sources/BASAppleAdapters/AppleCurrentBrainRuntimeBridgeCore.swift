@@ -185,12 +185,12 @@ public enum BASAppleCurrentBrainRuntimeBridgeBuilder {
 public enum BASAppleCurrentBrainRuntimeBridgeExecutor {
     public static func primeSession<CurrentBrain>(
         input: BASAppleCurrentBrainSessionBridgeInput,
-        refreshMemoryProjection: () -> Void = {},
-        bootstrapCurrentBrain: (BASAppleCurrentBrainBootstrapBridgeInput) -> CurrentBrain,
+        refreshMemoryProjection: () throws -> Void = {},
+        bootstrapCurrentBrain: (BASAppleCurrentBrainBootstrapBridgeInput) throws -> CurrentBrain,
         afterBootstrap: (CurrentBrain) -> Void
-    ) -> CurrentBrain {
-        refreshMemoryProjection()
-        let currentBrain = bootstrapCurrentBrain(
+    ) rethrows -> CurrentBrain {
+        try refreshMemoryProjection()
+        let currentBrain = try bootstrapCurrentBrain(
             BASAppleCurrentBrainRuntimeBridgeBuilder.sessionBootstrapInput(from: input)
         )
         afterBootstrap(currentBrain)
@@ -199,11 +199,11 @@ public enum BASAppleCurrentBrainRuntimeBridgeExecutor {
 
     public static func refreshActiveBrain<CurrentBrain>(
         input: BASAppleCurrentBrainActiveRefreshBridgeInput,
-        refreshMemoryProjection: () -> Void = {},
-        bootstrapCurrentBrain: (BASAppleCurrentBrainBootstrapBridgeInput) -> CurrentBrain
-    ) -> CurrentBrain {
-        refreshMemoryProjection()
-        return bootstrapCurrentBrain(
+        refreshMemoryProjection: () throws -> Void = {},
+        bootstrapCurrentBrain: (BASAppleCurrentBrainBootstrapBridgeInput) throws -> CurrentBrain
+    ) rethrows -> CurrentBrain {
+        try refreshMemoryProjection()
+        return try bootstrapCurrentBrain(
             BASAppleCurrentBrainRuntimeBridgeBuilder.activeBootstrapInput(from: input)
         )
     }

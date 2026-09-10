@@ -27,19 +27,19 @@ public enum BASAppleMemoryProjectionRefreshExecutor {
         force: Bool,
         cacheState: BASAppleMemoryProjectionRefreshCacheState,
         cached: () -> Result?,
-        refresh: () -> Result
-    ) -> Result {
+        refresh: () throws -> Result
+    ) rethrows -> Result {
         if BASAppleMemoryProjectionRefreshPlanner.shouldRefresh(
             force: force,
             cacheState: cacheState
         ) {
-            return refresh()
+            return try refresh()
         }
 
         if let cached = cached() {
             return cached
         }
 
-        return refresh()
+        return try refresh()
     }
 }

@@ -1587,7 +1587,7 @@ struct BASAppleCurrentBrainBootstrapTests {
             Issue.record("Expected the multiple configuration set to be rejected")
         } catch {
             #expect(
-                error as? BASAppleCurrentBrainPersistenceTransactionError
+                error as? BASApplePersistenceTransactionError
                     == .requiresSingleConfiguration(actual: 2)
             )
         }
