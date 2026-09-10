@@ -79,7 +79,7 @@ import CryptoKit
 /// `StorageError`。Per chapter 一百九十一 M91 doctrine,integrity
 /// outranks availability — a corrupt store is surfaced rather
 /// than silently truncated。
-public actor BASSQLiteEventLogStorage: BASEventLogStorage {
+public actor BASSQLiteEventLogStorage: BASEventLogStorage, BASEventLogRecoveryReading {
 
     // MARK: - Errors
 
@@ -388,6 +388,20 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         return try Self.fetchEventsForSession(db: db, sessionID: sessionID)
     }
 
+    public func recoveryEvents(
+        forSession sessionID: String,
+        limits: BASEventLogRecoveryReadLimits,
+        integrity: BASEventLogRecoveryIntegrityRequirement
+    ) async throws -> [BASEventLogEntry] {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try BASSQLiteEventLogRecoveryReader(db: db).read(
+            sessionID: sessionID,
+            limits: limits,
+            integrity: integrity)
+    }
+
     /// Red-team GAP-3b (tamper-evidence on REPLAY) — assert a session's events are CONTIGUOUS by
     /// `sequence_number` (each = previous + 1, no gaps, no duplicates), throwing `corruptedRow` on the first
     /// discontinuity, then return the decoded entries. The default reads (`events` / `eventsOrThrow`) return
@@ -563,7 +577,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     /// `SHA256( canonical(entry as sorted-keys JSON) || prevHash )`, lowercase hex. Computed identically at
     /// append + verify, so a tamper that changes the DECODED entry changes the hash; `prevHash` chains rows so
     /// a deletion/reorder breaks the link.
-    fileprivate static func integrityHash(entry: BASEventLogEntry, prevHash: String) throws -> String {
+    static func integrityHash(entry: BASEventLogEntry, prevHash: String) throws -> String {
         let enc = JSONEncoder()
         enc.outputFormatting = [.sortedKeys]
         let body: Data
@@ -1142,17 +1156,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         // Map BASEventLogKind → BASBinaryEventLogKind (best-
         // effort — both have overlapping cases)。 Fall back to
         // .internalSignal for unknown kinds (rare edge case)。
-        let kind: BASBinaryEventLogKind
-        switch entry.kind {
-        case .substrateAudit:
-            kind = .sovereignVerdict
-        case .internalSignal:
-            kind = .internalSignal
-        default:
-            // appBehavior,sessionLifecycle,toolInvocation,
-            // image,file,web,calendar,health,…
-            kind = .hostInput
-        }
+        let kind = binaryKind(for: entry.kind)
         // Build payloadJson with ALL non-core fields the binary wire doesn't natively carry。 Decoded on read。
         // ADR-040 durability fix: this envelope PREVIOUSLY dropped stateBeforeID / stateAfterID / actions /
         // confidence / payloadJson — a silent, irreversible data loss on every v2 read (incl. the S_{t-1}/S_t
@@ -1197,6 +1201,19 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             provenanceSummary: nil)
         return try? BASEventLogBinaryCodec.encode(
             binaryEntry)
+    }
+
+    static func binaryKind(for kind: BASEventLogKind) -> BASBinaryEventLogKind {
+        switch kind {
+        case .substrateAudit:
+            return .sovereignVerdict
+        case .internalSignal:
+            return .internalSignal
+        default:
+            // appBehavior,sessionLifecycle,toolInvocation,
+            // image,file,web,calendar,health,…
+            return .hostInput
+        }
     }
 
     /// audit runtimecore-b MED-5: decode the v2 payload envelope, THROWING on a
