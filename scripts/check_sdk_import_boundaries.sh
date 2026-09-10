@@ -34,6 +34,23 @@ FORBIDDEN_REGEX='^import BAS(RuntimeCore|Memory|Policy|Orchestration|Observabili
 ADMIN_REGEX='^import BASAdmin$'
 ADMIN_ALLOWED_PATH_REGEX='/(Debug|Inspection|Console|Testing)[^/]*\.swift:'
 
+TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/sdk-import-boundaries.XXXXXX")"
+trap 'rm -rf "$TEMP_DIR"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+capture_output() (
+  local out="$1"
+  local label="$2"
+  shift 2
+  if ! exec 3> "$out"; then
+    echo "check_sdk_import_boundaries: cannot create $label output '$out'." >&2
+    return 2
+  fi
+  "$@" >&3
+)
+
 # M86 — portable searcher. Prefer ripgrep when available (fast, identical
 # output format the rest of this script was built against); fall back to
 # `grep -rnE` when `rg` is not on PATH so this gate never silently passes
@@ -43,17 +60,20 @@ ADMIN_ALLOWED_PATH_REGEX='/(Debug|Inspection|Console|Testing)[^/]*\.swift:'
 # `if rg ...; then` treated as "no violations", making the whole gate
 # vacuously green. Now the gate fails loudly when neither searcher can run.
 if command -v rg >/dev/null 2>&1; then
-  searcher() { rg -n "$1" "${@:2:$#-2}" -g '*.swift' > "${@: -1}"; }
+  searcher() (
+    local out="${@: -1}"
+    capture_output "$out" scan rg -n "$1" "${@:2:$#-2}" -g '*.swift'
+  )
 elif command -v grep >/dev/null 2>&1; then
-  searcher() {
+  searcher() (
     # $1 = pattern, $2..n-1 = target dirs, $n = output file
     local pattern="$1"
     local out="${@: -1}"
     local -a targets=()
     local arg
     for arg in "${@:2:$#-2}"; do targets+=("$arg"); done
-    grep -rnE "$pattern" --include='*.swift' "${targets[@]}" > "$out"
-  }
+    capture_output "$out" scan grep -rnE "$pattern" --include='*.swift' "${targets[@]}"
+  )
 else
   echo "check_sdk_import_boundaries: neither 'rg' nor 'grep' found in PATH; cannot verify gate." >&2
   exit 2
@@ -63,10 +83,11 @@ fi
 # (pass), ≥2 = searcher ERROR (must fail, never be read as "clean"). The old
 # `if searcher …; then` collapsed 1 and ≥2 into the same "no violations" branch.
 _rc=0
-searcher "$FORBIDDEN_REGEX" "${TARGETS[@]}" /tmp/bas_host_import_violations.txt || _rc=$?
+host_violations="$TEMP_DIR/host-import-violations.txt"
+searcher "$FORBIDDEN_REGEX" "${TARGETS[@]}" "$host_violations" || _rc=$?
 if [[ $_rc -eq 0 ]]; then
   echo "Direct low-level BAS imports are forbidden in host sources. Use BASHostKit instead." >&2
-  cat /tmp/bas_host_import_violations.txt >&2
+  cat "$host_violations" >&2
   exit 1
 elif [[ $_rc -ge 2 ]]; then
   echo "check_sdk_import_boundaries: searcher errored (rc=$_rc) scanning FORBIDDEN imports." >&2
@@ -74,16 +95,24 @@ elif [[ $_rc -ge 2 ]]; then
 fi
 
 _rc=0
-searcher "$ADMIN_REGEX" "${TARGETS[@]}" /tmp/bas_admin_imports.txt || _rc=$?
+admin_imports="$TEMP_DIR/admin-imports.txt"
+admin_violations="$TEMP_DIR/admin-import-violations.txt"
+searcher "$ADMIN_REGEX" "${TARGETS[@]}" "$admin_imports" || _rc=$?
 if [[ $_rc -ge 2 ]]; then
   echo "check_sdk_import_boundaries: searcher errored (rc=$_rc) scanning ADMIN imports." >&2
   exit 2
 fi
 if [[ $_rc -eq 0 ]]; then
-  grep -Ev "$ADMIN_ALLOWED_PATH_REGEX" /tmp/bas_admin_imports.txt >/tmp/bas_admin_import_violations.txt || true
-  if [[ -s /tmp/bas_admin_import_violations.txt ]]; then
+  _filter_rc=0
+  capture_output "$admin_violations" filter grep -Ev "$ADMIN_ALLOWED_PATH_REGEX" "$admin_imports" || _filter_rc=$?
+  if [[ $_filter_rc -gt 1 ]]; then
+    echo "check_sdk_import_boundaries: administrator import filter errored (rc=$_filter_rc)." >&2
+    cat "$admin_violations" >&2
+    exit 2
+  fi
+  if [[ $_filter_rc -eq 0 ]]; then
     echo "Direct BASAdmin imports are only allowed in debug or inspection surfaces. Use BASHostKit elsewhere." >&2
-    cat /tmp/bas_admin_import_violations.txt >&2
+    cat "$admin_violations" >&2
     exit 1
   fi
 fi

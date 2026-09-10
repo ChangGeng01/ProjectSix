@@ -68,21 +68,42 @@ SOURCE_TEST_RESIDUAL_REGEX="${WHOLE_WORD_RESIDUAL_REGEX}|${EMBEDDED_IDENTIFIER_R
 README_RESIDUAL_REGEX='(sessionPrime|quickCapture|\bopenMode\b|reopenTomorrowItem|resumeCurrentDecision|BASQuick|BASBalance|BASReminder|quickEnvelope|balanceEnvelope|mirrorEnvelope|reminderEnvelope|reminder-source)'
 TEST_ALLOWLIST_REGEX='/(BASCognitionCoreTests|BASMemoryCognitionCoreTests|BASReferencePromptModesCoreTests|BASAppleCurrentBrainBootstrapTests|BASAppleEvolutionCheckpointWriterTests)\.swift:'
 
+TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/substrate-residual-markers.XXXXXX")"
+trap 'rm -rf "$TEMP_DIR"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+capture_output() (
+  local out="$1"
+  local label="$2"
+  shift 2
+  if ! exec 3> "$out"; then
+    echo "check_substrate_residuals: cannot create $label output '$out'." >&2
+    return 2
+  fi
+  "$@" >&3
+)
+
 # M86 — portable searcher. See check_sdk_import_boundaries.sh for the
 # rationale (rg was invoked unconditionally and the script vacuously
 # passed on machines without ripgrep because `if rg ...; then` treated
 # the missing command as "no matches"). Now we fall back to `grep -rnE`
 # when `rg` isn't installed and fail loudly when neither tool exists.
 if command -v rg >/dev/null 2>&1; then
-  searcher_swift_md() { rg -n "$1" "$2" -g '*.swift' -g '*.md' > "$3"; }
-  searcher_swift()    { rg -n "$1" "$2" -g '*.swift'              > "$3"; }
+  searcher_swift_md() (
+    capture_output "$3" scan rg -n "$1" "$2" -g '*.swift' -g '*.md'
+  )
+  searcher_swift() (
+    capture_output "$3" scan rg -n "$1" "$2" -g '*.swift'
+  )
 elif command -v grep >/dev/null 2>&1; then
-  searcher_swift_md() {
-    grep -rnE "$1" --include='*.swift' --include='*.md' "$2" > "$3"
-  }
-  searcher_swift() {
-    grep -rnE "$1" --include='*.swift' "$2" > "$3"
-  }
+  searcher_swift_md() (
+    capture_output "$3" scan grep -rnE "$1" --include='*.swift' --include='*.md' "$2"
+  )
+  searcher_swift() (
+    capture_output "$3" scan grep -rnE "$1" --include='*.swift' "$2"
+  )
 else
   echo "check_substrate_residuals: neither 'rg' nor 'grep' found in PATH; cannot verify gate." >&2
   exit 2
@@ -95,39 +116,62 @@ check_target() {
   local output="$4"
   local mode="${5:-swift_md}"
 
-  local succeeded=0
+  local rc=0
   if [[ "$mode" == "swift_md" ]]; then
-    if searcher_swift_md "$regex" "$target" "$output"; then succeeded=1; fi
+    searcher_swift_md "$regex" "$target" "$output" || rc=$?
   else
-    if searcher_swift "$regex" "$target" "$output"; then succeeded=1; fi
+    searcher_swift "$regex" "$target" "$output" || rc=$?
   fi
 
-  if [[ "$succeeded" == "1" ]]; then
+  if [[ "$rc" -eq 0 ]]; then
     echo "Substrate residual scan failed in $label. Move legacy Before vocabulary back to the host compatibility layer." >&2
     cat "$output" >&2
     exit 1
+  elif [[ "$rc" -gt 1 ]]; then
+    echo "check_substrate_residuals: scanner errored (rc=$rc) scanning $label." >&2
+    cat "$output" >&2
+    exit 2
   fi
 }
 
-check_target "$SOURCE_TARGET" "substrate sources" "$SOURCE_TEST_RESIDUAL_REGEX" /tmp/bas_substrate_source_residuals.txt swift_md
+check_target "$SOURCE_TARGET" "substrate sources" "$SOURCE_TEST_RESIDUAL_REGEX" "$TEMP_DIR/source-residuals.txt" swift_md
 # README is a single file; grep/rg handle single-file arguments for either globbing mode.
 if [[ -f "$README_TARGET" ]]; then
-  if searcher_swift_md "$README_RESIDUAL_REGEX" "$README_TARGET" /tmp/bas_substrate_readme_residuals.txt; then
-    if [[ -s /tmp/bas_substrate_readme_residuals.txt ]]; then
-      echo "Substrate residual scan failed in substrate README. Move legacy Before vocabulary back to the host compatibility layer." >&2
-      cat /tmp/bas_substrate_readme_residuals.txt >&2
-      exit 1
-    fi
+  readme_output="$TEMP_DIR/readme-residuals.txt"
+  _rc=0
+  searcher_swift_md "$README_RESIDUAL_REGEX" "$README_TARGET" "$readme_output" || _rc=$?
+  if [[ "$_rc" -eq 0 ]]; then
+    echo "Substrate residual scan failed in substrate README. Move legacy Before vocabulary back to the host compatibility layer." >&2
+    cat "$readme_output" >&2
+    exit 1
+  elif [[ "$_rc" -gt 1 ]]; then
+    echo "check_substrate_residuals: scanner errored (rc=$_rc) scanning substrate README." >&2
+    cat "$readme_output" >&2
+    exit 2
   fi
 fi
 
-if searcher_swift "$SOURCE_TEST_RESIDUAL_REGEX" "$TEST_TARGET" /tmp/bas_substrate_test_residuals_all.txt; then
-  grep -Ev "$TEST_ALLOWLIST_REGEX" /tmp/bas_substrate_test_residuals_all.txt >/tmp/bas_substrate_test_residuals.txt || true
-  if [[ -s /tmp/bas_substrate_test_residuals.txt ]]; then
+test_residuals_all="$TEMP_DIR/test-residuals-all.txt"
+test_residuals="$TEMP_DIR/test-residuals.txt"
+_rc=0
+searcher_swift "$SOURCE_TEST_RESIDUAL_REGEX" "$TEST_TARGET" "$test_residuals_all" || _rc=$?
+if [[ "$_rc" -eq 0 ]]; then
+  _filter_rc=0
+  capture_output "$test_residuals" filter grep -Ev "$TEST_ALLOWLIST_REGEX" "$test_residuals_all" || _filter_rc=$?
+  if [[ "$_filter_rc" -gt 1 ]]; then
+    echo "check_substrate_residuals: test allowlist filter errored (rc=$_filter_rc)." >&2
+    cat "$test_residuals" >&2
+    exit 2
+  fi
+  if [[ "$_filter_rc" -eq 0 ]]; then
     echo "Substrate residual scan failed in substrate tests. Keep legacy vocabulary only in explicit rejection coverage." >&2
-    cat /tmp/bas_substrate_test_residuals.txt >&2
+    cat "$test_residuals" >&2
     exit 1
   fi
+elif [[ "$_rc" -gt 1 ]]; then
+  echo "check_substrate_residuals: scanner errored (rc=$_rc) scanning substrate tests." >&2
+  cat "$test_residuals_all" >&2
+  exit 2
 fi
 
 echo "BAS substrate residual scan passed."

@@ -43,21 +43,50 @@ FORBIDDEN_HOST_PACKAGES_REGEX='^import (Before|SampleHost|BeforeWatch|BeforeWidg
 
 violations=0
 
+TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/qinao-import-boundaries.XXXXXX")"
+trap 'rm -rf "$TEMP_DIR"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 # Portable line scanner: prefer ripgrep, fall back to POSIX grep. Both
 # CI runners (with rg) and bare macOS hosts (without rg) must see the
 # same results — silent fallthrough to "passed" when rg is missing is
 # exactly the failure mode we're trying to prevent.
-scan_imports() {
+scan_imports() (
   local dir="$1"
   local pattern="$2"
+  local output="$3"
+  local rc=0
+  if ! exec 3> "$output"; then
+    echo "check_qinao_import_boundaries: cannot create scan output '$output'." >&2
+    return 2
+  fi
   if command -v rg >/dev/null 2>&1; then
-    rg -n "$pattern" "$dir" -g '*.swift' || true
+    rg -n "$pattern" "$dir" -g '*.swift' >&3 || rc=$?
   else
-    grep -rEn --include='*.swift' "$pattern" "$dir" || true
+    grep -rEn --include='*.swift' "$pattern" "$dir" >&3 || rc=$?
+  fi
+  exec 3>&-
+  return "$rc"
+)
+
+scan_with_status() {
+  local dir="$1"
+  local pattern="$2"
+  local output="$3"
+  local label="$4"
+  local rc=0
+  scan_imports "$dir" "$pattern" "$output" || rc=$?
+  if [[ "$rc" -gt 1 ]]; then
+    echo "check_qinao_import_boundaries: scanner errored (rc=$rc) scanning $label." >&2
+    violations=$((violations + 1))
   fi
 }
 
 # ---- 1. Qinao source imports ----
+source_imports="$TEMP_DIR/source-imports.txt"
+scan_with_status "$SOURCES_DIR" '^import [A-Za-z]' "$source_imports" "Qinao source imports"
 while IFS= read -r line; do
   # line: <path>:<lineno>:<text>
   [[ -z "$line" ]] && continue
@@ -68,10 +97,12 @@ while IFS= read -r line; do
     echo "UNKNOWN import in Qinao source: $line" >&2
     violations=$((violations + 1))
   fi
-done < <(scan_imports "$SOURCES_DIR" '^import [A-Za-z]')
+done < "$source_imports"
 
 # ---- 2. Forbidden host imports in Qinao sources ----
-forbidden_out="$(scan_imports "$SOURCES_DIR" "$FORBIDDEN_HOST_PACKAGES_REGEX")"
+forbidden_source="$TEMP_DIR/forbidden-source-imports.txt"
+scan_with_status "$SOURCES_DIR" "$FORBIDDEN_HOST_PACKAGES_REGEX" "$forbidden_source" "forbidden Qinao source imports"
+forbidden_out="$(< "$forbidden_source")"
 if [[ -n "$forbidden_out" ]]; then
   echo "Qinao sources must not import host packages (façades flow downward only):" >&2
   echo "$forbidden_out" >&2
@@ -80,6 +111,8 @@ fi
 
 # ---- 3. Qinao test imports ----
 if [[ -d "$TESTS_DIR" ]]; then
+  test_imports="$TEMP_DIR/test-imports.txt"
+  scan_with_status "$TESTS_DIR" '^(@testable )?import [A-Za-z]' "$test_imports" "Qinao test imports"
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     text="${line#*:*:}"
@@ -89,9 +122,11 @@ if [[ -d "$TESTS_DIR" ]]; then
       echo "UNKNOWN import in Qinao test: $line" >&2
       violations=$((violations + 1))
     fi
-  done < <(scan_imports "$TESTS_DIR" '^(@testable )?import [A-Za-z]')
+  done < "$test_imports"
 
-  forbidden_test_out="$(scan_imports "$TESTS_DIR" "$FORBIDDEN_HOST_PACKAGES_REGEX")"
+  forbidden_tests="$TEMP_DIR/forbidden-test-imports.txt"
+  scan_with_status "$TESTS_DIR" "$FORBIDDEN_HOST_PACKAGES_REGEX" "$forbidden_tests" "forbidden Qinao test imports"
+  forbidden_test_out="$(< "$forbidden_tests")"
   if [[ -n "$forbidden_test_out" ]]; then
     echo "Qinao tests must not import host packages:" >&2
     echo "$forbidden_test_out" >&2
@@ -102,22 +137,22 @@ fi
 # ---- 4. Build must succeed ----
 (
   cd "$PKG_DIR"
-  if ! swift build >/tmp/qinao_build.log 2>&1; then
+  if ! swift build >"$TEMP_DIR/qinao-build.log" 2>&1; then
     echo "QinaoRuntimeSDK failed to build:" >&2
-    tail -40 /tmp/qinao_build.log >&2
+    tail -40 "$TEMP_DIR/qinao-build.log" >&2
     exit 1
   fi
 ) || violations=$((violations + 1))
 
 # ---- 5. Redaction scan ----
-if ! "$ROOT/scripts/check_sovereign_redaction.sh" >/tmp/qinao_redaction.log 2>&1; then
-  cat /tmp/qinao_redaction.log >&2
+if ! "$ROOT/scripts/check_sovereign_redaction.sh" >"$TEMP_DIR/qinao-redaction.log" 2>&1; then
+  cat "$TEMP_DIR/qinao-redaction.log" >&2
   violations=$((violations + 1))
 fi
 
 # ---- 6. Delegate to host-side SDK boundary check ----
-if ! "$ROOT/scripts/check_sdk_import_boundaries.sh" >/tmp/qinao_sdk_boundary.log 2>&1; then
-  cat /tmp/qinao_sdk_boundary.log >&2
+if ! "$ROOT/scripts/check_sdk_import_boundaries.sh" >"$TEMP_DIR/qinao-sdk-boundary.log" 2>&1; then
+  cat "$TEMP_DIR/qinao-sdk-boundary.log" >&2
   violations=$((violations + 1))
 fi
 
