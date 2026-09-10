@@ -61,7 +61,8 @@ if [[ "$resolver" == "selected-xcode" ]] && ! "$metal_launcher" --version; then
   verification_failed=true
 fi
 for sdk in "$@"; do
-  if ! xcrun --sdk "$sdk" metal --version; then
+  # The component installation changed tool availability; bypass prior lookups.
+  if ! xcrun --no-cache --sdk "$sdk" metal --version; then
     echo "Metal compiler unavailable for $sdk after component preparation" >&2
     verification_failed=true
   fi

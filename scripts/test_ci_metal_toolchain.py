@@ -43,9 +43,16 @@ case "$selected" in
 esac
 printf "%s\\n" "$selected"
 """,
-                "xcrun": """[[ $# == 4 && "$1" == --sdk && "$3" == metal && "$4" == --version ]] || exit 64
+                "xcrun": """fresh=false
+if [[ "${1:-}" == --no-cache ]]; then fresh=true; shift; fi
+[[ $# == 4 && "$1" == --sdk && "$3" == metal && "$4" == --version ]] || exit 64
 missing="$MISSING_BEFORE"
-[[ ! -e "$STATE" ]] || missing="$MISSING_AFTER"
+if [[ -e "$STATE" ]]; then
+  missing="$MISSING_AFTER"
+  if [[ "$STALE_LOOKUP_AFTER" == 1 && "$fresh" == false ]]; then
+    missing="$MISSING_BEFORE"
+  fi
+fi
 case " $missing " in
   *" $2 "*) echo "fixture missing Metal for $2" >&2; exit 69 ;;
 esac
@@ -92,6 +99,7 @@ echo "fixture direct Metal compiler"
                 "DIRECT_RC_BEFORE": "0",
                 "DIRECT_RC_AFTER": "0",
                 "DOWNLOAD_RC": "0",
+                "STALE_LOOKUP_AFTER": "0",
             }
             env.update(overrides or {})
             result = subprocess.run(
@@ -144,8 +152,8 @@ echo "fixture direct Metal compiler"
                         "xcrun --sdk iphonesimulator metal --version",
                         "xcodebuild -downloadComponent MetalToolchain",
                         "metal --version",
-                        "xcrun --sdk macosx metal --version",
-                        "xcrun --sdk iphonesimulator metal --version",
+                        "xcrun --no-cache --sdk macosx metal --version",
+                        "xcrun --no-cache --sdk iphonesimulator metal --version",
                         "product",
                     ],
                 )
@@ -165,7 +173,7 @@ echo "fixture direct Metal compiler"
                 "xcrun --sdk macosx metal --version",
                 "xcodebuild -downloadComponent MetalToolchain",
                 "metal --version",
-                "xcrun --sdk macosx metal --version",
+                "xcrun --no-cache --sdk macosx metal --version",
                 "product",
             ],
         )
@@ -198,8 +206,8 @@ echo "fixture direct Metal compiler"
                 "xcrun --sdk macosx metal --version",
                 "xcrun --sdk iphonesimulator metal --version",
                 "xcodebuild -downloadComponent MetalToolchain",
-                "xcrun --sdk macosx metal --version",
-                "xcrun --sdk iphonesimulator metal --version",
+                "xcrun --no-cache --sdk macosx metal --version",
+                "xcrun --no-cache --sdk iphonesimulator metal --version",
                 "product",
             ],
         )
@@ -212,7 +220,8 @@ echo "fixture direct Metal compiler"
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("product", calls)
         self.assertNotIn("metal --version", calls)
-        self.assertEqual(calls.count("xcrun --sdk macosx metal --version"), 2)
+        self.assertEqual(calls.count("xcrun --sdk macosx metal --version"), 1)
+        self.assertEqual(calls.count("xcrun --no-cache --sdk macosx metal --version"), 1)
         self.assertEqual(
             calls.count("xcodebuild -downloadComponent MetalToolchain"), 1
         )
@@ -220,6 +229,30 @@ echo "fixture direct Metal compiler"
             "Metal compiler unavailable for macosx after component preparation",
             result.stderr,
         )
+
+    def test_installed_component_bypasses_preinstallation_negative_lookup(self):
+        for resolver in ("xcrun", "selected-xcode"):
+            with self.subTest(resolver=resolver):
+                result, calls = self.run_fixture(
+                    f"bash scripts/ensure_ci_metal_toolchain.sh --resolver {resolver} macosx iphonesimulator",
+                    {"MISSING_BEFORE": "macosx iphonesimulator", "STALE_LOOKUP_AFTER": "1"},
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(calls.count("xcodebuild -downloadComponent MetalToolchain"), 1)
+                for sdk in ("macosx", "iphonesimulator"):
+                    self.assertEqual(calls.count(f"xcrun --sdk {sdk} metal --version"), 1)
+                    self.assertEqual(calls.count(f"xcrun --no-cache --sdk {sdk} metal --version"), 1)
+                self.assertEqual(calls[-1], "product")
+
+    def test_fresh_lookup_still_refuses_missing_installed_compiler(self):
+        result, calls = self.run_fixture(
+            "bash scripts/ensure_ci_metal_toolchain.sh --resolver xcrun macosx",
+            {"MISSING_BEFORE": "macosx", "MISSING_AFTER": "macosx", "STALE_LOOKUP_AFTER": "1"},
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("product", calls)
+        self.assertEqual(calls.count("xcodebuild -downloadComponent MetalToolchain"), 1)
+        self.assertEqual(calls.count("xcrun --no-cache --sdk macosx metal --version"), 1)
 
     def test_explicit_selected_xcode_resolver_preserves_direct_launcher_checks(self) -> None:
         result, calls = self.run_fixture(
@@ -266,7 +299,10 @@ echo "fixture direct Metal compiler"
                     calls.count("xcodebuild -downloadComponent MetalToolchain"), 1
                 )
                 self.assertEqual(
-                    calls.count(f"xcrun --sdk {missing_after} metal --version"), 2
+                    calls.count(f"xcrun --sdk {missing_after} metal --version"), 1
+                )
+                self.assertEqual(
+                    calls.count(f"xcrun --no-cache --sdk {missing_after} metal --version"), 1
                 )
                 self.assertIn(
                     f"Metal compiler unavailable for {missing_after}", result.stderr
@@ -283,7 +319,8 @@ echo "fixture direct Metal compiler"
         self.assertEqual(
             calls.count("xcodebuild -downloadComponent MetalToolchain"), 1
         )
-        self.assertEqual(calls.count("xcrun --sdk macosx metal --version"), 2)
+        self.assertEqual(calls.count("xcrun --sdk macosx metal --version"), 1)
+        self.assertEqual(calls.count("xcrun --no-cache --sdk macosx metal --version"), 1)
         self.assertIn("Selected Xcode Metal launcher unavailable", result.stderr)
 
     def test_invalid_arguments_do_not_run_tools(self) -> None:
@@ -402,7 +439,13 @@ echo "fixture direct Metal compiler"
                     calls.count(
                         f"xcrun --sdk {missing_after} metal --version"
                     ),
-                    2,
+                    1,
+                )
+                self.assertEqual(
+                    calls.count(
+                        f"xcrun --no-cache --sdk {missing_after} metal --version"
+                    ),
+                    1,
                 )
 
         boundary_names = {
