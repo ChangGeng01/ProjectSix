@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -30,17 +31,27 @@ ORDINARY_EVENTS = {
     "pull_request": {"branches": ["main"]},
     "workflow_dispatch": None,
 }
+APPLE_JOBS = {"bas-tests", "qinao-tests", "samplehost-tests", "boundary-checks"}
+
+
+def _xcode27_selection(sdks: str = "macosx") -> dict[str, str]:
+    return {"name": "Select Xcode", "run": "set -e\n"
+            "sudo xcode-select -s /Applications/Xcode.app\n"
+            f"bash scripts/check_ci_xcode27.sh {sdks}\n"}
+
+
 # These are the product commands CI must actually execute, not admission inputs.
 PRODUCT_STEPS = {
     "bas-tests": [
-        {"name": "Select Xcode", "run": "sudo xcode-select -s /Applications/Xcode.app"},
+        _xcode27_selection(),
         {"name": "BAS test", "run": "swift test --package-path BehavioralAISubstrate"},
     ],
     "qinao-tests": [
+        _xcode27_selection(),
         {"name": "Qinao test", "working-directory": "QinaoRuntimeSDK", "run": "swift test"},
     ],
     "samplehost-tests": [
-        {"name": "Select Xcode", "run": "sudo xcode-select -s /Applications/Xcode.app"},
+        _xcode27_selection("macosx iphonesimulator"),
         {
             "name": "Build SampleHost for iOS Simulator",
             "working-directory": "SampleHost",
@@ -59,6 +70,7 @@ PRODUCT_STEPS = {
         },
     ],
     "boundary-checks": [
+        _xcode27_selection(),
         {"name": "Qinao import boundaries", "run": "bash scripts/check_qinao_import_boundaries.sh"},
         {"name": "Sovereign redaction", "run": "bash scripts/check_sovereign_redaction.sh"},
         {"name": "SDK import boundaries", "run": "bash scripts/check_sdk_import_boundaries.sh"},
@@ -67,8 +79,10 @@ PRODUCT_STEPS = {
         {"name": "God-file size guard (M762 chapter 203)", "run": "bash scripts/check_god_files.sh"},
         {
             "name": "CI contract and iOS floor helper tests",
-            "run": "python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger "
-                   "BehavioralAISubstrate.scripts.test_check_ios27_floor",
+            "run": "set -e\ncommand -v rg\n"
+                   "python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger "
+                   "BehavioralAISubstrate.scripts.test_check_ios27_floor "
+                   "scripts.test_boundary_tool_errors\n",
         },
     ],
     "python-fuzz": [
@@ -465,7 +479,7 @@ def validate_ordinary_workflow(text: str) -> list[str]:
         display_name, timeout = JOB_NAMES_AND_TIMEOUTS[name]
         context = {key: value for key, value in job.items() if key != "steps"}
         _require(errors, _strict_yaml_equal(context, {
-            "name": display_name, "runs-on": "macos-latest",
+            "name": display_name, "runs-on": "xcode-27" if name in APPLE_JOBS else "macos-latest",
             "timeout-minutes": timeout, "permissions": {"contents": "read"},
         }), f"ordinary job {name} exact execution context")
         steps = job.get("steps")
@@ -506,6 +520,177 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
 
     def test_ordinary_workflow_contract(self) -> None:
         self.assertNoContractErrors(validate_ordinary_workflow(_read(ORDINARY_WORKFLOW)))
+
+    def test_apple_jobs_select_standard_xcode27_before_product_steps(self) -> None:
+        document = _parse_yaml(_read(ORDINARY_WORKFLOW))
+        for name in ("bas-tests", "qinao-tests", "samplehost-tests", "boundary-checks"):
+            with self.subTest(job=name):
+                job = document["jobs"][name]
+                self.assertEqual(job["runs-on"], "xcode-27")
+                self.assertEqual(job["steps"][1]["name"], "Select Xcode")
+                sdks = "macosx iphonesimulator" if name == "samplehost-tests" else "macosx"
+                self.assertIn(f"bash scripts/check_ci_xcode27.sh {sdks}\n", job["steps"][1]["run"])
+        for name in ("rust-tests", "python-fuzz"):
+            self.assertEqual(document["jobs"][name]["runs-on"], "macos-latest")
+
+    def test_boundary_error_suite_is_an_explicit_ci_consumer(self) -> None:
+        document = _parse_yaml(_read(ORDINARY_WORKFLOW))
+        helper = _named_step(document["jobs"]["boundary-checks"],
+                             "CI contract and iOS floor helper tests")
+        self.assertIn("scripts.test_boundary_tool_errors", helper["run"].split())
+        self.assertIn("command -v rg", helper["run"])
+
+    def test_apple_alignment_and_boundary_consumer_mutations_are_rejected(self) -> None:
+        document = _parse_yaml(_read(ORDINARY_WORKFLOW))
+        self.assertNoContractErrors(validate_ordinary_workflow(json.dumps(document)))
+        for name in ("bas-tests", "qinao-tests", "samplehost-tests", "boundary-checks"):
+            for runner in ("macos-latest", "xcode-27-xlarge", "xcode-26"):
+                changed = json.loads(json.dumps(document))
+                changed["jobs"][name]["runs-on"] = runner
+                with self.subTest(job=name, runner=runner):
+                    self.assertTrue(validate_ordinary_workflow(json.dumps(changed)))
+            for old, new in (("scripts/check_ci_xcode27.sh", "scripts/other.sh"),
+                             (" macosx", " macosx26.6"),
+                             (" macosx", ""),
+                             ("bash scripts/check_ci_xcode27.sh", "true")):
+                changed = json.loads(json.dumps(document))
+                step = _named_step(changed["jobs"][name], "Select Xcode")
+                self.assertIn(old, step["run"])
+                step["run"] = step["run"].replace(old, new)
+                with self.subTest(job=name, mutation=old):
+                    self.assertTrue(validate_ordinary_workflow(json.dumps(changed)))
+        changed = json.loads(json.dumps(document))
+        step = _named_step(changed["jobs"]["samplehost-tests"], "Select Xcode")
+        self.assertIn(" iphonesimulator", step["run"])
+        step["run"] = step["run"].replace(" iphonesimulator", "")
+        self.assertTrue(validate_ordinary_workflow(json.dumps(changed)))
+        for old, new in ((" scripts.test_boundary_tool_errors", ""),
+                         ("command -v rg", "command -v rg || true"),
+                         ("command -v rg\n", "")):
+            changed = json.loads(json.dumps(document))
+            step = _named_step(changed["jobs"]["boundary-checks"],
+                               "CI contract and iOS floor helper tests")
+            self.assertIn(old, step["run"])
+            step["run"] = step["run"].replace(old, new)
+            with self.subTest(mutation=old):
+                self.assertTrue(validate_ordinary_workflow(json.dumps(changed)))
+
+    def _run_selection_fixture(
+        self, body: str, overrides: dict[str, str] | None = None,
+    ) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+        with tempfile.TemporaryDirectory(prefix="ci-sdk-guard-") as directory:
+            root = Path(directory)
+            calls = root / "calls"
+            (root / "scripts").mkdir()
+            shutil.copy2(PROJECT_ROOT / "scripts/check_ci_xcode27.sh",
+                         root / "scripts/check_ci_xcode27.sh")
+            (root / "bash").symlink_to("/bin/bash")
+            commands = {
+                "sudo": '[[ "$*" == "xcode-select -s /Applications/Xcode.app" ]] || exit 64\n'
+                        'exit "${SELECT_RC:-0}"\n',
+                "xcodebuild": '[[ "$*" == "-version" ]] || exit 64\n'
+                              'printf "%s\\n" "$XCODE_VERSION"\n'
+                              'exit "${XCODE_RC:-0}"\n',
+                "xcrun": '[[ "$1" == "--sdk" && "$3" == "--show-sdk-version" ]] || exit 64\n'
+                         'case "$2" in\n'
+                         '  macosx) printf "%s\\n" "$MACOS_VERSION"; exit "${MACOS_RC:-0}" ;;\n'
+                         '  iphonesimulator) printf "%s\\n" "$SIM_VERSION"; exit "${SIM_RC:-0}" ;;\n'
+                         '  *) exit 64 ;;\n'
+                         'esac\n',
+            }
+            for name, command in commands.items():
+                path = root / name
+                path.write_text('#!/bin/bash\nset -u\n'
+                                'printf "%s %s\\n" "${0##*/}" "$*" >> "$CALLS"\n'
+                                + command, encoding="utf-8")
+                path.chmod(0o700)
+            env = {
+                "PATH": str(root), "CALLS": str(calls),
+                "XCODE_VERSION": "Xcode 27.0\nBuild version 18A123",
+                "MACOS_VERSION": "27.0", "SIM_VERSION": "27.1",
+            }
+            env.update(overrides or {})
+            result = subprocess.run(
+                ["/bin/bash", "-e", "-c", body + '\nprintf "product\\n" >> "$CALLS"\n'],
+                cwd=root, env=env, capture_output=True, text=True, timeout=10,
+            )
+            return result, calls.read_text().splitlines() if calls.exists() else []
+
+    def test_actual_apple_selection_steps_accept_matching_toolchains(self) -> None:
+        jobs = _parse_yaml(_read(ORDINARY_WORKFLOW))["jobs"]
+        for name in ("bas-tests", "qinao-tests", "samplehost-tests", "boundary-checks"):
+            with self.subTest(job=name):
+                body = _named_step(jobs[name], "Select Xcode").get("run", "")
+                result, calls = self._run_selection_fixture(body)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                expected = ["sudo xcode-select -s /Applications/Xcode.app", "xcodebuild -version",
+                            "xcrun --sdk macosx --show-sdk-version"]
+                if name == "samplehost-tests":
+                    expected.append("xcrun --sdk iphonesimulator --show-sdk-version")
+                self.assertEqual(calls, expected + ["product"])
+
+    def test_actual_apple_selection_steps_reject_failures_before_product(self) -> None:
+        jobs = _parse_yaml(_read(ORDINARY_WORKFLOW))["jobs"]
+        cases = (
+            {"SELECT_RC": "23"},
+            {"XCODE_RC": "24"},
+            {"XCODE_VERSION": "Xcode 26.6\nBuild version 17G10"},
+            {"XCODE_VERSION": "Xcode 270.0\nBuild version 18A123"},
+            {"XCODE_VERSION": "unknown"},
+            {"MACOS_RC": "25"},
+            {"MACOS_VERSION": ""},
+            {"MACOS_VERSION": "27.garbage"},
+            {"MACOS_VERSION": "26.6"},
+        )
+        for name in ("bas-tests", "qinao-tests", "samplehost-tests", "boundary-checks"):
+            body = _named_step(jobs[name], "Select Xcode").get("run", "")
+            for override in cases:
+                with self.subTest(job=name, failure=override):
+                    result, calls = self._run_selection_fixture(body, override)
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertNotIn("product", calls)
+                    self.assertNotIn("xcrun --sdk iphonesimulator --show-sdk-version", calls)
+            if name == "samplehost-tests":
+                for override in ({"SIM_RC": "26"}, {"SIM_VERSION": ""},
+                                 {"SIM_VERSION": "26.6"}, {"SIM_VERSION": "27.garbage"}):
+                    with self.subTest(job=name, failure=override):
+                        result, calls = self._run_selection_fixture(body, override)
+                        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                        self.assertNotIn("product", calls)
+                        self.assertIn("xcrun --sdk iphonesimulator --show-sdk-version", calls)
+
+    def test_actual_helper_step_requires_rg_before_running_python(self) -> None:
+        jobs = _parse_yaml(_read(ORDINARY_WORKFLOW))["jobs"]
+        body = _named_step(jobs["boundary-checks"], "CI contract and iOS floor helper tests")["run"]
+        for present in (False, True):
+            with self.subTest(rg_available=present), tempfile.TemporaryDirectory(prefix="ci-helper-") as directory:
+                root = Path(directory)
+                calls = root / "calls"
+                python = root / "python3"
+                python.write_text('#!/bin/bash\nprintf "%s\\n" "$*" > "$CALLS"\n', encoding="utf-8")
+                python.chmod(0o700)
+                if present:
+                    rg = root / "rg"
+                    rg.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+                    rg.chmod(0o700)
+                result = subprocess.run(["/bin/bash", "-e", "-c", body], cwd=root,
+                                        env={"PATH": str(root), "CALLS": str(calls)},
+                                        text=True, capture_output=True, timeout=10)
+                if present:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(calls.read_text().split(), ["-B", "-m", "unittest", "-v",
+                        "scripts.test_test_workflow_owner_ledger",
+                        "BehavioralAISubstrate.scripts.test_check_ios27_floor",
+                        "scripts.test_boundary_tool_errors"])
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(calls.exists())
+
+    def test_xcode_guard_requires_nonempty_sdk_arguments(self) -> None:
+        result, calls = self._run_selection_fixture("bash scripts/check_ci_xcode27.sh")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("At least one SDK name is required", result.stderr)
+        self.assertEqual(calls, [])
 
     def test_each_product_command_cannot_be_removed_skipped_or_masked(self) -> None:
         document = _parse_yaml(_read(ORDINARY_WORKFLOW))
@@ -969,7 +1154,7 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
             document = _parse_yaml(_read(path))
             for job_name, step in _run_steps(document):
                 bodies.append((path.name, job_name, str(step.get("run"))))
-        self.assertEqual(len(bodies), 15)
+        self.assertEqual(len(bodies), 17)
         for workflow, job, body in bodies:
             with self.subTest(workflow=workflow, job=job):
                 result = subprocess.run(

@@ -19,7 +19,7 @@ permissions: {}
 jobs:
   bas-tests:
     name: BehavioralAISubstrate XCTest
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 30
     permissions:
       contents: read
@@ -32,13 +32,16 @@ jobs:
           lfs: false
           set-safe-directory: false
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: |
+          set -e
+          sudo xcode-select -s /Applications/Xcode.app
+          bash scripts/check_ci_xcode27.sh macosx
       - name: BAS test
         run: swift test --package-path BehavioralAISubstrate
 
   qinao-tests:
     name: QinaoRuntimeSDK XCTest
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 30
     permissions:
       contents: read
@@ -50,13 +53,18 @@ jobs:
           submodules: false
           lfs: false
           set-safe-directory: false
+      - name: Select Xcode
+        run: |
+          set -e
+          sudo xcode-select -s /Applications/Xcode.app
+          bash scripts/check_ci_xcode27.sh macosx
       - name: Qinao test
         working-directory: QinaoRuntimeSDK
         run: swift test
 
   samplehost-tests:
     name: SampleHost iOS XCTest
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 45
     permissions:
       contents: read
@@ -76,7 +84,10 @@ jobs:
           lfs: false
           set-safe-directory: false
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: |
+          set -e
+          sudo xcode-select -s /Applications/Xcode.app
+          bash scripts/check_ci_xcode27.sh macosx iphonesimulator
       - name: Build SampleHost for iOS Simulator
         working-directory: SampleHost
         run: |
@@ -94,7 +105,7 @@ jobs:
 
   boundary-checks:
     name: 4 boundary scripts + schema parity
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 10
     permissions:
       contents: read
@@ -106,6 +117,11 @@ jobs:
           submodules: false
           lfs: false
           set-safe-directory: false
+      - name: Select Xcode
+        run: |
+          set -e
+          sudo xcode-select -s /Applications/Xcode.app
+          bash scripts/check_ci_xcode27.sh macosx
       - name: Qinao import boundaries
         run: bash scripts/check_qinao_import_boundaries.sh
       - name: Sovereign redaction
@@ -119,7 +135,10 @@ jobs:
       - name: God-file size guard (M762 chapter 203)
         run: bash scripts/check_god_files.sh
       - name: CI contract and iOS floor helper tests
-        run: python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger BehavioralAISubstrate.scripts.test_check_ios27_floor
+        run: |
+          set -e
+          command -v rg
+          python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger BehavioralAISubstrate.scripts.test_check_ios27_floor scripts.test_boundary_tool_errors
 
   python-fuzz:
     name: Python pytest fuzz tests
