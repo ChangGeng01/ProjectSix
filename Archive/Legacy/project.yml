@@ -1,0 +1,199 @@
+name: Before
+options:
+  deploymentTarget:
+    iOS: "18.0"
+    watchOS: "11.0"
+  bundleIdPrefix: com.changgeng
+packages:
+  BehavioralAISubstrate:
+    path: BehavioralAISubstrate
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""
+    GENERATE_INFOPLIST_FILE: YES
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    SUPPORTS_MACCATALYST: NO
+    TARGETED_DEVICE_FAMILY: "1"
+configs:
+  Debug: debug
+  Release: release
+targets:
+  Before:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Before/App
+      - path: Before/Shared
+      - path: Before/Resources
+    entitlements:
+      path: Before/App/Before.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.changgeng.before
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.before
+        PRODUCT_NAME: Before
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        INFOPLIST_KEY_CFBundleDisplayName: Before
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        INFOPLIST_KEY_NSWidgetWantsLocation: NO
+    dependencies:
+      - target: BeforeWidgetExtension
+        embed: true
+      - package: BehavioralAISubstrate
+        product: BASHostKit
+
+  BeforeWidgetExtension:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: BeforeWidgetExtension
+      - path: Before/Shared
+      - path: BeforeWidgetExtension/Resources
+    entitlements:
+      path: BeforeWidgetExtension/BeforeWidgetExtension.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.changgeng.before
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.before.widget
+        PRODUCT_NAME: BeforeWidgetExtension
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: BeforeWidgetExtension/Info.plist
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+    dependencies:
+      - package: BehavioralAISubstrate
+        product: BASHostKit
+
+  BeforeWatch:
+    type: application
+    platform: watchOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: BeforeWatch
+      - path: Before/Shared
+    entitlements:
+      path: BeforeWatch/BeforeWatch.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.changgeng.before
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.before.watch
+        PRODUCT_NAME: BeforeWatch
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        INFOPLIST_KEY_CFBundleDisplayName: Before Watch
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.changgeng.before
+        INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp: NO
+        TARGETED_DEVICE_FAMILY: "4"
+    dependencies:
+      - package: BehavioralAISubstrate
+        product: BASHostKit
+
+  SampleHost:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: SampleHost
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.samplehost
+        PRODUCT_NAME: SampleHost
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        INFOPLIST_KEY_CFBundleDisplayName: SampleHost
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    dependencies:
+      - package: BehavioralAISubstrate
+        product: BASHostKit
+
+  SampleHostTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: SampleHostTests
+    dependencies:
+      - target: SampleHost
+      - package: BehavioralAISubstrate
+        product: BASHostKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.samplehost.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SampleHost.app/SampleHost"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  BeforeTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: BeforeTests
+    dependencies:
+      - target: Before
+      - package: BehavioralAISubstrate
+        product: BASHostKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.before.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Before.app/Before"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  BeforeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: BeforeUITests
+    dependencies:
+      - target: Before
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.before.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Before
+schemes:
+  Before:
+    build:
+      targets:
+        Before: all
+        BeforeWidgetExtension: all
+        BeforeTests: [test]
+    test:
+      targets:
+        - name: BeforeTests
+  BeforeUISmoke:
+    build:
+      targets:
+        Before: all
+        BeforeWidgetExtension: all
+        BeforeUITests: [test]
+    test:
+      targets:
+        - name: BeforeUITests
+  BeforeWatch:
+    build:
+      targets:
+        BeforeWatch: all
+  SampleHost:
+    build:
+      targets:
+        SampleHost: all
+        SampleHostTests: [test]
+    test:
+      targets:
+        - name: SampleHostTests

@@ -1,0 +1,222 @@
+diff --git a/BehavioralAISubstrate/Vendor/EventSource/Package.swift b/BehavioralAISubstrate/Vendor/EventSource/Package.swift
+index 7bb0b9965..1f151662f 100644
+--- a/BehavioralAISubstrate/Vendor/EventSource/Package.swift
++++ b/BehavioralAISubstrate/Vendor/EventSource/Package.swift
+@@ -54,3 +54,20 @@ let package = Package(
+         ),
+     ]
+ )
++
++
++// BAS vendor patch (see Docs/VENDOR_REFRESH_RECIPE.md): vendored third-party code — suppress its compiler
++// warnings so FIRST-PARTY diagnostics stay visible in Xcode/CI (this package's warnings are upstream's to fix;
++// we never act on them). `unsafeFlags` is PERMITTED because the M224 vendor freeze consumes every package as a
++// LOCAL PATH dependency (SwiftPM forbids unsafeFlags only for versioned dependencies).
++for target in package.targets where target.type == .regular || target.type == .macro {
++    var sw = target.swiftSettings ?? []
++    sw.append(.unsafeFlags(["-suppress-warnings"]))
++    target.swiftSettings = sw
++    var cs = target.cSettings ?? []
++    cs.append(.unsafeFlags(["-w"]))
++    target.cSettings = cs
++    var cx = target.cxxSettings ?? []
++    cx.append(.unsafeFlags(["-w"]))
++    target.cxxSettings = cx
++}
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift-lm/Package.swift b/BehavioralAISubstrate/Vendor/mlx-swift-lm/Package.swift
+index 9a6997287..73eb761a0 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift-lm/Package.swift
++++ b/BehavioralAISubstrate/Vendor/mlx-swift-lm/Package.swift
+@@ -156,3 +156,20 @@ if Context.environment["MLX_SWIFT_BUILD_DOC"] == "1"
+         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.3.0")
+     )
+ }
++
++
++// BAS vendor patch (see Docs/VENDOR_REFRESH_RECIPE.md): vendored third-party code — suppress its compiler
++// warnings so FIRST-PARTY diagnostics stay visible in Xcode/CI (this package's warnings are upstream's to fix;
++// we never act on them). `unsafeFlags` is PERMITTED because the M224 vendor freeze consumes every package as a
++// LOCAL PATH dependency (SwiftPM forbids unsafeFlags only for versioned dependencies).
++for target in package.targets where target.type == .regular || target.type == .macro {
++    var sw = target.swiftSettings ?? []
++    sw.append(.unsafeFlags(["-suppress-warnings"]))
++    target.swiftSettings = sw
++    var cs = target.cSettings ?? []
++    cs.append(.unsafeFlags(["-w"]))
++    target.cSettings = cs
++    var cx = target.cxxSettings ?? []
++    cx.append(.unsafeFlags(["-w"]))
++    target.cxxSettings = cx
++}
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift/Package.swift b/BehavioralAISubstrate/Vendor/mlx-swift/Package.swift
+index ef366ec18..3accf6f14 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift/Package.swift
++++ b/BehavioralAISubstrate/Vendor/mlx-swift/Package.swift
+@@ -203,6 +203,11 @@ let cmlx = Target.target(
+     cSettings: [
+         .headerSearchPath("mlx"),
+         .headerSearchPath("mlx-c"),
++        // BAS vendor patch: silence the ~8k -Wshorten-64-to-32 integer-precision warnings inherent to the
++        // MLX numerics C++ (upstream compiles with them; Xcode's default surfaces them). unsafeFlags is
++        // PERMITTED here because this package is consumed as a LOCAL PATH dependency (M224 vendor freeze) —
++        // SwiftPM only forbids unsafeFlags for versioned dependencies. See Docs/VENDOR_REFRESH_RECIPE.md.
++        .unsafeFlags(["-Wno-shorten-64-to-32"]),
+     ],
+     cxxSettings: cxxSettings + [
+         .headerSearchPath("mlx"),
+@@ -210,6 +215,8 @@ let cmlx = Target.target(
+         .headerSearchPath("json/single_include/nlohmann"),
+         .headerSearchPath("fmt/include"),
+         .define("MLX_VERSION", to: "\"0.31.1\""),
++        // BAS vendor patch: see cSettings note above.
++        .unsafeFlags(["-Wno-shorten-64-to-32"]),
+     ],
+     linkerSettings: linkerSettings
+ )
+@@ -345,3 +352,20 @@ if Context.environment["MLX_SWIFT_BUILD_DOC"] == "1"
+         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.3.0")
+     )
+ }
++
++
++// BAS vendor patch (see Docs/VENDOR_REFRESH_RECIPE.md): vendored third-party code — suppress its compiler
++// warnings so FIRST-PARTY diagnostics stay visible in Xcode/CI (this package's warnings are upstream's to fix;
++// we never act on them). `unsafeFlags` is PERMITTED because the M224 vendor freeze consumes every package as a
++// LOCAL PATH dependency (SwiftPM forbids unsafeFlags only for versioned dependencies).
++for target in package.targets where target.type == .regular || target.type == .macro {
++    var sw = target.swiftSettings ?? []
++    sw.append(.unsafeFlags(["-suppress-warnings"]))
++    target.swiftSettings = sw
++    var cs = target.cSettings ?? []
++    cs.append(.unsafeFlags(["-w"]))
++    target.cSettings = cs
++    var cx = target.cxxSettings ?? []
++    cx.append(.unsafeFlags(["-w"]))
++    target.cxxSettings = cx
++}
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/steel_attention.h b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/steel_attention.h
+index df891fa3f..e683212dd 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/steel_attention.h
++++ b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/attn/kernels/steel_attention.h
+@@ -1,3 +1,8 @@
++// BAS vendor patch: the Metal frontend compiles this header in a pre-C++17 mode and flags `if constexpr`
++// as a C++17 extension (4 warnings). The construct is valid for the Metal compiler in use; suppress the
++// extension warning so vendored noise stays out of first-party diagnostics. See Docs/VENDOR_REFRESH_RECIPE.md.
++#pragma clang diagnostic ignored "-Wc++17-extensions"
++
+ // Copyright © 2024-25 Apple Inc.
+ 
+ #include "../../../steel/attn/attn.h"
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/utils/integral_constant.h b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/utils/integral_constant.h
+index 40bcff8c0..140b0dc8b 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/utils/integral_constant.h
++++ b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx-generated/metal/steel/utils/integral_constant.h
+@@ -1,3 +1,8 @@
++// BAS vendor patch: the Metal frontend compiles this header in a pre-C++17 mode and flags `if constexpr`
++// as a C++17 extension (4 warnings). The construct is valid for the Metal compiler in use; suppress the
++// extension warning so vendored noise stays out of first-party diagnostics. See Docs/VENDOR_REFRESH_RECIPE.md.
++#pragma clang diagnostic ignored "-Wc++17-extensions"
++
+ // Copyright © 2024 Apple Inc.
+ 
+ #pragma once
+diff --git a/BehavioralAISubstrate/Vendor/swift-collections/Package.swift b/BehavioralAISubstrate/Vendor/swift-collections/Package.swift
+index cb4258027..725da35c6 100644
+--- a/BehavioralAISubstrate/Vendor/swift-collections/Package.swift
++++ b/BehavioralAISubstrate/Vendor/swift-collections/Package.swift
+@@ -378,3 +378,20 @@ let package = Package(
+   products: _products,
+   traits: _traits,
+   targets: _targets)
++
++
++// BAS vendor patch (see Docs/VENDOR_REFRESH_RECIPE.md): vendored third-party code — suppress its compiler
++// warnings so FIRST-PARTY diagnostics stay visible in Xcode/CI (this package's warnings are upstream's to fix;
++// we never act on them). `unsafeFlags` is PERMITTED because the M224 vendor freeze consumes every package as a
++// LOCAL PATH dependency (SwiftPM forbids unsafeFlags only for versioned dependencies).
++for target in package.targets where target.type == .regular || target.type == .macro {
++    var sw = target.swiftSettings ?? []
++    sw.append(.unsafeFlags(["-suppress-warnings"]))
++    target.swiftSettings = sw
++    var cs = target.cSettings ?? []
++    cs.append(.unsafeFlags(["-w"]))
++    target.cSettings = cs
++    var cx = target.cxxSettings ?? []
++    cx.append(.unsafeFlags(["-w"]))
++    target.cxxSettings = cx
++}
+diff --git a/BehavioralAISubstrate/Vendor/swift-nio/Package.swift b/BehavioralAISubstrate/Vendor/swift-nio/Package.swift
+index b23d711c4..8ce56f7f4 100644
+--- a/BehavioralAISubstrate/Vendor/swift-nio/Package.swift
++++ b/BehavioralAISubstrate/Vendor/swift-nio/Package.swift
+@@ -654,3 +654,20 @@ for target in package.targets {
+     }
+ }
+ // --- END: STANDARD CROSS-REPO SETTINGS DO NOT EDIT --- //
++
++
++// BAS vendor patch (see Docs/VENDOR_REFRESH_RECIPE.md): vendored third-party code — suppress its compiler
++// warnings so FIRST-PARTY diagnostics stay visible in Xcode/CI (this package's warnings are upstream's to fix;
++// we never act on them). `unsafeFlags` is PERMITTED because the M224 vendor freeze consumes every package as a
++// LOCAL PATH dependency (SwiftPM forbids unsafeFlags only for versioned dependencies).
++for target in package.targets where target.type == .regular || target.type == .macro {
++    var sw = target.swiftSettings ?? []
++    sw.append(.unsafeFlags(["-suppress-warnings"]))
++    target.swiftSettings = sw
++    var cs = target.cSettings ?? []
++    cs.append(.unsafeFlags(["-w"]))
++    target.cSettings = cs
++    var cx = target.cxxSettings ?? []
++    cx.append(.unsafeFlags(["-w"]))
++    target.cxxSettings = cx
++}
+diff --git a/BehavioralAISubstrate/Vendor/swift-syntax/Package.swift b/BehavioralAISubstrate/Vendor/swift-syntax/Package.swift
+index 59e62e1f5..204a985b7 100644
+--- a/BehavioralAISubstrate/Vendor/swift-syntax/Package.swift
++++ b/BehavioralAISubstrate/Vendor/swift-syntax/Package.swift
+@@ -405,3 +405,20 @@ var swiftParserSwiftSettings: [SwiftSetting] {
+     return []
+   }
+ }
++
++
++// BAS vendor patch (see Docs/VENDOR_REFRESH_RECIPE.md): vendored third-party code — suppress its compiler
++// warnings so FIRST-PARTY diagnostics stay visible in Xcode/CI (this package's warnings are upstream's to fix;
++// we never act on them). `unsafeFlags` is PERMITTED because the M224 vendor freeze consumes every package as a
++// LOCAL PATH dependency (SwiftPM forbids unsafeFlags only for versioned dependencies).
++for target in package.targets where target.type == .regular || target.type == .macro {
++    var sw = target.swiftSettings ?? []
++    sw.append(.unsafeFlags(["-suppress-warnings"]))
++    target.swiftSettings = sw
++    var cs = target.cSettings ?? []
++    cs.append(.unsafeFlags(["-w"]))
++    target.cSettings = cs
++    var cx = target.cxxSettings ?? []
++    cx.append(.unsafeFlags(["-w"]))
++    target.cxxSettings = cx
++}
+diff --git a/BehavioralAISubstrate/Vendor/swift-transformers/Package.swift b/BehavioralAISubstrate/Vendor/swift-transformers/Package.swift
+index a246d7f92..6cbcd7e98 100644
+--- a/BehavioralAISubstrate/Vendor/swift-transformers/Package.swift
++++ b/BehavioralAISubstrate/Vendor/swift-transformers/Package.swift
+@@ -48,3 +48,20 @@ let package = Package(
+         .testTarget(name: "TokenizersTests", dependencies: ["Tokenizers", "Models", "Hub"], resources: [.process("Resources")]),
+     ]
+ )
++
++
++// BAS vendor patch (see Docs/VENDOR_REFRESH_RECIPE.md): vendored third-party code — suppress its compiler
++// warnings so FIRST-PARTY diagnostics stay visible in Xcode/CI (this package's warnings are upstream's to fix;
++// we never act on them). `unsafeFlags` is PERMITTED because the M224 vendor freeze consumes every package as a
++// LOCAL PATH dependency (SwiftPM forbids unsafeFlags only for versioned dependencies).
++for target in package.targets where target.type == .regular || target.type == .macro {
++    var sw = target.swiftSettings ?? []
++    sw.append(.unsafeFlags(["-suppress-warnings"]))
++    target.swiftSettings = sw
++    var cs = target.cSettings ?? []
++    cs.append(.unsafeFlags(["-w"]))
++    target.cSettings = cs
++    var cx = target.cxxSettings ?? []
++    cx.append(.unsafeFlags(["-w"]))
++    target.cxxSettings = cx
++}

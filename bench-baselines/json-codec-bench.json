@@ -1,0 +1,17 @@
+{
+  "benchName" : "json-codec-bench",
+  "schemaVersion" : "bas-bench-baseline.v2",
+  "stats" : {
+    "max" : 4.159542,
+    "mean" : 0.014332992219845112,
+    "min" : 0.010833,
+    "outlierCount" : 116,
+    "p50" : 0.012917,
+    "p95" : 0.017792,
+    "p99" : 0.038167,
+    "p999" : 0.090791,
+    "sampleCount" : 49999,
+    "standardDeviation" : 0.019507973019912302
+  },
+  "storedAt" : "2026-05-03T19:47:31Z"
+}

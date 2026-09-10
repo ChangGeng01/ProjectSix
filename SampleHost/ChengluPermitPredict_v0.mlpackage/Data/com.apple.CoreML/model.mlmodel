@@ -1,0 +1,302 @@
+≤
+†
+featuresá43-dim one-hot (same as ChengluPreflight v0.4): 8 tone + 10 domain + 6 stake + 7 timeframe + 4 confidant + 3 askshape + 5 mutationSeed.
+*
++†ÄRá
+block_probabilityÂProbability substrate will route this prompt to BASActionPermitMode.block. Threshold 0.5 ‚Üí predicted block; runtime records prediction-vs-actual agreement but does NOT preempt substrate (red line: substrate always fires first).
+*
+†Ä¢Å
+ ChengluPermitPredict v0 ‚Äî MLP(64,32) binary classifier predicting whether substrate will issue .block (1) vs .delay/other (0) permit mode. Trained on chapter 176 5,088-row adversarial iPhone bench data. 2nd CoreML head in 14-layer meridian network ‚Äî runs alongside substrate, never replaces (red line: ÂÖàÈÜíÂÜçÁ≠î unchanged).0.0.1@Qinao Runtime SDK chapter ‰∏ÄÁôæ‰∏ÉÂçÅ‰πù ‚Äî 2nd meridian point"
+Apache-2.0¢:
+,com.github.apple.coremltools.conversion_date
+2026-05-05¢:
++com.github.apple.coremltools.source_dialectTorchScript¢+
+$com.github.apple.coremltools.version9.0¢4
+#com.github.apple.coremltools.sourcetorch==2.11.0≤„ı
+mainÏ
+
+features
+
+
++CoreML7¿
+CoreML7¥block_probabilityt
+const 
+features_to_fp16_dtype_0
+*
+val
+
+
+"
+fp16*.
+name&
+
+"
+features_to_fp16_dtype_0ú
+const(
+fc1_weight_to_fp16
+
+
+@
++*?
+val8
+
+
+@
++*"
+@model_path/weights/weight.bin@*(
+name 
+
+"
+fc1_weight_to_fp16ç
+const 
+fc1_bias_to_fp16
+
+
+
+@*:
+val3
+
+
+
+@*#
+@model_path/weights/weight.binÄ,*&
+name
+
+"
+fc1_bias_to_fp16Ü
+cast
+x
+
+
+features%
+dtype
+
+features_to_fp16_dtype_0&
+features_to_fp16
+
+
+
++*
+name
+
+
+"
+cast_1∑
+linear
+bias
+
+fc1_bias_to_fp16
+x
+
+features_to_fp16 
+weight
+
+fc1_weight_to_fp16(
+linear_0_cast_fp16
+
+
+
+@*(
+name 
+
+"
+linear_0_cast_fp16u
+relu
+x
+
+linear_0_cast_fp16'
+input_1_cast_fp16
+
+
+
+@*'
+name
+
+"
+input_1_cast_fp16ù
+const(
+fc2_weight_to_fp16
+
+
+ 
+@*@
+val9
+
+
+ 
+@*#
+@model_path/weights/weight.bin¿-*(
+name 
+
+"
+fc2_weight_to_fp16ç
+const 
+fc2_bias_to_fp16
+
+
+
+ *:
+val3
+
+
+
+ *#
+@model_path/weights/weight.binÄN*&
+name
+
+"
+fc2_bias_to_fp16∏
+linear
+bias
+
+fc2_bias_to_fp16
+x
+
+input_1_cast_fp16 
+weight
+
+fc2_weight_to_fp16(
+linear_1_cast_fp16
+
+
+
+ *(
+name 
+
+"
+linear_1_cast_fp16q
+relu
+x
+
+linear_1_cast_fp16%
+input_cast_fp16
+
+
+
+ *%
+name
+
+"
+input_cast_fp16ù
+const(
+out_weight_to_fp16
+
+
+
+ *@
+val9
+
+
+
+ *#
+@model_path/weights/weight.binÄO*(
+name 
+
+"
+out_weight_to_fp16r
+const 
+out_bias_to_fp16
+
+
+
+*
+val
+
+
+
+
+:
+õ *&
+name
+
+"
+out_bias_to_fp16∂
+linear
+bias
+
+out_bias_to_fp16
+x
+
+input_cast_fp16 
+weight
+
+out_weight_to_fp16(
+linear_2_cast_fp16
+
+
+
+*(
+name 
+
+"
+linear_2_cast_fp16u
+sigmoid
+x
+
+linear_2_cast_fp16&
+var_16_cast_fp16
+
+
+
+*%
+name
+
+"
+op_16_cast_fp16É
+const(
+ var_16_cast_fp16_to_fp32_dtype_0
+*
+val
+
+
+"
+fp32*5
+name-
+%
+#"!
+op_16_cast_fp16_to_fp32_dtype_0ó
+cast
+x
+
+var_16_cast_fp16-
+dtype$
+"
+ var_16_cast_fp16_to_fp32_dtype_0'
+block_probability
+
+
+*
+name
+
+
+"
+cast_0"Ê
+	buildInfoÿ"
+
+
+≈"¬
+6
+!
+
+"
+coremltools-version
+	
+"
+9.0
+A
+)
+!
+"
+coremltools-component-torch
+
+
+"
+2.11.0
+E
+(
+ 
+"
+coremltools-source-dialect
+
+"
+TorchScript

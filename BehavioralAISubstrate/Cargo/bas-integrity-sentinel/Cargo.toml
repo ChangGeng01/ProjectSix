@@ -1,0 +1,44 @@
+# Cargo manifest for bas-integrity-sentinel
+# chapter 七百六十 第一刀 / M2451 — DEEPER LAYER-MIGRATION ARC
+#
+# Typed Rust port of BASSovereignIntegritySentinel.swift (165 LOC)
+# — fingerprint verification + structured ScanReport derivation。
+#
+# Rationale per chapter 七百五十七 audit + user 严苛 table
+# (L11 「极值得 (DEEPER)」):
+#
+#   - bas-sovereign-c-abi already exposes a THIN integrity_scan
+#     C ABI that returns just the 4-bit hard_bits subset (BR-001 /
+#     BR-002 / BR-006 / BR-007)
+#   - This crate provides the FULL typed Rust API mirroring
+#     ScanRequest / ScanReport — richer output (failed artifact IDs,
+#     failed kinds set, self-mutation flag forwarded) for Rust
+#     consumers that need the full structure rather than just the
+#     bitfield
+#   - BTreeMap for trusted fingerprints ensures deterministic
+#     ordering across runs (no HashMap iteration nondeterminism)
+#
+# This crate is PURELY data + scanning logic。 No I/O,no shared
+# state,no allocation outside Vec growth during scan。 All inputs
+# are passed by reference (no string ownership transfer)。
+#
+# The crate is structured so bas-sovereign-c-abi could eventually
+# delegate its integrity_scan to bas-integrity-sentinel + collapse
+# the structured report to hard_bits — but that refactor is
+# deferred to a later arc to keep the chapter 七百五十八 wire
+# format byte-pinned。
+
+[package]
+name = "bas-integrity-sentinel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_integrity_sentinel"
+path = "src/lib.rs"
+
+[dependencies]
+# No external dependencies。 BTreeMap is in core/std。

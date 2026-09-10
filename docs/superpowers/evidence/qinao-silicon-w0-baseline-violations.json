@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "receipt_id": "qinao-silicon-w0-baseline-violations-v1",
+  "work_package": "W0",
+  "domain": "silicon_execution_spine",
+  "authoritative": false,
+  "authority_ledger": "docs/superpowers/specs/qinao-owner-ledger-v1.json",
+  "baseline_source_commit": "6703354b6",
+  "captured_on": "2026-07-17",
+  "commands": [
+    {
+      "id": "owner-ledger",
+      "command": "python3 scripts/check_qinao_owner_ledger.py --root $PWD --ledger docs/superpowers/specs/qinao-owner-ledger-v1.json",
+      "observed_exit": 0,
+      "observed_summary": "PASS; candidates=0"
+    },
+    {
+      "id": "bas-split-brain",
+      "command": "swift test --package-path BehavioralAISubstrate --filter 'BASTurnOperationOwnershipTests|BASProviderBoundaryTests'",
+      "observed_exit": 1,
+      "expected_architecture_red": true,
+      "executed_tests": 2,
+      "failing_tests": 2,
+      "harness_failures": 0
+    },
+    {
+      "id": "qinao-provider-boundary",
+      "command": "swift test --package-path QinaoRuntimeSDK --filter 'QinaoProviderBoundaryTests'",
+      "observed_exit": 1,
+      "expected_architecture_red": true,
+      "executed_tests": 3,
+      "failing_tests": 2,
+      "harness_failures": 0
+    }
+  ],
+  "passing_harness_tests": [
+    "QinaoProviderBoundaryTests.testBoundaryScannerHasTeethAndUnderstandsSwiftLexing"
+  ],
+  "failing_test_receipts": [
+    {
+      "test": "BASProviderBoundaryTests.testProductionDefaultComesFromManifestOnly",
+      "owner_ids": [
+        "model.manifest-invocation"
+      ],
+      "violations": [
+        "model.manifest-invocation.catalog-default",
+        "model.manifest-invocation.competing-recommendation"
+      ]
+    },
+    {
+      "test": "BASProviderBoundaryTests.testRegistryResolvesOnlyAnExplicitProviderID",
+      "owner_ids": [
+        "execution.plan-provider-router"
+      ],
+      "violations": [
+        "execution.plan-provider-router.lifo-registry",
+        "execution.plan-provider-router.missing-explicit-provider-id",
+        "execution.plan-provider-router.role-ranking"
+      ]
+    },
+    {
+      "test": "QinaoProviderBoundaryTests.testQinaoSDKContainsNoConcreteProviderRuntime",
+      "owner_ids": [
+        "provider.package-boundary"
+      ],
+      "violations": [
+        "Package.swift:declares-QinaoAppleFoundation",
+        "Package.swift:declares-QinaoMLX",
+        "Sources/QinaoAppleFoundation/QinaoAppleFoundationEndpoint.swift:AppleFoundationOrganAdapter(",
+        "Sources/QinaoAppleFoundation/QinaoAppleFoundationEndpoint.swift:import BASAppleAdapters",
+        "Sources/QinaoMLX/QinaoMLXEndpoint.swift:MLXOrganAdapter(",
+        "Sources/QinaoMLX/QinaoMLXEndpoint.swift:QinaoMLXModel",
+        "Sources/QinaoMLX/QinaoMLXEndpoint.swift:import BASAppleAdapters",
+        "Sources/QinaoMLX/QinaoMLXEndpoint.swift:import BASMLXAdapter",
+        "Sources/QinaoSample/SampleProvider.swift:QinaoMLXModel",
+        "Sources/QinaoSample/SampleSession.swift:QinaoMLXModel",
+        "Sources/QinaoSampleHost/MultiTurnDemo.swift:AppleFoundationOrganAdapter(",
+        "Sources/QinaoSampleHost/MultiTurnDemo.swift:import BASAppleAdapters",
+        "Sources/QinaoSampleHost/PersonaPanelReviewDemo.swift:AppleFoundationOrganAdapter(",
+        "Sources/QinaoSampleHost/PersonaPanelReviewDemo.swift:import BASAppleAdapters",
+        "Sources/QinaoSampleHost/SampleHostAppleFMExtensions.swift:AppleFoundationOrganAdapter(",
+        "Sources/QinaoSampleHost/SampleHostAppleFMExtensions.swift:import BASAppleAdapters",
+        "Sources/QinaoSampleHost/SampleHostDoctrineBenchExtensions.swift:import BASAppleAdapters",
+        "Sources/QinaoSampleHost/SampleHostLoRAExtensions.swift:AppleFoundationOrganAdapter(",
+        "Sources/QinaoSampleHost/SampleHostLoRAExtensions.swift:MLXOrganAdapter(",
+        "Sources/QinaoSampleHost/SampleHostLoRAExtensions.swift:import BASAppleAdapters",
+        "Sources/QinaoSampleHost/SampleHostLoRAExtensions.swift:import BASMLXAdapter",
+        "Sources/QinaoSampleHost/SampleHostLongSmokeBenchExtensions.swift:import BASAppleAdapters",
+        "Sources/QinaoSampleHost/SampleHostLongSmokeBenchExtensions.swift:import BASMLXAdapter",
+        "Sources/QinaoSampleHost/SampleHostMLXExtensions.swift:MLXOrganAdapter(",
+        "Sources/QinaoSampleHost/SampleHostMLXExtensions.swift:import BASMLXAdapter",
+        "Sources/QinaoSampleHost/SampleHostRuntimeBenchExtensions.swift:AppleFoundationOrganAdapter(",
+        "Sources/QinaoSampleHost/SampleHostRuntimeBenchExtensions.swift:MLXOrganAdapter(",
+        "Sources/QinaoSampleHost/SampleHostRuntimeBenchExtensions.swift:import BASAppleAdapters",
+        "Sources/QinaoSampleHost/SampleHostRuntimeBenchExtensions.swift:import BASMLXAdapter",
+        "Sources/QinaoSampleHost/main.swift:import BASAppleAdapters",
+        "Sources/QinaoSampleHost/main.swift:import BASMLXAdapter"
+      ]
+    },
+    {
+      "test": "QinaoProviderBoundaryTests.testStreamingAndEagerViewsShareOneOperationAndProviderInvocation",
+      "owner_ids": [
+        "execution.plan-provider-router",
+        "release.spool-publication",
+        "runtime.turn-operation"
+      ],
+      "violations": [
+        "execution.plan-provider-router.missing-exactly-once-call",
+        "release.spool-publication.stream-eager-final-mismatch",
+        "release.spool-publication.stream-then-regenerate",
+        "runtime.turn-operation.multiple-provider-invocations"
+      ]
+    }
+  ],
+  "deferred_behavioral_gates": [
+    {
+      "work_package": "W1",
+      "gate": "Replace the legacy session/prompt dual-view fixture with beginTurn plus shared typed operation stream/final identity assertions."
+    },
+    {
+      "work_package": "W4",
+      "gate": "Add ordered load/prefill/cache/decode actuation-receipt assertions only after the owning phase receipt and executePlanned contracts exist."
+    }
+  ],
+  "retirement_gate": "All four failing tests pass without rewriting this receipt, the OwnerLedger remains structurally green, and every listed owner key moves monotonically to its declared sole owner."
+}

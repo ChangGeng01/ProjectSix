@@ -1,0 +1,89 @@
+# ARCHIVED #if false BODY — chapter 八百二十八 / M2791-M2795
+#
+# 「不要 删除 只能 comment」 → 「不要 的 部分 都 archive」 evolution
+# (extending chapter 八百二十七's // commented-block pattern to
+#  #if false / #endif wrapped dead bodies)。
+#
+# ## Where this came from
+#
+#   Source: Tests/BehavioralAISubstrateTests/BASChapter751AtomReducerPortTests.swift
+#   Block:  #if false ... #endif at lines 243-298
+#   Size:   56 LOC
+#
+# ## Why it's archived
+#
+# This block was wrapped in #if false ... #endif per the earlier
+# 「依旧 不删除 只 comment」 discipline。 It's Swift code that
+# compiled BEFORE deactivation,but is now dead — SPM skips it
+# entirely because of the false conditional。 Per the chapter 八百
+# 二十七 pattern,we now archive dead bodies out of the live tree
+# rather than leaving them lurking in source files。
+#
+# ## How to restore (if ever needed)
+#
+#   1. Strip the leading 「# 」 from each line of this header
+#   2. Drop the trailing wrapper lines that are now just bookends
+#   3. Paste the Swift body back into the original source file at
+#      the extracted-lines range above
+#   4. Wrap with #if true (or remove the wrapping entirely)
+#
+# .txt extension ensures Swift Package Manager does NOT compile
+# this content。 Original body preserved verbatim below。
+#
+# ============================================================
+#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
+    func testPrintChapter751FirstHalfScorecard() {
+        print("")
+        print("=================================================================")
+        print(
+            "  CHAPTER 七百五十一 第一刀-第二刀 — MATURATION ARC kick-off")
+        print("=================================================================")
+        print("")
+        print("### 第一刀 / M2426 — L14 routedSeal flip default-on")
+        print("")
+        print(
+            "  useRoutedSeal: Bool = false  →  true")
+        print(
+            "  Rationale:1.24× Rust win (chapter 七百四十一)")
+        print(
+            "             + byte-equality pinned (chapter 七百十六)")
+        print(
+            "             + 9/9 byte-eq tests still pass")
+        print("")
+        print("### 第二刀 / M2427 — L8 atomReducer Rust port")
+        print("")
+        print(
+            "  Module:  Cargo/bas-memory-atom-store/src/reducer.rs")
+        print(
+            "  C ABI:   bas_atom_reducer_should_replace_admitted")
+        print(
+            "  Swift:   BASAutoRouteRanker.atomReducer*")
+        print(
+            "  Tests:   9 Rust unit + 6 Swift byte-eq")
+        print("")
+        print("### User directive 2026-05-20 alignment")
+        print("")
+        print(
+            "  1. L14/L11/L10 → real runtime:")
+        print(
+            "     L14 chain seal ✅ flipped default-on")
+        print(
+            "  2. 亏的不要硬上:")
+        print(
+            "     L14 won 1.24× → flipped。 L11/L10 TBD per perf")
+        print(
+            "  3. SQL 不只 schema:")
+        print(
+            "     Coming in 第四刀 (L11 SQL persistence go-live)")
+        print(
+            "  4. L8 主战场:")
+        print(
+            "     ✅ L8 atomReducer port shipped this chapter")
+        print("")
+
+        #if os(iOS) || os(macOS)
+        XCTAssertEqual(
+            BASAutoRouteRanker.atomReducerABIVersion(), 1)
+        #endif
+    }
+#endif  // chapter 七百五十七 第三刀

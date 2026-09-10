@@ -1,0 +1,25 @@
+# Cargo manifest for bas-presence-eye
+# chapter 七百六十六 / M2481-M2485 — DEEPER LAYER-MIGRATION ARC
+#
+# L6 Presence-Eye signal-fusion classifier。 Apple sensor pipe
+# (ProcessInfo / CoreMotion / CMAltimeter) stays Swift — only the
+# multi-channel salience × confidence → unified presence
+# confidence fusion math moves to Rust per 严苛 table「L6 部分值得」。
+#
+# Stability tier:TIER 2 (matches Swift contract,not a wire format
+# that ships to 3rd-party C consumers)。
+
+[package]
+name = "bas-presence-eye"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_presence_eye"
+path = "src/lib.rs"
+
+[dependencies]
+# Floating-point math only — std::f64 has all we need。

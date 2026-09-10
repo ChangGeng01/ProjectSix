@@ -1,0 +1,276 @@
+import Foundation
+import BASRuntimeCore
+
+public struct BASAppleAdaptiveRuntimeInput: Codable, Equatable, Sendable {
+    public var briefLanguageWeight: Double
+    public var lowCognitiveLoadWeight: Double
+    public var fatigueStrength: Double
+    public var emotionLoadStrength: Double
+    public var sessionBiases: [String]
+    public var interruptiveActionBias: Double
+    public var urgencyStrength: Double
+    public var boundaryNamingBias: Double
+    public var boundaryRiskStrength: Double
+    public var tradeoffClarityBias: Double
+    public var rebuiltSession: Bool
+    public var staleFieldCount: Int
+    public var screenedOutMemoryCount: Int
+    public var lowTrustLoad: Bool
+    public var retrievalInstability: Bool
+    public var retrievalTags: [String]
+    public var externallyRefreshedCandidateCount: Int
+    public var quarantinedObservationCount: Int
+    public var evidenceCaveatedCandidateCount: Int
+    public var externalRefreshGuardTriggered: Bool
+    public var observationOnlyQuarantine: Bool
+    public var evidenceCaveatLoad: Bool
+
+    public init(
+        briefLanguageWeight: Double,
+        lowCognitiveLoadWeight: Double,
+        fatigueStrength: Double,
+        emotionLoadStrength: Double,
+        sessionBiases: [String],
+        interruptiveActionBias: Double,
+        urgencyStrength: Double,
+        boundaryNamingBias: Double,
+        boundaryRiskStrength: Double,
+        tradeoffClarityBias: Double,
+        rebuiltSession: Bool,
+        staleFieldCount: Int,
+        screenedOutMemoryCount: Int,
+        lowTrustLoad: Bool,
+        retrievalInstability: Bool,
+        retrievalTags: [String],
+        externallyRefreshedCandidateCount: Int = 0,
+        quarantinedObservationCount: Int = 0,
+        evidenceCaveatedCandidateCount: Int = 0,
+        externalRefreshGuardTriggered: Bool = false,
+        observationOnlyQuarantine: Bool = false,
+        evidenceCaveatLoad: Bool = false
+    ) {
+        self.briefLanguageWeight = briefLanguageWeight
+        self.lowCognitiveLoadWeight = lowCognitiveLoadWeight
+        self.fatigueStrength = fatigueStrength
+        self.emotionLoadStrength = emotionLoadStrength
+        self.sessionBiases = sessionBiases
+        self.interruptiveActionBias = interruptiveActionBias
+        self.urgencyStrength = urgencyStrength
+        self.boundaryNamingBias = boundaryNamingBias
+        self.boundaryRiskStrength = boundaryRiskStrength
+        self.tradeoffClarityBias = tradeoffClarityBias
+        self.rebuiltSession = rebuiltSession
+        self.staleFieldCount = staleFieldCount
+        self.screenedOutMemoryCount = screenedOutMemoryCount
+        self.lowTrustLoad = lowTrustLoad
+        self.retrievalInstability = retrievalInstability
+        self.retrievalTags = retrievalTags
+        self.externallyRefreshedCandidateCount = externallyRefreshedCandidateCount
+        self.quarantinedObservationCount = quarantinedObservationCount
+        self.evidenceCaveatedCandidateCount = evidenceCaveatedCandidateCount
+        self.externalRefreshGuardTriggered = externalRefreshGuardTriggered
+        self.observationOnlyQuarantine = observationOnlyQuarantine
+        self.evidenceCaveatLoad = evidenceCaveatLoad
+    }
+}
+
+public struct BASAppleAdaptiveMatrixRequest: Codable, Equatable, Sendable {
+    public var executionTierID: String
+    public var preferredProviderID: String
+    public var allowFallbacks: Bool
+    public var isSimulator: Bool
+    public var physicalMemoryGB: Int
+    public var isLowPowerModeEnabled: Bool
+    public var preferredLanguages: [String]
+    /// x-arch MED-1 (2026-07-09): an OPTIONAL real thermal reading the host can
+    /// plumb from live ProcessInfo.thermalState. nil-default keeps Codable
+    /// byte-stable and every existing caller unchanged. When absent the producer
+    /// feeds honest "unknown" (⇒ nominal) instead of stuffing the POWER flag
+    /// ("low_power") into the thermal field — a category error that read a hot
+    /// device (not in low-power) as nominal.
+    public var thermalStateRaw: String?
+
+    public init(
+        executionTierID: String,
+        preferredProviderID: String,
+        allowFallbacks: Bool,
+        isSimulator: Bool,
+        physicalMemoryGB: Int,
+        isLowPowerModeEnabled: Bool,
+        preferredLanguages: [String],
+        thermalStateRaw: String? = nil
+    ) {
+        self.executionTierID = executionTierID
+        self.preferredProviderID = preferredProviderID
+        self.allowFallbacks = allowFallbacks
+        self.isSimulator = isSimulator
+        self.physicalMemoryGB = physicalMemoryGB
+        self.isLowPowerModeEnabled = isLowPowerModeEnabled
+        self.preferredLanguages = preferredLanguages
+        self.thermalStateRaw = thermalStateRaw
+    }
+}
+
+public struct BASAppleAdaptiveMatrixCompilation: Codable, Equatable, Sendable {
+    public var matrix: BASAdaptiveRuntimeMatrix
+    public var preferredProviderIDByKind: [String: String]
+
+    public init(
+        matrix: BASAdaptiveRuntimeMatrix,
+        preferredProviderIDByKind: [String: String]
+    ) {
+        self.matrix = matrix
+        self.preferredProviderIDByKind = preferredProviderIDByKind
+    }
+}
+
+public enum BASAppleAdaptiveRuntimeAdapter {
+    public static func compileMatrix(
+        request: BASAppleAdaptiveMatrixRequest
+    ) -> BASAppleAdaptiveMatrixCompilation {
+        let runtimeGear = runtimeGear(for: request.executionTierID)
+        let languageMode = BASLanguageMode.detect(preferredLanguages: request.preferredLanguages)
+        let deviceProfile = substrateDeviceProfile(for: request)
+        let matrix = BASAdaptiveRuntimeMatrixResolver.resolve(
+            request: BASAdaptiveRuntimeMatrixRequest(
+                runtimeGear: runtimeGear,
+                environmentClass: BASAdaptiveRuntimeMatrixResolver.environmentClass(for: deviceProfile),
+                deviceClass: BASAdaptiveRuntimeMatrixResolver.deviceClass(for: deviceProfile),
+                languageMode: languageMode,
+                allowFallbacks: request.allowFallbacks,
+                allowsModelInvocationByKind: Dictionary(
+                    uniqueKeysWithValues: BASAdaptiveTraceKind.allCases.map { kind in
+                        (
+                            kind,
+                            providerPreferenceID(
+                                for: kind.rawValue,
+                                executionTierID: request.executionTierID,
+                                preferredProviderID: request.preferredProviderID
+                            ) != BASReferenceProviderRuntime.templateProviderID
+                        )
+                    }
+                )
+            )
+        )
+
+        return BASAppleAdaptiveMatrixCompilation(
+            matrix: matrix,
+            preferredProviderIDByKind: Dictionary(
+                uniqueKeysWithValues: BASAdaptiveTraceKind.allCases.map { kind in
+                    (
+                        kind.rawValue,
+                        providerPreferenceID(
+                            for: kind.rawValue,
+                            executionTierID: request.executionTierID,
+                            preferredProviderID: request.preferredProviderID
+                        )
+                    )
+                }
+            )
+        )
+    }
+
+    public static func compileSignals(
+        from input: BASAppleAdaptiveRuntimeInput
+    ) -> BASAdaptiveRuntimeSignals {
+        BASAdaptiveRuntimeSignals(
+            briefBias: max(
+                input.briefLanguageWeight,
+                input.lowCognitiveLoadWeight
+            ),
+            fatigueSignal: max(
+                input.fatigueStrength,
+                input.emotionLoadStrength
+            ),
+            hasBriefSessionBias: hasBriefSessionBias(input.sessionBiases),
+            interruptiveBias: max(
+                input.interruptiveActionBias,
+                input.urgencyStrength,
+                input.fatigueStrength
+            ),
+            boundaryBias: max(
+                input.boundaryNamingBias,
+                input.boundaryRiskStrength
+            ),
+            tradeoffBias: input.tradeoffClarityBias,
+            rebuiltSession: input.rebuiltSession,
+            staleFieldCount: input.staleFieldCount,
+            screenedOutMemoryCount: input.screenedOutMemoryCount,
+            lowTrustLoad: input.lowTrustLoad,
+            retrievalInstability: input.retrievalInstability,
+            retrievalTags: input.retrievalTags,
+            externallyRefreshedCandidateCount: input.externallyRefreshedCandidateCount,
+            quarantinedObservationCount: input.quarantinedObservationCount,
+            evidenceCaveatedCandidateCount: input.evidenceCaveatedCandidateCount,
+            externalRefreshGuardTriggered: input.externalRefreshGuardTriggered,
+            observationOnlyQuarantine: input.observationOnlyQuarantine,
+            evidenceCaveatLoad: input.evidenceCaveatLoad
+        )
+    }
+
+    public static func adapt(
+        strategy: BASAdaptiveTaskStrategy,
+        with input: BASAppleAdaptiveRuntimeInput
+    ) -> BASAdaptiveTaskStrategy {
+        strategy.adapting(signals: compileSignals(from: input))
+    }
+
+    private static func hasBriefSessionBias(_ biases: [String]) -> Bool {
+        biases.contains { bias in
+            let normalized = bias.lowercased()
+            return normalized.contains("short") ||
+                normalized.contains("brief") ||
+                normalized.contains("concrete") ||
+                normalized.contains("avoid heavy analysis")
+        }
+    }
+
+    // internal (was private) so the x-arch MED-1 thermal-relabel teeth can
+    // observe the produced profile's thermalState via @testable import.
+    static func substrateDeviceProfile(
+        for request: BASAppleAdaptiveMatrixRequest
+    ) -> BASDeviceProfile {
+        BASDeviceProfile(
+            modelName: request.isSimulator ? "simulator" : "iphone-\(request.physicalMemoryGB)gb",
+            memoryMB: request.physicalMemoryGB * 1024,
+            batteryLevel: request.isLowPowerModeEnabled ? 0.18 : 1.0,
+            lowPowerMode: request.isLowPowerModeEnabled,
+            // x-arch MED-1: the real thermal reading (canonicalized downstream),
+            // or honest "unknown" (⇒ nominal) when absent — NOT the isLowPowerMode
+            // POWER flag, which is not a thermal signal (the old category error).
+            thermalState: request.thermalStateRaw ?? "unknown"
+        )
+    }
+
+    private static func runtimeGear(for executionTierID: String) -> BASRuntimeGear {
+        switch executionTierID {
+        case "testingOverride", "fullGemma":
+            .high
+        case "balancedGemma", "systemManaged":
+            .balanced
+        case "off", "simulator", "conservativeDeterministic":
+            .low
+        default:
+            .low
+        }
+    }
+
+    private static func providerPreferenceID(
+        for kindID: String,
+        executionTierID: String,
+        preferredProviderID: String
+    ) -> String {
+        switch executionTierID {
+        case "off", "simulator", "conservativeDeterministic":
+            BASReferenceProviderRuntime.templateProviderID
+        case "balancedGemma":
+            BASAdaptiveTraceKind(identifier: kindID) == .primary
+                ? BASReferenceProviderRuntime.templateProviderID
+                : preferredProviderID
+        case "testingOverride", "fullGemma", "systemManaged":
+            preferredProviderID
+        default:
+            preferredProviderID
+        }
+    }
+}

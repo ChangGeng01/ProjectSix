@@ -1,0 +1,85 @@
+# ARCHIVED #if false BODY — chapter 八百二十八 / M2791-M2795
+#
+# 「不要 删除 只能 comment」 → 「不要 的 部分 都 archive」 evolution
+# (extending chapter 八百二十七's // commented-block pattern to
+#  #if false / #endif wrapped dead bodies)。
+#
+# ## Where this came from
+#
+#   Source: Tests/BehavioralAISubstrateTests/BASChapter751RiskObservationsReplayTests.swift
+#   Block:  #if false ... #endif at lines 251-302
+#   Size:   52 LOC
+#
+# ## Why it's archived
+#
+# This block was wrapped in #if false ... #endif per the earlier
+# 「依旧 不删除 只 comment」 discipline。 It's Swift code that
+# compiled BEFORE deactivation,but is now dead — SPM skips it
+# entirely because of the false conditional。 Per the chapter 八百
+# 二十七 pattern,we now archive dead bodies out of the live tree
+# rather than leaving them lurking in source files。
+#
+# ## How to restore (if ever needed)
+#
+#   1. Strip the leading 「# 」 from each line of this header
+#   2. Drop the trailing wrapper lines that are now just bookends
+#   3. Paste the Swift body back into the original source file at
+#      the extracted-lines range above
+#   4. Wrap with #if true (or remove the wrapping entirely)
+#
+# .txt extension ensures Swift Package Manager does NOT compile
+# this content。 Original body preserved verbatim below。
+#
+# ============================================================
+#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
+    func testPrintChapter751ThirdKnifeScorecard() {
+        print("")
+        print("=================================================================")
+        print(
+            "  CHAPTER 七百五十一 第三刀 / M2428 — L11 SQL go-live")
+        print("=================================================================")
+        print("")
+        print("### User directive 2026-05-20")
+        print("")
+        print(
+            "  「SQL 不要只做 schema,继续接入真实持久化和 replay」")
+        print("")
+        print("### What lands")
+        print("")
+        print(
+            "  + Sources/BASPolicy/BASRiskObservationsSQLiteStorage.swift")
+        print(
+            "    - persistObservation(...)        write path")
+        print(
+            "    - loadObservations(sessionID:)   read path")
+        print(
+            "    - countObservations(band:since:) indexed COUNT")
+        print(
+            "    - schema applied on first open (idempotent)")
+        print("")
+        print("### Replay test coverage")
+        print("")
+        print(
+            "  1. Schema applies on first open ✅")
+        print(
+            "  2. Single observation round-trip ✅")
+        print(
+            "  3. 20-observation cold-restart replay ✅")
+        print(
+            "  4. ON CONFLICT idempotency ✅")
+        print(
+            "  5. Indexed COUNT by band + time-range ✅")
+        print(
+            "  6. Cross-session isolation ✅")
+        print("")
+        print("### Status")
+        print("")
+        print(
+            "  L11 SQL schema 七百三十八 → LIVE PERSISTENCE")
+        print(
+            "  Cold-restart replay verified deterministic")
+        print(
+            "  Chapter 七百三十八 第一刀 preamble queries are NOW REACHABLE")
+        print("")
+    }
+#endif  // chapter 七百五十七 第三刀

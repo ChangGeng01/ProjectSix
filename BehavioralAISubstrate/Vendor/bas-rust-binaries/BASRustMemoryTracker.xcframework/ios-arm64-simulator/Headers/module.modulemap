@@ -1,0 +1,36 @@
+// chapter 七百六 / M2189 第三刀 — module map enabling
+//                                  Swift `import BASRust
+//                                  MemoryTrackerBinary`
+//                                  to bring the C ABI
+//                                  surface into scope。
+//
+// SPM's `.binaryTarget(...).xcframework` only exposes
+// a Swift-importable module when the slice's Headers/
+// directory contains a `module.modulemap`。 This file
+// is copied into each XCFramework slice by
+// `scripts/build-rust-xcframework.sh` via the
+// `-headers` argument to `xcodebuild -create-xcframework`。
+//
+// Module name MUST match the Package.swift binary
+// target name (BASRustMemoryTrackerBinary)。
+
+module BASRustMemoryTrackerBinary {
+    header "bas_rust_memory_tracker.h"
+
+    // chapter 七百七十三 第二刀 — DEEPER LAYER-MIGRATION ARC
+    // headers added when activating the XCFramework rebuild
+    // (chapters 七百五十八-七百七十一 shipped 3 hand-curated
+    // public C headers for 3rd-party + watchOS consumers)。
+    // The crates whose ABIs don't have hand-curated public
+    // headers (lease-life,mirror-blade,presence-eye,
+    // host-constitution,world-prior) get Swift-side declarations
+    // via @_silgen_name on the BASRuntimeCore bridge,not C
+    // headers — their surface is internal-bridge-only,not
+    // 3rd-party-facing。
+    header "bas_sovereign_c_abi.h"
+    header "bas_red_team_bench.h"
+    header "bas_integrity_sentinel.h"
+
+    link "bas_memory_usage_tracker"
+    export *
+}

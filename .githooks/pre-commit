@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit — staged secret-scan guard
+# audit C1 recurrence prevention (2026-07-09)
+#
+# WHY THIS EXISTS
+#   The C1 incident = a large opaque corpus (140 MB recovery transcripts) was
+#   `git add`-ed wholesale and a real HuggingFace token (hf_…) rode along into a
+#   PUSHED commit. Rotating/deleting the token closed that leak; this hook stops
+#   the NEXT one — the root pattern is "track a big opaque dump → commit whatever
+#   secret is buried inside." It scans STAGED content before every commit and
+#   BLOCKS on a high-signal credential pattern. Prefers `gitleaks` if installed;
+#   otherwise a zero-dependency regex fallback that always works.
+#
+# ESCAPE HATCH (only when you have CONFIRMED a false positive):
+#   SKIP_SECRET_SCAN=1 git commit …     # skip just this scan
+#   git commit --no-verify …            # skip all hooks
+#
+# ENABLE ON A FRESH CLONE (the hook file is version-controlled; the pointer is
+# a LOCAL git setting, so run this once per clone):
+#   git config core.hooksPath .githooks
+#
+# LIMITATION: git-lfs-tracked files present as pointers here, so a secret inside
+# an LFS blob is not scanned (gitleaks shares this limit). The C1 leak was in a
+# regular text file, which IS scanned.
+
+set -uo pipefail
+
+if [ "${SKIP_SECRET_SCAN:-0}" = "1" ]; then
+  echo "[secret-scan] SKIPPED via SKIP_SECRET_SCAN=1" >&2
+  exit 0
+fi
+
+# Nothing staged → nothing to scan.
+git diff --cached --quiet && exit 0
+
+# Mask any matched value so the hook itself never re-prints a live secret.
+redact() {
+  sed -E 's/(hf_|sk-ant-|sk-|ghp_|gho_|github_pat_|glpat-|AKIA|AIza|xox[baprs]-|-----BEGIN)[A-Za-z0-9_/+ -]*/\1<REDACTED>/g'
+}
+
+# 1) gitleaks if present (maintained ruleset, redacted output).
+if command -v gitleaks >/dev/null 2>&1; then
+  if gitleaks protect --staged --redact --no-banner; then
+    exit 0
+  fi
+  {
+    echo ""
+    echo "[secret-scan] gitleaks flagged a potential secret in STAGED changes — commit BLOCKED."
+    echo "  TRUE secret  → unstage it, rotate/delete it upstream, never commit."
+    echo "  FALSE positive → allowlist it in .gitleaks.toml, or: git commit --no-verify"
+  } >&2
+  exit 1
+fi
+
+# 2) Zero-dependency fallback. FULL-LENGTH, high-signal credential regexes so
+#    masked stubs (e.g. the 9-char 'hf_kEwDog' left in the recovery files) do
+#    NOT trip it — only a real, full-length token does.
+PATTERNS='(hf_[A-Za-z0-9]{34}|sk-ant-[A-Za-z0-9_-]{24,}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{60,}|glpat-[A-Za-z0-9_-]{20}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)'
+
+found=0
+while IFS= read -r -d '' f; do
+  # scan the STAGED content of each staged (added/modified) file, whole-file so
+  # the "buried in a big dump" case is caught, not just the changed lines.
+  match="$(git show ":$f" 2>/dev/null | grep -Eano "$PATTERNS" | head -3 || true)"
+  if [ -n "$match" ]; then
+    if [ "$found" = 0 ]; then
+      echo "" >&2
+      echo "[secret-scan] credential-like pattern(s) in STAGED content — commit BLOCKED." >&2
+      echo "  (built-in fallback; \`brew install gitleaks\` for fuller coverage)" >&2
+      found=1
+    fi
+    echo "  ✗ $f" >&2
+    printf '%s\n' "$match" | redact | sed 's/^/      /' >&2
+  fi
+done < <(git diff --cached --name-only --diff-filter=d -z)
+
+if [ "$found" = 1 ]; then
+  echo "  TRUE secret → unstage it, rotate/delete it upstream, never commit." >&2
+  echo "  FALSE positive → git commit --no-verify" >&2
+  exit 1
+fi
+exit 0

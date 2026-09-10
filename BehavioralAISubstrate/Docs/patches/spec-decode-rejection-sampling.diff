@@ -1,0 +1,336 @@
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXLMCommon/Evaluate.swift b/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXLMCommon/Evaluate.swift
+index 218615f1a..0474f146d 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXLMCommon/Evaluate.swift
++++ b/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXLMCommon/Evaluate.swift
+@@ -766,6 +766,23 @@ public struct TokenIterator: TokenIteratorProtocol {
+ ///
+ /// Tokens are integers that can be passed through a `Tokenizer` or ``StreamingDetokenizer`` to produce Strings.
+ ///
++/// Acceptance strategy for ``SpeculativeTokenIterator``.
++///
++/// BAS vendor patch (spec-decode Phase 2 — archived as `Docs/patches/spec-decode-rejection-sampling.diff`,
++/// a mandatory re-vendor patch class; see `Docs/VENDOR_REFRESH_RECIPE.md`). The upstream default is
++/// `.argmaxEquality` (unchanged behaviour); `.rejectionSampling` adds the distribution-correct sampling lane.
++public enum SpeculativeAcceptanceStrategy: Sendable {
++    /// Accept a drafted token iff it equals the token the target would emit at that position. Correct ONLY for
++    /// greedy (argmax) decoding, where the accepted stream is token-identical to greedy target-only decoding.
++    /// This is the upstream behaviour and the default.
++    case argmaxEquality
++
++    /// Leviathan rejection sampling: accept a drafted token `x` with probability `min(1, p(x)/q(x))`; on
++    /// rejection emit a draw from the normalized residual `(p−q)₊`. Distribution-equivalent to sampling from the
++    /// target alone (correct for temperature > 0). Mirrors BAS's host-proven `BASSpeculativeRejectionSampler`.
++    case rejectionSampling
++}
++
+ /// Port of `speculative_generate_step()` from https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/generate.py
+ public struct SpeculativeTokenIterator: TokenIteratorProtocol {
+ 
+@@ -787,6 +804,21 @@ public struct SpeculativeTokenIterator: TokenIteratorProtocol {
+     let maxTokens: Int?
+     let numDraftTokens: Int
+ 
++    /// BAS vendor patch (spec-decode Phase 2): how a drafted token is accepted. `.argmaxEquality` (default) is the
++    /// upstream behaviour; `.rejectionSampling` is the distribution-correct sampling lane.
++    let acceptanceStrategy: SpeculativeAcceptanceStrategy
++
++    /// BAS vendor patch (audit fix): the sampling temperature, captured from `GenerateParameters` so the
++    /// `.rejectionSampling` branch can shape p/q EXACTLY as the sampler draws (`CategoricalSampler` samples
++    /// `categorical(logits * (1/temp))` ⇒ the true draw distribution is `softmax(logits/temp)`, NOT raw softmax).
++    let samplingTemperature: Float
++
++    /// BAS vendor patch: dedicated PRNG state for the rejection branch's accept/resample draws — same design as
++    /// the samplers' per-instance `RandomState()` (TIME-seeded). HONESTY: runs are NOT reproducible via the global
++    /// `MLXRandom.seed` — the sampler states and this state are all time-seeded; seeded reproducibility would
++    /// require plumbing explicit seeds through `GenerateParameters` (not currently exposed).
++    let rejectionRandomState = MLXRandom.RandomState()
++
+     // Buffer of accepted tokens from the current speculation round
+     private var pendingTokens = [Int]()
+     private var pendingIndex = 0
+@@ -811,12 +843,15 @@ public struct SpeculativeTokenIterator: TokenIteratorProtocol {
+         mainCache: [KVCache]? = nil,
+         draftCache: [KVCache]? = nil,
+         parameters: GenerateParameters,
+-        numDraftTokens: Int
++        numDraftTokens: Int,
++        acceptanceStrategy: SpeculativeAcceptanceStrategy = .argmaxEquality
+     ) throws {
+         self.y = input.text
+         self.draftY = input.text
+         self.mainModel = mainModel
+         self.draftModel = draftModel
++        self.acceptanceStrategy = acceptanceStrategy
++        self.samplingTemperature = parameters.temperature
+ 
+         self.mainCache = mainCache ?? mainModel.newCache(parameters: parameters)
+         self.draftCache = draftCache ?? draftModel.newCache(parameters: parameters)
+@@ -882,9 +917,12 @@ public struct SpeculativeTokenIterator: TokenIteratorProtocol {
+             return
+         }
+ 
+-        // Draft generation: autoregressive loop with draft model
++        // Draft generation: autoregressive loop with draft model. BAS patch: retain the processed draft logits
++        // per position so the `.rejectionSampling` strategy can recover q(x) — harmless to `.argmaxEquality`
++        // (just held references, no behaviour change).
+         var draftProcessor = processor  // Copy to discard later
+         var draftTokens = [MLXArray]()
++        var draftLogitsList = [MLXArray]()
+         for _ in 0 ..< numDraft {
+             let draftResult = draftModel(draftY[text: .newAxis], cache: draftCache, state: nil)
+             var draftLogits = draftResult.logits[0..., -1, 0...]
+@@ -893,6 +931,7 @@ public struct SpeculativeTokenIterator: TokenIteratorProtocol {
+             draftProcessor?.didSample(token: draftToken)
+             asyncEval(draftToken)
+             draftTokens.append(draftToken)
++            draftLogitsList.append(draftLogits)
+             draftY = .init(tokens: draftToken)
+         }
+ 
+@@ -904,66 +943,155 @@ public struct SpeculativeTokenIterator: TokenIteratorProtocol {
+         let mainLogits = mainResult.logits
+         mainState = mainResult.state
+ 
+-        let mainTokens: MLXArray
+-        if var verifyProcessor = processor {
+-            // Process each position sequentially so that the processor sees tokens sampled at earlier positions
+-            var sampled = [MLXArray]()
+-            for i in 0 ..< (numDraft + 1) {
+-                var logits = mainLogits[0..., verifyStart + i, 0...]
+-                logits = verifyProcessor.process(logits: logits)
+-                let token = sampler.sample(logits: logits)
+-                verifyProcessor.didSample(token: token)
+-                sampled.append(token)
++        switch acceptanceStrategy {
++        case .argmaxEquality:
++            // ===== Upstream behaviour, verbatim (token-identical to greedy target-only decoding). =====
++            let mainTokens: MLXArray
++            if var verifyProcessor = processor {
++                // Process each position sequentially so that the processor sees tokens sampled at earlier positions
++                var sampled = [MLXArray]()
++                for i in 0 ..< (numDraft + 1) {
++                    var logits = mainLogits[0..., verifyStart + i, 0...]
++                    logits = verifyProcessor.process(logits: logits)
++                    let token = sampler.sample(logits: logits)
++                    verifyProcessor.didSample(token: token)
++                    sampled.append(token)
++                }
++                mainTokens = concatenated(sampled)
++            } else {
++                // Batch-sample all verify tokens from main model in one operation
++                let verifyLogits = mainLogits[0..., verifyStart..., 0...].squeezed(axis: 0)
++                mainTokens = sampler.sample(logits: verifyLogits)
+             }
+-            mainTokens = concatenated(sampled)
+-        } else {
+-            // Batch-sample all verify tokens from main model in one operation
+-            let verifyLogits = mainLogits[0..., verifyStart..., 0...].squeezed(axis: 0)
+-            mainTokens = sampler.sample(logits: verifyLogits)
+-        }
+ 
+-        // Compare and accept proposed tokens
+-        eval(mainTokens, draftTokens)
+-        let mainTokensList = mainTokens.asArray(Int.self)
+-        let draftTokensList = concatenated(draftTokens).asArray(Int.self)
+-        var accepted = 0
+-        for i in 0 ..< numDraft {
+-            guard mainTokensList[i] == draftTokensList[i] else {
+-                break
++            // Compare and accept proposed tokens
++            eval(mainTokens, draftTokens)
++            let mainTokensList = mainTokens.asArray(Int.self)
++            let draftTokensList = concatenated(draftTokens).asArray(Int.self)
++            var accepted = 0
++            for i in 0 ..< numDraft {
++                guard mainTokensList[i] == draftTokensList[i] else {
++                    break
++                }
++
++                processor?.didSample(token: draftTokens[i])
++                pendingTokens.append(mainTokensList[i])
++                accepted += 1
+             }
+ 
+-            processor?.didSample(token: draftTokens[i])
+-            pendingTokens.append(mainTokensList[i])
+-            accepted += 1
+-        }
++            // Always emit the main model's token at position `accepted`
++            // (either the correction token or the bonus token if all drafts matched)
++            let finalToken = mainTokens[accepted ... accepted]
++            processor?.didSample(token: finalToken)
++            pendingTokens.append(mainTokensList[accepted])
++
++            // Rewind caches for rejected tokens
++            trimPromptCache(mainCache, numTokens: numDraft - accepted)
++            trimPromptCache(draftCache, numTokens: Swift.max(numDraft - accepted - 1, 0))
++
++            // Apply dynamic cache quantization after rewind
++            quantizeKVCache(&mainCache)
++            quantizeKVCache(&draftCache)
++
++            // Set y/draftY for the next round
++            y = .init(tokens: finalToken)
++            draftY = .init(tokens: finalToken)
++
++            // If all draft tokens were accepted, the draft model hasn't processed
++            // the last accepted draft token yet. Feed it through to keep caches in sync.
++            if accepted == numDraft {
++                draftY = .init(
++                    tokens: concatenated([
++                        draftTokens[numDraft - 1].reshaped([1]),
++                        finalToken,
++                    ])
++                )
++            }
+ 
+-        // Always emit the main model's token at position `accepted`
+-        // (either the correction token or the bonus token if all drafts matched)
+-        let finalToken = mainTokens[accepted ... accepted]
+-        processor?.didSample(token: finalToken)
+-        pendingTokens.append(mainTokensList[accepted])
+-
+-        // Rewind caches for rejected tokens
+-        trimPromptCache(mainCache, numTokens: numDraft - accepted)
+-        trimPromptCache(draftCache, numTokens: Swift.max(numDraft - accepted - 1, 0))
+-
+-        // Apply dynamic cache quantization after rewind
+-        quantizeKVCache(&mainCache)
+-        quantizeKVCache(&draftCache)
+-
+-        // Set y/draftY for the next round
+-        y = .init(tokens: finalToken)
+-        draftY = .init(tokens: finalToken)
+-
+-        // If all draft tokens were accepted, the draft model hasn't processed
+-        // the last accepted draft token yet. Feed it through to keep caches in sync.
+-        if accepted == numDraft {
+-            draftY = .init(
+-                tokens: concatenated([
+-                    draftTokens[numDraft - 1].reshaped([1]),
+-                    finalToken,
+-                ])
+-            )
++        case .rejectionSampling:
++            // ===== BAS patch: Leviathan rejection sampling — distribution-equivalent to sampling from the =====
++            // target alone. Mirrors BAS's host-proven `BASSpeculativeRejectionSampler`: accept draft token x with
++            // prob min(1, p(x)/q(x)); on rejection emit a draw from the normalized residual (p−q)₊ and stop; if
++            // every draft is accepted, emit a bonus token from the trailing main position.
++            //
++            // SUPPORTED ENVELOPE (audit fix): exactness requires p and q be the distributions ACTUALLY in play —
++            // both are shaped with (a) the sequential logit processor (exactly as target-only decoding would) and
++            // (b) the sampling temperature (CategoricalSampler draws ∝ softmax(logits/temp), so raw softmax was
++            // WRONG for temp≠1). Filtered samplers (topP/topK/minP) are NOT supported by this branch — the BAS
++            // caller routes only pure-temperature sampling here (it forces topP=1; see `_samplingParameters`).
++            // temp==0 never reaches this branch (greedy routes to `.argmaxEquality`); the <=0 guard is defensive.
++            //
++            // DEVICE-CERT-PENDING: algorithm host-proven; this MLX port is validated on-device (Phase 6).
++            let invTemp = samplingTemperature > 0 ? (1 / samplingTemperature) : 1
++            var accepted = 0
++            var finalToken: MLXArray? = nil
++            for i in 0 ..< numDraft {
++                // q: the distribution the draft token was DRAWN from — draft-processor-shaped logits (the draft
++                // loop processed them before sampling), temperature-scaled like the sampler's draw.
++                let qProbs = softmax(draftLogitsList[i] * invTemp, axis: -1)
++                // p: the distribution target-only sampling would draw — main logits through the SAME sequential
++                // processor (it sees every previously-emitted token via didSample below), temperature-scaled.
++                var pLogits = mainLogits[0..., verifyStart + i, 0...]
++                pLogits = processor?.process(logits: pLogits) ?? pLogits
++                let pProbs = softmax(pLogits * invTemp, axis: -1)
++                let token = draftTokens[i]
++                let qx = qProbs.take(token, axis: -1).item(Float.self)
++                let px = pProbs.take(token, axis: -1).item(Float.self)
++                let u = MLXRandom.uniform(
++                    Float(0) ..< Float(1), [1], key: rejectionRandomState
++                ).item(Float.self)
++                let ratio = qx > 0 ? Swift.min(Float(1), px / qx) : Float(1)
++                if u <= ratio {
++                    processor?.didSample(token: token)
++                    pendingTokens.append(token.item(Int.self))
++                    accepted += 1
++                } else {
++                    // Resample from the normalized residual (p−q)₊ (fallback to the shaped target if the residual
++                    // mass is non-positive — a numerical edge, never a zero vector). residual.log() maps zero
++                    // entries to -inf logits, which categorical() assigns ZERO probability — well-defined MLX
++                    // semantics (exp(-inf)=0 in the softmax), not an error path.
++                    let residual = maximum(pProbs - qProbs, 0)
++                    let mass = residual.sum().item(Float.self)
++                    let resampleLogits = mass > 0 ? residual.log() : pLogits * invTemp
++                    let resampled = MLXRandom.categorical(
++                        resampleLogits, axis: -1, key: rejectionRandomState)
++                    eval(resampled)
++                    processor?.didSample(token: resampled)
++                    pendingTokens.append(resampled.item(Int.self))
++                    finalToken = resampled
++                    break
++                }
++            }
++            if finalToken == nil {
++                // Every draft accepted → bonus token from the trailing main position, shaped EXACTLY as
++                // target-only sampling would draw it: processor + temperature (audit fix — was untempered/raw).
++                var bonusLogits = mainLogits[0..., verifyStart + numDraft, 0...]
++                bonusLogits = processor?.process(logits: bonusLogits) ?? bonusLogits
++                let bonus = MLXRandom.categorical(
++                    bonusLogits * invTemp, axis: -1, key: rejectionRandomState)
++                eval(bonus)
++                processor?.didSample(token: bonus)
++                pendingTokens.append(bonus.item(Int.self))
++                finalToken = bonus
++            }
++            let emitted = finalToken!
++
++            // Same cache accounting as the argmax path: keep `accepted` drafts + the 1 emitted token.
++            trimPromptCache(mainCache, numTokens: numDraft - accepted)
++            trimPromptCache(draftCache, numTokens: Swift.max(numDraft - accepted - 1, 0))
++            quantizeKVCache(&mainCache)
++            quantizeKVCache(&draftCache)
++
++            y = .init(tokens: emitted)
++            draftY = .init(tokens: emitted)
++            if accepted == numDraft {
++                draftY = .init(
++                    tokens: concatenated([
++                        draftTokens[numDraft - 1].reshaped([1]),
++                        emitted,
++                    ])
++                )
++            }
+         }
+     }
+ 
+@@ -1460,6 +1588,7 @@ public func generate(
+     draftModel: any LanguageModel,
+     draftCache: [KVCache]? = nil,
+     numDraftTokens: Int = 2,
++    acceptanceStrategy: SpeculativeAcceptanceStrategy = .argmaxEquality,
+     wiredMemoryTicket: WiredMemoryTicket? = nil
+ ) throws -> AsyncStream<Generation> {
+     let iterator = try SpeculativeTokenIterator(
+@@ -1469,7 +1598,8 @@ public func generate(
+         mainCache: cache,
+         draftCache: draftCache,
+         parameters: parameters,
+-        numDraftTokens: numDraftTokens
++        numDraftTokens: numDraftTokens,
++        acceptanceStrategy: acceptanceStrategy
+     )
+     let (stream, _) = generateLoopTask(
+         promptTokenCount: input.text.tokens.size,
+@@ -1599,6 +1729,7 @@ public func generateTokens(
+     draftModel: any LanguageModel,
+     draftCache: [KVCache]? = nil,
+     numDraftTokens: Int = 2,
++    acceptanceStrategy: SpeculativeAcceptanceStrategy = .argmaxEquality,
+     wiredMemoryTicket: WiredMemoryTicket? = nil
+ ) throws -> AsyncStream<TokenGeneration> {
+     let iterator = try SpeculativeTokenIterator(
+@@ -1608,7 +1739,8 @@ public func generateTokens(
+         mainCache: cache,
+         draftCache: draftCache,
+         parameters: parameters,
+-        numDraftTokens: numDraftTokens
++        numDraftTokens: numDraftTokens,
++        acceptanceStrategy: acceptanceStrategy
+     )
+     let (stream, _) = generateLoopTask(
+         promptTokenCount: input.text.tokens.size,

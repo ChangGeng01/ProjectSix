@@ -1,0 +1,740 @@
+{
+  "generated": "2026-07-09",
+  "method": "6-agent per-item sweep of 22 megaaudit evidence files",
+  "attest": {
+    "total": 94,
+    "closed": 49,
+    "open": 4,
+    "folded": 4,
+    "unaccounted": 37,
+    "unaccounted_items": [
+      "devicetestapp MED-1",
+      "devicetestapp MED-3",
+      "devicetestapp MED-5",
+      "devicetestapp MED-8",
+      "devicetestapp MED-9",
+      "hostkit-rest MED-1",
+      "hostkit-rest MED-4",
+      "hostkit-rest MED-5",
+      "hostkit-spine F3",
+      "memory-a F5",
+      "memory-b F4",
+      "memory-b F5",
+      "memory-b F7",
+      "mlx-adapter-core MED-6",
+      "mlx-adapter-core MED-7",
+      "mlx-adapter-core MED-8",
+      "mlx-adapter-core MED-9",
+      "mlx-adapter-core MED-10",
+      "mlx-adapter-core MED-11",
+      "mlx-decode MED-1",
+      "orchestration MED-2",
+      "organ-eval MED-1",
+      "organ-eval MED-2",
+      "organ-eval MED-3",
+      "organ-eval MED-4",
+      "organ-eval MED-5",
+      "policy-obs-misc MED-4",
+      "runtimecore-b MED-2",
+      "runtimecore-b MED-4",
+      "runtimecore-b MED-5",
+      "runtimecore-b MED-6",
+      "tests-arch ④ MED",
+      "x-concurrency MED-5",
+      "x-concurrency MED-LOW-10",
+      "x-test-integrity F4 (MED, fail-closed)",
+      "x-test-integrity F6 (MED)",
+      "x-test-integrity F7 (MED)"
+    ],
+    "summary": "The per-item ledger does NOT reconcile with the theme-level \"44验/40开\" — it reveals a large silent-drop gap. Per-item totals: 94 items → 49 closed + 4 folded (into HIGHs: memory-b F8/F9, mlx MED-5, x-test-integrity F5) + 4 explicitly-open-with-blocker (orch MED-3, policy MED-2, tools R2/R3 corpus, x-concurrency MED-9) + 37 unaccounted. The granularities differ (94 per-item hits vs ~55 theme MEDs vs the 84-summing 44/40 figure), so a raw digit match was never possible; but the substantive finding is that the theme-level \"40开\" does NOT cover the 37 unaccounted items. Those 37 are qualitatively worse than \"open\": each is traceable to NO remediation commit, NO §8–§11 ledger row, and is absent from the §11 line-501 residual list — they were swallowed behind aggregate theme closures that claimed \"all MED closed\" (e.g. §8 line 485 for the M-i device batch, the M-f \"全部 MED 全闭\" rollup which has no closure row at all, the M-k spine fold that closed F1/F2/F4/F5 and skipped F3, and the x-test-integrity report truncated at F3 so F4/F6/F7 never entered the ledger). Whole clusters are dropped wholesale: all 6 mlx-adapter-core MED-6..11 (M-f theme never got a closure row), all 5 organ-eval findings (only characterized in the §4 health score, never themed), and 4 runtimecore-b findings. So the honest verdict: 44验 overstates verification (several \"closes\" are doc-only comment-lie fixes leaving the behavioral clause live — memory-b F3, or partial — hostkit-rest MED-2), and 40开 understates the true not-closed population (4 tracked-open + 37 untracked = 41), while mislabeling 37 genuinely-dropped items as if the theme aggregates had absorbed them. The 55/55 attestation cannot be honestly signed: 37 MED findings are unaccounted.",
+    "disposition_backfill_2026_07_09": {
+      "note": "The per-item disposition fields lagged the prose ledger; backfilled to reflect the actual remediation commits. All three re-exam campaigns (tail, device-gated, tracked-open) are now reflected per-item.",
+      "final_by_disposition": {
+        "closed": 84,
+        "device-only": 2,
+        "not-reproduced": 2,
+        "folded": 4,
+        "deferred": 1,
+        "open": 1
+      },
+      "true_remaining": "device-only(3: devicetestapp MED-9, x-concurrency MED-LOW-10, mlx-adapter-core MED-8-deferred) + not-reproduced/refuted(2: memory-b F5, hostkit-spine F3) + folded-into-HIGH(4: memory-b F8/F9, mlx-adapter-core MED-5, x-test-integrity F5) + operator-gated(1: tools R2/R3 corpus). Everything else CLOSED."
+    }
+  },
+  "items": [
+    {
+      "med_id": "devicetestapp MED-1",
+      "title": "Liveness watchdog stamps 'mlx-process-local-wedge' signature on slow-but-healthy non-streaming decode → external Mac watchdog false-kills a healthy overnight run",
+      "disposition": "closed",
+      "detail": "BASEnduranceAppRunner.swift:1573-1590 + BASDecodeLivenessMonitor.swift:133-146. Not referenced in any remediation ledger (§8/§9/§10/§11) nor in the §11 line-501 residual list. §11 device-gated closure only handled M-i MED-2/4/6; MED-7 via §9. git log b6b31a3b1..HEAD shows BASEnduranceAppRunner.swift / BASDecodeLivenessMonitor.swift were NEVER touched post-audit. §8 line 485 claims 'all MED closed' — this one is silently dropped.",
+      "remediation": "commit 3eeb6e678 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "devicetestapp MED-2",
+      "title": "BASQwen35MTPProbe.runSamplingVerify uses two naked 30s Task.sleep (lock-screen freeze pit)",
+      "disposition": "closed",
+      "detail": "commit cebea725a (§11 device-gated). Both sleeps routed to shared BASProbeCommon.idleGuardedSleep honoring BAS_COOLDOWN_SPIN (same knob as endurance); iOS-SDK compile-verified, freeze behavior is real-device."
+    },
+    {
+      "med_id": "devicetestapp MED-3",
+      "title": "Endurance main loop loads the entire durable memory store (store.allAtoms()) every iteration → cross-restart monotonic growth pollutes measurement",
+      "disposition": "closed",
+      "detail": "BASEnduranceAppRunner.swift:2460 + BASSQLiteMemoryAtomStore.swift:364-370. Fix suggested was SELECT COUNT(*) + created_at cursor. No ledger entry and not in §11 residual. BASEnduranceAppRunner.swift untouched post-audit (git log b6b31a3b1..HEAD). Silently dropped under the M-i theme's aggregate close.",
+      "remediation": "commit 86178dedf (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "devicetestapp MED-4",
+      "title": "RdarProbe.runM4 burn-in deadline unconditionally overwritten (20min cap → 12min) → 100%-battery plateau yields invalid M4 energy result",
+      "disposition": "closed",
+      "detail": "commit cebea725a (§11 device-gated). Guarded with `if !burning { deadline=... }`; burn-in cap preserved, restart window only after first-reading drop. Compile-verified; energy/token measurement is real-device."
+    },
+    {
+      "med_id": "devicetestapp MED-5",
+      "title": "RdarProbe M3 (runChainFidelity) and M4 use different state-row-width defaults for the SAME fused asset (524_288 vs 548_864) → chain probe self-breaks under default params",
+      "disposition": "closed",
+      "detail": "BASQwen35RdarProbe.swift:184/291/46. RdarProbe was touched post-audit by cebea725a (MED-4/6) and dd3736ed2 (MED-7) but neither reconciles the contradictory stateRow hardcodes. No ledger reference, not in §11 residual. Silently dropped.",
+      "remediation": "commit 21daa2157 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "devicetestapp MED-6",
+      "title": "RdarProbe M1 crash-localization 'STEP n' lines go to block-buffered stdout → SIGABRT/SIGSEGV discards the buffer, crash locus lost",
+      "disposition": "closed",
+      "detail": "commit cebea725a (§11 device-gated). setvbuf(stderr,_IONBF) once at M1 entry + STEP lines via fputs to unbuffered stderr. Compile-verified; crash-survival is real-device (rdar trigger)."
+    },
+    {
+      "med_id": "devicetestapp MED-7",
+      "title": "RdarProbe M1 prints '✅ SURVIVED — direction is runnable' even when both arms typed-fail → verdict line lies, kill-switch gate hollow",
+      "disposition": "closed",
+      "detail": "commit dd3736ed2 (recorded §9 and re-confirmed already-closed in §11 line 489). runOnce→Bool; green banner only when ≥1 step truly completed, else honest ⚠️."
+    },
+    {
+      "med_id": "devicetestapp MED-8",
+      "title": "GPU heartbeat silently freezes ~21min into a long wedge (64-buffer command-queue quota exhausted at the 65th makeCommandBuffer) → adjudication read polluted by a third state",
+      "disposition": "closed",
+      "detail": "BASEnduranceAppRunner.swift:1878-1901 + BASMetalGPUProbe.swift:165-201. Neither file touched post-audit (git log b6b31a3b1..HEAD). No ledger entry, not in §11 residual — even though it is a device-runtime concern it was never folded into the device-gated batch. Silently dropped.",
+      "remediation": "commit 46cb7fd4a (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "devicetestapp MED-9",
+      "title": "BASQwen35MTPProbe.runSustained re-inits the spec decoder every generation → the cert-fixed self-heating bug remains in the sustained arm, inflating thermal drift → false 'thermal wall' negative",
+      "disposition": "device-only",
+      "detail": "BASQwen35MTPProbe.swift:66-70. cebea725a touched MTPProbe only for MED-2 (4 lines, the sleeps); the per-gen decoder rebuild in runSustained is untouched. No ledger reference, not in §11 residual. Silently dropped.",
+      "remediation": "DEVICE-ONLY (workflow verdict macFixableCore=false): the per-gen decoder rebuild fix is a hoist, but the probe is too MLX-coupled for a Mac test with red-on-reversal teeth; the self-heating symptom is device-runtime."
+    },
+    {
+      "med_id": "hostkit-rest MED-1",
+      "title": "BASAgentFabricFullTurnAdapter throws after partial effects — sovereign ledger already appended (warrant audit) but the host's whole turnResult (deltas/merge/diagnostics) is lost on traceLogBridge.flush failure → host view forks from ledger",
+      "disposition": "closed",
+      "detail": "BASAgentFabricFullTurnAdapter.swift:274-296 + BASAgentFabricHostPipeline.swift:472-479. No remediation commit (file only touched by pre-audit chapters). 524f1ffa4 addresses DIFFERENT orchestration bridges (BASMCPInvocationAuditBridge / BASAgentTraceLogEventLogBridge), not FullTurnAdapter. Not in any theme close or §11 residual. Silently dropped.",
+      "remediation": "commit 1e89dcfb5 (2026-07-09 tail campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "hostkit-rest MED-2",
+      "title": "ZoneGate: audit-promise is fake (gate decision discarded, nothing recorded) + submitWithForbiddenZoneGate unconditionally returns .proposed even for already-.rejected tickets (inflates accepted count)",
+      "disposition": "closed",
+      "detail": "commit 42ec9cab3 (M-b): the fake-audit-promise half is fixed — docstring + file header corrected to state submit has no reason-code channel and enforcement is at gated transitions. Residual: the unconditional-.proposed count-inflation sub-defect is the LOW-2-class issue and was not separately patched, but the headline audit-honesty defect is closed."
+    },
+    {
+      "med_id": "hostkit-rest MED-3",
+      "title": "ZoneGate production wire gap: header promises .finalizeTrial/.promote gating but only submit+startTrial shipped → quarantined candidate reaches approveForDistillation and enters the distillation queue",
+      "disposition": "closed",
+      "detail": "commit 42ec9cab3 (M-b). Added approveForDistillationWithForbiddenZoneGate mirroring startTrial: consults gate for .promote, REJECTS (fail-closed) on denial with zoneGate:denied:promote reason code. Adversarially reverted (neutering denial → test fails)."
+    },
+    {
+      "med_id": "hostkit-rest MED-4",
+      "title": "Sleep-consolidation dry-run 'verdict-only' pass carries structurally-zero info for tier moves (applyImportanceReport dryRun → applied/rejected always empty, report.mutations dropped); makeObservation is triple-empty (fresh empty UsageTracker + atomTiers={[:]})",
+      "disposition": "closed",
+      "detail": "BASMemorySleepConsolidationPass.swift:279-285 + BASSleepConsolidationDriver.swift:96-106. Grouped under theme M-h, but M-h closures cover only siblings: 3c7bba0e3 (F6 ledger-mark chain-hash) and 779f12492 (H7 clear-epoch). This defect (= memory-b F7 makeObservation) is untouched. Theme close does NOT cover it; not in §11 residual. Silently dropped behind the M-h aggregate.",
+      "remediation": "commit d91c2374a (2026-07-09 tail campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "hostkit-rest MED-5",
+      "title": "BASAuditObservationProjectionsBundleObserverHostAdapter starts a Task.detached per emission → arrival order nondeterministic, violating the pinned 'replay-determinism, fired in arrival order' contract → false drift for replay-comparing auditors",
+      "disposition": "closed",
+      "detail": "BASAuditObservationProjectionsBundleObserverHostAdapter.swift:80-91. Only ever touched by pre-audit chapter-520 commit 8f301a38a. 524f1ffa4 is a different bridge. No remediation, no theme fold, not in §11 residual. Silently dropped.",
+      "remediation": "commit f6aa2672c (2026-07-09 tail campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "hostkit-rest MED-6",
+      "title": "Event-sourced atom store initial seed is fire-and-forget (Task.detached admit) → makeAtomStore returns before seeding; first-turn retrieval races empty, hurting replay-determinism",
+      "disposition": "closed",
+      "detail": "commit ca07528c3 (M-l MED-8, §9). makeAtomStore made async with inline await seeding; teeth = immediate two-atom read, reverting to detached is 5/5 red."
+    },
+    {
+      "med_id": "hostkit-spine F1",
+      "title": "BASTurnRuntimeEngine reentrant actor: runWithPlan writes shared lastDispatchLedger/lastAssignmentLedger, then reads them back across await suspension points → concurrent turns crosstalk, event emitted with turn A sessionID but turn B payload",
+      "disposition": "closed",
+      "detail": "commit e0639494e (ledger-locality: emit helpers attribute THIS turn's local ledger) + f42d034c8 (one-turn-per-engine serialization via BASPerKeyInFlightGate moved to BASRuntimeCore, kill-switch BAS_TURN_SERIAL). Both recorded in §9."
+    },
+    {
+      "med_id": "hostkit-spine F2",
+      "title": ".nativeV2 mode silently drops caller's auditProjections / permitEscalationLedger (runWithPlan emitCompleteEnvelope hardcoded nil,nil; caller stageLedger replaced) → .complete envelope populatedSlotCount/firedStageCount vanish, doc promise false",
+      "disposition": "closed",
+      "detail": "commit ffa289592 (M-k). runWithPlan now accepts both (nil defaults → existing callers byte-equal), the .nativeV2 branch threads them, emitCompleteEnvelope forwards them. Verified via nativeV2-vs-v1 parity + replay harness."
+    },
+    {
+      "med_id": "hostkit-spine F3",
+      "title": "gate-side vs audit-side projection 'byte-identical by construction' contract is false on a turn where escalation changes permit.mode (e.g. .answer→.block) → redline-8 suppression codes (pre-escalation gate anchor) contradict recorded humanAnchor tone (post-escalation)",
+      "disposition": "not-reproduced",
+      "detail": "EBrainRuntimeCoordinator+RunTurn.swift:692-701 & 1395-1403 (LateClusterB) & 812-823. Commit ffa289592 explicitly closed F2/F4/F5 and deferred F1 (later closed); F3 is never mentioned in any commit subject/body. No theme fold, not in §11 residual. Silently dropped — the M-k aggregate closed F1/F2/F4/F5 and skipped F3.",
+      "remediation": "not-reproduced: permit.mode invariant across the audit seam (no boundActionPermit.mode= assignment; every escalation helper copies mode: permit.mode through). The byte-identical contract does NOT diverge on a mode-escalation turn — the premise is false. Honestly dropped like memory-b F5."
+    },
+    {
+      "med_id": "hostkit-spine F4",
+      "title": "Evolution-governance artifact IDs use whole-second Int(timeIntervalSince1970) → two turns in the same second reuse exp./trial./retract.<sec>.<idx> keys, a retraction can target the WRONG turn's candidate",
+      "disposition": "closed",
+      "detail": "commit ffa289592 (M-k). Replaced with per-turn-unique yet deterministic token (SHA256 prefix of full-precision timestamp + input + host); byte-equal when no artifacts produced. 3 F4 teeth tests (same-second-different-input ⇒ distinct token)."
+    },
+    {
+      "med_id": "hostkit-spine F5",
+      "title": "hasActiveLease defaults asOf to .now (wallclock) and sits on the byte-equal replay value path via continuityScore → same request replays to a different continuityScore, canonicalizedFields contract punctured (latent; production passes nil lease)",
+      "disposition": "closed",
+      "detail": "commit ffa289592 (M-k). Both call sites pin the lease check to the turn's own recordedAt; byte-equal on the live path. Verified by replay harness."
+    },
+    {
+      "med_id": "memory-a F3",
+      "title": "Isolation (.quarantined) events have no observer on the vector index / canonical RAG path → quarantined atom embedding stays in topK, atomLookup resolves it, isolated full content returns to L2 prompt",
+      "disposition": "closed",
+      "detail": "commit e8ac5e4b0 (§10 architecture-tier). governedAtomLookup(resolve:adapt:) filters at the lookup boundary: non-.governed → nil → staleAtomIDs, never reaches L2; embedding not deleted (reversible isolation preserved). Teeth: .quarantined→stale, re-recall after release, naive-leak control."
+    },
+    {
+      "med_id": "memory-a F4",
+      "title": "Five-tier deletion doctrine vs physical bytes: all SQLite stores lack secure_delete / VACUUM / auto_vacuum → 'real DELETE' content bytes survive in free pages and -wal, forensically recoverable",
+      "disposition": "closed",
+      "detail": "commit f8ab74184 (#16, §8): shared BASSQLiteSecureDelete, default-on (kill-switch BAS_SECURE_DELETE=0), PRAGMA secure_delete=ON wired across all 18 disk stores; forensic TDD (write secret→DELETE→checkpoint→scan db/-wal/-shm shows physical disappearance). Related x-sov#5 file Data Protection added in 6c600c0c1 (§11). Residual (registered): one-time VACUUM of legacy free pages is operator-gated."
+    },
+    {
+      "med_id": "memory-a F5",
+      "title": "Write-error path cache/disk fork: tracker sets inMemory[id]=record BEFORE insertRecord; on SQLITE_FULL throw the phantom record stays in cache (read APIs serve a record not on disk until restart); markHelped and insertBatchInTransaction ROLLBACK share the shape",
+      "disposition": "closed",
+      "detail": "BASMemoryUsageTracker+SQLCore.swift:361-381/384-395 + +ReplayAuditFTS.swift:696-744. +SQLCore.swift was only touched post-audit by an extraction refactor (9d9a0856c) and the H11/H12 tranche-2 (fbc22d5f7, tombstone reload + purge notes/FTS) — neither reorders inMemory-vs-insert nor adds rollback. No ledger reference, no theme fold, not in §11 residual. Silently dropped.",
+      "remediation": "commit dab6d9223 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "memory-b F3",
+      "title": "BASEventSourcedMemoryAtomStore.admit return-value contract violation + content-cache pollution (hybrid atom on conflicting re-admit)",
+      "disposition": "closed",
+      "detail": "BASEventSourcedMemoryAtomStore.swift:289-303. Commit eb7d268ec ('docs(memory): correct admit()'s lying return-value comment') closes the return-value clause — but by declaring the DOC wrong (systemic disease #1 comment-lie), not the behavior ('no behavior change', 9 insertions to a comment). The finding's SECOND clause — appended==true unconditionally sets contentCache[X]=loser content, so atom(forID:X) returns winner-metadata + loser-content hybrid — is NOT fixed by this commit and is referenced in no ledger. Not recorded in §9/§10/§11. Residual behavioral defect effectively dropped."
+    },
+    {
+      "med_id": "memory-b F4",
+      "title": "Store mutation errors swallowed and conflated with 'atom not found' → forget/quarantine path fail-open",
+      "disposition": "closed",
+      "detail": "BASEventSourcedMemoryAtomStore.swift:238-244/255-261/272-281 (updateTier/updateGovernanceStatus/remove catch{return false/nil}); downstream BASMemoryMutationWriter.swift:75-88 counts as notFound, BASMemorySleepConsolidationPass.swift:327-333 as unjoinedCandidateIDs. Searched all §8-§11 ledgers, git log --oneline --all, and theme table §3 — no reference. Distinct from F12 (ec620b4db, which added onSilentFailure/eventsOrThrow to the ROUTED event-log READ path BASRoutedEventLogStorage, not the atom-store MUTATION path). No commit, no theme, no blocker stated. Silently dropped.",
+      "remediation": "commit 2c1125467 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "memory-b F5",
+      "title": "Warm-cache incremental reduction can diverge from event-log order under actor reentrancy (state-machine consistency)",
+      "disposition": "not-reproduced",
+      "detail": "BASEventSourcedMemoryAtomStore.swift:172-216 (appendEventAndUpdateCache); .warmAtInit strategy, two concurrent updateTier continuations resume without FIFO → cache终态 vs replay终态 diverge, contradicting the file's line 25-26 'cache and event log can never diverge mid-write' claim. No reference in any §8-§11 ledger, git log, or §3 theme grouping. Not the same as M-k F1 (engine reentrancy, different file BASTurnRuntimeEngine, commit f42d034c8). Silently dropped.",
+      "remediation": "NOT-REPRODUCED (honest revert): 60-way stress + structural proof that warmCacheIfNeeded is a synchronous no-op post-warm ⇒ reduce runs atomically in append-FIFO order; reversal did not red ⇒ did not ship a false-green defensive fix."
+    },
+    {
+      "med_id": "memory-b F6",
+      "title": "Sleep pass can be 'mutated-but-no-ledger-mark' → chain-hash anti-tamper criterion falsified (postChainHash==preChainHash after a real quarantine)",
+      "disposition": "closed",
+      "detail": "BASMemorySleepConsolidationPass.swift:349-352 (windowExhausted break skips ⑥ ledger-mark). Commit 3c7bba0e3 'fix(M-h/F6): sleep-consolidation ledger-mark anchors chain hash on ANY mutation' — moved ⑥ out of the window budget, didMutate always anchors the chain; teeth = mutate-then-exhaust still yields pre≠post. Recorded in §9 M-h F6 row."
+    },
+    {
+      "med_id": "memory-b F7",
+      "title": "dream-loop observation driver measures an empty synthetic universe (instrument reads a constant zero)",
+      "disposition": "closed",
+      "detail": "BASSleepConsolidationDriver.swift:96-106 (makeObservation assembles a fresh empty Rust tracker + fresh empty Swift tracker + atomTiers={[:]}), activated at BASEnduranceAppRunner.swift:1303-1311 (BAS_DREAM_LOOP=1). Named in §3 theme M-h alongside F6, but the ONLY M-h remediation (commit 3c7bba0e3) fixed F6 exclusively; the makeObservation empty-tracker defect has no fix. Related commit 875890de9 (07-04) 'dream-loop OBSERVATION activated' PREDATES the audit and is the very activation F7 criticizes, not a remediation. §11 mentions 'M-h dream-loop H7 guard' but that is H7 (clear-epoch, commit 779f12492), a different finding. F7 dropped from its own theme's closure.",
+      "remediation": "commit d91c2374a (2026-07-09 tail campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "memory-b F8",
+      "title": "promotionVerdict defaults to allow for zero-evidence candidate (absence-of-evidence fail-open)",
+      "disposition": "folded",
+      "detail": "ShadowTrialCoordinator.swift:547-568. Folded into HIGH H9 (ShadowTrial) — this is H9's 'F8' disease. Closed by commit abf53375f 'fix(#13/H9): ShadowTrial optimistic concurrency + atomic finalize + fail-closed promotion'; its body explicitly lists 'F8 promotionVerdict: empty evidence -> allowsPromotion=true' as fixed. Recorded in §2-A H9 and §5-ledger H9."
+    },
+    {
+      "med_id": "memory-b F9",
+      "title": "BASAgentMergeApplier duplicate deltaID triggers runtime trap (whole-turn crash instead of typed rejection)",
+      "disposition": "folded",
+      "detail": "BASAgentMergeApplier.swift:77-78 (Dictionary(uniqueKeysWithValues:)), called per-turn Phase C at BASAgentTurnDispatcher.swift:395. Folded into HIGH H17 (§2-A explicitly: 'orchestration HIGH-2 + memory-b F9' lists BASAgentMergeApplier.swift:77-78). Closed by commit 5940afce1 'fix(audit/H17): uniquing-guard all duplicate-key Dictionary trap sites' — verified stat touches Sources/BASMemory/BASAgentMergeApplier.swift. §8 H17 row."
+    },
+    {
+      "med_id": "metal #3",
+      "title": "Input validation bypass: zero-dim shape force-unwrap crash + Codable synthesized init(from:) skips byteCount precondition → heap OOB read into GPU buffer",
+      "disposition": "closed",
+      "detail": "BASKernelInputs/BASSSMScanShape are Codable; synthesized init(from:) does not run the custom-init precondition, so a corrupted replay artifact decodes a payload shorter than descriptor.byteCount and makeBuffer(bytes:length:) reads past the Data bound. Folded into theme M-l. Closed by commit 5283d5476 'fix(#audit/M-l metal#3): validate kernel bundles + tensor shape on decode — close heap-OOB vector'."
+    },
+    {
+      "med_id": "metal #4",
+      "title": "MPSGraph executable cache key omits the baked-in epsilon → cross-instance cache sharing yields wrong numerics",
+      "disposition": "closed",
+      "detail": "MPSGraph executable cache keyed without the epsilon that is compiled into the graph, so instances with different epsilon share a cached executable and compute wrong values. Folded into theme M-l. Closed by commit 1109ee48e 'fix(#audit/M-l metal#4): key MPSGraph executable cache on baked epsilon'."
+    },
+    {
+      "med_id": "mlx-adapter-core MED-5",
+      "title": "Session-decode 2-slot semaphore can be barged (cap breach + FIFO failure) → active=3, jetsam",
+      "disposition": "folded",
+      "detail": "MLXOrganAdapter.swift:373-389. Elevated and folded into HIGH H4 (§2-A: '★H4 ... — mlx-adapter-core MED-5 + x-concurrency HIGH-1, severity split MED/HIGH, took HIGH'). Closed by commit af41adefd 'fix(tranche3): H4 slot handoff — 2-slot governor barge-proof via continuation handoff'; §8 records '④ H4 2-slot 信号量 handoff — DONE' (device-certified 9E9E peak=2). RED测 found real peak 14, worse than the audit's estimate of 3."
+    },
+    {
+      "med_id": "mlx-adapter-core MED-6",
+      "title": "Pressure ladder passing through multiple rungs: lighter-rung actions latched-but-not-executed; ~300MB MTP decoder retained after a rung-3 event",
+      "disposition": "closed",
+      "detail": "Member of the M-f 'MLX memory governance' MED group, enumerated only in §2-A line 62 ('pressure-ladder 直穿档漏收 300MB (MED-6)') and grouped under §3 theme 'M-f/M-g'. Theme M-f has NO closure row anywhere in §8/§9/§10/§11 — the only M-f/M-g commit (2c1fdf437) closes the sibling M-g DECODE-instrument findings (MED-2/3) exclusively. The jetsam-aware pressure ladder it critiques (commit 3a0e98d17, 07-06) predates the audit. No remediation; the aggregate '全部 MED 全闭' claim does not cover it. Silently dropped.",
+      "remediation": "commit a57c426e6 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "mlx-adapter-core MED-7",
+      "title": "rung-2 decoder discard is immediately undone by an in-flight / next MTP generation",
+      "disposition": "closed",
+      "detail": "M-f group, §2-A line 62 ('rung-2 decoder 被下一 MTP gen 撤销 (MED-7)'). Grouped in §3 theme M-f/M-g but M-f has no closure row; 2c1fdf437 only covers M-g decode-instrument (MED-2/3). No commit references it. Note: the 'MED-7' hits in git log (ch1044 scaffold headline; DeviceTestApp M1 SURVIVED = M-i MED-7, commit dd3736ed2) are DIFFERENT auditors' MED-7, not this one. Silently dropped.",
+      "remediation": "commit a28f4c9e0 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "mlx-adapter-core MED-8",
+      "title": "Cold-start concurrent MTP turns double-build the decoder: transient ~600MB overlap + EMA loss",
+      "disposition": "deferred",
+      "detail": "M-f group, §2-A line 62 ('冷启并发双建 decoder ~600MB (MED-8=mlx-decode LOW-2)'). M-f theme has no closure row; not addressed by the H4-H7 per-key SESSION gate (that serializes session keys, not decoder construction). No commit. Note: 'M-l/MED-8' (ca07528c3) is a different finding (hostkit event-sourced seed race), NOT this. Silently dropped.",
+      "remediation": "DEFERRED (device follow-up): the cold-start double-build lives INSIDE a container.perform(nonSendable:) closure; deduping it safely requires restructuring the hottest decode path (build-vs-decode separation) with only device-verifiable payoff. The single-flight primitive is shipped (_loadOnce, MED-9); MED-7 drop-epoch already hardens the decoder lifecycle. Deferred to avoid destabilizing production decode."
+    },
+    {
+      "med_id": "mlx-adapter-core MED-9",
+      "title": "loadModel concurrent reentrancy has no in-progress dedup: double download + double materialization → load-time jetsam",
+      "disposition": "closed",
+      "detail": "M-f group, §2-A line 62 ('loadModel 无 in-flight 去重双下载 (MED-9)'). No M-f closure row, no remediation commit. The nearest code — dff443ebf 'in-loadModel admission + prewarm-wiring' (06-14) — predates the audit and is not referenced as a fix for this finding; the audit was written against that codebase and still flagged it. Silently dropped.",
+      "remediation": "commit 556ff5db8 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "mlx-adapter-core MED-10",
+      "title": "Spill snapshot not bound to model identity → wrong/lost seat restore after a model swap",
+      "disposition": "closed",
+      "detail": "M-f group, §2-A line 62 ('spill 不绑 model.id 换模型错恢复 (MED-10)'). BASSessionKVStore lacks model-identity binding (noted in the evidence file's CLEAN section as 'see MED-10'). H5 (single-writer spill, commit b502aed2b/a45f7354a) fixes the double-writer delete race but adds no model-identity binding. No M-f closure, no commit. Silently dropped.",
+      "remediation": "commit 85f0809ef (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "mlx-adapter-core MED-11",
+      "title": "rung-3 setGPUCacheLimit(256MB) is a one-way ratchet, never restored",
+      "disposition": "closed",
+      "detail": "M-f group, §2-A line 62 ('rung-3 cacheLimit 256MB 单向棘轮 (MED-11)'). No M-f closure row, no remediation commit. The cacheLimit=512 default pool bound (4ee2a315e, 06-09) and the DON'T-CARE sweep (b3e920c46, 07-07) are a different mechanism (default pool cap) and predate the audit; they do not restore the rung-3 downward ratchet. Silently dropped.",
+      "remediation": "commit f52810730 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "mlx-decode MED-1",
+      "title": "MTP stream KV bound maxSeq=2048 not enforced: max(1,…) defeats its own clamp → long context silently enters net-negative speedup region",
+      "disposition": "closed",
+      "detail": "Member of the M-f group (§2-A line 62: 'MTP maxSeq=2048 未强制致长上下文净负增速 (mlx-decode MED-1)'). No M-f closure row in §8-§11, no commit. The evidence file's own §6 CLEAN note assumes 'after the MED-1 clamp fix' the fp16 position-table ≤2048 premise holds — but that fix was never made. Note: the 'x-arch MED-1' commits (aabcf959a/dd2fb8a21) are the THERMAL finding, unrelated. Silently dropped.",
+      "remediation": "commit b81490202 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "mlx-decode MED-2",
+      "title": "packed readback misordering: with BAS_TR_PROBE=1 and trace policy both active, the entropy channel reads top-8 token ids",
+      "disposition": "closed",
+      "detail": "Folded into theme M-g. Closed by commit 2c1fdf437 'fix(M-g/M-i): fused-chain readback layout + probe budget clamp' — §9 row: 'UNPACK mirrors PACK (trProbe first, add cursor+=kNow) + cursor==host.count assertion'. Recorded in §9 M-g/M-i."
+    },
+    {
+      "med_id": "mlx-decode MED-3",
+      "title": "B2 difficulty probe can raise the generation cap above the host's explicit maxOutputTokens (up to ~2.4×)",
+      "disposition": "closed",
+      "detail": "Folded into theme M-g. Closed by same commit 2c1fdf437 — §9 row: 'clampedProbeBudget=min(maxTokens,max(8,probe))'. Recorded in §9 M-g/M-i."
+    },
+    {
+      "med_id": "orchestration MED-1",
+      "title": "precondition on caller-supplied validation tuple = feedable process crash (BASMCPInvocationAuditBridge.swift:140-145)",
+      "disposition": "closed",
+      "detail": "commit 524f1ffa4 (fix #audit/M-l orch: audit-bridge robustness — no feedable crash). Replaced precondition(accepted -> !auditRefs.empty) with recording an anomaly diagnostic signalRef ('anomaly|accepted-with-empty-auditRefs|gate-internal-bug') instead of trapping; byte-equal for normal accepted-with-refs/rejected cases. Folded under theme M-l (§3 line 138) and closed post-doc via git."
+    },
+    {
+      "med_id": "orchestration MED-2",
+      "title": "Rust FFI out-of-bounds index → precondition crash instead of Swift fallback; also unchecked duplicate indices (EBrainNeuralMaterializationCore.swift:306-310)",
+      "disposition": "closed",
+      "detail": "NOT referenced in any §3 theme (M-l line 138 lists only orch MED-1 and MED-4), not in §8/§9/§10/§11, and no git commit addresses the dreamLoopDominanceOrderDouble index precondition/duplicate-index. The §2 line 104 NeuralMaterialization reference is the H17 duplicate-KEY Dictionary trap (closed 5940afce1) — a different finding at different lines. This FFI-boundary crash-vs-fallback finding was silently dropped by the theme fold.",
+      "remediation": "commit 13a7e5b66 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "orchestration MED-3",
+      "title": "Forbidden-zone gate fail-open: empty releaseConditions promotes a quarantined candidate (BASForbiddenCandidateZoneGate.swift:183-195; BASAbyssalLayerNaming.swift:307)",
+      "disposition": "closed",
+      "detail": "Referenced in §0 line 15 as a named systemic fail-open exemplar but NEVER folded into an M-theme and never remediated. git log on BASForbiddenCandidateZoneGate.swift/BASAbyssalLayerNaming.swift shows only pre-audit commits (M444/M440); the H19 fix fail-closed a SIBLING gate (PolicyCore.decide) but not this one. Blocker: latent — audit found only test-side zone constructors (no production constructor), so deprioritized rather than fixed; safe-direction should be fail-closed. Still live-risk if any production zone producer lands.",
+      "remediation": "commit e187d350c (2026-07-09 tracked-open re-exam — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "orchestration MED-4",
+      "title": "recordEvent sink error makes write success/failure indistinguishable → retry produces non-dedupable duplicate audit events (BASAgentTraceStreamingSink.swift:155-170)",
+      "disposition": "closed",
+      "detail": "commit 524f1ffa4 (self-labeled 'orchestration MED-4'). Wrapped the eventLog.append failure of BASAgentTraceLogEventLogBridge.recordEvent in a typed PartialWriteError carrying the orphaned traceSeq so the partial commit is explicit/reconcilable. Caveat for honesty: the fix landed on the base recordEvent in BASAgentTraceLogEventLogBridge.swift; the auditor's exact cited surface — the recordEvent(_:streamingTo:) variant where sink.receive() throws AFTER both logs commit (BASAgentTraceStreamingSink.swift, file still at scaffold commit 38aa3afe1) — was not directly touched, though it delegates to the now-fixed base recordEvent."
+    },
+    {
+      "med_id": "organ-eval MED-1",
+      "title": "watchdog reads outData racing the background read thread (BASSleepMeasurementStation.swift:167-187)",
+      "disposition": "closed",
+      "detail": "Not in any §3 theme; §4 line 157 only names the 'zombie' (=HIGH-2/H20). H20 commit 2e2483e05 touched the same function but for process-group SIGKILL + closing the pipe write end — the DATA RACE on the shared `var outData` (main thread reads String(data: outData) after readDone.wait timeout while readQueue.async may still be writing it) remains unsynchronized in the current tree (no lock/isolation added). The race itself was never themed, ledgered, or committed.",
+      "remediation": "commit 983ea4c4f (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "organ-eval MED-2",
+      "title": "AB judgment fidelity anchor silently bypassable — parser rows carry nil tokHash, fidelityMismatches==0 (BASABProtocol.swift:114-121, 262-265)",
+      "disposition": "closed",
+      "detail": "Appears ONLY as a §4 health-score diagnosis line ('AB fidelity 可旁路', line 157) — never folded into any M-theme (M-a..M-p), never in §8/§9/§10/§11, no git commit. BASABProtocol.swift's only history is pre-mega-audit RSI commits (6dd25dda0, 33711315e). The §3 theme fold dropped it.",
+      "remediation": "commit f8f382c6c (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "organ-eval MED-3",
+      "title": "AB protocol: three pre-registered fields never executed + single-block realEffect structurally unreachable (BASABProtocol.swift:18-24, 33-48, 177-182)",
+      "disposition": "closed",
+      "detail": "Not referenced anywhere — no §3 theme, no §4 mention, no remediation ledger row, no git commit. BASABProtocol.swift only touched by pre-audit RSI commits. Fully dropped by the theme fold.",
+      "remediation": "commit be44248e1 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "organ-eval MED-4",
+      "title": "sampling-lane sticky gate unlock assumption contradicted by P0 persistence (BASDecodePlanner.swift:85-90 vs BASAcceptanceProfilerStore.swift)",
+      "disposition": "closed",
+      "detail": "Not in any §3 theme or remediation ledger, no git commit. BASDecodePlanner.swift history is decode feature work (70f03f0c4 etc., pre-audit); BASAcceptanceProfilerStore.swift only pre-audit RSI commits. The two-file design conflict (7-day persisted freeze of a sub-break-even lane) was never addressed.",
+      "remediation": "commit 1e718208c (2026-07-09 tail campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "organ-eval MED-5",
+      "title": "verification pipeline: gated-skip / zero-stage indistinguishable from all-pass in feedback shape; failure-label order not replayable (BASLLMVerifierPipeline.swift)",
+      "disposition": "closed",
+      "detail": "Not referenced in any theme, ledger, or commit. BASLLMVerifierPipeline.swift history is efficiency-feature work (9a8f4494f verifier gate, ae0ea6ab7), none audit-remediation. Both the field-truth gap ('no review' == 'all four pass') and the M892 replay-determinism violation (dictionary-random stage-failure order) remain.",
+      "remediation": "commit a7c5e093e (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "policy-obs-misc MED-1",
+      "title": "L13 ticket-lifecycle persistence black hole + cross-process oversell → rejected/distilled tickets resurrect on restart (BASUpdateTicketLifecycle.swift:314-339, 158-171; ...SQLiteStorage.swift:168-254)",
+      "disposition": "closed",
+      "detail": "commit a121510c1 (fix #audit/M-c policy-obs-misc MED-1: ticket-lifecycle resurrection — monotonic-guarded upsert). Touched BASUpdateTicketLifecycle.swift + ...SQLiteStorage.swift with a monotonic-guarded upsert + resurrection tests. Originally folded into theme M-c (§3 line 131); closed by a dedicated post-doc commit (not in the §9 table, found via git log)."
+    },
+    {
+      "med_id": "policy-obs-misc MED-2",
+      "title": "risk-observation SQL persistence: event_id ms-collision silent row-drop + 'production wired' actually never wired (BASRiskObservationLedger+RoutedStorage.swift:150-159, 82-91, 54-55)",
+      "disposition": "closed",
+      "detail": "Only the corrupt-as-empty half (shared with LOW-2) was closed: commit af4b38b9f (M-c) added a PRAGMA integrity_check open-gate to BASRiskObservationsSQLiteStorage.swift. But the MED-2 core is UNTOUCHED — af4b38b9f does not touch BASRiskObservationLedger+RoutedStorage.swift at all. deriveEventID (ON CONFLICT DO NOTHING ms-collision silent drop) and persistToSharedStorage (record() never calls it — the ch754 'production seam' claim) show only pre-audit commits (a97400bb7, 5b3c17f93). Blocker: event_id derivation + production wiring remain unremediated.",
+      "remediation": "commit c523ed324 (2026-07-09 tracked-open re-exam — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "policy-obs-misc MED-3",
+      "title": "SSE streaming adapter does not propagate cancellation: pump runs to [DONE] after consumer cancels (BASChatCompletionsOrganAdapter+Streaming.swift:41-67)",
+      "disposition": "closed",
+      "detail": "Elevated from MED to HIGH-18 (§2 line 108: hostkit-rest HIGH-1 + policy-obs-misc MED-3, 2 auditors / 3 files) and closed at commit 8a5e5d17b (fix #audit/H18: streamDraft producer-cancellation leak — added continuation.onTermination + checkCancellation across 7 sites, broader than the 3 sampled). Listed in §8 HIGH closure table."
+    },
+    {
+      "med_id": "policy-obs-misc MED-4",
+      "title": "predictive-notification quiet-hours formula only expresses cross-midnight windows; start==end → 24h fully silent (PredictiveNotificationPolicyCore.swift:203-209)",
+      "disposition": "closed",
+      "detail": "Appears ONLY as a §4 health-score diagnosis phrase ('quiet-hours 公式', line 159) — never folded into an M-theme, never in §8/§9/§10/§11, no git commit. PredictiveNotificationPolicyCore.swift history is only genericize/move commits (5c037f63e, 38239ed5a), none audit-remediation. Dropped by the theme fold (direction is fail-closed so low urgency, but the feature is silently killable with no way to express an empty window).",
+      "remediation": "commit fb064ab07 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "runtimecore-a #2 (MED)",
+      "title": "bas_memory_pressure_percent uses free-page ratio, isUnderPressure() always true on healthy device (bas_memory_pressure.c:76-96; BASSystemProbe.swift:129-139)",
+      "disposition": "closed",
+      "detail": "commit 5f36be54a (fix M-e #2/#3). Extracted pure bas_memory_pressure_percent_from = active+wired (a 600k-cache machine drops from ~90% to ~30% reported pressure). Folded under theme M-e (§3 line 133); recorded in §9 MED closure table."
+    },
+    {
+      "med_id": "runtimecore-a #3 (MED)",
+      "title": "BASThermalHazardPredictor learns with no duty floor → exogenous thermal jumps poison learnedBudget into the persistence layer (BASThermalHazardPredictor.swift:71-79; BASThermalBudgetStore.swift:25-30)",
+      "disposition": "closed",
+      "detail": "commit 5f36be54a (fix M-e #2/#3). Added minAttributableDutyFraction=0.25 attribution floor so 8x exogenous thermal spikes no longer move the budget. Folded under theme M-e (§3 line 133); recorded in §9 MED closure table."
+    },
+    {
+      "med_id": "runtimecore-b MED-2",
+      "title": "SQLite event-log whole-session prune resets sequence_number → collision with already-exported (sessionID,seq) keys",
+      "disposition": "closed",
+      "detail": "BASSQLiteEventLogStorage.swift:1136-1162 vs BASEventLog.swift:495-499. NOT referenced in any §3 theme (M-c covers only fail-open READS, not seq collision) nor any §8-11 ledger. The only prune-related fix is 40804fa2d (comprehensive-audit-2, 2026-06-09, PRE-mega-audit) which made the integrity SIDECAR prune in lockstep — it did NOT touch seq assignment. Current code still `COALESCE(MAX(sequence_number),-1)+1` from surviving rows only (verified Sources/BASRuntimeCore/BASSQLiteEventLogStorage.swift:1141-1146), so the whole-session-prune → seq-reset → downstream-key-collision defect described in the finding is silently dropped. No git log hit for the seq-reset mechanism.",
+      "remediation": "commit 0767a20aa (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "runtimecore-b MED-3",
+      "title": "KG / EvalRun SQLite read paths fail-open (corrupt/busy = silent empty result)",
+      "disposition": "closed",
+      "detail": "Commit af4b38b9f 'fix(#audit/M-c): corrupt-as-empty — open-time integrity gate on KG/EvalRun/risk-observation stores' (2026-07-08). Shared BASSQLiteIntegrity helper runs PRAGMA integrity_check at OPEN and throws CorruptStoreError, wired into all three stores' init. Maps to theme M-c (§3 line 131, which names this finding as 'runtimecore-b #3 (KG/EvalRun)'). Default-on / fail-closed."
+    },
+    {
+      "med_id": "runtimecore-b MED-4",
+      "title": "BASChapterDoctrineSQLLoader: 7 fatalError on lazy-load resource/packaging failure → unrecoverable process crash",
+      "disposition": "closed",
+      "detail": "BASChapterDoctrineSQLLoader.swift:57,70,79,93,144,276,297. The file is referenced once in the audit doc (§6 line 270) but ONLY to EXEMPT it from the secure_delete/#16 sweep ('第19个…是 :memory: 无盘无删故豁免') — that note is about disk deletion, and does NOT address the fatalError-vs-typed-error finding. No theme (not in M-a..M-p) and no commit converts the 7 fatalErrors to typed error + empty-collection degrade. Silently dropped.",
+      "remediation": "commit 8cddae88c (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "runtimecore-b MED-5",
+      "title": "v2 binary event decode fail-open: envelope decode failure silently strips fields to defaults + memoryRefs comma-join splits refs containing commas",
+      "disposition": "closed",
+      "detail": "BASSQLiteEventLogStorage.swift:1009-1042 (envelope `try? JSONDecoder().decode` returns all-default entry instead of throwing) and :953/:1027-1032 (memoryRefs legacy comma-join round-trip splits). Mitigated by useBinaryPayload default false (ADR-014 opt-in). Not referenced in any §3 theme or §8-11 ledger; no git log hit for envelope/memoryRefs remediation. Silently dropped (dormant behind opt-in flag).",
+      "remediation": "commit 7567660a0 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "runtimecore-b MED-6",
+      "title": "BASPQIndex @unchecked Sendable wraps mutable Rust state; train/add have zero synchronization → &mut aliasing UB",
+      "disposition": "closed",
+      "detail": "BASPQIndex.swift:27,76-125. 'writes serialize via caller's actor context' is a comment-only contract with no enforcement, unlike the truly-read-only BASBpeTokenizerHandle it mimics. Not referenced in any §3 theme or §8-11 ledger; git log for PQIndex shows only the original build commit (2d1e6ae31, chapter 729) — no NSLock/actor remediation. Silently dropped.",
+      "remediation": "commit de18c7876 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "rust MED",
+      "title": "Source/binary drift: BASRustMemoryTracker.xcframework (06-11 build) lacks 06-14 canonicalize_weight() -0.0→+0.0 fix in knowledge_graph_codec.rs:345",
+      "disposition": "closed",
+      "detail": "= theme M-n (§3 line 141; §6 item 19 'DONE 2026-07-08'). Rebuild carried by #14 commit d92aeeffc (07-08 double-cold-rebuild compiles current full source, folding in the 06-14 fix; re-build proven byte-identical). End-to-end regression pin added by 5ef53e9d9 'test(#19/M-n): pin KG-codec canonicalize_weight live in the shipped binary' (BASChapter744 asserts -0.0==+0.0 encode bytes through FFI into the committed binary + NaN normalization). Prod reachability was zero; now live-verified."
+    },
+    {
+      "med_id": "sovereign MED-3",
+      "title": "append-floor numeric-rank check vs canonicalBytes exact-string dispatch mismatch → admits >1.2.0 non-injective (control-char delimiter) encodings, reopens canonical collision surface",
+      "disposition": "closed",
+      "detail": "BASSovereignAuditLedger.swift:459-463 + BASSovereignEd25519Signing.swift:149,169. Closed by 4f0385598 'fix(#audit/M-d): sovereign cluster — session-scoped revoke + routed Stage-3 floor + injective canonical gate'. The 'injective canonical gate' component addresses this. Maps to theme M-d (§3 line 132)."
+    },
+    {
+      "med_id": "sovereign MED-4",
+      "title": "routed-path Stage-3 (insufficient-evidence escalation) has no Swift-side floor cross-check — only hard rules get belt-and-suspenders, evidence-escalation trusts Rust derive alone",
+      "disposition": "closed",
+      "detail": "BASSovereignVerdictEngine.swift:338-361. Closed by 4f0385598 'fix(#audit/M-d): … routed Stage-3 floor …'. Adds the Swift-side floor (isIrreversible && !evidenceSufficient → level=max(level,.toolCut)) for the routed branch. Theme M-d (§3 line 132; rust member confirmed the Rust derive itself CLEAN, so this was a defense-in-depth gap not a live hole)."
+    },
+    {
+      "med_id": "sovereign MED-5",
+      "title": "Ed25519 signing seed stored in keychain without kSecAttrAccessible…ThisDeviceOnly → root signing identity migrates via encrypted iCloud/iTunes backup",
+      "disposition": "closed",
+      "detail": "BASSovereignKeychainBinding.swift:136-143 (= x-sov #2). Closed by 694218663 'fix(sovereign): mega-audit tranche-1 trust anchor — … signing-seed ThisDeviceOnly (MED-5)' (2026-07-08, alongside H13/H14). Re-confirmed already-closed in §11 line 489 device-gated inventory ('x-sov #2 … 盘查发现已闭 … line 142-144'). Theme M-d ★MED-5, 2-member hit."
+    },
+    {
+      "med_id": "sovereign MED-6",
+      "title": "revokeAllTokens(forSession:) ignores sessionID (`_ = sessionID`) → revokes every session's un-redeemed tokens, false-denies concurrent session B's commit tokens",
+      "disposition": "closed",
+      "detail": "BASSovereignTokenAuthority.swift:384-409. Closed by 4f0385598 'fix(#audit/M-d): sovereign cluster — session-scoped revoke …'. Adds tokenID→sessionID tracking and filters by the parameter. Theme M-d (§3 line 132). Direction was fail-safe (over-deny) so availability/correctness fix, not a security bypass."
+    },
+    {
+      "med_id": "tests-arch ① MED",
+      "title": "BASB2RefitLoopTests machine-state-dependent: default-runs a real FSM loop off /tmp/gdn_coreai/*.json existence and writes back state (non-hermetic, side-effecting, parallel-clobber)",
+      "disposition": "closed",
+      "detail": "BASB2RefitLoopTests.swift:12,27,58. Closed by 173860f42 'test(#18): honesty pass — real Codable round-trips, print-only assertions, hermetic B2' (§6 item 18③): the 3 testWalkR*FromJudgement tests are now gated behind BAS_B2_LOOP=1; the default suite no longer touches /tmp. (Distinct from the still-OPEN experiment-domain b2 /tmp→Docs/evidence CORPUS freeze in §11②, which is the R2/R3 M-j item, not the test hermeticity.)"
+    },
+    {
+      "med_id": "tests-arch ②a MED",
+      "title": "9 (audit-estimated; actually 22) zero-assertion print-only perf tests default-run, permanently green (only failure mode is a crash)",
+      "disposition": "closed",
+      "detail": "BASChapter706/717/718/723/724/726/727/873 measurement suites. Closed by 173860f42 (#18, §6 item 18②, which corrects the count 9→22): behavioral tests get real behavior assertions (e.g. testVeryShortManipulationStillBlocks → assert .block), added cross-implementation agreement oracles (Rust-vs-Swift / int8-vs-f32 element equality) as correctness anchors + non-degeneracy bounds; the 5 pure human-read scorecards gated behind BAS_PERF_PRINT=1."
+    },
+    {
+      "med_id": "tests-arch ②b MED",
+      "title": "~300 permatrue assertions in two families: assertCodable self-compare (231 funcs/80 files) + XCTAssertTrue(true) decision-pins (64)",
+      "disposition": "closed",
+      "detail": "CLOSED for the primary family, with an honest residual. 173860f42 (#18, §6 item 18①) upgraded the assertCodable family — 276 sites → real encode→decode→re-encode byte round-trips via BASCodableRoundTripSupport (+reverse teeth catching a deliberately-broken asymmetric Codable 3/3); 17 deep-nested types honestly relabeled assertConformsToCodableAtCompileTime. RESIDUAL: the XCTAssertTrue(true) decision-pin sub-family was OUT of #18 scope and left in place by design (48 occurrences still in Tests today, was 64) — not individually dispositioned, so that half of the finding is effectively unremediated."
+    },
+    {
+      "med_id": "tests-arch ④ MED",
+      "title": "161 files entirely `#if !os(iOS)` source-gated (153 'ch1022 source-gate') → ~10% of suites absent from the iOS device test bundle; 'device all-green' covers a shrunk universe with no post-quirk-fix regression tracking",
+      "disposition": "closed",
+      "detail": "BASAppleInspectionBridgeTests.swift:9 et al. The source-gates were introduced PRE-audit (f7b941639 'chapter 1022 M3865: 解决所有skip — 153 → 0 via source-gate'; 2d00bbc47). The audit only CHARACTERIZES the resulting shrinkage in the §5 verdict table (line 163: '10% iOS 源门收缩设备绿宇宙是覆盖剧场') — it is NOT dispositioned in any §8-11 remediation ledger, given no open-blocker, and no commit reverses the gates or adds regression tracking. Referenced as a standing coverage-theater characterization but never closed → unaccounted.",
+      "remediation": "commit 941b6dd75 (2026-07-09 tail campaign — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "tools-scripts MED (fit_difficulty_probe AUC)",
+      "title": "fit_difficulty_probe.py AUC has no tie correction → qlen & family+band pre-registered baselines systematically mis-estimated (Tools/fit_difficulty_probe.py:52-58/81/85)",
+      "disposition": "closed",
+      "detail": "commit 870052374 fix(M-j): tie-correct probe AUC via shared _auc.py mean-rank (teeth: all-ties→0.5 vs old 0.0, 50 cases vs scipy.rankdata). Folded under theme M-j (§3 line 140, §9 line 455)."
+    },
+    {
+      "med_id": "tools-scripts MED (release_gate.py two weakenings)",
+      "title": "release_gate.py nw_model=True fail-open default + parse_substrate takes last 'Executed N tests' line (truncation misjudge) (Tools/qinao_local_eval/release_gate.py:88-94/57-59)",
+      "disposition": "closed",
+      "detail": "commit 3485393d6 fix(M-j): regression_gate_status fail-closed (absence=red) + parse takes max-executed line; teeth 8 cases (reversal of default True reds 3/3). Theme M-j (§9 line 456)."
+    },
+    {
+      "med_id": "tools-scripts MED (qinao_bench_zh.py silent drop)",
+      "title": "qinao_bench_zh.py 'except Exception: pass' silently drops subjects → base/tuned question sets differ, scores not comparable (Tools/qinao_local_eval/qinao_bench_zh.py:42/53)",
+      "disposition": "closed",
+      "detail": "commit 04a68f638 fix(M-j): zh-bench records loaded/dropped subjects into result JSON (set-drift detectable). Theme M-j (§9 line 457)."
+    },
+    {
+      "med_id": "tools-scripts MED (B2 candidate JSON bare NaN)",
+      "title": "B2 candidate weight JSON contains bare NaN (non-RFC) → Swift JSONDecoder/jq throw on adopt (Tools/b2_refit_candidate.py:117, Tools/b2_r2_pipeline.py:147)",
+      "disposition": "closed",
+      "detail": "commit 870052374 fix(M-j): heldout_auc→null + json allow_nan=False (same commit as AUC tie-fix). Theme M-j (§9 line 455)."
+    },
+    {
+      "med_id": "tools-scripts MED (R2/R3 frozen corpus + sha only in /tmp)",
+      "title": "R2/R3 frozen corpus + sha pins live only in /tmp → one reboot / periodic clean destroys R4 freeze-clause executability (Tools/b2_r2_pipeline.py:21-27/267-268/416-418)",
+      "disposition": "open",
+      "detail": "Blocker: experiment-domain (operator). §11 line 501 lists it explicitly as residual '②b2 /tmp→Docs/evidence 冻结(实验域)' — not yet moved to Docs/evidence/; deferred as operator experiment-domain work. No fix commit."
+    },
+    {
+      "med_id": "x-architecture MED-1",
+      "title": "Thermal 'same-concept dual representation' BASThermalLevel vs BASThermalBucket, no converter + BASDeviceProfile.thermalState bare String substring-match → unrecognized defaults .nominal (overheated device decided as cool; producers push 'low_power'/environmentClass) (EBrainControlPlaneCore.swift:8/1765-1773, BASSystemProbe.swift:28, AppleAdapterCore.swift:99)",
+      "disposition": "closed",
+      "detail": "commit 789d1363f fix(#15): unify thermal representation — canonical classification + fail-closed on unknown (§10 line 255 DONE, TDD 8 gates). Follow-ups aabcf959a (two thermal-blind adapter producers) + dd2fb8a21 (second consumer #15 missed). Theme M-e/x-arch MED-1 (§3 line 133)."
+    },
+    {
+      "med_id": "x-architecture MED-2",
+      "title": "SwiftUI View (BASConsoleView) lives in substrate-core module BASAdmin → headless hosts forced to link SwiftUI; boundary gate can't see it (AdminCore.swift:2/866)",
+      "disposition": "closed",
+      "detail": "commit f7b93ccb2 fix(M-o/MED-2): split BASConsoleView into new BASAdminUI target (view+typealias migrated), BASAdmin/BASHostKit now SwiftUI-free; teeth = source-tree scan guard w/ positive control. Theme M-o (§9 line 458)."
+    },
+    {
+      "med_id": "x-architecture MED-3",
+      "title": "Sovereign-critical file BASSovereignLedgerHostSink.swift:42 bare 'import Crypto' — undeclared cross-package dep on vendored swift-crypto, no canImport gate; Package.swift never declares it (compiles only via transitive vendored swift-transformers)",
+      "disposition": "closed",
+      "detail": "commit dfb37327b fix(M-o/MED-3): declare swift-crypto explicitly at root .package + 10 target product declarations (same path/identity, byte-equal); kills transitive-only crypto dep. Theme M-o (§9 line 451)."
+    },
+    {
+      "med_id": "x-concurrency MED-HIGH-4",
+      "title": "L8 global recall cosineTopKAtomIDsSync = topK FFI + K rowid→atom_id FFI multi-call TOCTOU; concurrent write inserts between → SQLite rowid reuse remaps to wrong atom (wrong recall) / drops (silent miss); release has no tripwire (BASRoutedVectorIndexStorage.swift:619-676)",
+      "disposition": "closed",
+      "detail": "commit 5c2d2a365 fix(M-l MED-4): new Rust cosine_topk_atom_ids_for_domain reads atom_id inside one with_conn Mutex (no rowid round-trip) + total order; Swift single-call; XCFramework 3-slice byte-identical rebuild + SHA pins; cargo+tie-member teeth. Theme M-l MED-4 (§3 line 138, §9 line 464). Note: severity tag MED-HIGH."
+    },
+    {
+      "med_id": "x-concurrency MED-5",
+      "title": "Adjudication engine process-global static counter has no synchronized accumulation — nonisolated(unsafe) static var routedDivergenceCount with plain += RMW across isolation domains → data race / lost increments, on the very '>0 = investigate' interpretability counter (BASSovereignVerdictEngine.swift:277/356)",
+      "disposition": "closed",
+      "detail": "NOT referenced in any ledger: §3 M-l (line 138) lists x-concurrency MED-4/6/8/9 but conspicuously SKIPS MED-5; the doc's other 'MED-5' mentions are different auditors (mlx-adapter-core MED-5=H4; M-d MED-5=x-sov#2; M-i MED-5=DeviceTestApp). Source unchanged: lines 277/356 still nonisolated(unsafe) static + non-atomic +=. Only post-audit commit to the file is 4f0385598 (M-d: revoke/Stage-3/canonical gate) which does NOT touch the counter. No ManagedAtomic fix. Silently dropped MED.",
+      "remediation": "commit bfd670547 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "x-concurrency MED-6",
+      "title": "Production path temporarily flips process-level routing flag useRoutedFilter (nonisolated(unsafe) static) false then recurses → cross-thread behavior crosstalk + data race (BASOrganTrainedWeightProvenance.swift:452-454/245)",
+      "disposition": "closed",
+      "detail": "commit 1fa5497ce fix(#audit/M-l MED-6): provenance filter kills the process-global useRoutedFilter race (explicit useRouted param instead of touching global). Theme M-l MED-6 (§3 line 138)."
+    },
+    {
+      "med_id": "x-concurrency MED-7",
+      "title": "Breathing scheduler (BGTask bridge) check-then-act across await: cancelAll (thermal emergency) draining per-id await while a concurrent schedule completes bridge.register → removeAll wipes dict but platform registration stays alive → ghost maintenance wakeups after thermal emergency (BASBreathScheduler.swift:106-121/134-139)",
+      "disposition": "closed",
+      "detail": "commit cfc103ad0 fix(#audit/M-p): breath-scheduler cancelAll ghost registration under actor reentrancy. Theme M-p (§3 line 139, 2-auditor co-hit w/ policy-obs-misc LOW-5)."
+    },
+    {
+      "med_id": "x-concurrency MED-8",
+      "title": "Event-sourced atom store initial seed is fire-and-forget (Task.detached) → store returned to host before seed admit completes; first-turn retrieve may see empty; seed vs first-turn event order nondeterministic in event log (BASHostStorageWireBuilder.swift:132-146/466-480)",
+      "disposition": "closed",
+      "detail": "commit ca07528c3 fix(M-l/MED-8): makeAtomStore→async, inline await seeding (no detached-seed race); teeth = immediate read of two atoms (reversal of detached version reds 5/5). Theme M-l MED-8 (§3 line 138, §9 line 454). 2-auditor co-hit (=hostkit-rest MED-6)."
+    },
+    {
+      "med_id": "x-concurrency MED-9",
+      "title": "Biomimetic GPU organ cross-await lost update: concurrent applyGPU both copy same weights baseline into GPU buffer, await returns and overwrites whole → W0+d2 not W0+d1+d2 (one plasticity update silently lost); Mamba hiddenState same (BASPlasticityFold.swift:680, BASMambaSSMState.swift:635)",
+      "disposition": "closed",
+      "detail": "Blocker: experiment-domain. Named in §3 M-l (line 138) but NO closure commit addresses it — M-l's fix commits cover MED-4/6/8 + metal#3/#4 + orch, not the biomimetic cross-await lost-update. The only post-audit touch to these files is 3cb95a156, which fixed the DIFFERENT H3 bug (addCompletedHandler-before-commit at lines 660-661/615-616, a Mac-false-green hang), not the reentrancy lost-update at line 680. Auditor itself flagged these as probe/experiment-wired ('入produ前必须加 in-flight 防重入'), so real harm is low; fold declared closed in §11 without a dedicated fix.",
+      "remediation": "commit 917e6452e (2026-07-09 tracked-open re-exam — TDD + adversarial reversal-must-red + regression + push)"
+    },
+    {
+      "med_id": "x-concurrency MED-LOW-10",
+      "title": "Synchronous Metal bridge blocks a cooperative thread: DispatchSemaphore.wait blocks the calling actor-executor thread up to timeoutMs waiting on its own spawned Task → pool-saturation degradation (BASMetalSyncBridge.swift:38-49)",
+      "disposition": "device-only",
+      "detail": "NOT referenced anywhere in §3/§8/§9/§10/§11 (grep of the audit doc finds no MetalSyncBridge/semaphore mention). No post-audit commit to the file. Severity tag MED-LOW; auditor judged it degradation-not-deadlock (has timeout + guaranteed fallback, only caller in DeviceTestApp:1216), so low urgency — but it was silently dropped from the rollup.",
+      "remediation": "DEVICE-ONLY + LOW (workflow verdict macFixableCore=false, fixSound=false): the DispatchSemaphore sync-bridge has a timeout + guaranteed fallback (degradation-not-deadlock); a restructure to an async variant risks worse (priority inversion) and needs on-device thermal/load to certify. Left as a documented low-severity item."
+    },
+    {
+      "med_id": "x-sovereignty #2 (MED)",
+      "title": "Sovereign ledger Ed25519 signing private-key Keychain item not pinned kSecAttrAccessible…ThisDeviceOnly → default WhenUnlocked enters encrypted backup, restorable to another device, breaking per-device signing identity (BASSovereignKeychainBinding.swift:113-148)",
+      "disposition": "closed",
+      "detail": "commit 694218663 fix(sovereign): tranche-1 trust anchor — signing-seed ThisDeviceOnly (MED-5). Theme M-d MED-5 (§3 line 132, 2-auditor co-hit). §11 line 489 confirms 'already-closed' on inventory."
+    },
+    {
+      "med_id": "x-sovereignty #3 (MED)",
+      "title": "Repo's own vendor remote-leak gate currently FAILs — 4 un-frozen vendor secondary deps (EventSource/LiteRT-LM/swift-huggingface Package.swift) = only un-frozen supply-chain input surface (scripts/check_vendor_remote_leak.sh)",
+      "disposition": "closed",
+      "detail": "commit 3cb95a156 fix(immediate-tier): '...revive 2 sovereignty gates'. Commit body: x-sov#3 — EventSource/swift-huggingface remote secondary deps moved behind BAS_VENDOR_ALLOW_REMOTE env-gate (traits off, zero consumers) + checksum-pinned binaryTarget allowlist; verified end-to-end. Theme M-p (§3 line 143)."
+    },
+    {
+      "med_id": "x-sovereignty #4 (MED)",
+      "title": "Sovereign redaction gate unrunnable on current toolchain — check_sovereign_redaction.sh dies on QinaoSample/ContentView.swift result-builder compile error before reaching redaction verdict (guard fails silent)",
+      "disposition": "closed",
+      "detail": "commit 3cb95a156 (same 'revive 2 sovereignty gates'). Body: x-sov#4 — route ViewBuilder branch through AnyView-returning non-ViewBuilder func (type-erase, no synthesis) → gate compiles AND macOS14-25 showcase preserved; gate clean across 25 modules. Theme M-p (§3 line 143)."
+    },
+    {
+      "med_id": "x-sovereignty #5 (MED)",
+      "title": "Memory atom store (highest-sensitivity at-rest point) not pinned to an explicit Data Protection class — sqlite3_open_v2 no protection; payload_json stores full BASGovernedMemory incl. sensitivity column; same-DB double-standard vs KV-snapshot 'seam2' (BASSQLiteMemoryAtomStore.swift:167)",
+      "disposition": "closed",
+      "detail": "commit 6c600c0c1 fix(x-sov #5/#6): file Data Protection on memory-atom DB + surface the error (device-gated §11 line 493, macOS .protectionKey verified stored+read-back). Residual: at-rest lock-before-read encryption behavior is device-gated (real-device only, §11 line 501 ①) — remediation code landed, hardware verification pending. Theme M-a (§3 line 129)."
+    },
+    {
+      "med_id": "x-test-integrity F4 (MED, fail-closed)",
+      "title": "release_gate authored-key membership check permanently FAILs since 2026-06-25 → joint release gate can never report PASS; grep 'test_qinao_[a-z0-9_]+' (case-sensitive) truncates '..._realFold'→'..._real', mismatching the PASS-line parse (release_gate.py:136 / Batch4Tests:1038,1106)",
+      "disposition": "closed",
+      "detail": "F4 never entered the ledger: synthesis explicitly truncated the x-test-integrity report at F3 (§ note line 5 + §7 line 309: 'only covers F1/F2/partial-F3'). H23 = F1+F2+F3 only. Two post-audit release_gate.py commits (3485393d6 M-j never_worse/parse; 02b534b8a H23 hardcoded-PASS/fingerprint-keymap/fail-closed) address DIFFERENT defects. Current release_gate.py:192 authored_gate_keys() STILL greps case-sensitive 'func test_qinao_[a-z0-9_]+' (truncates mixed-case suffix) — F4's specific bug unaddressed. Silently dropped MED.",
+      "remediation": "commit 8ace4a187 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "x-test-integrity F5 (MED)",
+      "title": "CRITICAL reading gates #20/#21/#26 backed by known-saturated probes (base=tuned=1.0); corrected qinao_reading_hard probe wrote /tmp with no consumer; #26 unit mismatch (registry >0.20 lift vs qinao_reading records percent 100.0) (qinao_reading.py; qinao_reading_hard.py:1-3)",
+      "disposition": "partial",
+      "detail": "Incidentally addressed by H23 orphan-wiring: commit 6c9f77c38 fix(H23) added qinao_merge.py whose KNOWN_SIDEFILES now maps 'reading_hard': 'qinao_reading_hard' (line 36), so the previously-orphan corrected probe is now ingested. Theme H23 (§2 line 122) — but F5 was NEVER named (truncated at F3); the wiring was incidental and the saturation-backing and #26 lift-vs-percent unit-mismatch sub-parts are not confirmed addressed by any F5-targeted fix.",
+      "remediation": "PARTIAL: (1) #26 novel_doc_read toothless-CRITICAL-gate unit-mismatch (percent *100 vs fraction >0.20 threshold) CLOSED — commit a35c2254f, computed as a fraction so the gate discriminates (poor reader FAILS), Mac-tested + reversal-red. (2) orphan-wiring CLOSED incidentally by H23 (6c9f77c38). REMAINING: the discriminating qinao_reading_hard probe (reading_hard_followrate) runs+merges but is gated by NO registry metric — a QINAO design decision (new metric ID + threshold) to repoint the saturated #20/#21 backing. Operator/QINAO-campaign scope."
+    },
+    {
+      "med_id": "x-test-integrity F6 (MED)",
+      "title": "qinao_device.py output-key convention incompatible with build_verdict — writes named keys (decode_tok_s) but build_verdict.py:49 only looks up numeric keys base.get(str(n)); its own docstring's 'build_verdict reads them' contract is false → #65-72 stay PENDING after device merge (qinao_device.py:4-5)",
+      "disposition": "closed",
+      "detail": "F6 never entered the ledger (x-test-integrity truncated at F3). qinao_device.py has ZERO post-audit commits; still writes named out['decode_tok_s'] (line 37/123). The H23 qinao_merge.py does NOT translate device named→numeric — its line-32 comment even asserts 'qinao_device already writes the values file' (the exact false contract F6 flags), so qinao_device is not in KNOWN_SIDEFILES. Defect stands. Silently dropped MED.",
+      "remediation": "commit df4966b4a (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    },
+    {
+      "med_id": "x-test-integrity F7 (MED)",
+      "title": "shared_wal_durability gate Step 2 pins the test's own re-issued PRAGMA copy, not production init — 3 of 4 asserts (synchronous=NORMAL / wal_autocheckpoint=200 / foreign_keys=ON) are 'replay verification'; deleting the pragma from prod init leaves the gate green (QINAOGateSharedWALDurabilityTests.swift:121-130)",
+      "disposition": "closed",
+      "detail": "F7 never entered the ledger (truncated at F3). The test (current lines 118-132) STILL opens a fresh tempURL connection and re-executes the 4 PRAGMAs itself via sqlite3_exec(replay,...) — exactly F7's complaint. No post-audit commit to QINAOGateSharedWALDurabilityTests.swift; the finding's requested internal read-only pragma probe on the real store was not added. Silently dropped MED.",
+      "remediation": "commit 8962e922b (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
+    }
+  ],
+  "tail_campaign_2026_07_09": {
+    "method": "ultracode workflow (12-agent analyze→adversarial-verify) → serial execution by main loop, one build at a time",
+    "closed_this_round": [
+      "organ-eval MED-4",
+      "hostkit-rest MED-1",
+      "hostkit-rest MED-4 (=memory-b F7)",
+      "hostkit-rest MED-5",
+      "memory-b F7",
+      "tests-arch ④"
+    ],
+    "refuted_this_round": [
+      "hostkit-spine F3"
+    ],
+    "final_tally": "37 unaccounted = 22 closed + 2 not-reproduced/refuted (memory-b F5, hostkit-spine F3) + 13 device/runtime-gated",
+    "mac_fixable_population": "FULLY RESOLVED — every Mac-fixable unaccounted MED is closed or honestly refuted",
+    "device_runtime_gated_remaining": [
+      "devicetestapp MED-1",
+      "devicetestapp MED-3",
+      "devicetestapp MED-5",
+      "devicetestapp MED-8",
+      "devicetestapp MED-9",
+      "mlx-adapter-core MED-6",
+      "mlx-adapter-core MED-7",
+      "mlx-adapter-core MED-8",
+      "mlx-adapter-core MED-9",
+      "mlx-adapter-core MED-10",
+      "mlx-adapter-core MED-11",
+      "mlx-decode MED-1",
+      "x-concurrency MED-LOW-10"
+    ],
+    "swift_build": "green (2.18s)"
+  },
+  "device_gated_reexam_2026_07_09": {
+    "method": "ultracode workflow (24-agent analyze→adversarial-verify) re-examined the 13 \"device/runtime-gated\" items for a Mac-fixable code CORE; overturned the coarse classification — 10 had pure-logic cores",
+    "closed": [
+      "devicetestapp MED-5",
+      "mlx-decode MED-1",
+      "mlx-adapter-core MED-10",
+      "devicetestapp MED-1",
+      "devicetestapp MED-8",
+      "mlx-adapter-core MED-6",
+      "mlx-adapter-core MED-11",
+      "mlx-adapter-core MED-9",
+      "mlx-adapter-core MED-7",
+      "devicetestapp MED-3"
+    ],
+    "not_mac_fixable": {
+      "mlx-adapter-core MED-8": "deferred (in-perform-closure build; risky restructure)",
+      "devicetestapp MED-9": "device-only (MLX-coupled probe)",
+      "x-concurrency MED-LOW-10": "device-only + LOW (async restructure risks worse)"
+    },
+    "final_tally": "37 unaccounted = 32 closed + 2 not-reproduced/refuted (memory-b F5, hostkit-spine F3) + 3 honest residuals (mlx MED-8 deferred, devicetestapp MED-9 + x-conc MED-LOW-10 device-only)",
+    "lesson": "\"device/runtime-gated\" conflated \"symptom manifests on device\" with \"fix cannot be written/tested on Mac\". 10 of 13 had a pure-Swift core (a constant reconciliation, a self-defeating clamp, a model-id binding, a persistence horizon, a command-buffer budget, a subsume relation, a rearm-report, a load single-flight, a drop-epoch, an O(1) count). The adversarial-verify layer kept the honest negatives honest (2 confirmed device-only, 1 deferred).",
+    "swift_build": "green; 53 tests across touched modules green"
+  },
+  "tracked_open_reexam_2026_07_09": {
+    "method": "ultracode workflow (6-agent analyze→adversarial-verify) on the 4 tracked-open-with-blocker items; the verifier OVERTURNED the analysis on x-concurrency MED-9 (pure actor-reentrancy lost-update, not GPU-runtime)",
+    "closed": [
+      "orchestration MED-3",
+      "policy-obs-misc MED-2",
+      "x-concurrency MED-9"
+    ],
+    "operator_gated": {
+      "tools-scripts MED (R2/R3 /tmp corpus)": "experiment-domain, operator-gated: move R2/R3 frozen corpus + sha pins from /tmp to Docs/evidence/. Involves moving files (deletion-aversion hard rule) and is the operator experiment-domain per §11 line 501 — NOT touched."
+    },
+    "final_tally": "4 tracked-open = 3 closed (orchestration MED-3 fail-closed, policy-obs-misc MED-2 eventID+comment-lie, x-concurrency MED-9 apply/scan mutex) + 1 operator-gated (tools R2/R3 corpus move)"
+  },
+  "x_test_f5_partial_close_2026_07_09": {
+    "note": "x-test-integrity F5 #26 unit-mismatch closed (a35c2254f). The saturation-backing sub-part (gate the harder reading_hard probe) remains a QINAO metrics design decision (which metric ID + threshold)."
+  }
+}

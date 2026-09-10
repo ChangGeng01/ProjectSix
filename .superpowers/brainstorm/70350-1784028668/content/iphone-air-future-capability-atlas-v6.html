@@ -1,0 +1,198 @@
+<style>
+  .v6 { --line:rgba(255,255,255,.13); --muted:rgba(255,255,255,.64); --blue:#78a9ff; --amber:#ffc36e; --green:#59d6a7; --red:#ff7d87; --violet:#c99cff; --cyan:#59d5dc; }
+  .v6 h3 { margin-top:25px; }
+  .hero { border:1px solid rgba(89,214,167,.36); border-radius:16px; padding:15px; margin:14px 0 18px; background:linear-gradient(120deg,rgba(89,214,167,.075),rgba(120,169,255,.04)); }
+  .hero strong { color:var(--green); font-size:13px; }
+  .hero p { margin:6px 0 0; color:var(--muted); font-size:10px; line-height:1.55; }
+  .horizons { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-bottom:16px; }
+  .horizon { border:1px solid var(--line); border-radius:13px; padding:11px; min-height:110px; }
+  .horizon .tag { display:inline-block; border:1px solid currentColor; border-radius:999px; padding:2px 6px; font-size:8px; margin-bottom:6px; }
+  .horizon h4 { margin:0 0 4px; font-size:11px; }
+  .horizon p { margin:0; color:var(--muted); font-size:9px; line-height:1.48; }
+  .ship { color:var(--green); border-color:rgba(89,214,167,.38); }
+  .beta { color:var(--amber); border-color:rgba(255,195,110,.38); }
+  .future { color:var(--violet); border-color:rgba(201,156,255,.38); }
+  .arch { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(230px,.75fr); gap:10px; }
+  .semantic,.physical { border:1px solid var(--line); border-radius:15px; padding:12px; }
+  .panel-head { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:9px; }
+  .panel-head h4 { margin:0; font-size:12px; }
+  .pill { border:1px solid rgba(120,169,255,.35); border-radius:999px; color:var(--blue); font-size:8px; padding:3px 6px; white-space:nowrap; }
+  .layers { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .layer { border:1px solid rgba(120,169,255,.24); border-radius:9px; padding:7px; min-height:62px; background:rgba(120,169,255,.025); }
+  .layer b { display:block; font-size:9px; margin-bottom:2px; color:var(--blue); }
+  .layer span { display:block; font-size:8px; line-height:1.35; color:var(--muted); }
+  .membrane { border:1px dashed rgba(89,213,220,.38); color:var(--cyan); border-radius:9px; padding:8px; margin-top:8px; text-align:center; font-size:9px; }
+  .kernels { display:grid; grid-template-columns:1fr; gap:6px; }
+  .kernel { border:1px solid rgba(255,255,255,.12); border-radius:9px; padding:8px; }
+  .kernel b { display:block; font-size:9px; margin-bottom:3px; }
+  .kernel span { display:block; color:var(--muted); font-size:8px; line-height:1.38; }
+  .ortho { border:1px solid rgba(255,195,110,.3); border-radius:15px; padding:12px; margin-top:10px; background:rgba(255,195,110,.025); }
+  .silicon { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; }
+  .unit { border:1px solid var(--line); border-radius:9px; padding:8px; min-height:72px; }
+  .unit b { display:block; font-size:9px; margin-bottom:3px; }
+  .unit span { display:block; font-size:8px; color:var(--muted); line-height:1.38; }
+  .contract-flow { display:grid; grid-template-columns:repeat(7,auto); align-items:center; justify-content:stretch; gap:5px; margin-top:9px; }
+  .contract { border:1px solid rgba(255,195,110,.25); border-radius:8px; padding:7px 6px; text-align:center; font-size:8px; line-height:1.35; }
+  .arrow { color:var(--muted); text-align:center; }
+  .timeline { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; }
+  .phase { min-width:104px; flex:1; border:1px solid var(--line); border-radius:10px; padding:8px; font-size:8px; line-height:1.4; color:var(--muted); }
+  .phase b { display:block; color:white; font-size:9px; margin-bottom:2px; }
+  .phase.cpu { border-color:rgba(89,213,220,.34); }
+  .phase.gpu { border-color:rgba(201,156,255,.42); background:rgba(201,156,255,.035); }
+  .phase.sec { border-color:rgba(255,195,110,.38); }
+  .portfolio { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .backend { border:1px solid var(--line); border-radius:11px; padding:10px; }
+  .backend h4 { margin:0 0 4px; font-size:10px; }
+  .backend p { margin:0; color:var(--muted); font-size:8px; line-height:1.46; }
+  .backend.primary { border-color:rgba(89,214,167,.4); }
+  .backend.research { border-color:rgba(255,195,110,.4); }
+  .truth { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .truth-card { border:1px solid var(--line); border-radius:11px; padding:10px; }
+  .truth-card .n { font-size:17px; font-weight:700; margin-bottom:3px; }
+  .truth-card p { margin:0; color:var(--muted); font-size:8px; line-height:1.43; }
+  .green { color:var(--green); } .amber { color:var(--amber); } .red { color:var(--red); } .violet { color:var(--violet); }
+  .levers { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .lever { border:1px solid var(--line); border-radius:11px; padding:10px; }
+  .lever h4 { margin:0 0 4px; font-size:10px; }
+  .lever p { margin:0; color:var(--muted); font-size:8px; line-height:1.48; }
+  .audit { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+  .audit-col { border:1px solid var(--line); border-radius:12px; padding:10px; }
+  .audit-col h4 { margin:0 0 6px; font-size:10px; }
+  .audit-row { border-top:1px solid rgba(255,255,255,.08); padding:6px 0; font-size:8px; line-height:1.43; color:var(--muted); }
+  .audit-row:first-of-type { border-top:0; }
+  .invariant { border:1px solid rgba(89,214,167,.34); border-radius:12px; padding:11px; margin-top:10px; background:rgba(89,214,167,.025); }
+  .invariant b { color:var(--green); }
+  .invariant p { margin:4px 0 0; font-size:9px; line-height:1.5; color:var(--muted); }
+  @media(max-width:980px){ .arch{grid-template-columns:1fr;} .layers{grid-template-columns:repeat(4,1fr);} .silicon{grid-template-columns:repeat(4,1fr);} .contract-flow{grid-template-columns:1fr;} .arrow{transform:rotate(90deg);} }
+  @media(max-width:680px){ .horizons,.portfolio,.truth,.levers,.audit{grid-template-columns:1fr;} .layers,.silicon{grid-template-columns:repeat(2,1fr);} }
+</style>
+
+<div class="v6">
+  <h2>v6 · iPhone Air → Future Apple Silicon Capability Atlas</h2>
+  <p class="subtitle">不押注 A20/A21 传闻；用能力探测、模型证书与真实收据，让同一套 14 层语义在 Air、未来 iPhone 与不同 OS 上稳定演进。</p>
+
+  <div class="hero">
+    <strong>结论：未来架构的稳定轴不是芯片名，而是“语义不变 × 执行可替换 × 证据可晋升”。</strong>
+    <p>A19 Pro 同时拥有 GPU Shader、GPU 内 Neural Accelerators 与独立 Neural Engine，但 Apple 没有向第三方开放硬预留、P/E 核绑定、ANE 利用率或热降频控制。资源 lease 因此只能是 app 内合作式、OS 可撤销；所有 placement 必须诚实标为 observed / inferred / requested-only / unknown。</p>
+  </div>
+
+  <div class="horizons">
+    <div class="horizon ship"><span class="tag">H0 · SHIPPING</span><h4>iOS 18–26 · 当前生产基线</h4><p>MLX/Metal 4B 主干；Core ML 小头；A19 TensorOps/NAX 专项认证；Enhanced Security helper 隔离 L14。所有当前用户都必须有完整质量路径。</p></div>
+    <div class="horizon beta"><span class="tag">H1 · CONDITIONAL</span><h4>iOS 27 · Core AI 认证车道</h4><p>AOT、stateful KV/recurrent state、optimal layout、预分配与零拷贝很有潜力；但 Qwen3.5 动态控制流、自定义 Metal kernel、AOT 与 cache 仍有 Beta 已知问题。</p></div>
+    <div class="horizon future"><span class="tag">H2 · UNKNOWN</span><h4>未来 iPhone · capability-driven</h4><p>不写 `if A20`。新设备只产生新 CapabilitySnapshot 与 CertifiedBackendProfile；未知画像 fail-closed，退回 portable model / 已认证 MLX lane。</p></div>
+  </div>
+
+  <div class="arch">
+    <div class="semantic">
+      <div class="panel-head"><h4>14 Semantic LayerCores · 职责边界永远稳定</h4><span class="pill">WHAT THE SYSTEM MEANS</span></div>
+      <div class="layers">
+        <div class="layer"><b>L1 · Wick Life</b><span>资源约束、唤醒、节奏；不决定语义答案</span></div>
+        <div class="layer"><b>L2 · Brain Tissue</b><span>模型、KV/recurrent state、decode lane</span></div>
+        <div class="layer"><b>L3 · Folded Lung</b><span>context compile、压缩、呼吸边界</span></div>
+        <div class="layer"><b>L4 · World Prior</b><span>世界先验与领域边界</span></div>
+        <div class="layer"><b>L5 · Constitution</b><span>宿主偏好、目标、人格约束</span></div>
+        <div class="layer"><b>L6 · Situation</b><span>输入、意图、情境、presence</span></div>
+        <div class="layer"><b>L7 · Mirror Blade</b><span>解构、矛盾、状态需求规划</span></div>
+        <div class="layer"><b>L8 · Hippocampus</b><span>StateLake 检索、冲突、引用</span></div>
+        <div class="layer"><b>L9 · Kunlun / Dream</b><span>候选、反事实、行动性</span></div>
+        <div class="layer"><b>L10 · Tribunal</b><span>三我审议、合并、主动验证</span></div>
+        <div class="layer"><b>L11 · Risk Plane</b><span>风险卡、许可建议、effect gate</span></div>
+        <div class="layer"><b>L12 · Soft Hand</b><span>表达、密度、清晰度、输出 staging</span></div>
+        <div class="layer"><b>L13 · Evolution</b><span>update ticket、shadow trial、版本候选</span></div>
+        <div class="layer"><b>L14 · Sovereign</b><span>exact digest 授权、warrant、seal</span></div>
+      </div>
+      <div class="membrane">Typed membrane：每层只交换 immutable ArtifactRef + CapabilityRef；Query / Fan-out+Join / Proposal+Critique / Remand / Commit Saga</div>
+    </div>
+    <div class="physical">
+      <div class="panel-head"><h4>4 Physical Kernels</h4><span class="pill">WHO OWNS MECHANISM</span></div>
+      <div class="kernels">
+        <div class="kernel"><b>K1 · Lease &amp; Life</b><span>L1 policy + live thermal/power/memory observation；签 offer，不看 prompt 内容。</span></div>
+        <div class="kernel"><b>K2 · Neural Organ</b><span>L2/L3 + 唯一 heavy-model owner；weights、KV、MLX/Core AI session、token loop。</span></div>
+        <div class="kernel"><b>K3 · State &amp; Evolution</b><span>L4–L13 状态机制、StateLake、artifact DAG、commit saga；decode 时不抢 GPU。</span></div>
+        <div class="kernel"><b>K4 · Sovereign</b><span>L14 + isolated helper；授权 offer digest、nonce、防重放与 seal，不承载模型。</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ortho">
+    <div class="panel-head"><h4>Silicon Capability Plane · 正交资源 fabric，不是 L15</h4><span class="pill">HOW IT RUNS TODAY</span></div>
+    <div class="silicon">
+      <div class="unit"><b>CPU · QoS</b><span>tokenize、Swift、SQLite、crypto glue；无公开 P/E pinning</span></div>
+      <div class="unit"><b>GPU Shader</b><span>MLX 主干、fusion、sampling；decode 独占带宽</span></div>
+      <div class="unit"><b>GPU NAX</b><span>TensorOps/qmm/attention；与独立 ANE 不同</span></div>
+      <div class="unit"><b>Neural Engine</b><span>只运行 model+shape 实测证明有净收益的 lane</span></div>
+      <div class="unit"><b>Unified Memory</b><span>全进程单一 MemoryLedger；shared ≠ 无同步/无争用</span></div>
+      <div class="unit"><b>Storage</b><span>weights、AOT cache、StateLake；4B fit 时不做 NAND decode</span></div>
+      <div class="unit"><b>SE + MIE</b><span>设备密钥、digest 签名、helper 隔离；不贡献 tok/s</span></div>
+      <div class="unit"><b>N1 / C1X / Radios</b><span>网络与连接 offload；无第三方 AI 调度面</span></div>
+    </div>
+    <div class="contract-flow">
+      <div class="contract">CapabilitySnapshot<br>raw facts</div><div class="arrow">→</div>
+      <div class="contract">ModelExecutionProfile<br>certified tuple</div><div class="arrow">→</div>
+      <div class="contract">SiliconLeaseOffer<br>revocable + expiry</div><div class="arrow">→</div>
+      <div class="contract">UsageReceipt<br>actual + honest unknown</div>
+    </div>
+  </div>
+
+  <h3>一个 turn 的健康硬件所有权交接</h3>
+  <div class="timeline">
+    <div class="phase cpu"><b>Input / L6</b>CPU<br>normalize + intent/risk hints</div>
+    <div class="phase cpu"><b>StateLake / L7–L8</b>CPU + SQLite<br>真正 I/O lane 可并发</div>
+    <div class="phase cpu"><b>Compile / L3</b>CPU<br>COW artifacts；tokenize once</div>
+    <div class="phase gpu"><b>Prefill / L2</b>GPU TensorOps/NAX<br>prefix restore 优先</div>
+    <div class="phase gpu"><b>Decode / L2</b>GPU exclusive<br>plain/MTP/prompt lookup 由证书路由</div>
+    <div class="phase cpu"><b>Verify / L9–L12</b>CPU first<br>GPU verifier 必须串行且可证明</div>
+    <div class="phase sec"><b>Commit / L13–L14</b>SQLite + SE<br>authorize → effect → receipt → seal</div>
+  </div>
+
+  <h3>后端组合：不是一次迁移，而是可晋升 portfolio</h3>
+  <div class="portfolio">
+    <div class="backend primary"><h4 class="green">MLX / Metal · Production incumbent</h4><p>当前 4B 唯一满血主干。固定版本、真机 NAX receipt、fused token loop、hybrid state、prefix cache 与热态证书。</p></div>
+    <div class="backend"><h4>Core ML · Certified microheads</h4><p>小分类/重排/检测按 model+shape 认证。`.all` 只表示允许集合，不证明 ANE placement。</p></div>
+    <div class="backend research"><h4 class="amber">Core AI · Research/certification</h4><p>iOS 27 feature flag；AOT + stateful + zero-copy。数值、质量、内存、placement、30 分钟热稳全部通过后逐模型晋升。</p></div>
+    <div class="backend"><h4>Foundation Models · Optional sidecar</h4><p>OS 版本和 availability 会变化；适合可替代辅助任务，不作为 full-blood sovereign model 或 StateLake authority。</p></div>
+  </div>
+
+  <h3>40 tok/s：把宣传峰值、冷启动与持续 goodput 分开</h3>
+  <div class="truth">
+    <div class="truth-card"><div class="n green">34.6</div><p>当前 Qwen3.5-4B 满血短冷机最佳量级。距离 40 约 15%，但还不是可承诺通用 cold-40。</p></div>
+    <div class="truth-card"><div class="n red">15.9</div><p>20 分钟末段实测量级。Air 的热稳 30/40 不能靠 scheduler 或 NAX 峰值宣称。</p></div>
+    <div class="truth-card"><div class="n amber">≈25</div><p>59 GB/s 与 4-bit 每 target pass 字节量推得的 plain sustained 屋顶量级；更多矩阵峰值不消除权重流量。</p></div>
+    <div class="truth-card"><div class="n violet">&gt;1 token/read</div><p>持续跨过带宽屋顶的核心：MTP / ReDrafter / prompt lookup，或训练期减少 bytes/token。</p></div>
+  </div>
+  <div class="levers" style="margin-top:8px">
+    <div class="lever"><h4 class="green">现在 · 无损/可严格认证</h4><p>固定 MLX + NAX 实证、AOT/prewarm/shape bucket、消灭 host sync、混合 int4、hybrid checkpoint、内容寻址 prefix、任务门控 prompt lookup、热态 never-worse MTP。</p></div>
+    <div class="lever"><h4 class="amber">需训练 · 真正 30–40+</h4><p>Qwen 专用 ReDrafter、强化原生 MTP + fused verification、2-bit QAT、KV depth sharing、prompt-level fixed experts / pruning。必须重新做全质量与安全认证。</p></div>
+    <div class="lever"><h4 class="violet">未来 · 只保留接口</h4><p>Core AI 成熟路径、EpiCache/KV Prediction、下一代带宽与 cache。未来硬件只能新增 profile，不改 14 层语义和 capability contract。</p></div>
+  </div>
+
+  <h3>当前代码与目标架构的闭环差距</h3>
+  <div class="audit">
+    <div class="audit-col"><h4 class="green">保留并升格</h4>
+      <div class="audit-row">`BASOrganAdapter` 模型无关边界；MLX 当前真实热路</div>
+      <div class="audit-row">`BASDecodeLanePolicy` + never-worse / acceptance 纪律</div>
+      <div class="audit-row">`BASThermalTwin` 的 live sample + freshness；`BASMLXMemoryModel` 动态 cap</div>
+      <div class="audit-row">14 层 typed identity、4 kernels、StateLake fail-closed、Core AI default-deny gate</div>
+      <div class="audit-row">vendored MLX 的 A19 NAX 分支；补 actual-use evidence 后晋升</div>
+    </div>
+    <div class="audit-col"><h4 class="red">先修真相，再接前沿</h4>
+      <div class="audit-row">4 套重叠决策：ExecutionPlan / HardwareScheduler / DeviceRouting / MLX planner</div>
+      <div class="audit-row">nativeV2 stage 输出被丢弃后无条件再跑 V1：真实 closure 接入后会双算</div>
+      <div class="audit-row">tensor backing ≠ placement；ANE presence 不能推导 2GB/batch/op latency</div>
+      <div class="audit-row">静态 6.29GB profile 与 entitlement-aware 动态 memory SSOT 冲突</div>
+      <div class="audit-row">Core AI 当前 `[Float] ↔ NDArray` 复制；串行应是预算政策，不再是假定 API 不支持并发</div>
+    </div>
+  </div>
+
+  <div class="invariant"><b>Full-blood invariant</b><p>同 weights / quantization / tokenizer / verifier / sovereign policy / quality gate。thermal 可以等待、复用缓存、换成已认证等价 backend、关闭负收益 speculative；不能暗中换小模型、降精度、跳过验证或放宽 L14。健康的“满血”是 verified goodput / energy / recovery debt 最优，不是让 CPU、GPU、NAX、ANE 同时 100%。</p></div>
+
+  <div class="decision">
+    <h3>选择面向 Air 与未来 iPhone 的主路线</h3>
+    <p class="subtitle">我建议 A。它不会阻止 A19 深度优化，也不会把系统锁死在某一代芯片或仍处 Beta 的 Core AI。</p>
+    <div class="options">
+      <div class="option" data-choice="capability-portfolio" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content"><h3>Capability-driven portfolio（推荐）</h3><p>MLX 生产主干 + Core ML 小头 + Core AI 认证车道；按证据晋升，14 层语义不变。</p></div></div>
+      <div class="option" data-choice="air-vertical" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content"><h3>Air-first vertical optimization</h3><p>先针对 A19/Air 极致纵向打磨，再抽象未来设备；近期更集中，但迁移债更高。</p></div></div>
+      <div class="option" data-choice="coreai-first" onclick="toggleSelect(this)"><div class="letter">C</div><div class="content"><h3>Core AI-first migration</h3><p>把 iOS 27 Beta 能力设为主轴；潜在上限高，但当前 Qwen 与 AOT/custom-kernel 风险最大。</p></div></div>
+    </div>
+  </div>
+</div>

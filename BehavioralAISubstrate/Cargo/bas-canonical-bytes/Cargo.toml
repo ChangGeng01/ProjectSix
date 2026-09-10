@@ -1,0 +1,13 @@
+[package]
+name = "bas-canonical-bytes"
+description = "chapter 七百三 第四刀 — Rust port of BASSovereignAudit canonicalBytes assembler + Codable byte-stable encoders。 Used to produce the wire bytes the audit ledger SHA256s + Ed25519-signs"
+license.workspace = true
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+bas-substrate-core = { path = "../bas-substrate-core" }

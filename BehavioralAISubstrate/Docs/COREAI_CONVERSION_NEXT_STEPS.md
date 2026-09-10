@@ -1,0 +1,177 @@
+# Qwen3.5-4B → Core AI: next steps (M1 device kill-switch + M2 real-weight port)
+
+> **⚠️ AUDIT CORRECTION (2026-07-01) — READ FIRST; the celebratory language below OVERSTATES.** A strict audit
+> (measuring the claims that had only been asserted) found:
+> - The **fp16, full-causal REFERENCE port IS faithful** — cos 0.9998 vs MLX (T=6), every component MLX-verified. REAL.
+> - The **shipped 3 int4 assets use windowed-KV (W=8) = sliding-window attention — a DIFFERENT forward that was never
+>   fidelity-tested.** MEASURED: on T=16 (context > window) it gives top-1=900 vs MLX **350**, top-5 overlap **0/5**,
+>   cos **0.79** — **known-WRONG past 8 tokens** (i.e. for real decode). int4 alone (full-causal) costs cos
+>   0.9998→**0.9384** — **NOT "lossless"** (affine-per-group → symmetric-per-channel is a scheme change).
+> - Per-layer states (25/17 per asset) will **SIGSEGV on ANE** without single-state fusion → the assets are a
+>   **proof-of-concept, NOT shippable.**
+> So every "M2 COMPLETE / shippable / entire-Mac-side-DONE / cos 0.9998" line below is true **only for the fp16
+> full-causal reference**, NOT for what would ship. The shipped form is size-valid but numerically UNVALIDATED (and
+> windowed = wrong). The real go/no-go gates (M1 rdar / M3 fidelity / M4 power) all still stand.
+
+> **✅ FIX VERIFIED (2026-07-01) — the faithful shipped recipe is `full-causal KV + int8`.** After the audit, I
+> measured the fix: (a) **full-causal KV** (not windowed W=8) removes the context>8 divergence; (b) **int8** (not
+> int4-symmetric) removes the quant loss. int8 + full-causal vs MLX at **T=32: cos 0.9999, top-5 5/5** (the top-1
+> "flip" 3086↔693 is an fp16 TIE — both logit 10.3125). By contrast **int4-symmetric + full-causal flips at T=32**
+> (cos 0.969, top-1 = MLX's #6) — the affine-per-group→symmetric-per-channel re-quant is too lossy, and its error
+> ACCUMULATES with length (held at T=16, broke at T=32). Cost: int8 ≈2× int4 (~1.3 GB / 12-layer asset, still
+> under the 2 GB wall). So a FAITHFUL shipped form is achievable = full-causal + int8; the current windowed/int4
+> assets must be rebuilt with that recipe (mechanical). Device gates (M1/M3/M4) unchanged.
+
+> **✅✅ M1 DEVICE GATE CLOSED (2026-07-02, iPhone Air, live run).** Both probes ran via `BASQwen35RdarProbe`
+> (BAS_QWEN35_RDAR_PROBE=1; parameterized for asset/state/input contract):
+> - **Structure test** (11MB toy hybrid, 6 GDN + 2 FA @interval-4, single fused state): SURVIVED — default
+>   placement 261.5 ms/step, **ANE-pinned 2.4 ms/step**, 8/8 steps both. **rdar 177354777 does NOT crash the
+>   Qwen3.5 GDN-hybrid structure on this seed; the ANE executes GDN.**
+> - **Real-scale test** (Qwen35fused_asset1: 1.34GB int8, 12 REAL Qwen3.5-4B layers, state [13,548864], hidden
+>   contract): SURVIVED — loads + 8/8 steps; default 268.7 ms/step, **ANE-pinned 27.2 ms/step**.
+> - Forensics: the earlier fp16 1.6GB probe died at load with no crash line ⇒ **memory/spec-spike death (the E4B
+>   jetsam class), NOT the rdar** — int8 confirmed as the fix. Operational: auto-placement is ~10× slower than
+>   ANE-pinning for these assets — PIN the ANE.
+> - Rough extrapolation (NOT a measurement): 27.2 ms/step × (32/12) ≈ 73 ms/step ≈ ~14 tok/s full-model on ANE —
+>   in the expected ANE-slower-than-GPU band; the bet remains power, not speed. Caveats: zeros-input smoke (not
+>   fidelity), 8 steps (no sustained/thermal), asset1 only.
+> **Remaining device gates: M3-device (3-asset chain fidelity vs host logits) + M4 power (the bet's payoff).**
+
+> **✅✅✅ M3-DEVICE PASS (2026-07-02, iPhone Air, live).** The COMPLETE real-weight Qwen3.5-4B ran end-to-end on
+> device and matched the MLX golden: 4-stage sequential-residency chain (`BAS_RDAR_CHAIN=1`, real embedded T=32
+> inputs) — L0-11 ANE 27.3 ms/step · L12-23 ANE 26.2 · L24-31 ANE 18.1 · head GPU 28.0 → **FINAL top-5
+> [3086,693,198,62,16] = golden 5/5** (693/3086 fp16 tie; logit values within ~0.05 of MLX).
+> **New device finding: ANE `InvalidWidth` wall — the 248320-vocab head matmul exceeds the ANE max tensor width**
+> (compile warning + signal 9 on the original asset3; same class as the E4B-262k rejection; Llama-128k/Qwen-152k
+> compiled). FIX (verified): head-split — `Tools/qwen35_headsplit.py` builds asset3body (8L, ANE-safe, final norm
+> inside) + head_only (0.64GB int8, load with `.default`/GPU placement, dummy 1-row state for the probe contract).
+> Sum ≈100 ms/token across stages (~10 tok/s if per-token-chained, sequential-residency measured) — ANE-slower
+> band as expected; the bet remains POWER. **Remaining: M4 only** (sustained watts vs MLX/GPU: the payoff
+> question) + deployment residency design (4 assets ≈4.2GB vs the ~3.2GB cap — relies on mmap-clean-page
+> eviction or per-stage residency).
+
+> **✅ FIX IMPLEMENTED + PACKAGED (2026-07-01, `Tools/qwen35_fixed_decode.py` + `qwen35_3asset_fixed.py`).**
+> Shipped DECODE form (int8 + full-causal one-hot-write maxSeq KV) verified vs MLX at **T=32: cos 0.9999, top-5 5/5**
+> (top-1 3086↔693 is the fp16 tie). Repackaged into 3 int8+full-causal assets: **1.34 / 1.34 / 1.53 GB, each < 2 GB**
+> (supersedes the audit-failed int4/windowed `qwen35_3asset_int4.py`). HONEST residual: the torch RECIPE is
+> fidelity-verified, but the CONVERTED-asset runtime fidelity is M3 (CoreAI runtime, not yet run); per-layer states
+> still need single-state fusion for ANE (M1). Should-not-ship speed verdict UNCHANGED — the fix makes it faithful, not fast.
+
+> **✅ M3-HOST PASS (2026-07-02, `Tools/qwen35_m3_host_fidelity.py`).** The converted 3-asset chain ran on the REAL
+> CoreAI host runtime (`coreai.runtime.AIModel` — the same runtime that certified Llamba 24/24): asset1→asset2→asset3
+> with host-side embed + explicit state dicts, T=32 golden sequence → **cos=0.9998 vs MLX, top-5 5/5** (the fp16 tie
+> again). So the CONVERTED `.aimodel`s are RUNTIME-faithful, not just the torch recipe — the audit's biggest honest
+> residual is closed. Remaining now: single-state fusion (ANE segmenter) + M1 rdar + M4 power — all device-facing.
+
+> **✅ 全面开发 COMPLETE (2026-07-02) — everything developable off-device is now BUILT + VERIFIED:**
+> - **Fused single-state assets** (`Tools/qwen35_3asset_fused.py`): all per-layer states packed into ONE
+>   `state_all [n+1, 548864]` per asset (ANE-segmenter-safe, the mamba3 trick; pos in the last row). Torch chain
+>   re-verified (cos 0.9997, top-5 5/5 — not trusted "by construction") + all 3 converted with exactly
+>   `states=['state_all']`: 1.34 / 1.34 / 1.53 GB. These are the DEVICE-READY artifacts.
+> - **M1 device probe BUILT + WIRED** (`DeviceTestApp/Sources/App/BASQwen35RdarProbe.swift`, launch
+>   `BAS_QWEN35_RDAR_PROBE=1`, wired in BASEnduranceAppRunner + pbxproj, plutil-linted, API mirrored from
+>   BASCoreAIDecodeSession/DecodeProbe — SpecializationOptions .default + .neuralEngine, single `state_all`
+>   MutableViews). Staging command in the probe header. Crash ⇒ rdar confirmed; SURVIVED ⇒ M3-device/M4.
+> Remaining is EXECUTION on your A19 (M1 run → fused-asset device fidelity → M4 power), not development.
+
+
+
+Follows the proven convertibility (`Tools/{gdn,qwen35_hybrid,qwen35_real}_to_coreai.py` — op-graph + real-structure
++ int8/3-asset wall all verified; see `COREML_COREAI_DECISION.md`). Pursued as an explicit power/thermal/
+Apple-native strategic bet — the "should it" speed verdict (ANE ~3.7× slower than GPU) is unchanged; these steps
+find out whether the bet is even *runnable* and *faithful*.
+
+## M1 — device rdar kill-switch (YOURS to run; the cheapest gate; blocks everything)
+
+**Question:** does `rdar 177354777` ("linear-attention LLMs may crash," names Qwen3.5) actually crash the GDN
+structure on your A19 seed? If yes, the whole direction is blocked at Apple until a GA fix — no Mac work matters.
+
+**Target asset:** run `cd /tmp && ~/.venvs/coreai-cv/bin/python <repo>/BehavioralAISubstrate/Tools/qwen35_real_to_coreai.py`
+→ produces `/tmp/gdn_coreai/Qwen35Real_probe.aimodel` (real GDN structure, random weights — the rdar crash is about
+the linear-attention *structure*, not the weights, so this is a valid crash target). Copy it into the DeviceTestApp
+bundle.
+
+**Minimal device code** (mirror an existing probe in `DeviceTestApp/Sources/App/BASCoreAIDecodeProbe.swift`; uses the
+real API from `BASCoreAIDecodeSession`):
+```swift
+import CoreAI   // or the project's CoreAIRuntime import
+let url = Bundle.main.url(forResource: "Qwen35Real_probe", withExtension: "aimodel")!
+let model = try await AIModel(contentsOf: url, options: .init())
+let fn = try model.loadFunction(named: model.functionNames.first!)!
+// single-token input; the fused `state_all` is carried by the runtime (stateful model)
+let input = NDArray(scalars: [Int32(0)], shape: [1, 1])
+let out = try await fn.run(inputs: ["input_id": input])   // ← rdar 177354777 would crash HERE
+print("SURVIVED — logits shape \(out["logits"]!.shape)")   // reaching this line = the direction is alive
+```
+
+**Read the result:**
+- **SIGABRT / crash during `fn.run`** → rdar CONFIRMED for Qwen3.5-GDN on this seed → **STOP the direction** until a
+  GA fix; retest per new iOS SDK. (Mitigation to try first: the model already uses static shapes + a single fused
+  state, which is the recommended avoid-dynamic-control-flow posture — if it still crashes, it's the framework.)
+- **Returns logits** → survives → the direction is runnable → proceed to M3 (fidelity) / M4 (power).
+
+(Wiring caveat: adding a probe file needs a DeviceTestApp target entry in the hand-maintained pbxproj — do NOT run
+xcodegen. Easiest path: paste the snippet into an existing probe's body and swap the asset name.)
+
+## M2 — real-weight port (Mac; the big piece; only worth it if M1 survives)
+
+**Foundation PROVEN (2026-06-30, `Tools/qwen35_realweights_to_coreai.py`):** a REAL layer-0 GDN block loaded
+from the local 4-bit checkpoint (dequant verified sane, out_proj mean|w|=0.009), run through the faithful forward
+(conv1d→qk-rmsnorm→`decay=exp(-exp(A_log)·softplus(a+dt_bias))`→beta=sigmoid→gated-delta→gated-rmsnorm→out_proj+SwiGLU),
+lowers + converts to a CoreAI `.aimodel` (228 MB, states = recurrence + conv-window). So the dequant + the faithful
+GDN forward — the crux of the whole port — WORK on real weights. Remaining M2 = scale to 32L + 3-asset split + int8
++ real embed/head. **Layer-0 fidelity vs MLX is now VERIFIED** (mlx_lm reference, block on token 100: cosine=0.9999, MAE=0.0005 — after the fidelity check caught+fixed a missing qk-norm scale that gave cos=0.64). So dequant + faithful forward are numerically correct. Full-model M3 (all 32L through the CoreAI runtime) still open. **FA (full-attn) layer ALSO verified** (layer 3 vs MLX, pos-0: cos=0.9999, MAE=0.0038 — confirms the q-gate split `q_proj→[16,256]q ‖ [16,256]gate`, q/k-norm over head_dim 256, `output·sigmoid(gate)`, o_proj, SwiGLU MLP; RoPE + multi-token attention are standard, verified at full-model). So BOTH layer types of the real-weight port are numerically faithful. Remaining: assemble all 32L + real embed/head (vocab 248320) + RoPE tables + KV, then a MULTI-TOKEN full-logits check vs MLX (exercises RoPE + attention), then 3-asset+int8. **RoPE + multi-token attention now VERIFIED** (FA layer 3 on a T=4 sequence vs MLX: cos=0.9999, MAE=0.0036 — NeoX RoPE base=1e7 / dims=64 partial, causal GQA, first try). ⇒ ALL port components (dequant, GDN recurrence, FA structure, RoPE+multi-token attention) are numerically faithful. The full 32L port is now COMPOSITION of verified pieces — remaining is packaging (wire 32L + tied embed/head vocab 248320 + final norm → full-logits sanity → 3-asset split + int8), memory-heavy but low-risk on correctness, then M1 device / M3 runtime / M4 power.
+
+**FULL 32L PORT FIDELITY-VERIFIED (2026-06-30, `Tools/qwen35_full_port_fidelity.py`):** the complete real-weight port (all 32 layers + tied embed/head vocab 248320 + final norm, assembled from the verified pieces) produces last-token logits matching MLX on a 6-token sequence at **cos=0.9998, top-1 identical (id 13), top-5 identical order** — first assembly try. **M2 CORRECTNESS IS COMPLETE
+
+**int4 PACKAGING PROVEN (2026-06-30, `Tools/qwen35_int4_package.py`):** the verified real-weight GDN layer int4-quantized + converted = 57.3 MB (fp16 was 228.5 → 4x); a 12-layer int4 asset ≈0.72 GB (+embed ~0.3 GB) → the 3-asset split (embed+12L / 12L / 8L+head) sits well under the 2 GB wall. **EVERY M2 piece is now proven: convertibility + full-port fidelity + int4 packaging.** Remaining Mac work = MECHANICAL full 32L→3-asset assembly with inter-asset fused-state hand-off; real gates all device-side (M1/M3/M4).**: the real-weight Qwen3.5-4B port is end-to-end faithful, not just component-verified. Remaining = pure CoreAI PACKAGING (3-asset split + int8, structurally already shown by the convert probes) + device (M1 rdar / M3 runtime / M4 power). No open correctness question remains on the Mac side.
+
+Turns the weights-free probes into a **real-weight** asset (for real fidelity + a real device run). No 8GB
+download needed — dequantize the LOCAL 4-bit checkpoint.
+
+**Weight map** (verified from `mlx-community/Qwen3.5-4B-4bit`; all quantized weights are 4-bit `U32`-packed +
+`BF16` scales/biases, group_size 64 → dequant `w = scale*q + bias` per group → fp16):
+
+GDN layer (`model.layers.{i}.linear_attn.*`, i where `(i+1)%4 != 0`):
+| key | shape | role in the port |
+|---|---|---|
+| `in_proj_qkv` | 2560→8192 | q(16×128) ‖ k(16×128) ‖ v(32×128) — split after proj |
+| `conv1d.weight` | [8192,4,1] | depthwise causal conv (k=4) on the qkv stream — carry a 3-wide conv window as state |
+| `in_proj_a`, `dt_bias`, `A_log` | 2560→32, [32], [32] | decay: `dt=softplus(a+dt_bias)`, `A=-exp(A_log)`, `decay=exp(dt*A)` (Mamba-2 discretization; confirm vs `GatedDelta.swift`) |
+| `in_proj_b` | 2560→32 | `beta = sigmoid(b)` (delta strength, per value head) |
+| `in_proj_z` | 2560→4096 | output gate `z` (silu) |
+| `norm.weight` | [128] | per-head RMSNorm on the GDN output |
+| `out_proj` | 4096→2560 | output projection |
+| `input_layernorm`, `post_attention_layernorm` | [2560] | block norms |
+
+Full-attn layer (i where `(i+1)%4==0`): standard `self_attn.{q,k,v,o}_proj` (16h/4kv GQA, head_dim 256, RoPE) —
+reuse the proven `Tools/llama_to_coreai.py` attention path. MLP (all layers): `mlp.{gate,up,down}_proj` SwiGLU
+(2560↔9216). Embedding/LM head: `model.embed_tokens` (vocab 248320, likely tied).
+
+**Steps:** (1) safetensors loader + 4-bit dequant → fp16 state_dict; (2) load into the faithful module
+(`qwen35_real_to_coreai.py` structure + the conv1d + the exact A_log/dt decay above); (3) **3-asset split**
+(12+12+8 layers; embed in asset 1, head in asset 3) with fused-state hand-off; (4) int8 quantize in the converter
+(`inject_subbyte_tensors`, per `mamba3_to_coreai.py`) — each asset ≈1.3GB < 2GB wall (confirmed). Output: 3
+`.aimodel` assets = a real, device-testable Qwen3.5-4B.
+
+## M2 COMPLETE — 3-asset int4 build (2026-06-30, `Tools/qwen35_3asset_int4.py`)
+
+The full 32L real-weight Qwen3.5-4B is now **3 shippable int4 CoreAI assets**, each under the 2 GB wall, chaining
+by hidden hand-off:
+- asset1 (layers 0-11) = 0.67 GB · asset2 (layers 12-23) = 0.67 GB · asset3 (layers 24-31 + final-norm + tied head) = 0.77 GB · **total ≈ 2.11 GB**.
+All 3 export + int4-pack + convert cleanly. Decode forwards: RealGDN (verified) + FA single-token windowed-KV(W=8) + RoPE@pos.
+
+**Honest caveats (device-deployment refinements, all M1/M3/M4 concerns):**
+- Per-layer states (25/17 per asset) are convert-valid but the ANE segmenter needs a SINGLE fused state per asset
+  (mamba3 finding: >2 states → device SIGSEGV) — must fuse before M1.
+- FA uses a windowed KV (W=8) = sliding-window attention; full causal KV (grows to maxSeq) is more faithful for long context.
+- Embed is a host-side lookup (not in an asset); int4 re-quant is an affine-per-group→symmetric-per-channel SCHEME CHANGE with MEASURED loss (T=16 full-causal cos 0.9384, top-5 2/5; windowed form far worse).
+
+**So the entire Mac-side is DONE: convertibility + full-port fidelity (cos 0.9998) + int4 packaging + 3-asset assembly.**
+The only remaining work is all device-side (M1 rdar / M3 runtime fidelity / M4 power) — the real go/no-go gates.
+
+## M3 / M4 (after M2)
+- **M3 fidelity** (needs the Swift CoreAI host runtime, `BASCoreAINDArrayBridge`): run the real-weight assets vs the
+  MLX reference, assert logits MAE / top-1 agreement. Note: greedy token-identity is the real bar.
+- **M4 device power/speed** (A19): tok/s vs the MLX/GPU baseline + **watts** (the whole point of the bet — is the
+  ~3.7× speed loss bought back in energy/token + thermal headroom?). This is the go/no-go for actually shipping it.

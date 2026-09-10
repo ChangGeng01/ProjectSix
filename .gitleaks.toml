@@ -1,0 +1,35 @@
+# .gitleaks.toml — secret-scan config for BehavioralAISubstrate
+# audit C1 recurrence prevention (2026-07-09)
+#
+# Used by the .githooks/pre-commit hook when `gitleaks` is installed
+# (`brew install gitleaks`), and by any future CI secret-scan job. With no
+# gitleaks present, the hook falls back to a built-in regex scan and this file
+# is inert — but it documents intent and is ready the moment gitleaks lands.
+#
+# Full history sweep (one-off, after installing gitleaks):
+#   gitleaks detect --source . --redact
+# Staged-only (what the hook runs):
+#   gitleaks protect --staged --redact
+
+# Start from gitleaks' maintained default ruleset, then extend below.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known-inert artifacts that must not block commits"
+# The C1 HuggingFace token was deleted upstream (dead) and masked in-tree to the
+# 9-char stub 'hf_kEwDog' in the recovery corpus. The stub is not a live secret;
+# ignore it so historical recovery files never trip the scanner.
+regexes = [
+  '''hf_kEwDog''',
+]
+# Recovery transcripts are a large opaque dump kept for provenance; the live
+# secret they once held is gone. Scanning their full history on every run is
+# noise — paths below are allowlisted for the WORKING-TREE scan only. (This does
+# NOT weaken pre-commit: the hook scans STAGED changes, and a NEW real token in
+# any file, including these, is still full-length and caught by the built-in
+# fallback regex, which does not honor this allowlist.)
+paths = [
+  '''docs/Recovery/FULL_CONVERSATION/.*\.md''',
+  '''docs/Recovery/ORPHAN_neither-fork_.*\.md''',
+]

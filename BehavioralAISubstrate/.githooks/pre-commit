@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit
+# chapter 八百二十九 / M2797 — substrate pre-commit hook
+#
+# Install: `cd BehavioralAISubstrate && git config core.hooksPath .githooks`
+# (run once per clone)。 After install,every `git commit` runs the 3 CI
+# gates first;commit aborts if any gate fails。
+#
+# Skip (one-off):`git commit --no-verify`
+# Skip permanent: `git config core.hooksPath ""`
+#
+# Path resolution:hook resolves the gate runner relative to ITSELF
+# (not the git toplevel),so it works correctly when substrate is
+# nested in a monorepo (e.g。 outer repo at Project06/Project06 with
+# substrate at Project06/Project06/BehavioralAISubstrate)。
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SUBSTRATE_ROOT="$(cd "${HOOK_DIR}/.." && pwd)"
+exec bash "${SUBSTRATE_ROOT}/scripts/pre-commit-gates.sh"

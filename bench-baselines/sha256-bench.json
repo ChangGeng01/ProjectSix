@@ -1,0 +1,17 @@
+{
+  "benchName" : "sha256-bench",
+  "schemaVersion" : "bas-bench-baseline.v2",
+  "stats" : {
+    "max" : 4.010459,
+    "mean" : 0.044177797667979274,
+    "min" : 0.024708,
+    "outlierCount" : 1121,
+    "p50" : 0.038041,
+    "p95" : 0.071125,
+    "p99" : 0.231833,
+    "p999" : 0.781125,
+    "sampleCount" : 99999,
+    "standardDeviation" : 0.056236213006749504
+  },
+  "storedAt" : "2026-05-03T19:47:30Z"
+}

@@ -1,0 +1,78 @@
+import Foundation
+import CoreGraphics
+
+enum BeforePolicy {
+    enum QuickCheck {
+        static let defaultBufferDuration: QuickBufferDuration = .ninetySeconds
+        static let recentHistoryLimit = 30
+    }
+
+    enum Widget {
+        static let timelineRefreshInterval: TimeInterval = 60 * 30
+    }
+
+    enum LetGo {
+        static let motionUpdateInterval = 1.0 / 60.0
+        static let horizontalAccelerationThreshold = 1.08
+        static let directionalDominanceRatio = 1.15
+        static let triggerCooldownInterval: TimeInterval = 0.9
+        static let longPressDuration: TimeInterval = 0.55
+        static let pressFeedbackScale: CGFloat = 0.985
+        static let pressFeedbackAnimationDuration: TimeInterval = 0.12
+        static let releaseAnimationDuration = 0.24
+        static let completionTransitionDuration = 0.18
+        static let releaseTravelDistance: CGFloat = 520
+        static let releaseRotationDegrees = 8.0
+    }
+
+    enum Reflection {
+        static let reminderMaxCharacters = 80
+        static let maxStoredReminders = 10
+    }
+
+    enum Settings {
+        static let developerTraceLimit = 12
+        static let developerReplayLimit = 8
+        static let developerReplayTraceLookbackInterval: TimeInterval = 60 * 30
+        static let developerReplayFutureTraceGraceInterval: TimeInterval = 10
+        static let intelligenceResponseCacheLimit = 24
+        static let intelligenceCircuitFailureTripThreshold = 3
+        static let intelligenceCircuitSlowTripThreshold = 2
+        static let intelligenceCircuitCooldownInterval: TimeInterval = 60 * 3
+    }
+
+    enum Notifications {
+        static let tomorrowReminderHour = 9
+        static let tomorrowReminderMinute = 0
+        static let predictiveQuietHoursStartHour = 22
+        static let predictiveQuietHoursEndHour = 8
+        static let predictiveInterventionCooldownInterval: TimeInterval = 60 * 60 * 2
+        static let predictiveInterventionDismissalSuppressionInterval: TimeInterval = 60 * 60 * 12
+        static let predictiveInterventionDailyCap = 2
+
+        static func normalizedReminderDate(
+            after baseDate: Date,
+            calendar: Calendar = .autoupdatingCurrent
+        ) -> Date {
+            let tomorrow = calendar.date(byAdding: .day, value: 1, to: baseDate) ?? baseDate
+            var components = calendar.dateComponents([.year, .month, .day], from: tomorrow)
+            components.hour = tomorrowReminderHour
+            components.minute = tomorrowReminderMinute
+            return calendar.date(from: components) ?? tomorrow
+        }
+    }
+
+    enum LaunchRequests {
+        static let schemaVersion = 1
+        static let maxQueuedRequests = 5
+        static let expirationInterval: TimeInterval = 60 * 10
+    }
+
+    enum RuntimeState {
+        static let workspaceRetentionInterval: TimeInterval = 60 * 60 * 24
+        static let taskGraphRetentionInterval: TimeInterval = 60 * 60 * 24
+        static let pendingReflectionRetentionInterval: TimeInterval = 60 * 60 * 12
+        static let evolutionCheckpointRetentionInterval: TimeInterval = 60 * 60 * 24 * 30
+        static let evolutionCheckpointLimit = 40
+    }
+}

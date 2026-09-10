@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Raises the per-process physical-footprint jetsam cap so a ~2.7 GB model (Gemma-4-E4B) can load on
+	     8 GB devices. Restored 2026-06-19 (the file had been reset to an empty <dict/>, re-introducing the
+	     E4B load-jetsam from the 2-day saga). Dev-grantable on team U4ZLQM8399. -->
+	<key>com.apple.developer.kernel.increased-memory-limit</key>
+	<true/>
+</dict>
+</plist>

@@ -1,0 +1,236 @@
+name: Test + boundary checks
+
+# M761 chapter 二百三 — first CI workflow.
+# Triggers on every push + PR to main / branch.
+# Runs: BAS XCTest + Qinao XCTest + 4 boundary scripts +
+# cross-language schema parity gate + god-file size guard.
+
+on:
+  push:
+    # deep-audit P2-23 (2026-07-13): the active dev branch (decode-planner) was NOT covered,
+    # so every push to it silently skipped CI. `decode-*` covers it + future decode branches.
+    branches: [ main, "m605-chapter-*", "decode-*" ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  bas-tests:
+    name: BehavioralAISubstrate XCTest
+    runs-on: xcode-27
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
+      - name: Select Xcode
+        run: |
+          set -e
+          sudo xcode-select -s /Applications/Xcode.app
+          bash scripts/check_ci_xcode27.sh macosx
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.5"
+      - name: Prepare Metal compiler
+        run: bash scripts/ensure_ci_metal_toolchain.sh --resolver xcrun macosx
+      - name: Prepare MLX metallib
+        run: bash scripts/prepare_ci_mlx_metallib.sh
+      - name: BAS test
+        run: bash scripts/run_ci_swift_tests.sh bas
+      - name: Upload BAS XCTest failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bas-xctest-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/bas-xctest-diagnostics.*
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6
+
+  qinao-tests:
+    name: QinaoRuntimeSDK XCTest
+    runs-on: xcode-27
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
+      - name: Select Xcode
+        run: |
+          set -e
+          sudo xcode-select -s /Applications/Xcode.app
+          bash scripts/check_ci_xcode27.sh macosx
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.5"
+      - name: Prepare Metal compiler
+        run: bash scripts/ensure_ci_metal_toolchain.sh --resolver xcrun macosx
+      - name: Prepare MLX metallib
+        run: bash scripts/prepare_ci_mlx_metallib.sh
+      - name: Qinao test
+        working-directory: QinaoRuntimeSDK
+        run: bash ../scripts/run_ci_swift_tests.sh qinao
+      - name: Upload Qinao XCTest failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qinao-xctest-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qinao-xctest-diagnostics.*
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6
+
+  samplehost-tests:
+    name: SampleHost iOS XCTest
+    runs-on: xcode-27
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    # 2026-05-21 — RE-ENABLED after SampleHost reconstitution。
+    # SampleHost is now a standalone SPM iOS package at /SampleHost/Package.swift
+    # (since 2026-05-20 SampleHost was a scheme inside the now-archived
+    # Before.xcodeproj — see CHANGELOG.md / Archive/Legacy/README.md.archive-notice)。
+    # The package depends on BehavioralAISubstrate via sibling-path dep。
+    # Tests live at /SampleHost/Tests/SampleHostTests/ (relocated from /SampleHostTests/
+    # to satisfy SPM-canonical layout)。
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
+      - name: Select Xcode
+        run: |
+          set -e
+          sudo xcode-select -s /Applications/Xcode.app
+          bash scripts/check_ci_xcode27.sh macosx iphonesimulator
+      - name: Prepare Metal compiler
+        run: bash scripts/ensure_ci_metal_toolchain.sh --resolver xcrun macosx iphonesimulator
+      - name: Build SampleHost for iOS Simulator
+        working-directory: SampleHost
+        run: |
+          xcodebuild build \
+            -scheme SampleHost \
+            -destination 'platform=iOS Simulator,name=iPhone 17e' \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Test SampleHost on iOS Simulator
+        working-directory: SampleHost
+        run: |
+          xcodebuild test \
+            -scheme SampleHost \
+            -destination 'platform=iOS Simulator,name=iPhone 17e' \
+            CODE_SIGNING_ALLOWED=NO
+
+  boundary-checks:
+    name: 4 boundary scripts + schema parity
+    runs-on: xcode-27
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      QINAO_SWIFT_BUILD_SYSTEM: native
+      QINAO_CI_DIAGNOSTICS: "1"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
+      - name: Select Xcode
+        run: |
+          set -e
+          sudo xcode-select -s /Applications/Xcode.app
+          bash scripts/check_ci_xcode27.sh macosx
+      - name: Qinao import boundaries
+        run: bash scripts/check_qinao_import_boundaries.sh
+      - name: Sovereign redaction
+        run: bash scripts/check_sovereign_redaction.sh
+      - name: Upload Qinao symbol graph failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qinao-symbolgraph-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qinao-symbolgraph-diagnostics.*
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6
+      - name: SDK import boundaries
+        run: bash scripts/check_sdk_import_boundaries.sh
+      - name: Substrate residuals
+        run: bash scripts/check_substrate_residuals.sh
+      - name: Cross-language schema parity
+        run: python3 scripts/check_chenglu_schema_parity.py
+      - name: God-file size guard (M762 chapter 203)
+        run: bash scripts/check_god_files.sh
+      - name: CI contract and iOS floor helper tests
+        run: |
+          set -e
+          command -v rg
+          python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger BehavioralAISubstrate.scripts.test_check_ios27_floor scripts.test_boundary_tool_errors scripts.test_ci_metal_toolchain scripts.test_ci_native_macos scripts.test_ci_failure_diagnostics
+
+  python-fuzz:
+    name: Python pytest fuzz tests
+    runs-on: macos-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.5"
+      - name: Run pytest
+        run: |
+          pip install pytest
+          python3 -m pytest scripts/test_chenglu_feature_schema.py -v
+
+  # deep-audit P2-23 (2026-07-13): the 26 Rust crates had ZERO CI coverage, so a broken /
+  # non-reproducible Rust change (the source of the shipped XCFramework) could land unnoticed.
+  # This builds + tests the workspace --locked against the pinned toolchain (rust-toolchain.toml
+  # → 1.96.0), enforcing the same Cargo.lock the reproducible XCFramework build uses.
+  rust-tests:
+    name: Rust cargo build + test (--locked)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          set-safe-directory: false
+      - name: cargo build + test (locked, pinned toolchain)
+        working-directory: BehavioralAISubstrate/Cargo
+        run: |
+          cargo build --locked --release
+          cargo test --locked

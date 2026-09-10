@@ -1,0 +1,140 @@
+<style>
+  .v4 { --line:rgba(255,255,255,.13); --muted:rgba(255,255,255,.63); --blue:#78a9ff; --amber:#ffc36e; --green:#59d6a7; --red:#ff7d87; --violet:#c99cff; --cyan:#59d5dc; }
+  .platform { border:1px solid rgba(255,195,110,.33); background:rgba(255,195,110,.05); border-radius:14px; padding:13px; margin:15px 0 20px; }
+  .platform b { color:var(--amber); }
+  .platform p { margin:5px 0 0; font-size:11px; line-height:1.5; color:var(--muted); }
+  .zones { display:grid; grid-template-columns:1.55fr 1fr 1fr; gap:10px; }
+  .zone { border:1px solid var(--line); border-radius:15px; padding:13px; min-height:230px; }
+  .zone h3 { margin:0 0 5px; font-size:14px; }
+  .zone .sub { color:var(--muted); font-size:10px; line-height:1.45; margin-bottom:10px; }
+  .zone-item { border:1px solid var(--line); border-radius:9px; padding:8px; margin:6px 0; font-size:10px; line-height:1.4; }
+  .host { border-color:rgba(120,169,255,.34); background:rgba(120,169,255,.035); }
+  .sovereign { border-color:rgba(255,195,110,.4); background:rgba(255,195,110,.04); }
+  .effect { border-color:rgba(201,156,255,.35); background:rgba(201,156,255,.04); }
+  .forbid { color:var(--red); }
+  .allow { color:var(--green); }
+  .ipc { display:flex; align-items:stretch; gap:7px; overflow-x:auto; margin:13px 0; padding-bottom:4px; }
+  .ipc-node { min-width:138px; flex:1; border:1px solid var(--line); border-radius:11px; padding:9px; font-size:10px; line-height:1.42; }
+  .ipc-node b { display:block; margin-bottom:4px; }
+  .arrow { align-self:center; color:var(--muted); }
+  .contract-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; }
+  .contract { border:1px solid var(--line); border-radius:11px; padding:10px; }
+  .contract h3 { margin:0 0 5px; font-size:12px; }
+  .contract p { margin:0; font-size:10px; line-height:1.48; color:var(--muted); }
+  .tiers { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:12px; }
+  .tier { border:1px solid var(--line); border-radius:14px; padding:12px; position:relative; }
+  .tier.recommended { border-color:rgba(89,214,167,.45); background:rgba(89,214,167,.045); }
+  .tier h3 { margin:0 0 5px; font-size:13px; }
+  .tier p { margin:0; font-size:10px; color:var(--muted); line-height:1.5; }
+  .tag { position:absolute; right:9px; top:9px; border:1px solid rgba(89,214,167,.4); border-radius:999px; padding:3px 6px; font-size:8px; color:var(--green); }
+  .state-row { display:flex; align-items:stretch; gap:6px; overflow-x:auto; }
+  .state { min-width:115px; border:1px solid var(--line); border-radius:9px; padding:8px; font-size:9px; line-height:1.4; }
+  .state b { display:block; font-size:10px; margin-bottom:3px; }
+  .unknown { border-color:rgba(255,125,135,.42); background:rgba(255,125,135,.04); }
+  .not-process { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+  .no-box { border:1px solid rgba(255,125,135,.32); border-radius:11px; padding:10px; background:rgba(255,125,135,.025); }
+  .no-box b { display:block; font-size:11px; margin-bottom:4px; color:var(--red); }
+  .no-box p { margin:0; font-size:10px; color:var(--muted); line-height:1.45; }
+  .section-title { margin-top:25px; }
+  .decision { margin-top:25px; }
+  @media(max-width:840px){ .zones,.tiers,.contract-grid,.not-process{grid-template-columns:1fr;} }
+</style>
+
+<div class="v4">
+  <h2>v4 · Dual Mesh 上的选择性进程隔离</h2>
+  <p class="subtitle">按信任区切进程，不按 L1–L14 平均切进程。语义层编号保持不变，transport 只是部署平面。</p>
+
+  <div class="platform">
+    <b>平台现实</b>
+    <p>当前工程最低 iOS 18；Enhanced Security helper extension / 自定义 ExtensionFoundation 进程按 iOS 26+ feature gate 使用。iOS 18–25 继续走同一组 ports 的 in-process 实现，但必须携带 IsolationAttestation，不能假装安全等级相同。</p>
+  </div>
+
+  <div class="zones">
+    <div class="zone host">
+      <h3>Zone A · Cognitive Host</h3>
+      <div class="sub">主 App 进程 · 高带宽热路径 · 没有 sovereign private key</div>
+      <div class="zone-item"><b>L1–L13 semantic cores</b><br>pure DAG、Artifact Mesh、bounded ControlRing</div>
+      <div class="zone-item"><b>L2 Neural Kernel</b><br>MLX model、weights、KV、token loop、JIT residency 全留本进程</div>
+      <div class="zone-item"><b>L8 StateLake</b><br>默认本进程 actor；只把 projection 送入模型与跨进程口</div>
+      <div class="zone-item forbid">不能签 L14 capability；不能绕过 EffectPort；不能获得 helper 私钥</div>
+    </div>
+
+    <div class="zone sovereign">
+      <h3>Zone B · Sovereign Helper</h3>
+      <div class="sub">iOS 26+ Enhanced Security extension · 轻量、无模型、无 UI</div>
+      <div class="zone-item"><b>L14 semantic core + crypto mechanism</b><br>preflight、exact-digest authorization、revocation、seal</div>
+      <div class="zone-item"><b>Private assets</b><br>signing key、spent/nonce ledger、sealed policy roots 留在 extension 私有域</div>
+      <div class="zone-item allow">只接收 digests、proofs、policy/snapshot refs；不接收完整 prompt、KV、raw StateLake</div>
+      <div class="zone-item forbid">无 network、无 model、无 tool executor；不能产生 candidate 或 risk permit</div>
+    </div>
+
+    <div class="zone effect">
+      <h3>Zone C · Effect Broker</h3>
+      <div class="sub">按 adapter 能力隔离 · extension 不可用时显式降级</div>
+      <div class="zone-item"><b>SpineCommitter transport</b><br>验证 L14 capability、读取 canonical payload、调用 tool provider</div>
+      <div class="zone-item"><b>Least entitlement</b><br>每类工具声明 network/system framework/lookup/idempotency 能力</div>
+      <div class="zone-item allow">只能返回 typed DispatchOutcome + provider receipt</div>
+      <div class="zone-item forbid">不能 mint capability、读 StateLake、访问模型、改变 permit</div>
+    </div>
+  </div>
+
+  <h3 class="section-title">跨进程仍然只走 Dual Mesh</h3>
+  <div class="ipc">
+    <div class="ipc-node"><b>Host Artifact</b>小消息：Codable header、digest、refs、capability request</div><div class="arrow">→</div>
+    <div class="ipc-node"><b>XPC Envelope</b>双端检查 schema、audience、epoch、session、expiry、parent digest</div><div class="arrow">→</div>
+    <div class="ipc-node sovereign"><b>Sovereign Decision</b>只返回 signed grant/denial/remand；私钥从不越界</div><div class="arrow">→</div>
+    <div class="ipc-node"><b>BlobRef when needed</b>大 payload 放受控共享容器，XPC 只传 ref + digest；消费方一次读取后校验</div><div class="arrow">→</div>
+    <div class="ipc-node effect"><b>Real Receipt</b>operation/attempt/provider/outcome/assurance/proof</div>
+  </div>
+
+  <div class="contract-grid">
+    <div class="contract"><h3>Transport-neutral Port</h3><p>同一个 `SovereignPort` / `EffectPort` 可由 in-process 或 XPC 实现；LayerCore 完全不知道部署位置。</p></div>
+    <div class="contract"><h3>IsolationAttestation</h3><p>每轮记录 inProcess、regularExtension、enhancedSecurity、unavailable。高风险 policy 可要求最低隔离级别。</p></div>
+    <div class="contract"><h3>Peer + Payload Binding</h3><p>XPC peer identity、audience、operation、payload digest、policy/snapshot、turn/epoch 全部绑定；不能拿 A 的消息调用 B。</p></div>
+    <div class="contract"><h3>No silent fallback</h3><p>需要 enhanced isolation 而 helper 不可用时，deny/remand；绝不偷偷降成 host executor 后仍声称强隔离。</p></div>
+  </div>
+
+  <h3 class="section-title">进程中断与 effect 恢复</h3>
+  <div class="state-row">
+    <div class="state"><b>notStarted</b>可安全重连/重发同 digest request</div><div class="arrow">→</div>
+    <div class="state"><b>capabilityReady</b>grant 已持久化才可暴露给 broker</div><div class="arrow">→</div>
+    <div class="state"><b>dispatchStarted</b>operationID 稳定，attempt 已落盘</div><div class="arrow">→</div>
+    <div class="state unknown"><b>processInterrupted</b>dispatch 前可恢复；dispatch 后映射 outcomeUnknown</div><div class="arrow">→</div>
+    <div class="state"><b>lookup/reconcile</b>先查询 provider；没有 lookup 的高风险工具不自动重发</div><div class="arrow">→</div>
+    <div class="state sovereign"><b>sealed</b>真实 receipt + staged L8 CAS + terminal audit</div>
+  </div>
+
+  <h3 class="section-title">三个部署等级</h3>
+  <div class="tiers">
+    <div class="tier recommended">
+      <div class="tag">推荐</div>
+      <h3>Tier 1 · Selective</h3>
+      <p>iOS 26+ 将 L14 放 Enhanced Security helper；Effect Broker 对可隔离 adapter 使用独立 extension。L2/L8 留 host。安全收益最大、性能损失最小。</p>
+    </div>
+    <div class="tier">
+      <h3>Tier 2 · Hardened State</h3>
+      <p>在 Tier 1 上增加 L8 Sensitive StateVault extension；只有高敏 domain 远程查询 projection。隔离更强，但有 XPC、索引重建、jetsam/recovery 成本。</p>
+    </div>
+    <div class="tier">
+      <h3>Tier 0 · Compatible</h3>
+      <p>iOS 18–25 或扩展不可用：ports 保持不变但在进程内执行，attestation 明确标记弱隔离；高风险能力可按 policy 被禁用。</p>
+    </div>
+  </div>
+
+  <h3 class="section-title">明确不做</h3>
+  <div class="not-process">
+    <div class="no-box"><b>不做 14 个进程</b><p>语义层不是部署单元；会产生 IPC 风暴、生命周期碎片与不可控故障传播。</p></div>
+    <div class="no-box"><b>不把 L2/MLX 移入 helper</b><p>模型、KV、JIT 和 Metal residency 是 Air 热路径；跨进程复制/重载会破坏吞吐与内存。</p></div>
+    <div class="no-box"><b>不共享 sovereign key</b><p>不能为了 app-group 便利让 host 与 helper 共用私钥；否则进程隔离失去核心意义。</p></div>
+  </div>
+
+  <div class="decision">
+    <h3>采用哪个进程隔离等级？</h3>
+    <p class="subtitle">我推荐 Tier 1；Tier 2 可作为高安全模式，而不是默认热路径。</p>
+    <div class="options">
+      <div class="option" data-choice="tier1-selective" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content"><h3>Tier 1 默认，Tier 2 可选</h3><p>L14 + 可隔离 Effect Broker 独立；敏感 StateVault 作为高安全配置。</p></div></div>
+      <div class="option" data-choice="tier2-default" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content"><h3>Tier 2 默认</h3><p>敏感 L8 StateVault 也默认跨进程，接受额外延迟和恢复复杂度。</p></div></div>
+      <div class="option" data-choice="more-processes" onclick="toggleSelect(this)"><div class="letter">C</div><div class="content"><h3>还要更多进程</h3><p>希望继续评估 L2、Verifier 或每个 Kernel 的独立进程方案。</p></div></div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,22 @@
+# Cargo manifest for bas-host-constitution
+# chapter 七百六十八 / M2491-M2495 — DEEPER LAYER-MIGRATION ARC
+#
+# L5 Host Constitution merge logic port。 Deterministic conflict
+# resolution + per-domain merge rules per 严苛 table「L5 很值得」。
+#
+# SQLite storage stays Swift (BASHostConstitutionSQLiteStorage)。
+# Rust owns the per-merge deterministic decision tree。
+
+[package]
+name = "bas-host-constitution"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_host_constitution"
+path = "src/lib.rs"
+
+[dependencies]

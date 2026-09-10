@@ -1,0 +1,669 @@
+œ
+â
+featuresq43-dim signature one-hot: 8 tone + 10 domain + 6 stake + 7 timeframe + 4 confidant + 3 askshape + 5 mutationSeed.
+*
++†ÄRÖ
+afm_success_probeSigmoid output: probability AFM call returns 'ok' status. Threshold 0.5 ‚Üí route to AFM, else Gemma.
+*
+†ÄRt
+
+block_probZSigmoid output: probability substrate routes to .block. Threshold 0.5 ‚Üí predicted block.
+*
+†ÄR∂
+length_normöZ-normalized linear output. Denorm: predicted_chars = length_norm * length_std + length_mean. length_mean / length_std are saved in user_defined_metadata.
+*
+†ÄRy
+latency_norm]Z-normalized linear output. Denorm: predicted_ms = latency_norm * latency_std + latency_mean.
+*
+†ÄRÜ
+verbosity_probhSigmoid output: P(AFM body > 1500 chars). UI hint: long-response anticipation. Threshold 0.5 ‚Üí 'long'.
+*
+†Ä¢Ñ
+ÖChengluMultiHead v0.1 ‚Äî shared encoder (43‚Üí64‚Üí32) + 5 task heads. Chapter ‰∏ÄÁôæÂÖ´ÂçÅ‰∏â added 5th head (verbosity_prob). 5 outputs: afm_success_prob (sigmoid), block_prob (sigmoid), length_norm (z-space, denorm via length_mean=1360.34, length_std=886.82), latency_norm (z-space, denorm via latency_mean=5671.48, latency_std=6729.38), verbosity_prob (sigmoid, P(body > 1500 chars)).0.0.1[Qinao Runtime SDK chapter ‰∏ÄÁôæÂÖ´ÂçÅ‰∏â ‚Äî 5th head via shared encoder (verbosity_class)"
+Apache-2.0¢+
+$com.github.apple.coremltools.version9.0¢4
+#com.github.apple.coremltools.sourcetorch==2.11.0¢ 
+latency_mean5671.47607421875¢:
+,com.github.apple.coremltools.conversion_date
+2026-05-06¢:
++com.github.apple.coremltools.source_dialectTorchScript¢
+length_mean1360.34326171875¢!
+verbosity_threshold_chars1500¢
+latency_std6729.37939453125¢
+
+length_std886.8180541992188≤´0Ω.
+main¥.
+
+features
+
+
++CoreML7à.
+CoreML7¸-afm_success_prob
+block_problength_normlatency_normverbosity_probt
+const 
+features_to_fp16_dtype_0
+*.
+name&
+
+"
+features_to_fp16_dtype_0*
+val
+
+
+"
+fp16ú
+const(
+fc1_weight_to_fp16
+
+
+@
++*(
+name 
+
+"
+fc1_weight_to_fp16*?
+val8
+
+
+@
++*"
+@model_path/weights/weight.bin@ç
+const 
+fc1_bias_to_fp16
+
+
+
+@*&
+name
+
+"
+fc1_bias_to_fp16*:
+val3
+
+
+
+@*#
+@model_path/weights/weight.binÄ,Ü
+cast%
+dtype
+
+features_to_fp16_dtype_0
+x
+
+
+features&
+features_to_fp16
+
+
+
++*
+name
+
+
+"
+cast_5∑
+linear
+x
+
+features_to_fp16
+bias
+
+fc1_bias_to_fp16 
+weight
+
+fc1_weight_to_fp16(
+linear_0_cast_fp16
+
+
+
+@*(
+name 
+
+"
+linear_0_cast_fp16u
+relu
+x
+
+linear_0_cast_fp16'
+input_1_cast_fp16
+
+
+
+@*'
+name
+
+"
+input_1_cast_fp16ù
+const(
+fc2_weight_to_fp16
+
+
+ 
+@*(
+name 
+
+"
+fc2_weight_to_fp16*@
+val9
+
+
+ 
+@*#
+@model_path/weights/weight.bin¿-ç
+const 
+fc2_bias_to_fp16
+
+
+
+ *&
+name
+
+"
+fc2_bias_to_fp16*:
+val3
+
+
+
+ *#
+@model_path/weights/weight.binÄN∏
+linear
+x
+
+input_1_cast_fp16
+bias
+
+fc2_bias_to_fp16 
+weight
+
+fc2_weight_to_fp16(
+linear_1_cast_fp16
+
+
+
+ *(
+name 
+
+"
+linear_1_cast_fp16q
+relu
+x
+
+linear_1_cast_fp16%
+input_cast_fp16
+
+
+
+ *%
+name
+
+"
+input_cast_fp16ß
+const-
+head_afm_weight_to_fp16
+
+
+
+ *-
+name%
+
+"
+head_afm_weight_to_fp16*@
+val9
+
+
+
+ *#
+@model_path/weights/weight.binÄO|
+const%
+head_afm_bias_to_fp16
+
+
+
+*+
+name#
+
+"
+head_afm_bias_to_fp16*
+val
+
+
+
+
+:
+1¿
+linear
+x
+
+input_cast_fp16!
+bias
+
+head_afm_bias_to_fp16%
+weight
+
+head_afm_weight_to_fp16(
+linear_2_cast_fp16
+
+
+
+*(
+name 
+
+"
+linear_2_cast_fp16u
+sigmoid
+x
+
+linear_2_cast_fp16&
+var_20_cast_fp16
+
+
+
+*%
+name
+
+"
+op_20_cast_fp16É
+const(
+ var_20_cast_fp16_to_fp32_dtype_0
+*5
+name-
+%
+#"!
+op_20_cast_fp16_to_fp32_dtype_0*
+val
+
+
+"
+fp32´
+const/
+head_block_weight_to_fp16
+
+
+
+ */
+name'
+
+"
+head_block_weight_to_fp16*@
+val9
+
+
+
+ *#
+@model_path/weights/weight.binÄPÄ
+const'
+head_block_bias_to_fp16
+
+
+
+*-
+name%
+
+"
+head_block_bias_to_fp16*
+val
+
+
+
+
+:
+/ƒ
+linear
+x
+
+input_cast_fp16#
+bias
+
+head_block_bias_to_fp16'
+weight
+
+head_block_weight_to_fp16(
+linear_3_cast_fp16
+
+
+
+*(
+name 
+
+"
+linear_3_cast_fp16u
+sigmoid
+x
+
+linear_3_cast_fp16&
+var_24_cast_fp16
+
+
+
+*%
+name
+
+"
+op_24_cast_fp16É
+const(
+ var_24_cast_fp16_to_fp32_dtype_0
+*5
+name-
+%
+#"!
+op_24_cast_fp16_to_fp32_dtype_0*
+val
+
+
+"
+fp32≠
+const0
+head_length_weight_to_fp16
+
+
+
+ *0
+name(
+ 
+"
+head_length_weight_to_fp16*@
+val9
+
+
+
+ *#
+@model_path/weights/weight.binÄQÇ
+const(
+head_length_bias_to_fp16
+
+
+
+*.
+name&
+
+"
+head_length_bias_to_fp16*
+val
+
+
+
+
+:
+Œ†∆
+linear
+x
+
+input_cast_fp16$
+bias
+
+head_length_bias_to_fp16(
+weight
+
+head_length_weight_to_fp16(
+linear_4_cast_fp16
+
+
+
+*(
+name 
+
+"
+linear_4_cast_fp16à
+const*
+"linear_4_cast_fp16_to_fp32_dtype_0
+*8
+name0
+(
+&"$
+"linear_4_cast_fp16_to_fp32_dtype_0*
+val
+
+
+"
+fp32Ø
+const1
+head_latency_weight_to_fp16
+
+
+
+ *1
+name)
+!
+"
+head_latency_weight_to_fp16*@
+val9
+
+
+
+ *#
+@model_path/weights/weight.binÄRÑ
+const)
+head_latency_bias_to_fp16
+
+
+
+*/
+name'
+
+"
+head_latency_bias_to_fp16*
+val
+
+
+
+
+:
+h(»
+linear
+x
+
+input_cast_fp16%
+bias
+
+head_latency_bias_to_fp16)
+weight
+
+head_latency_weight_to_fp16(
+linear_5_cast_fp16
+
+
+
+*(
+name 
+
+"
+linear_5_cast_fp16à
+const*
+"linear_5_cast_fp16_to_fp32_dtype_0
+*8
+name0
+(
+&"$
+"linear_5_cast_fp16_to_fp32_dtype_0*
+val
+
+
+"
+fp32≥
+const3
+head_verbosity_weight_to_fp16
+
+
+
+ *3
+name+
+#
+!"
+head_verbosity_weight_to_fp16*@
+val9
+
+
+
+ *#
+@model_path/weights/weight.binÄSà
+const+
+head_verbosity_bias_to_fp16
+
+
+
+*1
+name)
+!
+"
+head_verbosity_bias_to_fp16*
+val
+
+
+
+
+:
+ø¨Ã
+linear
+x
+
+input_cast_fp16'
+bias
+
+head_verbosity_bias_to_fp16+
+weight!
+
+head_verbosity_weight_to_fp16(
+linear_6_cast_fp16
+
+
+
+*(
+name 
+
+"
+linear_6_cast_fp16u
+sigmoid
+x
+
+linear_6_cast_fp16&
+var_34_cast_fp16
+
+
+
+*%
+name
+
+"
+op_34_cast_fp16É
+const(
+ var_34_cast_fp16_to_fp32_dtype_0
+*5
+name-
+%
+#"!
+op_34_cast_fp16_to_fp32_dtype_0*
+val
+
+
+"
+fp32î
+cast-
+dtype$
+"
+ var_34_cast_fp16_to_fp32_dtype_0
+x
+
+var_34_cast_fp16$
+verbosity_prob
+
+
+*
+name
+
+
+"
+cast_0ñ
+cast/
+dtype&
+$
+"linear_5_cast_fp16_to_fp32_dtype_0
+x
+
+linear_5_cast_fp16"
+latency_norm
+
+
+*
+name
+
+
+"
+cast_1ï
+cast/
+dtype&
+$
+"linear_4_cast_fp16_to_fp32_dtype_0
+x
+
+linear_4_cast_fp16!
+length_norm
+
+
+*
+name
+
+
+"
+cast_2ê
+cast-
+dtype$
+"
+ var_24_cast_fp16_to_fp32_dtype_0
+x
+
+var_24_cast_fp16 
+
+block_prob
+
+
+*
+name
+
+
+"
+cast_3ñ
+cast-
+dtype$
+"
+ var_20_cast_fp16_to_fp32_dtype_0
+x
+
+var_20_cast_fp16&
+afm_success_prob
+
+
+*
+name
+
+
+"
+cast_4"Ê
+	buildInfoÿ"
+
+
+≈"¬
+6
+!
+
+"
+coremltools-version
+	
+"
+9.0
+A
+)
+!
+"
+coremltools-component-torch
+
+
+"
+2.11.0
+E
+(
+ 
+"
+coremltools-source-dialect
+
+"
+TorchScript

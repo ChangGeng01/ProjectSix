@@ -1,0 +1,165 @@
+<style>
+  .v7 { --bg:#0b1020; --panel:#121a2d; --line:rgba(255,255,255,.12); --muted:rgba(255,255,255,.65); --blue:#7bb2ff; --cyan:#61d7df; --green:#5ee0aa; --amber:#ffc875; --red:#ff818a; --violet:#caa2ff; color:#f7f9ff; }
+  .v7 * { box-sizing:border-box; }
+  .v7 h2,.v7 h3,.v7 h4 { margin-top:0; }
+  .v7 h3 { margin:24px 0 10px; font-size:14px; }
+  .v7 .subtitle { color:var(--muted); font-size:10px; line-height:1.55; }
+  .hero { border:1px solid rgba(94,224,170,.4); background:linear-gradient(115deg,rgba(94,224,170,.08),rgba(123,178,255,.04)); border-radius:16px; padding:15px; margin:12px 0 15px; }
+  .hero b { color:var(--green); font-size:13px; }
+  .hero p { margin:6px 0 0; color:var(--muted); font-size:9px; line-height:1.55; }
+  .equation { display:grid; grid-template-columns:repeat(7,1fr); gap:7px; margin-bottom:12px; }
+  .axis { border:1px solid var(--line); border-radius:11px; padding:9px; min-height:68px; }
+  .axis b { display:block; color:var(--blue); font-size:9px; margin-bottom:3px; }
+  .axis span { color:var(--muted); font-size:8px; line-height:1.35; }
+  .axis.fabric { grid-column:1/-1; min-height:auto; border-color:rgba(255,200,117,.38); background:rgba(255,200,117,.035); }
+  .axis.fabric b { color:var(--amber); }
+  .axes-note { border:1px dashed rgba(97,215,223,.34); border-radius:10px; padding:9px; text-align:center; color:var(--cyan); font-size:9px; }
+  .topology { display:grid; grid-template-columns:1.7fr .8fr .8fr; gap:9px; }
+  .panel { border:1px solid var(--line); border-radius:14px; padding:11px; background:rgba(18,26,45,.45); }
+  .panel h4 { font-size:11px; margin-bottom:7px; }
+  .layers { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .layer { border:1px solid rgba(123,178,255,.24); border-radius:8px; padding:6px; min-height:53px; }
+  .layer b { display:block; color:var(--blue); font-size:8px; margin-bottom:2px; }
+  .layer span { display:block; color:var(--muted); font-size:7px; line-height:1.3; }
+  .cell { margin-top:7px; border:1px dashed rgba(97,215,223,.36); color:var(--cyan); border-radius:8px; padding:7px; text-align:center; font-size:8px; }
+  .stack { display:grid; gap:6px; }
+  .box { border:1px solid var(--line); border-radius:8px; padding:7px; }
+  .box b { display:block; font-size:8px; margin-bottom:2px; }
+  .box span { display:block; color:var(--muted); font-size:7px; line-height:1.35; }
+  .kernels .box { border-color:rgba(202,162,255,.3); }
+  .rings .box { border-color:rgba(255,200,117,.3); }
+  .flow { display:flex; gap:5px; align-items:stretch; overflow-x:auto; padding-bottom:4px; }
+  .step { flex:1; min-width:94px; border:1px solid var(--line); border-radius:9px; padding:7px; color:var(--muted); font-size:7px; line-height:1.35; }
+  .step b { display:block; color:white; font-size:8px; margin-bottom:2px; }
+  .step.auth { border-color:rgba(255,200,117,.38); }
+  .step.neural { border-color:rgba(202,162,255,.4); }
+  .step.state { border-color:rgba(97,215,223,.35); }
+  .step.effect { border-color:rgba(255,129,138,.38); }
+  .arrow { align-self:center; color:var(--muted); font-size:10px; }
+  .loops { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .loop { border:1px solid var(--line); border-radius:11px; padding:9px; min-height:112px; }
+  .loop .n { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:rgba(123,178,255,.13); color:var(--blue); font-size:8px; font-weight:700; margin-bottom:5px; }
+  .loop b { display:block; font-size:9px; margin-bottom:3px; }
+  .loop p { margin:0; color:var(--muted); font-size:7px; line-height:1.42; }
+  .loop em { color:var(--green); font-style:normal; }
+  .fixes { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .fix { border:1px solid var(--line); border-radius:11px; padding:9px; }
+  .fix b { display:block; color:var(--amber); font-size:9px; margin-bottom:3px; }
+  .fix p { margin:0; color:var(--muted); font-size:7px; line-height:1.45; }
+  .verdict { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:11px; }
+  .vcard { border:1px solid var(--line); border-radius:12px; padding:11px; }
+  .vcard strong { display:block; font-size:11px; margin-bottom:4px; }
+  .vcard p { margin:0; color:var(--muted); font-size:8px; line-height:1.45; }
+  .pass { border-color:rgba(94,224,170,.42); } .pass strong { color:var(--green); }
+  .revise { border-color:rgba(255,200,117,.42); } .revise strong { color:var(--amber); }
+  .target { border-color:rgba(202,162,255,.42); } .target strong { color:var(--violet); }
+  @media(max-width:980px){ .equation{grid-template-columns:repeat(4,1fr)} .topology{grid-template-columns:1fr} .loops{grid-template-columns:repeat(2,1fr)} .layers{grid-template-columns:repeat(4,1fr)} }
+  @media(max-width:640px){ .equation,.loops,.fixes,.verdict{grid-template-columns:1fr} .layers{grid-template-columns:repeat(2,1fr)} }
+</style>
+
+<div class="v7">
+  <h2>v7 · 14-Layer Apple Silicon Architecture · Verification Lock</h2>
+  <p class="subtitle">经过计数、权威、崩溃恢复、StateABI、热控、并发、回放与性能证据八轮破坏性推演后的最终设计口径。</p>
+
+  <div class="hero">
+    <b>锁定句：14 层负责语义权威，4 内核负责物理机制，4 环负责有界反馈，7 平面负责正交观察。</b>
+    <p>这些数字是四条独立坐标轴，不能相加。Silicon Capability Fabric 只把可观察能力、认证画像、可撤销 lease 与真实 receipt 连接起来；它不是 L15、K5、第五环或第八平面。</p>
+  </div>
+
+  <div class="equation">
+    <div class="axis"><b>1 · Semantic Authority</b><span>L1–L14 唯一语义裁决权</span></div>
+    <div class="axis"><b>2 · Kernel Ownership</b><span>K1–K4 共享机制与故障域</span></div>
+    <div class="axis"><b>3 · Execution DAG</b><span>typed artifact 的每-turn 拓扑</span></div>
+    <div class="axis"><b>4 · ControlRing</b><span>四个有界反馈闭环</span></div>
+    <div class="axis"><b>5 · Data Plane</b><span>snapshot、CAS、outbox、ledger</span></div>
+    <div class="axis"><b>6 · Adapter / IO</b><span>OS、模型、存储、effect 边界</span></div>
+    <div class="axis"><b>7 · Observe / Replay</b><span>收据、证据等级、确定性重放</span></div>
+    <div class="axis fabric"><b>Silicon Capability Fabric · cross-plane fabric</b><span>横跨 2 + 6 + 7：CapabilitySnapshot → CertifiedProfile → revocable Lease → UsageReceipt。芯片名不是策略；未知设备从 quarantine 开始。</span></div>
+  </div>
+  <div class="axes-note">14 Semantic LayerCores ≠ 10 cores + 4 loops · 4 Kernels ≠ layers · 4 Rings ≠ authority · 7 Planes ≠ pipeline stages</div>
+
+  <h3>锁定拓扑</h3>
+  <div class="topology">
+    <div class="panel">
+      <h4>14 Semantic LayerCores · stable IDs</h4>
+      <div class="layers">
+        <div class="layer"><b>L1 Wick Life</b><span>lease/budget truth</span></div>
+        <div class="layer"><b>L2 Brain Tissue</b><span>neural plan/receipt</span></div>
+        <div class="layer"><b>L3 Folded Lung</b><span>context compile</span></div>
+        <div class="layer"><b>L4 World Prior</b><span>versioned claims</span></div>
+        <div class="layer"><b>L5 Constitution</b><span>host policy</span></div>
+        <div class="layer"><b>L6 Situation</b><span>intent/risk hints</span></div>
+        <div class="layer"><b>L7 Grounding</b><span>requirements/fusion</span></div>
+        <div class="layer"><b>L8 Memory</b><span>snapshot/candidates</span></div>
+        <div class="layer"><b>L9 Dream</b><span>portfolio/selection</span></div>
+        <div class="layer"><b>L10 Tribunal</b><span>verify/critique</span></div>
+        <div class="layer"><b>L11 Risk</b><span>permit/confirm</span></div>
+        <div class="layer"><b>L12 Soft Hand</b><span>spool/release</span></div>
+        <div class="layer"><b>L13 Evolution</b><span>prepare/reconcile</span></div>
+        <div class="layer"><b>L14 Sovereign</b><span>decision/revoke/seal</span></div>
+      </div>
+      <div class="cell">LayerCell = ingress membrane → pure semantic core → egress membrane · only typed immutable artifacts + attenuated capabilities cross cells</div>
+    </div>
+    <div class="panel kernels">
+      <h4>4 Physical Kernels</h4>
+      <div class="stack">
+        <div class="box"><b>K1 Lease &amp; Life</b><span>thermal/power/memory broker + global heavy-owner gate</span></div>
+        <div class="box"><b>K2 Neural Organ</b><span>weights、NeuralStateCache、token loop</span></div>
+        <div class="box"><b>K3 State &amp; Evolution</b><span>SemanticStateLake、artifact store、outbox</span></div>
+        <div class="box"><b>K4 Sovereign Microkernel</b><span>signer、durable spent ledger、audit</span></div>
+      </div>
+    </div>
+    <div class="panel rings">
+      <h4>4 bounded ControlRings</h4>
+      <div class="stack">
+        <div class="box"><b>ΩR Resource</b><span>observe → defer/remand → receipt</span></div>
+        <div class="box"><b>ΩG Grounding</b><span>coverage/conflict → bounded retrieval</span></div>
+        <div class="box"><b>ΩD Deliberation</b><span>critique → bounded candidate revision</span></div>
+        <div class="box"><b>ΩE Effect/Evolution</b><span>receipt → reconcile/seal/remand</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>一个 turn：公共主干与三条终端分支</h3>
+  <div class="flow">
+    <div class="step"><b>Normalize</b>canonical ingress artifact</div><div class="arrow">→</div>
+    <div class="step auth"><b>L14 preflight</b>admission decision</div><div class="arrow">→</div>
+    <div class="step"><b>L1 + L6</b>lease + intent/risk hints</div><div class="arrow">→</div>
+    <div class="step state"><b>L7/L8</b>snapshot retrieval + eligibility + conflicts</div><div class="arrow">→</div>
+    <div class="step neural"><b>L3/L2</b>compile → prefill → decode</div><div class="arrow">→</div>
+    <div class="step"><b>L9–L11</b>select → complete verify → final risk</div>
+  </div>
+  <div class="fixes" style="margin-top:8px">
+    <div class="fix"><b>Low-risk provisional</b><p>L11 provisional eligibility → L14 bounded grant <strong>before first byte</strong> → L12 hash-chained provisional UI。不能驱动 tool、effect 或 state；最终结果仍走完整验证。</p></div>
+    <div class="fix"><b>Exact response</b><p>L10/L11 final → L12 deterministic spool → L14 exact result authorization → L12 exact release。普通响应不穿过 effect outbox。</p></div>
+    <div class="fix"><b>External effect / state</b><p>L13 StatePrepare + K3 outbox → L14/K4 authorization → Zone-C pending/claim/ready/dispatch → receipt → L13 StateCommit → L14 seal → activate。</p></div>
+  </div>
+
+  <h3>八轮破坏性循环 · 修订后设计级通过</h3>
+  <div class="loops">
+    <div class="loop"><div class="n">1</div><b>Cardinality</b><p>消除“14=10+4”和 Silicon 第八平面歧义。<em>PASS：四轴独立。</em></p></div>
+    <div class="loop"><div class="n">2</div><b>Authority &amp; purity</b><p>L14 core 只产出 AuthorizationDecision；K4 membrane 签名。<em>PASS：语义与机制分离。</em></p></div>
+    <div class="loop"><div class="n">3</div><b>Artifact &amp; capability</b><p>结果未知时用 StatePrepare/request + schema/constraints；receipt 后 StateCommit/result digest。<em>PASS：无预知 digest 悖论。</em></p></div>
+    <div class="loop"><div class="n">4</div><b>Crash &amp; effect saga</b><p>K4 与 Zone C 各自本地事务，以 ClaimReceipt/query 关闭 crash gap；含 succeeded_unsealed 与 indeterminate。<em>PASS：不假装跨进程原子。</em></p></div>
+    <div class="loop"><div class="n">5</div><b>StateABI fallback</b><p>exact ABI 或 certified converter；否则丢弃 neural state 并重做 prefill。<em>PASS：无 silent garbage。</em></p></div>
+    <div class="loop"><div class="n">6</div><b>Thermal &amp; full-blood</b><p>热控只能慢、等、停、回收或切等价 backend；QualityIdentity + NeuralExecutionContract 不变。<em>PASS：质量不暗降。</em></p></div>
+    <div class="loop"><div class="n">7</div><b>Replay &amp; concurrency</b><p>snapshot-bound turn、late result 下一 epoch、单 heavy owner、bounded remand。<em>PASS：无回调环与双算语义。</em></p></div>
+    <div class="loop"><div class="n">8</div><b>Performance evidence</b><p>process-cold TTFT、cache-cold prefill、thermally-cold resident decode、end-to-end goodput 分开。<em>PASS：40/30 不混指标。</em></p></div>
+  </div>
+
+  <h3>红队发现后必须锁死的六处修正</h3>
+  <div class="fixes">
+    <div class="fix"><b>Signer truth</b><p>当前 Ed25519 seed 是 Keychain at-rest，并非 Secure Enclave non-exportable。硬件根使用可轮换 P-256 suite；envelope 必须 algorithm-agile。</p></div>
+    <div class="fix"><b>State naming</b><p>SemanticStateLake 属 L8/K3；NeuralStateCache 属 L2/K2。现有 `.statelake` tensor reader 不能证明语义湖已实现。</p></div>
+    <div class="fix"><b>One heavy owner</b><p>每 phase 只有一个 authoritative heavy owner；CPU/GPU/NAX/ANE 不是越满越好。nativeV2 丢结果再跑 V1 的双算风险必须消除。</p></div>
+    <div class="fix"><b>Durable authorization</b><p>nonce、issuance、reserve/spend 全部 K4 helper-private、事务持久；DB 丢失或损坏 fail-closed，不能用空账本继续。</p></div>
+    <div class="fix"><b>Honest placement</b><p>requested compute unit 不等于 actual placement。CapabilitySnapshot、certified profile 与 UsageReceipt 分层；未知设备从 quarantine 起步。</p></div>
+    <div class="fix"><b>Private commitments</b><p>内部完整性与可公开审计分离：私有低熵 artifact 不向 trace 暴露裸 digest，使用 keyed/blinded commitment。</p></div>
+  </div>
+
+  <div class="verdict">
+    <div class="vcard pass"><strong>Design consistency · PASS</strong><p>修订后的抽象规范在八类故障模型下无已知结构矛盾；这只锁定设计。</p></div>
+    <div class="vcard revise"><strong>Current code · REVISE</strong><p>统一 execution spine、MemoryLedger、durable ledger/outbox、StateABI、typed artifact mesh 等仍未落地。</p></div>
+    <div class="vcard target"><strong>Air 40 tok/s · TARGET</strong><p>严格定义为 thermally-cold resident accepted decode；不是 process-cold 或 end-to-end。持续 30 仍须两机 1800 秒 last-quarter p10 门。</p></div>
+  </div>
+</div>

@@ -1,0 +1,28 @@
+# Cargo manifest for bas-mirror-blade
+# chapter 七百六十四 / M2471-M2475 — DEEPER LAYER-MIGRATION ARC
+#
+# Pure-Rust port of the L7 decomposition state classifier:
+#   - DecomposeState enum (6 cases) modeling the signal types
+#     the L7 decomposition pipeline can emit
+#   - threshold-based transition rule pure fns
+#
+# Mirrors the structure of BASMLDecomposeService.decompose(...)
+# (Sources/BASHostKit/BASMLDecomposeService.swift):the actor
+# walks a context frame against thresholds + appends signal IDs
+# to typed arrays。 Rust owns the per-signal threshold decision
+# as a pure fn so the actor body becomes a thin orchestrator。
+
+[package]
+name = "bas-mirror-blade"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_mirror_blade"
+path = "src/lib.rs"
+
+[dependencies]
+# No external dependencies — threshold compares + enum dispatch only。

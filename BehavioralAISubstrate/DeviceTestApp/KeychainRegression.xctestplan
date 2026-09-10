@@ -1,0 +1,67 @@
+{
+  "configurations" : [
+    {
+      "id" : "C456BF8B-FBD5-4110-A324-EF871AD35021",
+      "name" : "KeychainRegression",
+      "options" : {
+        "environmentVariableEntries" : [
+          {
+            "key" : "BAS_ENDURANCE_AUTOSTART",
+            "value" : "0"
+          },
+          {
+            "key" : "BAS_V12_PROBE",
+            "value" : "0"
+          },
+          {
+            "key" : "BAS_FUZZ_BENCH_RUN",
+            "value" : "0"
+          },
+          {
+            "key" : "QINAO_MLX_E2E",
+            "value" : "0"
+          },
+          {
+            "key" : "QINAO_MLX_BENCH",
+            "value" : "0"
+          },
+          {
+            "key" : "QINAO_FM_E2E",
+            "value" : "0"
+          },
+          {
+            "key" : "BAS_T5_XCTEST",
+            "value" : "0"
+          },
+          {
+            "key" : "BAS_AGENT_FABRIC",
+            "value" : "disabled"
+          }
+        ]
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:BASDeviceTest.xcodeproj",
+      "identifier" : "39AADB9AE735A751550198B7",
+      "name" : "BASDeviceTestApp"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "selectedTests" : [
+        "BASSovereignKeychainBindingTests",
+        "BASSovereignAuditLedgerEd25519Tests",
+        "BASSovereignCommitTokenEd25519Tests"
+      ],
+      "target" : {
+        "containerPath" : "container:BASDeviceTest.xcodeproj",
+        "identifier" : "B37EEFE9266B23A2D02CD662",
+        "name" : "BASDeviceTests"
+      }
+    }
+  ],
+  "version" : 1
+}

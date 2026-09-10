@@ -1,0 +1,140 @@
+// MARK: - BASANESpecHybridProbe — Track B2: the end-to-end ANE-draft ∥ MLX-verify hybrid (BAS_ANE_SPEC_PROBE=1)
+//
+// The "last big piece": a Core ML int8 Llama-3.2-1B draft (65% A19-ANE) proposes K tokens; the MLX target
+// verifies all K in ONE forward (greedy argmax); accept the longest matching prefix — TOKEN-identical to
+// target-only greedy (ADR-039). Certifying config (fits the iPhone-Air cap): a 1B MLX target + the 1B int8 draft
+// (~2.7 GB). Byte-identity is target-size-independent, so 1B+1B fully certifies the mechanism; the 3B target is
+// memory-gated (2969+1200 > 3376 cap) and deferred.
+//
+// The silent-corruption gate: a broken draft RESYNC stays byte-identical but collapses acceptance to ~0. So the
+// load-bearing number is mean_acc (accepted/round) — on this same-family config it must be substantial (>~1).
+//
+// Stage first: LlamaDraft1B_int8.mlpackage + rope_cos_f32.bin + rope_sin_f32.bin into Documents. Env:
+// BAS_SPEC_K, BAS_SPEC_MAX_DECODE, BAS_SPEC_DRAFT_UNITS (all|ane|gpu).
+
+import Foundation
+import os
+import CoreML
+import BASOrgan
+import BASMLXAdapter
+
+enum BASANESpecHybridProbe {
+
+    // FileLog consolidated into the shared ProbeFileLog (BASProbeCommon.swift) — Tier-B dedup.
+
+    private static func footprintMB() -> Double {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let kr = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return kr == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : -1
+    }
+
+    private static let workloads: [(name: String, prompt: String)] = [
+        ("rag-quote",
+         "Here is a passage:\n\"\"\"\nThe mitochondrion is the powerhouse of the cell. It generates most of "
+         + "the cell's supply of adenosine triphosphate.\n\"\"\"\nQuote the passage above back verbatim."),
+        ("code-repeat",
+         "Repeat this Swift function exactly, then again unchanged:\nfunc add(_ a: Int, _ b: Int) -> Int { a + b }"),
+        ("long-quote",
+         "Here is a passage:\n\"\"\"\nThe quick brown fox jumps over the lazy dog. Pack my box with five dozen "
+         + "liquor jugs. How vexingly quick daft zebras jump. The five boxing wizards jump quickly. Sphinx of "
+         + "black quartz, judge my vow.\n\"\"\"\nNow repeat that entire passage back to me three times, verbatim."),
+        ("control-freeform",
+         "Write a short original opening paragraph for a science-fiction story set on a distant moon."),
+    ]
+
+    static func run() async {
+        let fileLog = ProbeFileLog(filePrefix: "ane-spec", category: "ane-spec", alsoPrint: false)
+        defer { fileLog.close() }
+        let env = ProcessInfo.processInfo.environment
+        let k = Int(env["BAS_SPEC_K"] ?? "") ?? 4
+        let cap = Int(env["BAS_SPEC_MAX_DECODE"] ?? "") ?? 128
+        let unitsStr = env["BAS_SPEC_DRAFT_UNITS"] ?? "all"
+        // Target: 1b (certifies the mechanism; draft not cheaper → no speedup) vs 3b (the WIN case — the 1B int8
+        // draft replaces expensive 3B forwards). int8 draft mmaps to ~30MB resident, so 3B+draft fits the cap.
+        let targetStr = env["BAS_SPEC_TARGET"] ?? "1b"
+        let target = targetStr == "3b" ? MLXModelCatalog.llama3_2_3B_4bit : MLXModelCatalog.llama3_2_1B_4bit
+        // Draft quant: int8 (faithful, 1.2GB) vs int4 (lossy-vs-own-fp32 but CHEAPER per forward — 0.66GB, less
+        // bandwidth; acceptance vs the TARGET may still hold on repetitive content). Path (a): cheaper draft.
+        let quant = env["BAS_SPEC_DRAFT_QUANT"] ?? "int8"
+        let draftFile = "LlamaDraft1B_\(quant).mlpackage"
+
+        guard #available(iOS 18.0, *) else {
+            fileLog.emit("📊 ane-spec SKIPPED — needs iOS 18 (MLState)"); return
+        }
+        let units: MLComputeUnits = unitsStr == "ane" ? .cpuAndNeuralEngine : (unitsStr == "gpu" ? .cpuAndGPU : .all)
+        fileLog.emit("📊 ane-spec START target=\(target.providerID) draft=\(quant) K=\(k) cap=\(cap) units=\(unitsStr) "
+            + String(format: "footprint0=%.0fMB", footprintMB()))
+
+        guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            fileLog.emit("📊 ane-spec ERROR=no-documents"); return
+        }
+        let modelURL = docs.appendingPathComponent(draftFile)
+        let cosURL = docs.appendingPathComponent("rope_cos_f32.bin")
+        let sinURL = docs.appendingPathComponent("rope_sin_f32.bin")
+        for u in [modelURL, cosURL, sinURL] where !FileManager.default.fileExists(atPath: u.path) {
+            fileLog.emit("📊 ane-spec ERROR=missing \(u.lastPathComponent) — stage it into Documents"); return
+        }
+
+        do {
+            let adapter = MLXOrganAdapter(
+                model: target, maxOutputTokens: cap, speculativeDecoding: .off)
+            try await adapter.loadModel()
+            fileLog.emit(String(format: "📊 ane-spec target loaded footprint=%.0fMB", footprintMB()))
+
+            let draft = try BASCoreMLDraftSession(
+                modelURL: modelURL, ropeCosURL: cosURL, ropeSinURL: sinURL, computeUnits: units)
+            fileLog.emit(String(format: "📊 ane-spec draft loaded footprint=%.0fMB (peak resident with both)", footprintMB()))
+
+            // Warmup: absorb the draft's Core ML first-call compile + the target's first decode so the timed
+            // workloads measure steady-state, not one-time lazy compilation.
+            let warm = BASOrganRequest(
+                requestID: "spec-warmup", role: .core, preset: .greedyDeterministic,
+                instruction: "Say hello.", context: [])
+            _ = try? await adapter.coreMLDraftAB(for: warm, draft: draft, numDraftTokens: k)
+            fileLog.emit(String(format: "📊 ane-spec warmup done footprint=%.0fMB", footprintMB()))
+
+            var speedups: [Double] = []
+            var allIdentical = true
+            var idCount = 0
+
+            for w in workloads {
+                let request = BASOrganRequest(
+                    requestID: "spec-\(w.name)", role: .core,
+                    preset: .greedyDeterministic, instruction: w.prompt, context: [])
+                do {
+                    let ab = try await adapter.coreMLDraftAB(for: request, draft: draft, numDraftTokens: k)
+                    let identical = ab.specTokens == ab.baseTokens
+                    if identical { idCount += 1 } else { allIdentical = false }
+                    let speedup = ab.specMs > 0 ? ab.baseMs / ab.specMs : 0
+                    let hitRate = ab.proposed > 0 ? Double(ab.accepted) / Double(ab.proposed) : 0
+                    let meanAcc = ab.rounds > 0 ? Double(ab.accepted) / Double(ab.rounds) : 0
+                    speedups.append(speedup)
+                    // The design's gate: overlap pays only when (K+1)·t_ane ≤ t_verify (draft fits the verify
+                    // shadow). ane_ms/gpu_ms is the per-run propose+commit vs verify split → the ratio that decides.
+                    let aneShare = ab.gpuMs > 0 ? ab.aneMs / ab.gpuMs : 0
+                    fileLog.emit(String(
+                        format: "📊 ane-spec workload=%@ tokens=%d rounds=%d hit_rate=%.2f mean_acc=%.2f "
+                            + "spec_ms=%.0f base_ms=%.0f speedup=%.2fx ane_ms=%.0f gpu_ms=%.0f ane/gpu=%.2f "
+                            + "token_identical=%@",
+                        w.name, ab.specTokens.count, ab.rounds, hitRate, meanAcc,
+                        ab.specMs, ab.baseMs, speedup, ab.aneMs, ab.gpuMs, aneShare, identical ? "YES" : "NO"))
+                } catch {
+                    fileLog.emit("📊 ane-spec workload=\(w.name) ERROR=\(error)")
+                }
+            }
+
+            let mean = speedups.isEmpty ? 0 : speedups.reduce(0, +) / Double(speedups.count)
+            fileLog.emit(String(
+                format: "📊 ane-spec DONE K=%d mean_speedup=%.2fx token_identical=%d/%d all_identical=%@ "
+                    + "peak=%.0fMB", k, mean, idCount, workloads.count,
+                allIdentical ? "YES" : "NO", footprintMB()))
+        } catch {
+            fileLog.emit("📊 ane-spec ERROR=\(error)")
+        }
+    }
+}

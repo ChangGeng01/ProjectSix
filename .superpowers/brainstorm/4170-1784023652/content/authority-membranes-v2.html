@@ -1,0 +1,180 @@
+<style>
+  .v2 { --ink:rgba(255,255,255,.88); --muted:rgba(255,255,255,.62); --line:rgba(255,255,255,.13); --green:#55d6a7; --blue:#78a9ff; --violet:#c698ff; --amber:#ffbd66; --red:#ff7c83; }
+  .badge-row { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0 22px; }
+  .badge-row span { padding:7px 10px; border:1px solid var(--line); border-radius:999px; font-size:11px; background:rgba(255,255,255,.035); }
+  .change { display:grid; grid-template-columns:130px 1fr; gap:10px; align-items:center; border:1px solid rgba(85,214,167,.28); background:rgba(85,214,167,.055); border-radius:12px; padding:10px 12px; margin:8px 0; }
+  .change b { color:var(--green); font-size:12px; }
+  .change span { font-size:12px; color:var(--muted); line-height:1.45; }
+  .planes { display:grid; grid-template-columns:repeat(7,minmax(105px,1fr)); gap:7px; overflow-x:auto; padding-bottom:5px; }
+  .plane { min-width:105px; border:1px solid var(--line); border-radius:11px; padding:10px; }
+  .plane h3 { margin:0 0 7px; font-size:12px; }
+  .plane p { margin:0; color:var(--muted); font-size:10px; line-height:1.45; }
+  .plane .no { display:block; color:var(--red); margin-top:6px; }
+  .section-title { margin-top:26px; }
+  .membrane { display:grid; grid-template-columns:1fr auto 1fr; gap:10px; align-items:center; margin:14px 0 20px; }
+  .owner { border:1px solid var(--line); border-radius:13px; padding:13px; }
+  .owner h3 { margin:0 0 6px; font-size:14px; }
+  .owner p { margin:0; font-size:11px; color:var(--muted); line-height:1.5; }
+  .port { border:1px solid rgba(120,169,255,.35); border-radius:999px; padding:8px 10px; color:var(--blue); font-size:10px; text-align:center; }
+  .artifact { border:1px solid rgba(198,152,255,.32); background:rgba(198,152,255,.06); border-radius:13px; padding:13px; }
+  .artifact h3 { margin:0 0 6px; font-size:14px; color:var(--violet); }
+  .artifact p { margin:0; font-size:11px; color:var(--muted); line-height:1.5; }
+  .bands { display:grid; gap:10px; }
+  .band { border:1px solid var(--line); border-radius:14px; padding:12px; }
+  .band-head { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+  .band-head b { font-size:12px; }
+  .band-head span { color:var(--muted); font-size:10px; }
+  .steps { display:flex; gap:7px; align-items:stretch; overflow-x:auto; padding-bottom:4px; }
+  .step { min-width:122px; flex:1; border:1px solid var(--line); border-radius:10px; padding:9px; font-size:10px; line-height:1.4; }
+  .step strong { display:block; font-size:11px; margin-bottom:4px; color:var(--ink); }
+  .step em { display:block; font-style:normal; color:var(--muted); }
+  .join { align-self:center; color:var(--muted); font-size:14px; }
+  .life { border-color:rgba(85,214,167,.34); background:rgba(85,214,167,.045); }
+  .neural { border-color:rgba(120,169,255,.34); background:rgba(120,169,255,.045); }
+  .state { border-color:rgba(198,152,255,.31); background:rgba(198,152,255,.04); }
+  .sovereign { border-color:rgba(255,189,102,.37); background:rgba(255,189,102,.045); }
+  .machine { display:flex; align-items:stretch; gap:6px; overflow-x:auto; padding:7px 0 4px; }
+  .statebox { min-width:118px; border:1px solid var(--line); border-radius:10px; padding:9px; font-size:10px; line-height:1.35; }
+  .statebox b { display:block; margin-bottom:4px; }
+  .statebox small { color:var(--muted); }
+  .unknown { border-color:rgba(255,124,131,.5); background:rgba(255,124,131,.06); }
+  .scenario-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .scenario { border:1px solid var(--line); border-radius:12px; padding:12px; }
+  .scenario h3 { margin:0 0 6px; font-size:13px; }
+  .scenario p { margin:0; font-size:11px; color:var(--muted); line-height:1.48; }
+  .rules { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin:18px 0; }
+  .rule { border:1px solid var(--line); border-radius:11px; padding:11px; font-size:11px; line-height:1.45; }
+  .rule b { display:block; color:var(--green); margin-bottom:4px; }
+  .decision { margin-top:25px; }
+  @media (max-width:820px) {
+    .planes { grid-template-columns:repeat(7,145px); }
+    .membrane { grid-template-columns:1fr; }
+    .scenario-grid,.rules { grid-template-columns:1fr; }
+    .change { grid-template-columns:1fr; }
+  }
+</style>
+
+<div class="v2">
+  <h2>v2 · 边界清晰，但不是彼此隔绝</h2>
+  <p class="subtitle">经过正常问答、冲突检索、semantic cache、multi-turn KV、热降频、高风险工具、crash/retry 七类脑内运行后的修订版。</p>
+
+  <div class="badge-row">
+    <span>14 = Semantic Authority</span><span>4 Kernel = Mechanism Ownership</span><span>ControlRing = Bounded Relation</span><span>0 个 mega TurnContext</span><span>0 个 14-Actor 串行链</span>
+  </div>
+
+  <div class="change"><b>修正 1 · 入口</b><span>外部 InputAdapter 只做字节/ID canonicalization；L14 先做身份、session、policy lineage preflight，之后 L1 才发 turn lease。未经授权的输入不能读取 L5/L8。</span></div>
+  <div class="change"><b>修正 2 · 所有权</b><span>LayerCore 拥有语义决定；Kernel/Store 拥有机制与可变字节。例如 L2 拥有 neural request/plan/receipt 语义，GPU、weights、KV、token buffer 留在 Neural Kernel。</span></div>
+  <div class="change"><b>修正 3 · 提交</b><span>删除“finalize 后再写 L8”和 exactly-once 幻觉；改为 durable prepare/outbox、真实 receipt、可恢复 reconcile、staged L8 version、最后 seal/activate。</span></div>
+  <div class="change"><b>修正 4 · 协作</b><span>层不能持有其他层的 service instance；只能通过 typed port 交换 immutable Artifact。反馈不直接 callback，而是下一 epoch 的 bounded RemandDirective。</span></div>
+
+  <h3 class="section-title">一套系统，七个正交平面</h3>
+  <div class="planes">
+    <div class="plane"><h3>Semantic Authority</h3><p>L1–L14：谁对哪种“意义/决定”负责。<span class="no">不拥有 GPU/DB/线程。</span></p></div>
+    <div class="plane"><h3>Kernel Ownership</h3><p>4 个物理域：机制、隔离、并发、可变运行状态。<span class="no">不产生业务 verdict。</span></p></div>
+    <div class="plane"><h3>Execution DAG</h3><p>依赖、fan-out/join、deadline、cancel、skip。<span class="no">不改变语义。</span></p></div>
+    <div class="plane"><h3>ControlRing</h3><p>ΩR/ΩG/ΩD/ΩE：epoch、budget、stop、remand。<span class="no">不持有业务状态。</span></p></div>
+    <div class="plane"><h3>Data Plane</h3><p>StateLake、NeuralArtifactStore、outbox、ledger 的 bytes/version。<span class="no">不自行决策。</span></p></div>
+    <div class="plane"><h3>Adapter / IO</h3><p>MLX、Metal、SQLite、Qinao、tool provider 的机械执行。<span class="no">不 permit、不绕 gate。</span></p></div>
+    <div class="plane"><h3>Observe / Replay</h3><p>trace、metric、receipt、replay digest。<span class="no">不隐式回流同轮。</span></p></div>
+  </div>
+
+  <h3 class="section-title">层间“膜”：合作只能穿过这里</h3>
+  <div class="membrane">
+    <div class="owner">
+      <h3>Producer LayerCore</h3>
+      <p>只能写自己拥有的语义结论；不能返回 service、闭包、Any、裸 prompt JSON 或共享 mutable frame。</p>
+    </div>
+    <div class="port">Query / Command Port<br>consumer whitelist</div>
+    <div class="artifact">
+      <h3>Immutable LayerArtifact</h3>
+      <p>turn/epoch · producer · schema · digest · parentRefs · snapshot/policy refs · sensitivity · determinism · expiry。Outcome 只能是 Produced / Skipped / Remand / Denied / Failed。</p>
+    </div>
+  </div>
+  <p class="subtitle">SpineRuntime 只执行 Artifact DAG、追加引用和调度任务；它没有 domain state、不能改 verdict，因此不是第 15 个核心。</p>
+
+  <h3 class="section-title">14 层协作 DAG（不是编号串行）</h3>
+  <div class="bands">
+    <div class="band">
+      <div class="band-head"><b>Admission</b><span>先授权，再占用 turn 资源</span></div>
+      <div class="steps">
+        <div class="step sovereign"><strong>L14 Preflight</strong><em>AdmissionGrant / Denial</em></div><div class="join">→</div>
+        <div class="step life"><strong>L1 Lease</strong><em>TurnLease + BudgetGrant</em></div><div class="join">→</div>
+        <div class="step state"><strong>L6 Situation</strong><em>IntentHypotheses + advisory RiskHint</em></div>
+      </div>
+    </div>
+
+    <div class="band">
+      <div class="band-head"><b>Grounding · ΩG</b><span>L7 两阶段 plan/reduce；最多 2 个 epoch</span></div>
+      <div class="steps">
+        <div class="step state"><strong>L7 Plan</strong><em>GroundingQueryPlan</em></div><div class="join">→</div>
+        <div class="step state"><strong>L4 World Prior</strong><em>versioned public prior</em></div>
+        <div class="step state"><strong>L5 Constitution</strong><em>sealed safe projection</em></div>
+        <div class="step state"><strong>L8 StateLake Read</strong><em>immutable snapshot/read set</em></div><div class="join">→</div>
+        <div class="step state"><strong>L7 Reduce</strong><em>GroundingManifest + conflicts</em></div><div class="join">→</div>
+        <div class="step neural"><strong>L3 Compile</strong><em>ContextManifest + binding key</em></div>
+      </div>
+    </div>
+
+    <div class="band">
+      <div class="band-head"><b>Deliberation · ΩD</b><span>L9 唯一选案；L2 只处理 neural mechanics</span></div>
+      <div class="steps">
+        <div class="step state"><strong>L9 Source Plan</strong><em>cache / direct / tool / infer</em></div><div class="join">↔</div>
+        <div class="step neural"><strong>L2 Neural Broker</strong><em>唯一 NeuralExecutionPlan；hot loop 留在 kernel</em></div><div class="join">→</div>
+        <div class="step state"><strong>L9 Select</strong><em>CandidatePortfolio + SelectionProposal</em></div><div class="join">→</div>
+        <div class="step state"><strong>L10 Verify</strong><em>claim support / repair / reject</em></div><div class="join">→</div>
+        <div class="step state"><strong>L11 Permit</strong><em>唯一 RiskPermit</em></div>
+      </div>
+    </div>
+
+    <div class="band">
+      <div class="band-head"><b>Commit · ΩE</b><span>授权、执行、事实结算彼此分离</span></div>
+      <div class="steps">
+        <div class="step state"><strong>L12 Pending</strong><em>ResponseSpoolRef / ToolIntent</em></div><div class="join">→</div>
+        <div class="step state"><strong>L13 Prepare</strong><em>PreparedCommitBatch + baseRevision</em></div><div class="join">→</div>
+        <div class="step sovereign"><strong>L14 Authorize</strong><em>digest-bound capability</em></div><div class="join">→</div>
+        <div class="step"><strong>SpineCommitter</strong><em>only dispatch / release mouth</em></div><div class="join">→</div>
+        <div class="step state"><strong>L13 Reconcile</strong><em>real receipt; no fake executed</em></div><div class="join">→</div>
+        <div class="step state"><strong>L8 Stage</strong><em>invisible version / CAS</em></div><div class="join">→</div>
+        <div class="step sovereign"><strong>L14 Seal</strong><em>activate snapshot + terminal audit</em></div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title">外部副作用的可恢复状态机</h3>
+  <div class="machine">
+    <div class="statebox"><b>prepared</b><small>outbox + state precondition durable</small></div><div class="join">→</div>
+    <div class="statebox"><b>capabilityReady</b><small>signature durable before exposure</small></div><div class="join">→</div>
+    <div class="statebox"><b>dispatchStarted</b><small>stable operationID / attemptID</small></div><div class="join">→</div>
+    <div class="statebox unknown"><b>succeeded / failed / outcomeUnknown</b><small>unknown 永不盲重试</small></div><div class="join">→</div>
+    <div class="statebox"><b>receiptDurable</b><small>provider or observed assurance</small></div><div class="join">→</div>
+    <div class="statebox"><b>stateApplyPending</b><small>L8 staged CAS / recovery</small></div><div class="join">→</div>
+    <div class="statebox sovereign"><b>completed</b><small>seal + activated snapshot</small></div>
+  </div>
+  <p class="subtitle">本地 operation/outbox/receipt 状态可 exactly-once；外部 effect 只有 provider 支持 idempotency + lookup 才 effectively-once。否则高风险 timeout = outcomeUnknown + reconcile/manual，不自动重发。</p>
+
+  <h3 class="section-title">七次运行后的快路与闭环</h3>
+  <div class="scenario-grid">
+    <div class="scenario"><h3>Verified semantic hit</h3><p>L7 只检查 dependency versions；L9 命中；L10 用 receipt digest/epochs O(1) 验证；L11/L12/L13/L14 仍运行。L2/L3 发 typed Skipped，不被强制唤醒。</p></div>
+    <div class="scenario"><h3>Multi-turn KV / prefix hit</h3><p>L3 semantic/stable-prefix fingerprint 与 model、adapter、quant、tokenizer/template、session generation 全匹配才恢复。只加速 L2，绝不跳过 L9–L14。</p></div>
+    <div class="scenario"><h3>Thermal serious+</h3><p>L1 仅阶段 checkpoint；L2 在 hot loop 内读取本地原子状态并 MTP→plain。不能降低模型质量或偷偷截短；需要改变语义预算时返回下一 epoch remand。</p></div>
+    <div class="scenario"><h3>High-risk tool / streaming</h3><p>正文只生成一次并写 content-addressed spool；同一字节通过 L10/L11/L14 后释放。高风险过程中只允许 typed progress，partial tool JSON 不得流出或执行。</p></div>
+    <div class="scenario"><h3>Evidence conflict</h3><p>L7 处理 evidence-set 冲突；L10 处理 candidate-claim 冲突。Remand 通过 ΩG/ΩD 下一 epoch，次数耗尽则澄清/拒答，不产生代码级回调环。</p></div>
+    <div class="scenario"><h3>Tool receipt → next turn</h3><p>只有 sealed receipt 才能变成新的 typed InputEvent；携带 causation、depth、idempotency cursor。模型只看脱敏 projection，receipt 本身不能自动生成下一 ToolIntent。</p></div>
+  </div>
+
+  <div class="rules">
+    <div class="rule"><b>一层一真相</b>每种 semantic decision 只有一个 writer；其他层只能引用 artifact。</div>
+    <div class="rule"><b>合作不等于全唤醒</b>每轮走依赖 DAG；可安全跳过的层必须留下 typed SkipReceipt。</div>
+    <div class="rule"><b>Actor 是实现细节</b>只在共享可变/IO 边界 actor 化；pure layer core 在同一 task 内值调用。</div>
+  </div>
+
+  <div class="decision">
+    <h3>v2 的“边界 + 深度协作”是否是你要的质感？</h3>
+    <p class="subtitle">这一轮只确认架构关系；下一段再精确规定每个 artifact、失败分级与测试矩阵。</p>
+    <div class="options">
+      <div class="option" data-choice="approve-v2-boundaries" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content"><h3>采用 v2</h3><p>正交平面、Layer membrane、DAG 协作和 commit saga 都成立。</p></div></div>
+      <div class="option" data-choice="more-collaboration" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content"><h3>还要更深合作</h3><p>边界正确，但希望层间共享/反馈更强。</p></div></div>
+      <div class="option" data-choice="more-isolation" onclick="toggleSelect(this)"><div class="letter">C</div><div class="content"><h3>还要更强隔离</h3><p>希望依赖、数据可见性或失败传播再收紧。</p></div></div>
+    </div>
+  </div>
+</div>

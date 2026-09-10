@@ -1,0 +1,17 @@
+{
+  "benchName" : "lifecycle-bench",
+  "schemaVersion" : "bas-bench-baseline.v2",
+  "stats" : {
+    "max" : 2.190791,
+    "mean" : 0.001741952429524649,
+    "min" : 0.00125,
+    "outlierCount" : 143,
+    "p50" : 0.001375,
+    "p95" : 0.0015,
+    "p99" : 0.002584,
+    "p999" : 0.070417,
+    "sampleCount" : 99999,
+    "standardDeviation" : 0.014685486794355542
+  },
+  "storedAt" : "2026-05-03T19:47:26Z"
+}

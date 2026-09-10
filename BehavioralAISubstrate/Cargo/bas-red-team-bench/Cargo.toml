@@ -1,0 +1,48 @@
+# Cargo manifest for bas-red-team-bench
+# chapter 七百五十九 第一刀 / M2446 — DEEPER LAYER-MIGRATION ARC
+#
+# Batch adversarial-prompt classifier。 Lifts the 24 red lines from
+# `BASDoctrineAdversarialStressTests.swift` (10 Cthulhu + 8 Kunlun +
+# 5 Product + 1 BR-014 Sovereign Domain Scope) into a Rust classifier
+# with SIMD-friendly pattern matching。
+#
+# Rationale per chapter 七百五十七 audit + user 严苛 table
+# (L11 「极值得 (DEEPER)」):
+#
+#   - Existing Swift implementation:
+#     `BASProductRedLineLinter.lint(inputs: [String])` walks each
+#     input via `.contains()` substring scan,single-threaded
+#   - Rust gain expected ~50-100× batch throughput per the
+#     planning audit (single-threaded Swift contains() vs SIMD
+#     pattern-tree in Rust)
+#   - Output stability:`RedLineMatch` carries (input_index,
+#     red_line_id,pattern_index) so consumers can map back to
+#     the original Swift enum for governance logging
+#
+# This crate is PURELY data + scanning logic。 No I/O,no shared
+# state,no allocation outside Vec growth during classification。
+# All input prompts are passed by reference (no string ownership
+# transfer)。 The pattern corpus is compile-time-pinned via
+# const-arrays so future patterns require an explicit code change
+# + ABI bump rather than runtime configuration drift。
+
+[package]
+name = "bas-red-team-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_red_team_bench"
+path = "src/lib.rs"
+
+[dependencies]
+# chapter 八百五十四 / M2921 — rayon for parallel batch classify。
+# Per Phase A measurement (chapter 八百五十二),rayon scatter
+# patterns can be costly。 For red-team-bench the parallelism is
+# CLEANER:each prompt is independently classified into its own
+# Vec of matches,then concat。 No shared mutable state,no
+# per-task heap reuse needed beyond what rayon already does。
+rayon = "1.10"

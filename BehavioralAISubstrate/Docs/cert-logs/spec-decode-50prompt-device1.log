@@ -1,0 +1,182 @@
+📊 spec-decode START budget_mb=6000 decode_cap=48 prompts=50 dist_n=128 dist_temp=0.70 pairing=fallback
+📊 spec-decode loading-target tier=fallback mode=greedy target=mlx.llama3_2.3b.it.4bit
+📊 spec-decode loaded-target tier=fallback drafting=mlx.llama3_2.1b.it.4bit
+📊 spec-decode dual-resident tier=fallback mode=greedy
+📊 spec-decode lane=greedy p=0 spec_ms=1223
+📊 spec-decode lane=greedy p=1 spec_ms=902
+📊 spec-decode lane=greedy p=2 spec_ms=703
+📊 spec-decode lane=greedy p=3 spec_ms=1548
+📊 spec-decode lane=greedy p=4 spec_ms=1488
+📊 spec-decode lane=greedy p=5 spec_ms=641
+📊 spec-decode lane=greedy p=6 spec_ms=1715
+📊 spec-decode lane=greedy p=7 spec_ms=393
+📊 spec-decode lane=greedy p=8 spec_ms=1484
+📊 spec-decode lane=greedy p=9 spec_ms=971
+📊 spec-decode lane=greedy p=10 spec_ms=726
+📊 spec-decode lane=greedy p=11 spec_ms=718
+📊 spec-decode lane=greedy p=12 spec_ms=337
+📊 spec-decode lane=greedy p=13 spec_ms=1538
+📊 spec-decode lane=greedy p=14 spec_ms=747
+📊 spec-decode lane=greedy p=15 spec_ms=1576
+📊 spec-decode lane=greedy p=16 spec_ms=419
+📊 spec-decode lane=greedy p=17 spec_ms=1805
+📊 spec-decode lane=greedy p=18 spec_ms=343
+📊 spec-decode lane=greedy p=19 spec_ms=502
+📊 spec-decode lane=greedy p=20 spec_ms=778
+📊 spec-decode lane=greedy p=21 spec_ms=351
+📊 spec-decode lane=greedy p=22 spec_ms=364
+📊 spec-decode lane=greedy p=23 spec_ms=1462
+📊 spec-decode lane=greedy p=24 spec_ms=429
+📊 spec-decode lane=greedy p=25 spec_ms=2064
+📊 spec-decode lane=greedy p=26 spec_ms=604
+📊 spec-decode lane=greedy p=27 spec_ms=736
+📊 spec-decode lane=greedy p=28 spec_ms=444
+📊 spec-decode lane=greedy p=29 spec_ms=616
+📊 spec-decode lane=greedy p=30 spec_ms=672
+📊 spec-decode lane=greedy p=31 spec_ms=823
+📊 spec-decode lane=greedy p=32 spec_ms=361
+📊 spec-decode lane=greedy p=33 spec_ms=380
+📊 spec-decode lane=greedy p=34 spec_ms=2354
+📊 spec-decode lane=greedy p=35 spec_ms=961
+📊 spec-decode lane=greedy p=36 spec_ms=284
+📊 spec-decode lane=greedy p=37 spec_ms=681
+📊 spec-decode lane=greedy p=38 spec_ms=375
+📊 spec-decode lane=greedy p=39 spec_ms=1805
+📊 spec-decode lane=greedy p=40 spec_ms=452
+📊 spec-decode lane=greedy p=41 spec_ms=376
+📊 spec-decode lane=greedy p=42 spec_ms=853
+📊 spec-decode lane=greedy p=43 spec_ms=478
+📊 spec-decode lane=greedy p=44 spec_ms=2026
+📊 spec-decode lane=greedy p=45 spec_ms=1039
+📊 spec-decode lane=greedy p=46 spec_ms=793
+📊 spec-decode lane=greedy p=47 spec_ms=2923
+📊 spec-decode lane=greedy p=48 spec_ms=1237
+📊 spec-decode lane=greedy p=49 spec_ms=1443
+📊 spec-decode lane=greedy DONE n=50
+📊 spec-decode loading-target tier=fallback mode=sampling target=mlx.llama3_2.3b.it.4bit
+📊 spec-decode loaded-target tier=fallback drafting=mlx.llama3_2.1b.it.4bit
+📊 spec-decode dual-resident tier=fallback mode=sampling
+📊 spec-decode lane=sampling p=0 spec_ms=2126
+📊 spec-decode lane=sampling p=1 spec_ms=2352
+📊 spec-decode lane=sampling p=2 spec_ms=1540
+📊 spec-decode lane=sampling p=3 spec_ms=3110
+📊 spec-decode lane=sampling p=4 spec_ms=3087
+📊 spec-decode lane=sampling p=5 spec_ms=1233
+📊 spec-decode lane=sampling p=6 spec_ms=3277
+📊 spec-decode lane=sampling p=7 spec_ms=869
+📊 spec-decode lane=sampling p=8 spec_ms=1473
+📊 spec-decode lane=sampling p=9 spec_ms=3103
+📊 spec-decode lane=sampling p=10 spec_ms=2885
+📊 spec-decode lane=sampling p=11 spec_ms=1282
+📊 spec-decode lane=sampling p=12 spec_ms=819
+📊 spec-decode lane=sampling p=13 spec_ms=3075
+📊 spec-decode lane=sampling p=14 spec_ms=1272
+📊 spec-decode lane=sampling p=15 spec_ms=3412
+📊 spec-decode lane=sampling p=16 spec_ms=1121
+📊 spec-decode lane=sampling p=17 spec_ms=3627
+📊 spec-decode lane=sampling p=18 spec_ms=1129
+📊 spec-decode lane=sampling p=19 spec_ms=1608
+📊 spec-decode lane=sampling p=20 spec_ms=1617
+📊 spec-decode lane=sampling p=21 spec_ms=1532
+📊 spec-decode lane=sampling p=22 spec_ms=747
+📊 spec-decode lane=sampling p=23 spec_ms=3471
+📊 spec-decode lane=sampling p=24 spec_ms=1427
+📊 spec-decode lane=sampling p=25 spec_ms=4171
+📊 spec-decode lane=sampling p=26 spec_ms=825
+📊 spec-decode lane=sampling p=27 spec_ms=1447
+📊 spec-decode lane=sampling p=28 spec_ms=852
+📊 spec-decode lane=sampling p=29 spec_ms=1278
+📊 spec-decode lane=sampling p=30 spec_ms=1132
+📊 spec-decode lane=sampling p=31 spec_ms=3593
+📊 spec-decode lane=sampling p=32 spec_ms=933
+📊 spec-decode lane=sampling p=33 spec_ms=741
+📊 spec-decode lane=sampling p=34 spec_ms=3503
+📊 spec-decode lane=sampling p=35 spec_ms=1857
+📊 spec-decode lane=sampling p=36 spec_ms=633
+📊 spec-decode lane=sampling p=37 spec_ms=1421
+📊 spec-decode lane=sampling p=38 spec_ms=709
+📊 spec-decode lane=sampling p=39 spec_ms=3624
+📊 spec-decode lane=sampling p=40 spec_ms=799
+📊 spec-decode lane=sampling p=41 spec_ms=867
+📊 spec-decode lane=sampling p=42 spec_ms=1356
+📊 spec-decode lane=sampling p=43 spec_ms=840
+📊 spec-decode lane=sampling p=44 spec_ms=2476
+📊 spec-decode lane=sampling p=45 spec_ms=1556
+📊 spec-decode lane=sampling p=46 spec_ms=2519
+📊 spec-decode lane=sampling p=47 spec_ms=4091
+📊 spec-decode lane=sampling p=48 spec_ms=2773
+📊 spec-decode lane=sampling p=49 spec_ms=1708
+📊 spec-decode lane=sampling DONE n=50
+📊 spec-decode dist-spec p=0 drew=128
+📊 spec-decode dist-spec p=1 drew=128
+📊 spec-decode tier=fallback dual_peak_mb=2542
+📊 spec-decode lane=baseline p=0 greedy_ms=1631 sampling_ms=3121
+📊 spec-decode lane=baseline p=1 greedy_ms=1669 sampling_ms=1647
+📊 spec-decode lane=baseline p=2 greedy_ms=1182 sampling_ms=1108
+📊 spec-decode lane=baseline p=3 greedy_ms=2942 sampling_ms=2980
+📊 spec-decode lane=baseline p=4 greedy_ms=2953 sampling_ms=2968
+📊 spec-decode lane=baseline p=5 greedy_ms=1255 sampling_ms=1256
+📊 spec-decode lane=baseline p=6 greedy_ms=2860 sampling_ms=2974
+📊 spec-decode lane=baseline p=7 greedy_ms=780 sampling_ms=866
+📊 spec-decode lane=baseline p=8 greedy_ms=2733 sampling_ms=2997
+📊 spec-decode lane=baseline p=9 greedy_ms=1583 sampling_ms=1137
+📊 spec-decode lane=baseline p=10 greedy_ms=1109 sampling_ms=1583
+📊 spec-decode lane=baseline p=11 greedy_ms=1305 sampling_ms=814
+📊 spec-decode lane=baseline p=12 greedy_ms=571 sampling_ms=547
+📊 spec-decode lane=baseline p=13 greedy_ms=2545 sampling_ms=1325
+📊 spec-decode lane=baseline p=14 greedy_ms=1265 sampling_ms=2984
+📊 spec-decode lane=baseline p=15 greedy_ms=2987 sampling_ms=1289
+📊 spec-decode lane=baseline p=16 greedy_ms=713 sampling_ms=661
+📊 spec-decode lane=baseline p=17 greedy_ms=2650 sampling_ms=3010
+📊 spec-decode lane=baseline p=18 greedy_ms=726 sampling_ms=595
+📊 spec-decode lane=baseline p=19 greedy_ms=616 sampling_ms=1368
+📊 spec-decode lane=baseline p=20 greedy_ms=1327 sampling_ms=1366
+📊 spec-decode lane=baseline p=21 greedy_ms=640 sampling_ms=1031
+📊 spec-decode lane=baseline p=22 greedy_ms=567 sampling_ms=1439
+📊 spec-decode lane=baseline p=23 greedy_ms=2579 sampling_ms=2970
+📊 spec-decode lane=baseline p=24 greedy_ms=825 sampling_ms=948
+📊 spec-decode lane=baseline p=25 greedy_ms=2777 sampling_ms=3002
+📊 spec-decode lane=baseline p=26 greedy_ms=1066 sampling_ms=867
+📊 spec-decode lane=baseline p=27 greedy_ms=1123 sampling_ms=1400
+📊 spec-decode lane=baseline p=28 greedy_ms=701 sampling_ms=589
+📊 spec-decode lane=baseline p=29 greedy_ms=861 sampling_ms=859
+📊 spec-decode lane=baseline p=30 greedy_ms=1063 sampling_ms=2950
+📊 spec-decode lane=baseline p=31 greedy_ms=1242 sampling_ms=1443
+📊 spec-decode lane=baseline p=32 greedy_ms=703 sampling_ms=644
+📊 spec-decode lane=baseline p=33 greedy_ms=554 sampling_ms=525
+📊 spec-decode lane=baseline p=34 greedy_ms=2579 sampling_ms=2978
+📊 spec-decode lane=baseline p=35 greedy_ms=1296 sampling_ms=635
+📊 spec-decode lane=baseline p=36 greedy_ms=563 sampling_ms=536
+📊 spec-decode lane=baseline p=37 greedy_ms=887 sampling_ms=2744
+📊 spec-decode lane=baseline p=38 greedy_ms=887 sampling_ms=695
+📊 spec-decode lane=baseline p=39 greedy_ms=2652 sampling_ms=3086
+📊 spec-decode lane=baseline p=40 greedy_ms=809 sampling_ms=626
+📊 spec-decode lane=baseline p=41 greedy_ms=575 sampling_ms=557
+📊 spec-decode lane=baseline p=42 greedy_ms=921 sampling_ms=780
+📊 spec-decode lane=baseline p=43 greedy_ms=604 sampling_ms=652
+📊 spec-decode lane=baseline p=44 greedy_ms=2799 sampling_ms=3045
+📊 spec-decode lane=baseline p=45 greedy_ms=1272 sampling_ms=595
+📊 spec-decode lane=baseline p=46 greedy_ms=599 sampling_ms=564
+📊 spec-decode lane=baseline p=47 greedy_ms=2580 sampling_ms=3030
+📊 spec-decode lane=baseline p=48 greedy_ms=1064 sampling_ms=1288
+📊 spec-decode lane=baseline p=49 greedy_ms=1276 sampling_ms=1187
+📊 spec-decode lane=baseline DONE n=50
+📊 spec-decode dist-base p=0 drew=256
+📊 spec-decode dist-base p=1 drew=256
+📊 spec-decode dist-check p=0 support=21 noise_tv=0.0781 spec_tv=0.1562 verified=true
+📊 spec-decode dist-check p=1 support=8 noise_tv=0.0469 spec_tv=0.0391 verified=true
+📊 speculative-decode-gate mode=greedy recommendation=insufficientEvidence
+📊   reasons=CORRECTNESS_VERIFIED,DEVICES_BELOW_MIN,LATENCY_WIN,MEMORY_FITS
+📊   correctness=verified acceptance=n/a
+📊   latency(paired n=50): speculative_ms=958.90 baseline_ms=1429.29
+📊   memory: dual_peak=2542MB budget=6000MB
+📊   devices=1 parsed=50 skipped=0
+📊   (observation-only — a human decides; the gate never auto-enables)
+📊 speculative-decode-gate mode=sampling recommendation=doNotEnable
+📊   reasons=CORRECTNESS_VERIFIED,DEVICES_BELOW_MIN,LATENCY_LOSS,MEMORY_FITS
+📊   correctness=verified acceptance=n/a
+📊   latency(paired n=50): speculative_ms=1937.99 baseline_ms=1565.22
+📊   memory: dual_peak=2542MB budget=6000MB
+📊   devices=1 parsed=50 skipped=0
+📊   (observation-only — a human decides; the gate never auto-enables)
+📊 spec-decode FINAL tier=fallback records=100 (n=1 device / beta — a human reads the verdicts; the gate never auto-enables)

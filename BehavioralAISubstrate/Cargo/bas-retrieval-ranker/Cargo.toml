@@ -1,0 +1,20 @@
+[package]
+name = "bas-retrieval-ranker"
+description = "chapter 七百三 第三刀 — Rust port of retrieval scoring + ranking + cosine similarity + decay-policy logic from BASMemory + BASOrchestration retrieval paths"
+license.workspace = true
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+# chapter 七百十二 第一刀 — reuse SHA256 from bas-substrate-core for
+# the ledger seal so every byte matches Swift CryptoKit's output。
+bas-substrate-core = { path = "../bas-substrate-core" }
+# chapter 八百七十二 / M3026 — rayon for parallel batched cosine across
+# corpus rows。 Mirror pattern from bas-mamba-scan (chapter 八百五十二)
+# and bas-red-team-bench (chapter 八百五十四)。
+rayon = "1.10"

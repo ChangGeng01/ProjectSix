@@ -1,0 +1,8 @@
+📊 prompt-lookup START ngram=1..3 K=4 cap=200 adaptiveK=true tree=false branch=2 nodes=8
+📊 prompt-lookup CLEAN-BASELINE plain_greedy_tok/s=19.5 (bit-exact, no prefill/spec)
+📊 prompt-lookup workload=rag-quote tokens=200 rounds=139 hit_rate=0.47 mean_acc=0.43 spec_ms=8768 base_ms=10945 speedup=1.25x byte_identical=YES
+📊 prompt-lookup workload=json-structured tokens=200 rounds=165 hit_rate=0.31 mean_acc=0.21 spec_ms=11158 base_ms=11187 speedup=1.00x byte_identical=YES
+📊 prompt-lookup workload=code-repeat tokens=200 rounds=151 hit_rate=0.44 mean_acc=0.32 spec_ms=18807 base_ms=17729 speedup=0.94x byte_identical=YES
+📊 prompt-lookup workload=verify-claim tokens=200 rounds=143 hit_rate=0.42 mean_acc=0.39 spec_ms=19494 base_ms=17993 speedup=0.92x byte_identical=YES
+📊 prompt-lookup workload=control-freeform tokens=200 rounds=158 hit_rate=0.34 mean_acc=0.26 spec_ms=20885 base_ms=17433 speedup=0.83x byte_identical=YES
+📊 prompt-lookup DONE ngram=1..3 K=4 repetitive_mean_speedup=1.03x byte_identical=5/5 all_identical=YES

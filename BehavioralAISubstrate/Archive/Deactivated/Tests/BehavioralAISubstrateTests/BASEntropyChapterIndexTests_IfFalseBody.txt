@@ -1,0 +1,84 @@
+# ARCHIVED #if false BODY — chapter 八百二十八 / M2791-M2795
+#
+# 「不要 删除 只能 comment」 → 「不要 的 部分 都 archive」 evolution
+# (extending chapter 八百二十七's // commented-block pattern to
+#  #if false / #endif wrapped dead bodies)。
+#
+# ## Where this came from
+#
+#   Source: Tests/BehavioralAISubstrateTests/BASEntropyChapterIndexTests.swift
+#   Block:  #if false ... #endif at lines 228-278
+#   Size:   51 LOC
+#
+# ## Why it's archived
+#
+# This block was wrapped in #if false ... #endif per the earlier
+# 「依旧 不删除 只 comment」 discipline。 It's Swift code that
+# compiled BEFORE deactivation,but is now dead — SPM skips it
+# entirely because of the false conditional。 Per the chapter 八百
+# 二十七 pattern,we now archive dead bodies out of the live tree
+# rather than leaving them lurking in source files。
+#
+# ## How to restore (if ever needed)
+#
+#   1. Strip the leading 「# 」 from each line of this header
+#   2. Drop the trailing wrapper lines that are now just bookends
+#   3. Paste the Swift body back into the original source file at
+#      the extracted-lines range above
+#   4. Wrap with #if true (or remove the wrapping entirely)
+#
+# .txt extension ensures Swift Package Manager does NOT compile
+# this content。 Original body preserved verbatim below。
+#
+# ============================================================
+#if false  // chapter 七百五十二 第二刀 deactivated
+    func testIndexMirrorsChapter427() {
+        let entry = BASEntropyChapterIndex.entry(
+            forTag: BASChapter427EntropyDoctrine
+                .chapterTag)
+        XCTAssertEqual(
+            entry?.mNumberFirst,
+            BASChapter427EntropyDoctrine.mNumberFirst)
+        XCTAssertEqual(
+            entry?.mNumberLast,
+            BASChapter427EntropyDoctrine.mNumberLast)
+    }
+
+    func testIndexMirrorsChapter432() {
+        let entry = BASEntropyChapterIndex.entry(
+            forTag: BASChapter432EntropyDoctrine
+                .chapterTag)
+        XCTAssertEqual(
+            entry?.mNumberFirst,
+            BASChapter432EntropyDoctrine.mNumberFirst)
+        XCTAssertEqual(
+            entry?.mNumberLast,
+            BASChapter432EntropyDoctrine.mNumberLast)
+    }
+
+    // MARK: - M1108 deep-review extension cross-mirror
+
+    func testIndexMirrorsChapter430() {
+        let entry = BASEntropyChapterIndex.entry(
+            forTag: BASChapter430EntropyDoctrine
+                .chapterTag)
+        XCTAssertEqual(
+            entry?.mNumberFirst,
+            BASChapter430EntropyDoctrine.mNumberFirst)
+        XCTAssertEqual(
+            entry?.mNumberLast,
+            BASChapter430EntropyDoctrine.mNumberLast)
+    }
+
+    func testIndexMirrorsChapter433() {
+        let entry = BASEntropyChapterIndex.entry(
+            forTag: BASChapter433EntropyDoctrine
+                .chapterTag)
+        XCTAssertEqual(
+            entry?.mNumberFirst,
+            BASChapter433EntropyDoctrine.mNumberFirst)
+        XCTAssertEqual(
+            entry?.mNumberLast,
+            BASChapter433EntropyDoctrine.mNumberLast)
+    }
+#endif  // chapter 七百五十二 第二刀

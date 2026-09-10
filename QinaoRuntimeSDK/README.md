@@ -1,0 +1,413 @@
+# Qinao Runtime SDK · 绮脑运行时 SDK
+
+> The carrying protocol between a human host and a second brain.
+
+Qinao is a runtime for building applications that think *on behalf of* a
+human host without ever pretending to *be* the human host. The SDK
+sits in a deliberate position:
+
+```
+Human Host  ───►  Qinao SDK  ───►  Second Brain  ───►  Neural Network
+```
+
+Four layers, four update frequencies, four different accountability
+stories. The SDK is the contract surface that makes the other three
+layers safe to compose.
+
+---
+
+## Three invariants
+
+Each invariant is an **interface contract**, not an advertisement. The
+SDK will refuse at the boundary if any one is violated.
+
+### 1 · Wake before you answer — 先醒再答
+
+Every `QinaoSessionRequest` is arbitrated by the lifecycle kernel before
+generation begins. The brain can refuse to wake, wake partially, wake
+for a bounded budget, or wake in maintenance-only mode. A request does
+not reach the candidate pipeline until the kernel has issued a run
+lease with a thermal guard, a budget frame, and a maintenance window.
+
+### 2 · The network never rules — 神经不直接掌权
+
+A neural network can produce *intent* — a draft, a tool invocation, a
+write-memory proposal. It can never produce *permission*. Every
+side-effecting call the SDK executes must carry a three-signature
+bundle:
+
+| Signature               | Source                | Meaning                                    |
+| ----------------------- | --------------------- | ------------------------------------------ |
+| ActionPermit            | Risk gate (`QinaoRisk`) | "the risk shape is acceptable"            |
+| SovereignWarrant        | Sovereign control plane (`QinaoSovereign`) | "the control plane authorises this intent" |
+| SnapshotContinuityProof | Snapshot ark          | "the world this action commits into is the world the permit was issued against" |
+
+Any call missing any of the three is refused at `QinaoRuntime.execute`
+— it never reaches the substrate. Digest-mismatch, session-mismatch,
+and TTL-expired signatures are all refused.
+
+### 3 · Host secrets stay out of base weights — 宿主私有经验不进基础权重
+
+Host experience has three legal landing zones:
+
+1. **Host constitution** — typed, versioned, deletable, rollback-able.
+2. **Session memory** — hot / warm / cold tiers with per-scope cascade
+   delete and governance-gated admission.
+3. **Update tickets** — shadow-previewed, sovereign-adjudicated, and
+   — only after approval — released for offline distillation.
+
+The neural network's base weights are never updated from inside a
+session. Deletion is real deletion; rollback is real rollback.
+
+The invariant has two mirrored gates:
+
+- **Inbound** — the training pipeline filter rejects any curriculum
+  template below the `domainExpertReviewed` provenance tier from
+  entering the L2 training corpus. Curriculum content cannot reach
+  training unless a real domain expert has signed it.
+- **Outbound** — the trained-weight filter rejects any trained
+  adapter from entering the production organ registry unless its
+  provenance envelope carries the `domainExpertReviewed` tier with
+  a non-nil expert attestation signature reference and issued-at
+  timestamp. Trained weights cannot reach production unless their
+  training provenance is signed too.
+
+Both gates use the same 4-tier ladder
+(`illustrative` < `aiAdvisory` < `peerReviewed` < `domainExpertReviewed`)
+so the doctrine composes: only signed-curriculum-trained signed-weights
+serve runtime requests.
+
+---
+
+## Five integrity properties
+
+The invariants compose into five independently-auditable properties. A
+demo for each lives under
+`Tests/QinaoRuntimeSDKTests/PropertyDemos/*` and runs in CI.
+
+| Property                      | What is demonstrated                                   |
+| ----------------------------- | ------------------------------------------------------ |
+| **Wake and sleep — 会醒会停** | The lifecycle kernel can reach every state from dormant through deep-loop through clean reboot, including the lockdown path. |
+| **World and host — 懂世界也懂宿主** | World priors (causal templates, domain bridges, counterfactual seeds) compose with the typed host constitution. Host overrides follow the bedrock rule: host cannot rewrite a world axiom, only demote or reject. |
+| **Think, not spin — 会想不自转** | The dream loop plus the internal tribunal produce a candidate frontier, a compare panel, and — when any candidate crosses the critique threshold — a guardian branch. Determinism is contract-pinned. |
+| **Protect, not take over — 会保护不接管** | The risk gate returns a four-way decision (allow / delay / replace / block) with stable reason codes; the soft-hand surfaces render the decision without performing it. The host is the only actor who can commit. |
+| **Grow, not wildly — 会成长不乱长** | Host changes flow through submit → preview → approve → commit; rejection, freeze, rollback, and cascade delete are all first-class. Projection parity is proven by a round-trip equality test. |
+
+---
+
+## Nine public modules
+
+```
+               QinaoRuntime
+                    │
+      ┌──────┬──────┼──────┬───────┬──────────────┐
+      ▼      ▼      ▼      ▼       ▼              ▼
+   QinaoHost QinaoMemory QinaoLoop QinaoRisk QinaoWorldPrior
+      │      │      │      │       │              │
+      └──────┴──────┴──────┴───────┴──────────────┘
+                         ▼
+                    QinaoSovereign
+                         │
+                         ▼
+                      QinaoUI
+
+  (opt-in) QinaoAppleFoundation  ── on-device LLM endpoint factory
+```
+
+| Module                  | Role                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| `QinaoRuntime`          | Session lifecycle, three-signature gate, tool execution.     |
+| `QinaoHost`             | Host constitution: submit / preview / approve / reject / rollback / freeze / thaw. |
+| `QinaoMemory`           | Session memory: admit / recall / forget across hot·warm·cold tiers. |
+| `QinaoLoop`             | Candidate frontier, compare panel, guardian branch.          |
+| `QinaoRisk`             | Risk signals → four-way assessment with stable reason codes. |
+| `QinaoWorldPrior`       | Horizons, axioms, causal templates, domain bridges, counterfactual branches, and boundary-bedrock override evaluation. |
+| `QinaoSovereign`        | Control plane: rollback plan, warrant issuance, session halt. |
+| `QinaoUI`               | Five soft-hand SwiftUI surfaces (compare panel · draft shell · delay packet · boundary script · silent stub). |
+| `QinaoAppleFoundation`  | **Opt-in.** One-call factory for the Apple FoundationModels endpoint. Hosts that don't want Apple-specific code (or to link `FoundationModels`) skip this library. |
+
+Every public type in every module is `Sendable`. Every public error is
+typed and carries stable reason codes. Nothing in a module's public
+surface names the internal machinery that implements it.
+
+---
+
+## Wiring the on-device LLM
+
+The default neural provider is Apple's on-device `FoundationModels`
+framework. With the opt-in `QinaoAppleFoundation` library, hosts wire
+the model in one line:
+
+```swift
+import QinaoLoop
+import QinaoAppleFoundation
+
+let endpoint = await QinaoLoop.makeAppleFoundationEndpoint()
+let loop = QinaoLoop(organEndpoint: endpoint)
+```
+
+On macOS 26+ / iOS 26+ / visionOS 26+ with Apple Intelligence
+enabled, `loop.generateCandidates(...)` drives a real
+`LanguageModelSession`. On older OS or with Apple Intelligence
+disabled, the loop surfaces `LoopError.organUnavailable(reason:)`
+with a stable code so hosts can render a typed refusal.
+
+Pass `includeDeterministicFallback: true` for a deterministic
+in-memory stub that always responds — useful for offline development
+and CI:
+
+```swift
+let endpoint = await QinaoLoop.makeAppleFoundationEndpoint(
+    includeDeterministicFallback: true)
+```
+
+Hosts that want a different provider (or to compose multiple) write a
+custom `QinaoOrganEndpoint` conformance and pass it to
+`QinaoLoop(organEndpoint:)`. The loop itself never speaks the
+provider's native dialect.
+
+### Third-party / remote LLM providers
+
+A generic OpenAI-compatible HTTP organ adapter ships with the
+substrate. Any provider that exposes a Chat Completions–shaped
+endpoint plugs into the same registry the on-device adapter uses:
+
+- OpenAI (`api.openai.com/v1/chat/completions`)
+- Anthropic via OpenAI-compatible proxy
+- Mistral, Together AI, Groq, Fireworks, etc.
+- Local servers: llama.cpp, vLLM, LM Studio, Ollama
+
+The adapter takes a URL, a header dictionary, and a model ID;
+hosts wire a `QinaoOrganEndpoint` around it the same way they
+wire the on-device adapter. Failure modes are mapped to the same
+stable `LoopError.organUnavailable(reason:)` grammar:
+`http-401` / `http-500` / `malformed-json` /
+`transport:<message>` / `unsupported-role:<role>`.
+
+---
+
+## Minimal use
+
+```swift
+import QinaoRuntime
+import QinaoSovereign
+import QinaoHost
+import QinaoMemory
+import QinaoLoop
+import QinaoRisk
+import QinaoAppleFoundation
+
+// 1. Bootstrap the control plane — the Configuration only carries
+// plain value types (Data, TimeInterval, @Sendable () -> Date).
+let config = QinaoSovereignControlPlane.Configuration(
+    signingSecret: mySigningSecret,
+    warrantTTLSeconds: 30,
+    now: { Date() })
+let (sovereign, substrate) = QinaoSovereignControlPlane.bootstrap(
+    configuration: config)
+
+// 2. Compose the risk gate and the loop with an Apple-FM-backed
+// organ endpoint.
+let risk = QinaoRiskGate(permitTTLSeconds: 30,
+                         defaultDelaySeconds: 60,
+                         now: { Date() })
+let endpoint = await QinaoLoop.makeAppleFoundationEndpoint()
+let loop = QinaoLoop(organEndpoint: endpoint)
+
+// 3. Generate candidates from prompts (real on-device LLM):
+let result = try await loop.generateCandidates(
+    sessionID: "s1",
+    seeds: [
+        QinaoLoop.CandidateSeed(
+            candidateID: "c1", title: "Mindful break",
+            prompt: "Suggest one short break activity in 12 words.",
+            role: .core,
+            expectedBenefit: 0.8, expectedCost: 0.1,
+            reversibility: 0.95, confidence: 0.7)
+    ])
+// result[0].body is a real Apple FoundationModels response.
+// result[0].providerID == "apple.foundation-models.v1"
+
+// 4. When a candidate is chosen, collect the three signatures.
+let permit = try await risk.requestActionPermit(for: intent)
+let warrant = try await sovereign.issueWarrant(for: intent)
+let proof = try sovereign.continuityProof(for: intent)
+
+// 5. Execute through the gate — missing or mismatched signatures
+// are refused at the boundary.
+try await runtime.execute(
+    toolName: "calendar.add_event",
+    payload: payload,
+    intent: intent,
+    signatures: .init(permit: permit, warrant: warrant, proof: proof))
+```
+
+---
+
+## Measured numbers
+
+Snapshot from the live regression suite running on a macOS 26.4.1
+Apple-Silicon dev box. All numbers come from green tests under
+`Tests/QinaoRuntimeSDKTests/` and are printed as part of the test
+output.
+
+| Property                                | Result                                              | Test |
+| --------------------------------------- | --------------------------------------------------- | ---- |
+| 14-layer saturation per turn            | 13/13 hot-path layers fire when prerequisites met; layer 14 is always present | `QinaoRuntime14LayerSaturationTests.testFullyLoadedTurnInjectsAll13Layers` |
+| Observation-pipeline latency, p95       | 0.32 ms (100 sequential fully-loaded turns)         | `QinaoRuntime14LayerSaturationTests.testHundredSequentialTurnsLatencyDistribution` |
+| Apple FoundationModels round-trip, scout | ~0.3 s (one short-reply prompt)                     | `AppleFoundationE2ETests.testRealScoutDraftReturnsNonEmptyBody` |
+| Apple FoundationModels round-trip, core | ~1.2 s (one short-paragraph prompt)                 | `AppleFoundationE2ETests.testRealCoreDraftReturnsNonEmptyBody` |
+| Cross-session real parallelism          | 2 sessions complete in ~0.35 s (both hit the model) | `QinaoAppleFoundationConcurrencyTests.testTwoConcurrentSessionsBothReachAppleFM` |
+| Stream cancellation latency             | ~150 ms from `task.cancel()` to iteration exit      | `AppleFoundationStreamCancellationTests.testCancellingStreamingTaskTerminatesWithinBudget` |
+| Thermal stability (100-turn stress)     | nominal → nominal (no escalation)                   | `QinaoRuntime14LayerSaturationTests.testThermalStateDoesNotEscalateAcross100Turns` |
+| Error-translation reason-code matrix    | 7 deterministic mappings pinned                     | `QinaoOrganErrorTranslationTests` |
+| Cross-process audit-ledger recovery     | phase-A entries survive actor teardown + reopen     | `QinaoSovereignPersistentLedgerTests.testReopenSamePathRecoversAuditChain` |
+
+The Apple-FM round-trip tests are gated behind `QINAO_FM_E2E=1` so the
+default `swift test` run stays fast and offline. Set the env var to
+exercise the real on-device model:
+
+```sh
+QINAO_FM_E2E=1 swift test --filter AppleFoundationE2ETests
+```
+
+### Real-LLM coverage pyramid
+
+Tests that drive a real Apple FoundationModels session:
+
+| Suite | Tests | Layer covered |
+| ----- | ----- | ------------- |
+| `AppleFoundationE2ETests` | 5 | L2 — adapter contract |
+| `AppleFoundationStreamingTests` | 5 | L2 — token streaming |
+| `AppleFoundationStreamCancellationTests` | 2 | L2 — task cancellation propagation |
+| `QinaoAppleFoundationE2ETests` | 3 | L9 — host-written endpoint pattern |
+| `QinaoAppleFoundationFactoryTests` | 4 | L9 — public factory ergonomics |
+| `QinaoAppleFoundationConcurrencyTests` | 2 | L9 — cross-session parallelism |
+| `QinaoLoopStreamBodyTests` | 5 | L9 — public streaming surface |
+| `QinaoAppleFoundationGateChainTests` | 2 | L11 + L14 — three-signature gate |
+| `QinaoAppleFoundationRiskGateTests` | 3 | L11 + L12 — risk → soft-hand surface |
+| `QinaoAppleFoundationAuditChainTests` | 2 | L13 + L14 — shadow trial → audit ledger |
+| `QinaoAppleFoundationWorldPriorChainTests` | 3 | L4 — boundary bedrock + guardian dissent |
+| `QinaoAppleFoundationMemoryChainTests` | 3 | L8 — admit, recall, cascade delete |
+
+Run all real-LLM tests at once:
+
+```sh
+QINAO_FM_E2E=1 swift test
+```
+
+### Runnable demo
+
+`QinaoSampleHost` is a CLI that drives the SDK end-to-end on real
+Apple FM. Three modes:
+
+```sh
+# Single turn — prints provider / trace / score / body.
+swift run QinaoSampleHost "your prompt here"
+
+# Streaming — appends each chunk as it arrives, then summarises
+# time-to-first-chunk + total elapsed.
+swift run QinaoSampleHost --stream "Reply with three short adjectives."
+
+# Benchmark — runs N sequential turns, reports min / p50 / p95 /
+# max / mean latency.
+swift run QinaoSampleHost --bench 10
+
+# Drive a remote OpenAI-compatible provider instead of Apple FM
+# (M213). Requires --url and --model; --api-key is optional.
+swift run QinaoSampleHost \
+    --provider chatcompletions \
+    --url https://api.openai.com/v1/chat/completions \
+    --api-key sk-... \
+    --model gpt-4o-mini \
+    "your prompt here"
+
+# Same provider, streaming mode:
+swift run QinaoSampleHost --stream \
+    --provider chatcompletions \
+    --url https://api.openai.com/v1/chat/completions \
+    --api-key sk-... \
+    --model gpt-4o-mini \
+    "your prompt"
+```
+
+Real measurements on a macOS 26.4.1 Apple-Silicon dev box:
+
+| Mode | Result (sample run) |
+| ---- | --------------------- |
+| Single | provider `apple.foundation-models.v1`, score 0.475, body present |
+| Stream | 2 chunks, time-to-first ~330 ms, total ~390 ms |
+| Bench (5 turns) | min 224 ms / p50 228 ms / p95 260 ms / mean 233 ms |
+
+On macOS / iOS / visionOS < 26 (or with Apple Intelligence disabled)
+the CLI exits with a stable error code and a recovery hint pointing
+at `includeDeterministicFallback: true`.
+
+---
+
+## Contract discipline
+
+- Every public type is a `struct` or `actor`; no exposed classes.
+- Every public function is either pure, async, or `throws` with a
+  typed error enum.
+- Every public error carries stable reason codes suitable for host UI
+  copy keys.
+- The SDK forbids — by CI scripts — the leakage of internal
+  vocabulary into the public API, the README, or trace output.
+
+See `HONESTY_BOARD.md` for the live ledger of what every promise on
+this page is currently backed by in code, tests, and CI.
+
+---
+
+## Milestone ledger — what backs each promise today
+
+Every row below names the runtime file and test suite that proves the
+promise. All listed tests are part of the default `swift test` run on
+`QinaoRuntimeSDK` and are kept green on every push.
+
+| Promise | Backed by |
+| --- | --- |
+| **Wake before you answer — L1 lifecycle** | `QinaoRuntime` session bootstrap + `QinaoBGMaintenanceBridge` platform wake-up (`QinaoBGMaintenanceBridgeTests`, `QinaoRuntimeGateTests`) |
+| **Three-signature gate on every side-effect** | `QinaoRuntime.execute` (`QinaoRuntimeGateTests`) |
+| **Second-authority audit on every turn** | `QinaoRuntime.sendSession` main-path audit (`QinaoRuntimeSessionTests`) |
+| **Pre-halted session refuses to run** | `QinaoRuntime.sendSession` pre-flight (`QinaoRuntimeSessionTests.testPreHaltedSessionRefusesBeforeAuditing`) |
+| **Fail-closed on parity mismatch** | `QinaoRuntime.sendSession` parity branch (`QinaoRuntimeSessionTests.testLaxerParityFailsClosedAndMarksHalted`) |
+| **Severity-driven auto-halt (rollback / deadStop)** | `QinaoRuntime.sendSession` severity branch (`QinaoRuntimeSessionTests.testDeadStopSeverityAutoHalts`) |
+| **Host decides on quarantine severity** | `QinaoRuntime.sendSession` no-autohalt branch (`QinaoRuntimeSessionTests.testQuarantineSeverityDoesNotAutoHalt`) |
+| **Coverage reading on every turn** | `QinaoRuntime.sendSession` records a structured `CoverageReading` before any halt branch; queryable via `sovereign.coverageReading(sessionID:turnID:)` (`QinaoRuntimeCoverageTests.testCleanTurnRecordsCoverageAndIsQueryable`) |
+| **Budget-ceiling breach halts fail-closed** | `TurnError.coverageHalt` + `reason = "coverage-halt"` when clamped per-turn cost exceeds ceiling (`QinaoRuntimeCoverageTests.testLowBudgetCeilingTripsCoverageHalt`) |
+| **Halt path preserves coverage audit row** | Coverage computed before parity / severity branches so the ledger retains a reading on fail-closed exits (`QinaoRuntimeCoverageTests.testDeadStopHaltPathStillCarriesCoverage`) |
+| **Expected-layer expansion is auditable** | Caller-specified `expectedCoverageLayerIDs` surfaces silent layers as `.missingLayer` findings (`QinaoRuntimeCoverageTests.testAdditionalExpectedLayersProduceMissingFindings`) |
+| **Cross-session isolation** | Coverage / halt / audit state is keyed per `(sessionID, turnID)` and does not leak across sessions (`QinaoRuntimeCrossSessionTests`) |
+| **World priors fold into the risk gate** | `QinaoRiskGate.requestActionPermit(…worldContext:worldEndpoint:)` (`QinaoRiskWorldPriorTests`) |
+| **Unknown world-template is a typed error** | `RiskError.unknownWorldTemplate` (`QinaoRiskWorldPriorTests`) |
+| **Informed consent forces `.replace`** | `QinaoRiskGate` consent branch (`QinaoRiskWorldPriorTests`) |
+| **Low-evidence irreversible forces `.delay`** | `QinaoRiskGate` evidence branch (`QinaoRiskWorldPriorTests`) |
+| **World priors queryable as a public façade** | `QinaoWorldPriorVault` actor (8 domains · 20 causal templates · 8 domain bridges · 5 axioms · counterfactual seeder ≥ 3 branches) with Qinao-native mirror types only (`QinaoWorldPriorTests`) |
+| **Host override of a world axiom is clean / demote / reject** | `QinaoWorldPriorVault.evaluateHostOverride(claimID:declaredEvidence:statement:)` bedrock semantics (`QinaoWorldPriorTests.testAxiomaticClaimOutranksWellSupportedOverride` · `testEqualEvidenceOverrideDemotesToPlausible` · `testByteIdenticalStatementOverrideIsClean`) |
+| **Grow path is reference-integrity checked** | `QinaoWorldPriorVault.registerTemplate` / `registerBridge` — duplicate IDs, unknown template refs in bridge pairings, and axiom collisions surface as typed `VaultError` (`QinaoWorldPriorTests.testDuplicateTemplateIDThrowsTypedError` · `testBridgeReferencingUnknownTemplateFailsRefIntegrity`) |
+| **Host secrets stay out of base weights** | `QinaoLearningExportBundle` triple gate: scrubbed + privacySafe + sovereignSafe (`QinaoLearningExportTests`) |
+| **Host constitution: submit / preview / approve / rollback** | `QinaoHost` candidate pipeline + projection parity (`QinaoHostTests`, `WorldAndHostDemo.testHostCandidateFlowsSubmitPreviewApproveRollback`) |
+| **Cascade delete across memory tiers** | `QinaoMemory.forget(sensitivity:)` cascade (`WorldAndHostDemo.testSensitivityCascadeForgetIsTyped`) |
+| **Candidate frontier + compare panel + guardian branch** | `QinaoLoop` (`QinaoLoopTests`, `ThinkNotSpinDemo`) |
+| **Control plane: rollback / halt / release** | `QinaoSovereignControlPlane` (`QinaoSovereignTests`) |
+| **Five soft-hand surfaces (answer / compare / delay / block / replace)** | `QinaoUI` (`QinaoUITests`) |
+| **Apple FoundationModels driven end-to-end through the public API** | `QinaoLoop.makeAppleFoundationEndpoint()` factory routes `QinaoLoop.generateCandidates(...)` to a real on-device `LanguageModelSession` (`AppleFoundationE2ETests`, `QinaoAppleFoundationE2ETests`, `QinaoAppleFoundationFactoryTests`) |
+| **Concurrent sessions are race-safe** | Two parallel sessions on independent `QinaoLoop` actors both reach the model without deadlock or cross-talk (`QinaoAppleFoundationConcurrencyTests.testTwoConcurrentSessionsBothReachAppleFM`) |
+| **Reason-code grammar pinned across providers** | Every `QinaoOrganEndpoint` error translates to a stable `LoopError.organUnavailable(reason:)` code (`QinaoOrganErrorTranslationTests`) |
+| **14-layer per-turn observation streaming + perf budget** | `QinaoRuntime.sendSession` injects every applicable layer's observation summary; pipeline p95 < 0.5 ms; thermal state stable across 100-turn stress (`QinaoRuntime14LayerSaturationTests`) |
+| **Token-streaming surface** | `QinaoLoop.streamBody(...)` yields `OrganResponseChunk` values driven by `LanguageModelSession.streamResponse(to:)` — cumulative-body monotonic, Σ delta == final cumulative, sub-second cancellation propagation (`QinaoLoopStreamBodyTests`, `AppleFoundationStreamingTests`, `AppleFoundationStreamCancellationTests`) |
+| **Three-signature gate end-to-end with real LLM** | Real `LanguageModelSession` body drives `ActionIntent` through `QinaoRiskGate.requestActionPermit` + `QinaoSovereignControlPlane.issueWarrant` + `SnapshotContinuityProof` to `QinaoRuntime.execute`; mismatched warrant digest produces `digestMismatch` and tool-execution count == 0 (`QinaoAppleFoundationGateChainTests`) |
+| **Risk gate routes real LLM body to a soft-hand surface** | Same real-LLM body + risk signals → `requestSurfaceAction` returns `.draftShell` for safe inputs and a non-`.draftShell` surface with reason codes for high-risk inputs (`QinaoAppleFoundationRiskGateTests`) |
+| **Audit chain end-to-end with real LLM** | Real `LanguageModelSession` body becomes a shadow-trial ticket; `sendSession` streams the L13 layer summary into the L14 audit ledger; `observationBundle(sessionID:turnID:)` returns the bundle (`QinaoAppleFoundationAuditChainTests`) |
+| **Cross-process audit-ledger persistence** | `Configuration.ledgerDatabasePath` opens SQLite-backed storage; tearing down the control plane and reopening on the same path rehydrates the chain (`QinaoSovereignPersistentLedgerTests`) |
+| **Real LLM body honors boundary bedrock** | A real `LanguageModelSession` body wrapped as `.speculative` host claim against `axiom-ethics-consent` (axiomatic) is rejected by the L4 vault; the L4-L9 chain raises a guardian branch with `world-prior-contradiction` dissent (`QinaoAppleFoundationWorldPriorChainTests`) |
+| **Real LLM body honors L8 governance + cascade delete** | Real body + sufficient confidence → admitted, retrievable, then `forget(id:)` removes it from `recall(...)` AND lands a cascade receipt with the deleted UUID; sub-floor confidence is refused with the stable `confidence-below-floor` reason (`QinaoAppleFoundationMemoryChainTests`) |
+| **Provider-agnostic adapter contract** | A generic HTTP organ adapter (M208) drops into the same registry/loop machinery as the on-device adapter. Speaks OpenAI Chat Completions JSON; works against OpenAI / Anthropic-compatible / Mistral / Together / Groq / llama.cpp / vLLM / LM Studio / Ollama. URLProtocol-stub tests cover happy path + HTTP 401/500 + malformed JSON + role enforcement (`ChatCompletionsOrganAdapterTests`, 11/11 offline) |
+
+---
+
+## License
+
+© Qinao · All rights reserved.

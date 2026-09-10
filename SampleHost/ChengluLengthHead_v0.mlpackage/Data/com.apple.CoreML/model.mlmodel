@@ -1,0 +1,289 @@
+í
+∫
+features°43-dim one-hot (same as ChengluPreflight v0.4 / ChengluPermitPredict v0): 8 tone + 10 domain + 6 stake + 7 timeframe + 4 confidant + 3 askshape + 5 mutationSeed.
+*
++†ÄR«
+body_length´Regression head output for ChengluLengthHead v0. Honest limit: trained on chapter 175/176 5,088-row adversarial corpus only; generalizes poorly to non-adversarial prompts.
+*
+†Ä¢á
+¡ChengluLengthHead v0 ‚Äî MLP(64,32) regression predicting AFM body length (chars) from signature features. Trained on chapter 176 5,088 rows. UI pre-warm: 'this prompt likely produces N chars'.0.0.1OQinao Runtime SDK chapter ‰∏ÄÁôæÂÖ´ÂçÅ ‚Äî ChengluLengthHead v0 regression head"
+Apache-2.0¢:
+,com.github.apple.coremltools.conversion_date
+2026-05-05¢+
+$com.github.apple.coremltools.version9.0¢4
+#com.github.apple.coremltools.sourcetorch==2.11.0¢:
++com.github.apple.coremltools.source_dialectTorchScript≤È˚
+mainÚ
+
+features
+
+
++CoreML7∆
+CoreML7∫body_lengtht
+const 
+features_to_fp16_dtype_0
+*.
+name&
+
+"
+features_to_fp16_dtype_0*
+val
+
+
+"
+fp16ú
+const(
+fc1_weight_to_fp16
+
+
+@
++*(
+name 
+
+"
+fc1_weight_to_fp16*?
+val8
+
+
+@
++*"
+@model_path/weights/weight.bin@ç
+const 
+fc1_bias_to_fp16
+
+
+
+@*&
+name
+
+"
+fc1_bias_to_fp16*:
+val3
+
+
+
+@*#
+@model_path/weights/weight.binÄ,Ü
+cast
+x
+
+
+features%
+dtype
+
+features_to_fp16_dtype_0&
+features_to_fp16
+
+
+
++*
+name
+
+
+"
+cast_1∑
+linear
+bias
+
+fc1_bias_to_fp16 
+weight
+
+fc1_weight_to_fp16
+x
+
+features_to_fp16(
+linear_0_cast_fp16
+
+
+
+@*(
+name 
+
+"
+linear_0_cast_fp16u
+relu
+x
+
+linear_0_cast_fp16'
+input_1_cast_fp16
+
+
+
+@*'
+name
+
+"
+input_1_cast_fp16ù
+const(
+fc2_weight_to_fp16
+
+
+ 
+@*(
+name 
+
+"
+fc2_weight_to_fp16*@
+val9
+
+
+ 
+@*#
+@model_path/weights/weight.bin¿-ç
+const 
+fc2_bias_to_fp16
+
+
+
+ *&
+name
+
+"
+fc2_bias_to_fp16*:
+val3
+
+
+
+ *#
+@model_path/weights/weight.binÄN∏
+linear
+bias
+
+fc2_bias_to_fp16 
+weight
+
+fc2_weight_to_fp16
+x
+
+input_1_cast_fp16(
+linear_1_cast_fp16
+
+
+
+ *(
+name 
+
+"
+linear_1_cast_fp16q
+relu
+x
+
+linear_1_cast_fp16%
+input_cast_fp16
+
+
+
+ *%
+name
+
+"
+input_cast_fp16ù
+const(
+out_weight_to_fp16
+
+
+
+ *(
+name 
+
+"
+out_weight_to_fp16*@
+val9
+
+
+
+ *#
+@model_path/weights/weight.binÄOr
+const 
+out_bias_to_fp16
+
+
+
+*&
+name
+
+"
+out_bias_to_fp16*
+val
+
+
+
+
+:
+ı4∂
+linear
+bias
+
+out_bias_to_fp16 
+weight
+
+out_weight_to_fp16
+x
+
+input_cast_fp16(
+linear_2_cast_fp16
+
+
+
+*(
+name 
+
+"
+linear_2_cast_fp16à
+const*
+"linear_2_cast_fp16_to_fp32_dtype_0
+*8
+name0
+(
+&"$
+"linear_2_cast_fp16_to_fp32_dtype_0*
+val
+
+
+"
+fp32ï
+cast
+x
+
+linear_2_cast_fp16/
+dtype&
+$
+"linear_2_cast_fp16_to_fp32_dtype_0!
+body_length
+
+
+*
+name
+
+
+"
+cast_0"Ê
+	buildInfoÿ"
+
+
+≈"¬
+6
+!
+
+"
+coremltools-version
+	
+"
+9.0
+A
+)
+!
+"
+coremltools-component-torch
+
+
+"
+2.11.0
+E
+(
+ 
+"
+coremltools-source-dialect
+
+"
+TorchScript

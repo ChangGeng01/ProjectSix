@@ -1,0 +1,85 @@
+{
+  "configurations" : [
+    {
+      "id" : "00000000-0000-0000-0000-000000000952",
+      "name" : "Device2HrFuzz",
+      "options" : {
+        "environmentVariableEntries" : [
+          {
+            "key" : "BAS_FUZZ_BENCH_RUN",
+            "value" : "1"
+          },
+          {
+            "key" : "BAS_FUZZ_BENCH_ITER",
+            "value" : "5000"
+          },
+          {
+            "key" : "BAS_FUZZ_RUNTIME_ITER",
+            "value" : "100"
+          },
+          {
+            "key" : "BAS_FUZZ_ITER",
+            "value" : "2000"
+          },
+          {
+            "key" : "BAS_FUZZ_EVOL_GEN",
+            "value" : "3"
+          },
+          {
+            "key" : "BAS_FUZZ_EVOL_CHILD",
+            "value" : "4"
+          },
+          {
+            "key" : "QINAO_MLX_E2E",
+            "value" : "1"
+          },
+          {
+            "key" : "QINAO_MLX_BENCH",
+            "value" : "1"
+          },
+          {
+            "key" : "BAS_FUZZ_STRICT_COVERAGE",
+            "value" : "1"
+          },
+          {
+            "key" : "BAS_FUZZ_INTENSITY",
+            "value" : "10"
+          },
+          {
+            "key" : "QINAO_FM_E2E",
+            "value" : "1"
+          },
+          {
+            "key" : "BAS_AGENT_FABRIC",
+            "value" : "enabled"
+          },
+          {
+            "key" : "BAS_AGENT_TIER",
+            "value" : "all"
+          },
+          {
+            "key" : "BAS_TRANSCRIPT_MODE",
+            "value" : "compareAll"
+          }
+        ]
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:BASDeviceTest.xcodeproj",
+      "identifier" : "BASDeviceTestApp",
+      "name" : "BASDeviceTestApp"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:BASDeviceTest.xcodeproj",
+        "identifier" : "BASDeviceTests",
+        "name" : "BASDeviceTests"
+      }
+    }
+  ],
+  "version" : 1
+}

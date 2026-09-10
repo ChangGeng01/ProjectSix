@@ -1,0 +1,1025 @@
+// MARK: - Tests for bas-mamba-scan
+// chapter 八百六十五 / M2981 — extracted from lib.rs to keep that
+// file under the 800-line god-file ceiling per coding-style.md。
+// Lib.rs declares `#[cfg(test)] mod tests;` at the end,Rust auto-
+// resolves this to src/tests.rs。 No semantic change — all tests
+// run identically,still as part of `cargo test -p bas-mamba-scan`。
+
+#![allow(clippy::needless_range_loop)]
+
+use super::*;
+
+fn make_shape(b: u32, l: u32, d: u32) -> MambaScanShape {
+    MambaScanShape { b, l, d }
+}
+
+
+#[test]
+fn abi_version_is_one() {
+    assert_eq!(bas_mamba_scan_abi_version(), 1);
+}
+
+#[test]
+fn shape_linear_index_matches_swift_convention() {
+    // ((b * L) + t) * D + d
+    let shape = make_shape(2, 3, 4);
+    assert_eq!(shape.linear_index(0, 0, 0), 0);
+    assert_eq!(shape.linear_index(0, 0, 3), 3);
+    assert_eq!(shape.linear_index(0, 1, 0), 4);
+    assert_eq!(shape.linear_index(0, 2, 0), 8);
+    assert_eq!(shape.linear_index(1, 0, 0), 12);
+    assert_eq!(shape.linear_index(1, 2, 3), 23);
+    assert_eq!(shape.element_count(), 2 * 3 * 4);
+}
+
+#[test]
+fn scan_minimal_b1_l1_d1_yields_simple_recurrence() {
+    // B=1, L=1, D=1 → single (b=0, d=0) thread,
+    // single time step:
+    //   h_0 = 0
+    //   A_bar = exp(delta * A_d)
+    //   B_bar = delta * B
+    //   h_1 = A_bar * 0 + B_bar * x = B_bar * x
+    //   y_0 = C * h_1 = C * delta * B * x
+    let shape = make_shape(1, 1, 1);
+    let x = vec![2.0_f32];
+    let delta = vec![0.5_f32];
+    let a = vec![-1.0_f32];
+    let b_proj = vec![3.0_f32];
+    let c_proj = vec![4.0_f32];
+    let y = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape)
+        .expect("scan must succeed");
+    let expected = 4.0_f32 * 0.5 * 3.0 * 2.0;
+    assert!((y[0] - expected).abs() < 1e-6);
+}
+
+#[test]
+fn scan_l2_recurrence_carries_h_state_across_time() {
+    // B=1, L=2, D=1 — verify h carries between t=0 and t=1
+    let shape = make_shape(1, 2, 1);
+    let x = vec![1.0_f32, 1.0];
+    let delta = vec![0.1_f32, 0.1];
+    let a = vec![-2.0_f32];
+    let b_proj = vec![1.0_f32, 1.0];
+    let c_proj = vec![1.0_f32, 1.0];
+    let y = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape)
+        .expect("scan must succeed");
+    // Hand-rolled expected:
+    //   A_bar = exp(0.1 * -2) = exp(-0.2) ≈ 0.8187308
+    //   B_bar = 0.1 * 1 = 0.1
+    //   t=0: h = 0.8187 * 0 + 0.1 * 1 = 0.1
+    //        y[0] = 1 * 0.1 = 0.1
+    //   t=1: h = 0.8187 * 0.1 + 0.1 * 1 = 0.18187
+    //        y[1] = 1 * 0.18187 = 0.18187
+    assert!((y[0] - 0.1_f32).abs() < 1e-6);
+    let expected_y1 = (0.1_f32 * -2.0).exp() * 0.1 + 0.1;
+    assert!((y[1] - expected_y1).abs() < 1e-6);
+}
+
+#[test]
+fn scan_independent_channels_do_not_cross_contaminate() {
+    // B=1, L=2, D=2 — two channels evolve independently
+    let shape = make_shape(1, 2, 2);
+    // x[t=0,d=0]=1, x[t=0,d=1]=10, x[t=1,d=0]=2, x[t=1,d=1]=20
+    let x = vec![1.0_f32, 10.0, 2.0, 20.0];
+    let delta = vec![0.1_f32, 0.1, 0.1, 0.1];
+    let a = vec![-1.0_f32, -1.0];
+    let b_proj = vec![1.0_f32, 1.0, 1.0, 1.0];
+    let c_proj = vec![1.0_f32, 1.0, 1.0, 1.0];
+    let y = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape)
+        .expect("scan must succeed");
+    // Each channel: y_d evolves with its own h_d
+    // Channel d=0: x=[1,2], expected output proportional to (1, 2 + small carry)
+    // Channel d=1: x=[10,20], expected output 10× channel d=0
+    let ratio = y[1] / y[0]; // (t=0, d=1) / (t=0, d=0)
+    assert!((ratio - 10.0_f32).abs() < 1e-4,
+        "Channel d=1 should be 10× channel d=0 at t=0");
+}
+
+#[test]
+fn scan_independent_batches_do_not_cross_contaminate() {
+    // B=2, L=1, D=1 — two batches evolve independently
+    let shape = make_shape(2, 1, 1);
+    let x = vec![5.0_f32, 7.0];  // batch 0:x=5, batch 1:x=7
+    let delta = vec![0.1_f32, 0.1];
+    let a = vec![-1.0_f32];
+    let b_proj = vec![1.0_f32, 1.0];
+    let c_proj = vec![1.0_f32, 1.0];
+    let y = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape)
+        .expect("scan must succeed");
+    // y[0] = 1 * 0.1 * 1 * 5 = 0.5
+    // y[1] = 1 * 0.1 * 1 * 7 = 0.7
+    assert!((y[0] - 0.5_f32).abs() < 1e-6);
+    assert!((y[1] - 0.7_f32).abs() < 1e-6);
+}
+
+#[test]
+fn scan_rejects_x_count_mismatch() {
+    let shape = make_shape(1, 2, 1);
+    // x is too short
+    let x = vec![1.0_f32];
+    let delta = vec![0.1_f32, 0.1];
+    let a = vec![-1.0_f32];
+    let b_proj = vec![1.0_f32, 1.0];
+    let c_proj = vec![1.0_f32, 1.0];
+    let err = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape)
+        .unwrap_err();
+    match err {
+        MambaScanError::PayloadCountMismatch { name, expected, actual } => {
+            assert_eq!(name, "x");
+            assert_eq!(expected, 2);
+            assert_eq!(actual, 1);
+        }
+    }
+}
+
+#[test]
+fn scan_rejects_a_count_mismatch() {
+    let shape = make_shape(1, 1, 3);
+    let x = vec![0.0_f32; 3];
+    let delta = vec![0.1_f32; 3];
+    let a = vec![-1.0_f32];  // too short:expected 3
+    let b_proj = vec![1.0_f32; 3];
+    let c_proj = vec![1.0_f32; 3];
+    let err = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape)
+        .unwrap_err();
+    match err {
+        MambaScanError::PayloadCountMismatch { name, expected, actual } => {
+            assert_eq!(name, "A");
+            assert_eq!(expected, 3);
+            assert_eq!(actual, 1);
+        }
+    }
+}
+
+#[test]
+fn scan_decay_to_zero_with_strong_negative_a() {
+    // With A = -100, decay is nearly instant — h should
+    // collapse to ~0 after one step regardless of x。
+    let shape = make_shape(1, 3, 1);
+    let x = vec![1.0_f32, 1.0, 1.0];
+    let delta = vec![1.0_f32, 1.0, 1.0];
+    let a = vec![-100.0_f32];
+    let b_proj = vec![1.0_f32, 1.0, 1.0];
+    let c_proj = vec![1.0_f32, 1.0, 1.0];
+    let y = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape)
+        .expect("scan must succeed");
+    // A_bar = exp(-100) ≈ 0 → h stays ≈ B_bar * x_t = delta * 1 * 1 = 1
+    // So y[t] ≈ 1 for all t (no accumulation)
+    for v in &y {
+        assert!((v - 1.0_f32).abs() < 1e-6);
+    }
+}
+
+#[test]
+fn scan_b2_l3_d2_full_shape_no_crash() {
+    // Larger fixture exercising all loops
+    let shape = make_shape(2, 3, 2);
+    let bld = shape.element_count();
+    let x: Vec<f32> = (0..bld).map(|i| (i as f32) * 0.01).collect();
+    let delta: Vec<f32> = (0..bld).map(|i| 0.1 + (i as f32) * 0.001).collect();
+    let a = vec![-1.0_f32, -0.5];
+    let b_proj: Vec<f32> = (0..bld).map(|i| 0.5 + (i as f32) * 0.01).collect();
+    let c_proj: Vec<f32> = (0..bld).map(|i| 1.0 + (i as f32) * 0.01).collect();
+    let y = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape)
+        .expect("scan must succeed");
+    assert_eq!(y.len(), bld);
+    // All outputs finite (no NaN/Inf from runaway exp)
+    for v in &y {
+        assert!(v.is_finite(), "all outputs must be finite");
+    }
+}
+
+// MARK: - Parallel scan tests (knife 2 — chapter 八百五十二 / M2912)
+
+#[test]
+fn scan_parallel_matches_sequential_b1_l1_d1() {
+    let shape = make_shape(1, 1, 1);
+    let x = vec![2.0_f32];
+    let delta = vec![0.5_f32];
+    let a = vec![-1.0_f32];
+    let b_proj = vec![3.0_f32];
+    let c_proj = vec![4.0_f32];
+    let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    let par = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    assert_eq!(seq, par,
+        "Minimal shape: parallel must be bit-equal to sequential");
+}
+
+#[test]
+fn scan_parallel_matches_sequential_b4_l32_d16() {
+    // Larger shape exercising real rayon parallelism
+    let shape = make_shape(4, 32, 16);
+    let bld = shape.element_count();
+    let d_count = shape.d as usize;
+    let x: Vec<f32> = (0..bld).map(|i| ((i % 23) as f32) * 0.013).collect();
+    let delta: Vec<f32> = (0..bld).map(|i| 0.05 + ((i % 17) as f32) * 0.001).collect();
+    let a: Vec<f32> = (0..d_count).map(|i| -0.5 - (i as f32) * 0.1).collect();
+    let b_proj: Vec<f32> = (0..bld).map(|i| 0.3 + ((i % 11) as f32) * 0.007).collect();
+    let c_proj: Vec<f32> = (0..bld).map(|i| 1.1 + ((i % 13) as f32) * 0.005).collect();
+    let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    let par = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    assert_eq!(seq, par,
+        "Larger shape (4, 32, 16): parallel must be bit-equal to sequential");
+}
+
+#[test]
+fn scan_parallel_handles_strong_decay() {
+    // Verify NaN/Inf-safe path
+    let shape = make_shape(2, 8, 4);
+    let bld = shape.element_count();
+    let d_count = shape.d as usize;
+    let x = vec![1.0_f32; bld];
+    let delta = vec![1.0_f32; bld];
+    let a = vec![-50.0_f32; d_count];  // strong decay
+    let b_proj = vec![1.0_f32; bld];
+    let c_proj = vec![1.0_f32; bld];
+    let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    let par = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    assert_eq!(seq, par);
+    for v in &par {
+        assert!(v.is_finite(), "All outputs must be finite under strong decay");
+    }
+}
+
+#[test]
+fn scan_parallel_rejects_x_count_mismatch() {
+    let shape = make_shape(1, 2, 1);
+    let x = vec![1.0_f32];  // too short
+    let delta = vec![0.1_f32, 0.1];
+    let a = vec![-1.0_f32];
+    let b_proj = vec![1.0_f32, 1.0];
+    let c_proj = vec![1.0_f32, 1.0];
+    let err = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap_err();
+    match err {
+        MambaScanError::PayloadCountMismatch { name, .. } => {
+            assert_eq!(name, "x");
+        }
+    }
+}
+
+#[test]
+fn scan_parallel_byte_equality_grid_random_inputs() {
+    // 50-fixture randomized grid pinning parallel ≡ sequential
+    for trial in 0..50_u64 {
+        let b = 1 + (trial % 4) as usize;
+        let l = 4 + (trial % 16) as usize;
+        let d = 1 + (trial % 8) as usize;
+        let shape = make_shape(b as u32, l as u32, d as u32);
+        let bld = shape.element_count();
+        // xorshift64 deterministic pseudo-random
+        let mut state: u64 = trial.wrapping_mul(0x9E37).wrapping_add(0x12345);
+        let mut next = || {
+            state ^= state.wrapping_shl(13);
+            state ^= state.wrapping_shr(7);
+            state ^= state.wrapping_shl(17);
+            ((state % 1000) as f32) / 1000.0
+        };
+        let x: Vec<f32> = (0..bld).map(|_| next()).collect();
+        let delta: Vec<f32> = (0..bld).map(|_| 0.01 + 0.1 * next()).collect();
+        let a: Vec<f32> = (0..d).map(|_| -1.0 - next()).collect();
+        let b_proj: Vec<f32> = (0..bld).map(|_| next()).collect();
+        let c_proj: Vec<f32> = (0..bld).map(|_| next()).collect();
+        let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        let par = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        assert_eq!(seq, par,
+            "Trial {}: parallel must be bit-equal to sequential for shape ({}, {}, {})",
+            trial, b, l, d);
+    }
+}
+
+// MARK: - Parallel v2 tests (chapter 八百六十三 / M2971)
+
+#[test]
+fn scan_parallel_v2_matches_sequential_b1_l1_d1() {
+    let shape = make_shape(1, 1, 1);
+    let x = vec![2.0_f32];
+    let delta = vec![0.5_f32];
+    let a = vec![-1.0_f32];
+    let b_proj = vec![3.0_f32];
+    let c_proj = vec![4.0_f32];
+    let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    let v2 = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    assert_eq!(seq, v2);
+}
+
+#[test]
+fn scan_parallel_v2_matches_sequential_b8_l32_d16() {
+    let shape = make_shape(8, 32, 16);
+    let bld = shape.element_count();
+    let d_count = shape.d as usize;
+    let x: Vec<f32> = (0..bld).map(|i| ((i % 23) as f32) * 0.013).collect();
+    let delta: Vec<f32> = (0..bld).map(|i| 0.05 + ((i % 17) as f32) * 0.001).collect();
+    let a: Vec<f32> = (0..d_count).map(|i| -0.5 - (i as f32) * 0.1).collect();
+    let b_proj: Vec<f32> = (0..bld).map(|i| 0.3 + ((i % 11) as f32) * 0.007).collect();
+    let c_proj: Vec<f32> = (0..bld).map(|i| 1.1 + ((i % 13) as f32) * 0.005).collect();
+    let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    let v2 = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    assert_eq!(seq, v2,
+        "v2 (par_chunks_mut) must be bit-equal to sequential");
+}
+
+#[test]
+fn scan_parallel_v2_byte_equality_grid() {
+    // 30-fixture randomized grid
+    for trial in 0..30_u64 {
+        let b = 1 + (trial % 8) as usize;
+        let l = 4 + (trial % 12) as usize;
+        let d = 1 + (trial % 8) as usize;
+        let shape = make_shape(b as u32, l as u32, d as u32);
+        let bld = shape.element_count();
+        let mut state: u64 = trial.wrapping_mul(0xCAFE).wrapping_add(0xBABE);
+        let mut next = || {
+            state ^= state.wrapping_shl(13);
+            state ^= state.wrapping_shr(7);
+            state ^= state.wrapping_shl(17);
+            ((state % 1000) as f32) / 1000.0
+        };
+        let x: Vec<f32> = (0..bld).map(|_| next()).collect();
+        let delta: Vec<f32> = (0..bld).map(|_| 0.01 + 0.1 * next()).collect();
+        let a: Vec<f32> = (0..d).map(|_| -1.0 - next()).collect();
+        let b_proj: Vec<f32> = (0..bld).map(|_| next()).collect();
+        let c_proj: Vec<f32> = (0..bld).map(|_| next()).collect();
+        let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        let v2 = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        assert_eq!(seq, v2,
+            "Trial {} (b={}, l={}, d={}):v2 must byte-equal sequential",
+            trial, b, l, d);
+    }
+}
+
+#[test]
+fn scan_parallel_v2_rejects_x_count_mismatch() {
+    let shape = make_shape(1, 2, 1);
+    let x = vec![1.0_f32];
+    let delta = vec![0.1_f32, 0.1];
+    let a = vec![-1.0_f32];
+    let b_proj = vec![1.0_f32, 1.0];
+    let c_proj = vec![1.0_f32, 1.0];
+    let err = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap_err();
+    match err {
+        MambaScanError::PayloadCountMismatch { name, .. } => {
+            assert_eq!(name, "x");
+        }
+    }
+}
+
+// MARK: - C ABI tests (chapter 八百五十二 第三刀 / M2913)
+
+#[test]
+fn c_abi_sequential_minimal_round_trip() {
+    let x = vec![2.0_f32];
+    let delta = vec![0.5_f32];
+    let a = vec![-1.0_f32];
+    let b_proj = vec![3.0_f32];
+    let c_proj = vec![4.0_f32];
+    let mut out = vec![-99.0_f32; 1];
+    let rc = unsafe {
+        bas_mamba_scan_sequential(
+            x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+            b_proj.as_ptr(), c_proj.as_ptr(),
+            1, 1, 1,
+            out.as_mut_ptr(), 1)
+    };
+    assert_eq!(rc, 0, "C ABI must succeed");
+    let expected = 4.0_f32 * 0.5 * 3.0 * 2.0;
+    assert!((out[0] - expected).abs() < 1e-6);
+}
+
+#[test]
+fn c_abi_parallel_matches_sequential_at_shape_4_8_4() {
+    let shape = make_shape(4, 8, 4);
+    let bld = shape.element_count();
+    let x: Vec<f32> = (0..bld).map(|i| (i as f32) * 0.013).collect();
+    let delta: Vec<f32> = (0..bld).map(|i| 0.05 + (i as f32) * 0.001).collect();
+    let a: Vec<f32> = (0..4).map(|i| -0.5 - (i as f32) * 0.1).collect();
+    let b_proj: Vec<f32> = (0..bld).map(|i| 0.3 + (i as f32) * 0.007).collect();
+    let c_proj: Vec<f32> = (0..bld).map(|i| 1.1 + (i as f32) * 0.005).collect();
+
+    let mut out_seq = vec![-99.0_f32; bld];
+    let mut out_par = vec![-99.0_f32; bld];
+
+    let rc_seq = unsafe {
+        bas_mamba_scan_sequential(
+            x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+            b_proj.as_ptr(), c_proj.as_ptr(),
+            4, 8, 4,
+            out_seq.as_mut_ptr(), bld as i32)
+    };
+    let rc_par = unsafe {
+        bas_mamba_scan_parallel(
+            x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+            b_proj.as_ptr(), c_proj.as_ptr(),
+            4, 8, 4,
+            out_par.as_mut_ptr(), bld as i32)
+    };
+    assert_eq!(rc_seq, 0);
+    assert_eq!(rc_par, 0);
+    assert_eq!(out_seq, out_par,
+        "C ABI parallel must byte-equal C ABI sequential");
+}
+
+#[test]
+fn c_abi_rejects_null_pointers() {
+    let mut out = vec![0.0_f32; 1];
+    let rc = unsafe {
+        bas_mamba_scan_sequential(
+            std::ptr::null(), std::ptr::null(), std::ptr::null(),
+            std::ptr::null(), std::ptr::null(),
+            1, 1, 1,
+            out.as_mut_ptr(), 1)
+    };
+    assert_eq!(rc, -1);
+}
+
+#[test]
+fn c_abi_rejects_zero_dimensions() {
+    // Chapter 八百六十七 / M2991 — third-pass review caught that this
+    // test originally only exercised b=0,leaving l=0 and d=0 paths
+    // through the sequential ABI guard untested。 Inverse asymmetry
+    // from chapter 八百六十六 which fixed the parallel side。 Mirror
+    // the full trio here。
+    let dummy = vec![1.0_f32; 4];
+    let mut out = vec![0.0_f32; 4];
+    let rc_b = unsafe {
+        bas_mamba_scan_sequential(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            0, 1, 1,
+            out.as_mut_ptr(), 4)
+    };
+    let rc_l = unsafe {
+        bas_mamba_scan_sequential(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            1, 0, 1,
+            out.as_mut_ptr(), 4)
+    };
+    let rc_d = unsafe {
+        bas_mamba_scan_sequential(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            1, 1, 0,
+            out.as_mut_ptr(), 4)
+    };
+    assert_eq!(rc_b, -1, "Sequential: b=0 must reject");
+    assert_eq!(rc_l, -1, "Sequential: l=0 must reject");
+    assert_eq!(rc_d, -1, "Sequential: d=0 must reject");
+}
+
+#[test]
+fn c_abi_rejects_insufficient_out_capacity() {
+    let x = vec![1.0_f32; 4];  // b=1, l=2, d=2 = 4 elements
+    let delta = vec![0.1_f32; 4];
+    let a = vec![-1.0_f32; 2];
+    let b_proj = vec![1.0_f32; 4];
+    let c_proj = vec![1.0_f32; 4];
+    let mut out = vec![0.0_f32; 2];  // too small
+    let rc = unsafe {
+        bas_mamba_scan_sequential(
+            x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+            b_proj.as_ptr(), c_proj.as_ptr(),
+            1, 2, 2,
+            out.as_mut_ptr(), 2)
+    };
+    assert_eq!(rc, -1, "out_capacity < bld must reject");
+}
+
+// MARK: - Original sequential tests continue
+
+#[test]
+fn scan_deterministic_repeats_yield_byte_equal_outputs() {
+    // chapter 392 replay-determinism — running the same
+    // inputs twice must produce byte-equal outputs。
+    let shape = make_shape(2, 4, 3);
+    let bld = shape.element_count();
+    let x: Vec<f32> = (0..bld).map(|i| (i as f32) * 0.013).collect();
+    let delta: Vec<f32> = (0..bld).map(|i| 0.05 + (i as f32) * 0.001).collect();
+    let a = vec![-1.5_f32, -0.7, -0.3];
+    let b_proj: Vec<f32> = (0..bld).map(|i| 0.3 + (i as f32) * 0.007).collect();
+    let c_proj: Vec<f32> = (0..bld).map(|i| 1.1 + (i as f32) * 0.005).collect();
+    let y1 = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape)
+        .expect("scan must succeed");
+    let y2 = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape)
+        .expect("scan must succeed");
+    assert_eq!(y1, y2, "Same inputs must produce bit-equal outputs");
+}
+
+// MARK: - chapter 八百六十四 / M2976 review-remediation tests
+
+/// Pin: v1 scan_parallel (now Rust-only oracle) is bit-equal
+/// to v2 scan_parallel_v2 (now C ABI-backed)。 Reviewer flagged
+/// that the original test grid only verified v2 ≡ sequential,
+/// not v2 ≡ v1。 Both must hold because v1 is the byte-equality
+/// oracle for v2's transparent C ABI swap (chapter 八百六十三)。
+#[test]
+fn scan_parallel_v1_bit_equals_v2_over_30_fixture_grid() {
+    for trial in 0..30_u64 {
+        let b = 1 + (trial % 6) as usize;
+        let l = 4 + (trial % 14) as usize;
+        let d = 1 + (trial % 7) as usize;
+        let shape = make_shape(b as u32, l as u32, d as u32);
+        let bld = shape.element_count();
+        let mut state: u64 = trial.wrapping_mul(0xD00D).wrapping_add(0xFEED);
+        let mut next = || {
+            state ^= state.wrapping_shl(13);
+            state ^= state.wrapping_shr(7);
+            state ^= state.wrapping_shl(17);
+            ((state % 1000) as f32) / 1000.0
+        };
+        let x: Vec<f32> = (0..bld).map(|_| next()).collect();
+        let delta: Vec<f32> = (0..bld).map(|_| 0.01 + 0.1 * next()).collect();
+        let a: Vec<f32> = (0..d).map(|_| -1.0 - next()).collect();
+        let b_proj: Vec<f32> = (0..bld).map(|_| next()).collect();
+        let c_proj: Vec<f32> = (0..bld).map(|_| next()).collect();
+        let v1 = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        let v2 = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        assert_eq!(v1, v2,
+            "Trial {} (b={}, l={}, d={}):v1 oracle MUST bit-equal v2",
+            trial, b, l, d);
+    }
+}
+
+/// Pin: NaN/Inf input handling propagates correctly。 The
+/// recurrence `h = exp(δ·A)·h + (δ·B)·x` produces NaN when
+/// any of A / B / x / δ is NaN at the corresponding (b, t, d)
+/// cell。 IEEE-754 guarantees NaN propagation,but we PIN it
+/// across all 3 paths (seq / v1 / v2) to catch any future
+/// optimization that breaks NaN semantics。
+#[test]
+fn scan_handles_nan_inputs_consistently_across_paths() {
+    let shape = make_shape(1, 4, 2);
+    let mut x = vec![1.0_f32; 8];
+    x[2] = f32::NAN;  // inject NaN at idx 2 = (b=0,t=1,d=0)
+    let delta = vec![0.1_f32; 8];
+    let a = vec![-1.0_f32; 2];
+    let b_proj = vec![1.0_f32; 8];
+    let c_proj = vec![1.0_f32; 8];
+    let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    let v1 = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    let v2 = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    // For NaN comparisons we need to check is_nan parity (NaN != NaN)
+    for i in 0..8 {
+        assert_eq!(seq[i].is_nan(), v1[i].is_nan(),
+            "idx {}: seq NaN-parity must match v1", i);
+        assert_eq!(seq[i].is_nan(), v2[i].is_nan(),
+            "idx {}: seq NaN-parity must match v2", i);
+        if !seq[i].is_nan() {
+            assert_eq!(seq[i], v1[i],
+                "idx {}: non-NaN cells must bit-equal", i);
+            assert_eq!(seq[i], v2[i],
+                "idx {}: non-NaN cells must bit-equal", i);
+        }
+    }
+}
+
+#[test]
+fn scan_handles_inf_inputs_consistently_across_paths() {
+    let shape = make_shape(1, 2, 2);
+    let x = vec![f32::INFINITY, 1.0, 1.0, 1.0];
+    let delta = vec![0.1_f32; 4];
+    let a = vec![-1.0_f32; 2];
+    let b_proj = vec![1.0_f32; 4];
+    let c_proj = vec![1.0_f32; 4];
+    let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    let v1 = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    let v2 = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    for i in 0..4 {
+        assert_eq!(seq[i].is_finite(), v1[i].is_finite(),
+            "idx {}: seq finite-parity must match v1", i);
+        assert_eq!(seq[i].is_finite(), v2[i].is_finite(),
+            "idx {}: seq finite-parity must match v2", i);
+    }
+}
+
+/// Pin: C ABI overflow guard rejects adversarial dimensions
+/// that would overflow i64 multiplication。 Pre-八百六十四
+/// guard used naive `(b as i64) * (l as i64) * (d as i64)`
+/// which wraps at b=l=d ≈ 2.1M cubes (i64::MAX ≈ 9.2e18,
+/// 2.1e6³ ≈ 9.3e18)。 The chapter 八百六十四 fix uses
+/// checked_mul which returns None on wrap → reject as -1。
+#[test]
+fn c_abi_rejects_adversarial_dimensions_via_checked_mul() {
+    let dummy = vec![1.0_f32; 1];
+    let mut out = vec![0.0_f32; 1];
+    // b=l=d=i32::MAX/2 → cube would overflow i64
+    let big = i32::MAX / 2;
+    let rc = unsafe {
+        bas_mamba_scan_sequential(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            big, big, big,
+            out.as_mut_ptr(), 1)
+    };
+    assert_eq!(rc, -1,
+        "Adversarial dims that overflow i64 must be rejected");
+}
+
+// MARK: - Chapter 八百六十六 parallel C ABI guard parity tests
+//
+// 3-agent review of chapter 八百六十五 caught that all 4 chapter 八百六十四
+// C ABI guard regression tests exercised ONLY the sequential entry。
+// The parallel C ABI has its own near-duplicate guard block — a typo
+// or future regression in just one of the 5 null checks would slip
+// past every test prior to this chapter。 Mirror the suite onto the
+// parallel entry。 Same shape,same intent。
+
+#[test]
+fn c_abi_parallel_rejects_null_pointers() {
+    let mut out = vec![0.0_f32; 1];
+    let rc = unsafe {
+        bas_mamba_scan_parallel(
+            std::ptr::null(), std::ptr::null(), std::ptr::null(),
+            std::ptr::null(), std::ptr::null(),
+            1, 1, 1,
+            out.as_mut_ptr(), 1)
+    };
+    assert_eq!(rc, -1, "Parallel C ABI must reject null inputs");
+}
+
+#[test]
+fn c_abi_parallel_rejects_zero_dimensions() {
+    let dummy = vec![1.0_f32; 4];
+    let mut out = vec![0.0_f32; 4];
+    let rc_b = unsafe {
+        bas_mamba_scan_parallel(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            0, 1, 1,
+            out.as_mut_ptr(), 4)
+    };
+    let rc_l = unsafe {
+        bas_mamba_scan_parallel(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            1, 0, 1,
+            out.as_mut_ptr(), 4)
+    };
+    let rc_d = unsafe {
+        bas_mamba_scan_parallel(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            1, 1, 0,
+            out.as_mut_ptr(), 4)
+    };
+    assert_eq!(rc_b, -1, "Parallel: b=0 must reject");
+    assert_eq!(rc_l, -1, "Parallel: l=0 must reject");
+    assert_eq!(rc_d, -1, "Parallel: d=0 must reject");
+}
+
+#[test]
+fn c_abi_parallel_rejects_insufficient_out_capacity() {
+    let x = vec![1.0_f32; 4];  // b=1, l=2, d=2 = 4 elements
+    let delta = vec![0.1_f32; 4];
+    let a = vec![-1.0_f32; 2];
+    let b_proj = vec![1.0_f32; 4];
+    let c_proj = vec![1.0_f32; 4];
+    let mut out = vec![0.0_f32; 2];  // too small
+    let rc = unsafe {
+        bas_mamba_scan_parallel(
+            x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+            b_proj.as_ptr(), c_proj.as_ptr(),
+            1, 2, 2,
+            out.as_mut_ptr(), 2)
+    };
+    assert_eq!(rc, -1,
+        "Parallel: out_capacity < bld must reject");
+}
+
+#[test]
+fn c_abi_parallel_rejects_adversarial_dimensions_via_checked_mul() {
+    // Pre-chapter 八百六十六 the parallel C ABI used naive
+    // `(b as i64) * (l as i64) * (d as i64)` overflow guard
+    // which would wrap b=l=d ≈ 2.1M to a positive value
+    // < i32::MAX,slipping through。 The chapter 八百六十六
+    // mirror to checked_mul closes the gap symmetric with
+    // chapter 八百六十四's sequential fix。
+    let dummy = vec![1.0_f32; 1];
+    let mut out = vec![0.0_f32; 1];
+    let big = i32::MAX / 2;
+    let rc = unsafe {
+        bas_mamba_scan_parallel(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            big, big, big,
+            out.as_mut_ptr(), 1)
+    };
+    assert_eq!(rc, -1,
+        "Parallel: adversarial dims overflowing i64 must reject");
+}
+
+// MARK: - Chapter 八百六十六 PayloadCountMismatch field coverage
+//
+// 3-agent review caught that PayloadCountMismatch existed for 5
+// fields (x, delta, A, B, C) but only x + A were directly tested。
+// A copy-paste swap of "B" / "C" / "delta" in error reporting
+// would compile and pass the prior test grid。 This parameterized
+// test exercises ALL 5 field name paths in scan_sequential。
+
+#[test]
+fn payload_count_mismatch_reports_each_field_name() {
+    // Chapter 八百六十六 introduced this test but with 2 gaps caught
+    // by chapter 八百六十七's third-pass review:
+    //   (H2) only asserted `name`,not `expected`/`actual` — a B↔C
+    //   constructor-arg swap would still pass
+    //   (H3) only exercised `scan_sequential` — same 5-field
+    //   validation lives in `scan_parallel` (lib.rs ~218-242) and
+    //   `scan_parallel_v2` (lib.rs ~350-374) and could drift
+    //   independently
+    // This chapter 八百六十七 expansion closes both:assert all 3
+    // fields of PayloadCountMismatch + parameterize over all 3
+    // production scan functions。
+    let shape = make_shape(1, 2, 2);
+    let bld = shape.element_count();  // 4
+    let good_x = vec![1.0_f32; bld];
+    let good_delta = vec![0.1_f32; bld];
+    let good_a = vec![-1.0_f32; 2];
+    let good_b_proj = vec![1.0_f32; bld];
+    let good_c_proj = vec![1.0_f32; bld];
+    let short = vec![1.0_f32; bld - 1];
+
+    // Scan-fn signature: (x, delta, a, b_proj, c_proj, shape) -> Result。
+    // Use a function-pointer type so all 3 scan functions go through
+    // the same call site,with no per-call boxing。
+    type ScanFn = fn(&[f32], &[f32], &[f32], &[f32], &[f32], MambaScanShape)
+        -> Result<Vec<f32>, MambaScanError>;
+
+    let scan_fns: [(&'static str, ScanFn); 3] = [
+        ("scan_sequential", scan_sequential),
+        ("scan_parallel", scan_parallel),
+        ("scan_parallel_v2", scan_parallel_v2),
+    ];
+
+    // Field name => (input-shorted call,expected-actual pair)。
+    // expected = the bld or d_count the impl computes;actual =
+    // the short.len() / single-element a。 For x/delta/B/C the
+    // expected is bld=4 and the short.len() is 3;for A it's
+    // d_count=2 vs 1。
+    let cases: &[(&'static str, &dyn Fn(ScanFn) -> MambaScanError,
+                  usize, usize)] = &[
+        ("x", &|f: ScanFn| f(
+            &short, &good_delta, &good_a, &good_b_proj,
+            &good_c_proj, shape).unwrap_err(), 4, 3),
+        ("delta", &|f: ScanFn| f(
+            &good_x, &short, &good_a, &good_b_proj,
+            &good_c_proj, shape).unwrap_err(), 4, 3),
+        ("A", &|f: ScanFn| f(
+            &good_x, &good_delta, &vec![-1.0_f32; 1],
+            &good_b_proj, &good_c_proj, shape).unwrap_err(), 2, 1),
+        ("B", &|f: ScanFn| f(
+            &good_x, &good_delta, &good_a, &short,
+            &good_c_proj, shape).unwrap_err(), 4, 3),
+        ("C", &|f: ScanFn| f(
+            &good_x, &good_delta, &good_a, &good_b_proj,
+            &short, shape).unwrap_err(), 4, 3),
+    ];
+    for (fn_name, scan_fn) in scan_fns.iter() {
+        for (expected_name, make_err, expected_count, actual_count)
+            in cases.iter()
+        {
+            let err = make_err(*scan_fn);
+            match err {
+                MambaScanError::PayloadCountMismatch {
+                    name, expected, actual,
+                } => {
+                    assert_eq!(name, *expected_name,
+                        "{}: expected error.name = {:?}, got {:?}",
+                        fn_name, expected_name, name);
+                    assert_eq!(expected, *expected_count,
+                        "{} field {}: expected = {}, got {}",
+                        fn_name, expected_name, expected_count, expected);
+                    assert_eq!(actual, *actual_count,
+                        "{} field {}: actual = {}, got {}",
+                        fn_name, expected_name, actual_count, actual);
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Chapter 八百六十七 / M2991 — boundary-success regression test
+//
+// 3-agent review of chapter 八百六十六 caught (M1) that we only assert
+// the FAILURE side of the checked_mul overflow guard。 A fence-post
+// bug at `lib.rs:476` or `lib.rs:539` (e.g. flipping `<=` to `<`)
+// would silently start rejecting borderline-OK shapes — invisible
+// to the i32::MAX/2 adversarial test。 Pin the success side: a
+// shape close to the cap should succeed,not get rejected。
+
+// MARK: - Chapter 八百六十九 / M3006 — true near-cap fence-post test
+//
+// 4th-pass review caught (H-B1) that chapter 八百六十七's
+// `c_abi_accepts_shape_at_lower_capacity_boundary` was at bld=100,
+// 7 orders of magnitude below i32::MAX。 A `<=` → `<` fence-post
+// bug at lib.rs:476 / 539 would still be invisible。 This test
+// uses dimensions chosen so bld ≈ i32::MAX as a真 near-cap pin。
+//
+// Math: i32::MAX = 2_147_483_647。 b=4 × l=4 × d=134_217_727 →
+// bld = 2_147_483_632 (just 15 under i32::MAX,well inside the cap)
+// would require a 2.1B-element float allocation = 8.6 GB — too
+// big to allocate in a unit test。
+//
+// Instead use a SMALL b/l with a d-cap that exercises the same
+// checked_mul guard arm without the memory cost: we只 verify that
+// the CAP CHECK accepts;we use a stub call with a dummy 1-element
+// alloc plus the cap-just-passes capacity value。 Since we never
+// actually run the scan (it would OOM),we cannot use the real
+// scan_sequential — we ALSO test the REJECT side at bld =
+// i32::MAX as i64 + 1 to pin the cap-fence-post in BOTH directions
+// purely through the guard logic (no math)。
+
+#[test]
+fn c_abi_rejects_just_above_cap_fence_post() {
+    // Exact value: just above i32::MAX,which checked_mul allows
+    // (returns Some) but the explicit `<= i32::MAX as i64` cap
+    // check at lib.rs:476 / 539 must reject。 Provides the missing
+    // half of the H-B1 fence-post pin。
+    //
+    // Chapter 八百七十 / M3016 — corrects chapter 八百六十九's math
+    // comment which said「= i32::MAX + 4」 but actual is + 1:
+    //   i32::MAX = 2_147_483_647
+    //   i32::MAX / 4 = 536_870_911 (integer div truncates)
+    //   d = (i32::MAX/4) + 1 = 536_870_912
+    //   bld = 2 * 2 * 536_870_912 = 2_147_483_648 = i32::MAX + 1
+    // The test still works (any value > cap rejects),only the
+    // math comment was off by 3 (caught by 5th-pass agent A)。
+    let dummy = vec![1.0_f32; 1];
+    let mut out = vec![0.0_f32; 1];
+    // b=2,l=2,d=(i32::MAX/4 + 1) → bld = 2 * 2 * (i32::MAX/4 + 1)
+    // = i32::MAX + 1 > i32::MAX → must reject。 d=536_870_912
+    // fits as i32 (i32::MAX/4 + 1)。
+    let d_just_over = (i32::MAX / 4) + 1;
+    let rc_seq = unsafe {
+        bas_mamba_scan_sequential(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            2, 2, d_just_over,
+            out.as_mut_ptr(), 1)
+    };
+    let rc_par = unsafe {
+        bas_mamba_scan_parallel(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            2, 2, d_just_over,
+            out.as_mut_ptr(), 1)
+    };
+    assert_eq!(rc_seq, -1,
+        "Sequential: bld just above i32::MAX cap must reject — \
+         this pins the `<= i32::MAX as i64` fence-post");
+    assert_eq!(rc_par, -1,
+        "Parallel: bld just above i32::MAX cap must reject — \
+         same fence-post,parallel ABI side");
+}
+
+#[test]
+fn c_abi_accepts_shape_at_lower_capacity_boundary() {
+    // Conservative: use a small shape that comfortably fits in the
+    // < i32::MAX cap (bld = 100) — verifies the SUCCESS arm of the
+    // checked_mul cap check is on both ABI entries。
+    let bld = 100;  // b=2, l=10, d=5 = 100
+    let x = vec![0.1_f32; bld];
+    let delta = vec![0.05_f32; bld];
+    let a = vec![-1.0_f32; 5];
+    let b_proj = vec![1.0_f32; bld];
+    let c_proj = vec![1.0_f32; bld];
+    let mut out_seq = vec![0.0_f32; bld];
+    let mut out_par = vec![0.0_f32; bld];
+
+    let rc_seq = unsafe {
+        bas_mamba_scan_sequential(
+            x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+            b_proj.as_ptr(), c_proj.as_ptr(),
+            2, 10, 5,
+            out_seq.as_mut_ptr(), bld as i32)
+    };
+    let rc_par = unsafe {
+        bas_mamba_scan_parallel(
+            x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+            b_proj.as_ptr(), c_proj.as_ptr(),
+            2, 10, 5,
+            out_par.as_mut_ptr(), bld as i32)
+    };
+    assert_eq!(rc_seq, 0,
+        "Sequential ABI must accept shapes within capacity");
+    assert_eq!(rc_par, 0,
+        "Parallel ABI must accept shapes within capacity");
+    assert_eq!(out_seq, out_par,
+        "Sequential and parallel must produce byte-equal output");
+}
+
+// MARK: - chapter 九百四十五 / M3430 — race-detection stress tests
+//
+// Per ch 944 16P discipline:rayon parallel paths claim「race-free
+// by construction」 in code comments,but had NO empirical test
+// that would FAIL if the disjoint-write invariant were violated。
+//
+// These tests follow the ch 944 cross-engine race test pattern:
+// actually TRY to trigger nondeterminism / cross-call contamination
+// / data races,assert the path is robust。
+
+#[test]
+fn scan_parallel_v2_determinism_across_repeated_runs() {
+    // Run scan_parallel_v2 100 times with the SAME inputs。
+    // Assert ALL 100 outputs are byte-equal。
+    // If there were a data race / rayon work-stealing nondeterminism,
+    // outputs would differ across runs。
+    let shape = make_shape(8, 64, 32);
+    let bld = shape.element_count();
+    // Deterministic pseudo-random inputs via xorshift32
+    let mut state: u32 = 0xDEADBEEF;
+    let mut rand_f32 = || {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        (state as f32 / u32::MAX as f32 - 0.5) * 2.0
+    };
+    let x: Vec<f32> = (0..bld).map(|_| rand_f32()).collect();
+    let delta: Vec<f32> =
+        (0..bld).map(|_| rand_f32().abs() * 0.1).collect();
+    let a: Vec<f32> =
+        (0..shape.d as usize).map(|_| -rand_f32().abs()).collect();
+    let b_proj: Vec<f32> = (0..bld).map(|_| rand_f32()).collect();
+    let c_proj: Vec<f32> = (0..bld).map(|_| rand_f32()).collect();
+
+    let baseline = scan_parallel_v2(
+        &x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    for run in 1..100 {
+        let result = scan_parallel_v2(
+            &x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        assert_eq!(result, baseline,
+            "scan_parallel_v2 run {} diverged from baseline —              rayon work-stealing nondeterminism or data race",
+            run);
+    }
+}
+
+#[test]
+fn scan_parallel_v2_concurrent_multi_call_no_cross_contamination() {
+    // Spawn 8 std::thread,each calls scan_parallel_v2 with its
+    // OWN distinct inputs。 Each thread asserts its own output
+    // matches the sequential reference for its inputs。
+    // If rayon's thread pool leaked state across calls,outputs
+    // would be wrong (some thread would get another thread's result)。
+    use std::thread;
+    use std::sync::Arc;
+
+    let shape = make_shape(2, 16, 8);
+    let bld = shape.element_count();
+    let n_threads = 8;
+
+    // Each thread has distinct delta multiplier so its expected
+    // output is unique。
+    let handles: Vec<_> = (0..n_threads).map(|tid| {
+        let scale = (tid + 1) as f32 * 0.1;
+        thread::spawn(move || {
+            let x: Vec<f32> = (0..bld)
+                .map(|i| (i as f32 * scale).sin()).collect();
+            let delta: Vec<f32> = vec![scale; bld];
+            let a: Vec<f32> =
+                vec![-(tid as f32 + 1.0); shape.d as usize];
+            let b_proj: Vec<f32> = vec![scale * 2.0; bld];
+            let c_proj: Vec<f32> = vec![1.0; bld];
+
+            let seq = scan_sequential(
+                &x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+            let par = scan_parallel_v2(
+                &x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+            (tid, seq, par)
+        })
+    }).collect();
+
+    for h in handles {
+        let (tid, seq, par) = h.join().unwrap();
+        assert_eq!(seq, par,
+            "Thread {} got cross-contaminated output — rayon              pool leaked state across concurrent v2 calls", tid);
+    }
+}
+
+#[test]
+fn scan_parallel_v2_byte_equality_holds_under_concurrent_rayon_load() {
+    // Run scan_parallel_v2 INSIDE a rayon par_iter to verify
+    // nested rayon scopes don't deadlock or corrupt output。
+    // (Common failure mode of nested rayon if pool config is wrong。)
+    use rayon::prelude::*;
+    let shape = make_shape(4, 16, 8);
+    let bld = shape.element_count();
+    let x: Vec<f32> = (0..bld).map(|i| (i as f32 * 0.01).cos()).collect();
+    let delta: Vec<f32> = vec![0.05; bld];
+    let a: Vec<f32> = vec![-1.0; shape.d as usize];
+    let b_proj: Vec<f32> = vec![1.0; bld];
+    let c_proj: Vec<f32> = vec![1.0; bld];
+
+    let expected = scan_sequential(
+        &x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+
+    // 16 concurrent invocations through rayon::par_iter
+    let results: Vec<Vec<f32>> = (0..16usize)
+        .into_par_iter()
+        .map(|_| scan_parallel_v2(
+            &x, &delta, &a, &b_proj, &c_proj, shape).unwrap())
+        .collect();
+
+    for (i, result) in results.iter().enumerate() {
+        assert_eq!(result, &expected,
+            "Nested rayon invocation {} corrupted output", i);
+    }
+}

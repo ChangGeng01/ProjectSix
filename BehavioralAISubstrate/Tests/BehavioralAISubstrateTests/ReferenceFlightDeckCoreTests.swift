@@ -1,0 +1,502 @@
+import Foundation
+import Testing
+import BASObservability
+import BASPolicy
+import BASRuntimeCore
+import BASAppleAdapters  // deep-audit sweep: gemmaE4BProviderID now lives in an adapter-side extension
+@testable import BASAdmin
+
+@Suite("BASReferenceFlightDeck")
+struct ReferenceFlightDeckCoreTests {
+    @Test("reference flight deck input builder compiles package inspection summary into deck inputs")
+    func referenceFlightDeckInputBuilderCompilesInspectionSummary() {
+        let input = BASReferenceFlightDeckInputBuilder.build(
+            from: BASReferenceFlightDeckAssemblyInput(
+                generatedAt: Date(timeIntervalSince1970: 1_710_000_000),
+                isPureLocalClosedLoop: true,
+                activeProviderTitle: "Testing Stub",
+                backendTitle: "CPU",
+                activeTaskGraphTaskCount: 3,
+                hardwareAccelerationActive: false,
+                activeRuntimeUsingDeterministicFallback: true,
+                fallbackTitle: "Gemma",
+                inspectionSummary: makeInspectionSummary(activeProviderID: BASReferenceProviderRuntime.testingStubProviderID),
+                brainSummary: makeBrainSummary()
+            )
+        )
+
+        #expect(input.runtime.activeProviderTitle == "Testing Stub")
+        #expect(input.runtime.frontLoadShare == 0.5)
+        #expect(input.runtime.activeRuntimeUsingDeterministicFallback)
+        #expect(input.data.activeTaskGraphTaskCount == 3)
+        #expect(input.memory.averagePromotedRecordCount == 6)
+        #expect(input.memory.snapshotVariantCount == 1)
+        #expect(input.safety.lockedSensitiveCoverage == 1)
+        #expect(input.orchestration.exercisedKindCount == 1)
+        #expect(input.observability.promptMetricsPresent == true)
+        #expect(input.evaluation.calibrationKindCount == 1)
+        #expect(input.delivery.activeProviderIsTestingStub == true)
+        #expect(input.delivery.hasFallbackProvider == true)
+        #expect(input.delivery.fallbackTitle == "Gemma")
+    }
+
+    @Test("reference flight deck scores runtime and observability blockers")
+    func scoresRuntimeAndObservabilityRisks() throws {
+        let output = BASReferenceFlightDeckBuilder.build(
+            from: BASReferenceFlightDeckInput(
+                generatedAt: Date(timeIntervalSince1970: 1_710_000_000),
+                isPureLocalClosedLoop: true,
+                runtime: BASReferenceRuntimeLayerInput(
+                    activeProviderTitle: "Template",
+                    runtimeGear: "low",
+                    averageRequestDurationMs: 1800,
+                    averageFirstPresentableMs: 1400,
+                    frontLoadShare: 0.82,
+                    backendTitle: "CPU",
+                    activeRuntimeUsingDeterministicFallback: true,
+                    overTimeBudgetRate: 0.22,
+                    slowRequestRate: 0.31,
+                    kindsOverFirstPresentableBudget: ["Quick", "Mirror"],
+                    hardwareAccelerationActive: false
+                ),
+                data: BASReferenceDataLayerInput(
+                    traceCount: 2,
+                    replayCount: 2,
+                    contextAwareTraceCount: 1,
+                    activeTaskGraphTaskCount: 3
+                ),
+                memory: BASReferenceMemoryLayerInput(
+                    brainTraceCount: 1,
+                    averagePromotedRecordCount: 3,
+                    averagePendingCandidateCount: 2,
+                    lowTrustMemoryLoadRate: 0.05,
+                    pendingMemoryLoadRate: 0.2,
+                    snapshotVariantCount: 1
+                ),
+                safety: BASReferenceSafetyLayerInput(
+                    traceCount: 2,
+                    evidencePollutionRate: 0.05,
+                    lowTrustMemoryLoadRate: 0.05,
+                    cacheQuarantineRate: 0.03,
+                    circuitTripCount: 0,
+                    circuitOpenProviderCount: 0,
+                    boundaryModeCount: 1,
+                    lockedSensitiveCoverage: 2,
+                    consistencyCheckedTraceCount: 2,
+                    consistencyRejectRate: 0.0,
+                    forbiddenActionViolations: 0
+                ),
+                orchestration: BASReferenceOrchestrationLayerInput(
+                    traceCount: 2,
+                    lifecycleRebuildCount: 1,
+                    exercisedKindCount: 4,
+                    fallbackActivations: 1,
+                    totalRequests: 4,
+                    actionSurfaceCount: 8
+                ),
+                observability: BASReferenceObservabilityLayerInput(
+                    traceCount: 2,
+                    replayCount: 0,
+                    totalRequests: 4,
+                    promptMetricsPresent: false,
+                    firstPresentableTracked: true,
+                    consistencyCheckedTraceCount: 1,
+                    consistencyCheckCoverageRate: 0.25,
+                    totalCacheEntries: 6,
+                    averageFirstPresentableMs: 1400
+                ),
+                evaluation: BASReferenceEvaluationLayerInput(
+                    totalRequests: 4,
+                    traceCount: 2,
+                    brainTraceCount: 1,
+                    promptVariantCount: 2,
+                    calibrationKindCount: 1,
+                    driftingKinds: [],
+                    pendingReviewAverage: 0,
+                    overTargetBudgetRate: 0.12
+                ),
+                delivery: BASReferenceDeliveryLayerInput(
+                    registeredProviderCount: 3,
+                    registeredOpenModelProviderCount: 1,
+                    activeProviderIsTestingStub: false,
+                    hasFallbackProvider: true,
+                    fallbackTitle: "Gemma",
+                    averageCheckpointCount: 1,
+                    rollbackReadyCount: 1
+                )
+            )
+        )
+
+        let runtime = try #require(output.assessments.first(where: { $0.kind == .runtime }))
+        let observability = try #require(output.assessments.first(where: { $0.kind == .observability }))
+
+        #expect(runtime.score == 5)
+        #expect(runtime.blockers.contains("Active runtime is leaning on deterministic fallback."))
+        #expect(runtime.blockers.contains(where: { $0.contains("Quick, Mirror") }))
+        #expect(observability.score == 60)
+        #expect(observability.blockers.contains("Replay coverage is zero."))
+        #expect(observability.blockers.contains("Prompt-shape metrics are missing."))
+        #expect(observability.blockers.contains("Consistency-harness coverage is too shallow across sampled traces."))
+    }
+
+    @Test("reference flight deck input and assessments honor replay revocation from inspection")
+    func referenceFlightDeckHonorsReplayRevocationFromInspection() throws {
+        let inspectionBundle = BASInspectionBundle(
+            generatedAt: Date(timeIntervalSince1970: 1_710_000_111),
+            trace: BASExecutionTrace(
+                inputSummary: "resume",
+                selectedRoute: .local("gemmaE4B"),
+                memoriesRecalled: ["Memory A"],
+                toolsCalled: [],
+                latency: BASTraceLatencyBreakdown(
+                    routeSelectionMs: 12,
+                    retrievalMs: 10,
+                    generationMs: 120,
+                    toolMs: 0
+                ),
+                outputSummary: "ok"
+            ),
+            replayFingerprint: BASReplayFingerprint(value: String(repeating: "c", count: 64)),
+            replayDisposition: BASReplayDisposition(
+                isAvailable: false,
+                reason: "Replay revoked by forget gate forget.guard.anchor after checkpoint exports and sync exports.",
+                forgetRequestID: "forget.guard.anchor",
+                checkpointsRevoked: true,
+                syncExportsRevoked: true,
+                vaultConsistencyState: "revocation_pending",
+                vaultDeletionManifestID: "forget.guard.anchor",
+                vaultSyncRevocationCount: 1,
+                vaultRequiresApproval: true,
+                vaultOutOfSyncDeviceIDs: ["device.secondary", "device.tablet"],
+                vaultMigrationTargetDeviceID: "device.secondary"
+            ),
+            releaseDecision: BASReleaseDecision(kind: .allow, reason: "allowed"),
+            anomalySignals: [],
+            calibration: nil
+        )
+        let input = BASReferenceFlightDeckInputBuilder.build(
+            from: BASReferenceFlightDeckAssemblyInput(
+                generatedAt: Date(timeIntervalSince1970: 1_710_000_111),
+                isPureLocalClosedLoop: true,
+                activeProviderTitle: "Gemma",
+                backendTitle: "CPU",
+                activeTaskGraphTaskCount: 2,
+                hardwareAccelerationActive: true,
+                activeRuntimeUsingDeterministicFallback: false,
+                fallbackTitle: "Template",
+                inspectionSummary: makeInspectionSummary(activeProviderID: "gemmaE4B"),
+                brainSummary: makeBrainSummary(),
+                inspectionBundle: inspectionBundle
+            )
+        )
+
+        #expect(input.data.replayAvailable == false)
+        #expect(input.data.replayBlocker?.contains("forget.guard.anchor") == true)
+        #expect(input.data.vaultConsistencyState == "revocation_pending")
+        #expect(input.data.vaultSyncRevocationCount == 1)
+        #expect(input.data.vaultOutOfSyncDeviceIDs == ["device.secondary", "device.tablet"])
+        #expect(input.data.vaultMigrationTargetDeviceID == "device.secondary")
+        #expect(input.observability.replayAvailable == false)
+        #expect(input.observability.replayBlocker?.contains("forget.guard.anchor") == true)
+        #expect(input.observability.vaultConsistencyState == "revocation_pending")
+        #expect(input.observability.vaultSyncRevocationCount == 1)
+        #expect(input.observability.vaultOutOfSyncDeviceIDs == ["device.secondary", "device.tablet"])
+        #expect(input.observability.vaultMigrationTargetDeviceID == "device.secondary")
+
+        let output = BASReferenceFlightDeckBuilder.build(from: input)
+        let data = try #require(output.assessments.first(where: { $0.kind == .data }))
+        let observability = try #require(output.assessments.first(where: { $0.kind == .observability }))
+
+        #expect(data.blockers.contains(where: { $0.contains("forget.guard.anchor") }))
+        #expect(data.blockers.contains(where: { $0.contains("vault consistency") }))
+        #expect(data.blockers.contains(where: { $0.contains("device.secondary") }))
+        #expect(observability.blockers.contains(where: { $0.contains("forget.guard.anchor") }))
+        #expect(observability.blockers.contains(where: { $0.contains("vault consistency") }))
+        #expect(observability.blockers.contains(where: { $0.contains("device.secondary") }))
+        #expect(data.signals.contains(where: { $0.contains("Replay status: blocked") }))
+        #expect(data.signals.contains(where: { $0.contains("Vault consistency: revocation_pending") }))
+        #expect(data.signals.contains(where: { $0.contains("device.secondary") }))
+        #expect(observability.signals.contains(where: { $0.contains("Replay status: blocked") }))
+        #expect(observability.signals.contains(where: { $0.contains("Vault consistency: revocation_pending") }))
+        #expect(observability.signals.contains(where: { $0.contains("device.secondary") }))
+    }
+
+    @Test("reference flight deck tracks evaluation drift and delivery debt")
+    func scoresEvaluationAndDeliveryDebt() throws {
+        let output = BASReferenceFlightDeckBuilder.build(
+            from: BASReferenceFlightDeckInput(
+                isPureLocalClosedLoop: false,
+                runtime: BASReferenceRuntimeLayerInput(
+                    activeProviderTitle: "Gemma",
+                    runtimeGear: "balanced",
+                    averageRequestDurationMs: 620,
+                    averageFirstPresentableMs: 420,
+                    frontLoadShare: 0.42,
+                    backendTitle: "Metal",
+                    activeRuntimeUsingDeterministicFallback: false,
+                    overTimeBudgetRate: 0.02,
+                    slowRequestRate: 0.04,
+                    kindsOverFirstPresentableBudget: [],
+                    hardwareAccelerationActive: true
+                ),
+                data: BASReferenceDataLayerInput(
+                    traceCount: 8,
+                    replayCount: 5,
+                    contextAwareTraceCount: 8,
+                    activeTaskGraphTaskCount: 2
+                ),
+                memory: BASReferenceMemoryLayerInput(
+                    brainTraceCount: 6,
+                    averagePromotedRecordCount: 5,
+                    averagePendingCandidateCount: 1,
+                    lowTrustMemoryLoadRate: 0.04,
+                    pendingMemoryLoadRate: 0.12,
+                    snapshotVariantCount: 3
+                ),
+                safety: BASReferenceSafetyLayerInput(
+                    traceCount: 8,
+                    evidencePollutionRate: 0.04,
+                    lowTrustMemoryLoadRate: 0.04,
+                    cacheQuarantineRate: 0.02,
+                    circuitTripCount: 0,
+                    circuitOpenProviderCount: 0,
+                    boundaryModeCount: 2,
+                    lockedSensitiveCoverage: 3,
+                    consistencyCheckedTraceCount: 8,
+                    consistencyRejectRate: 0.05,
+                    forbiddenActionViolations: 0
+                ),
+                orchestration: BASReferenceOrchestrationLayerInput(
+                    traceCount: 8,
+                    lifecycleRebuildCount: 3,
+                    exercisedKindCount: 4,
+                    fallbackActivations: 2,
+                    totalRequests: 8,
+                    actionSurfaceCount: 12
+                ),
+                observability: BASReferenceObservabilityLayerInput(
+                    traceCount: 8,
+                    replayCount: 5,
+                    totalRequests: 8,
+                    promptMetricsPresent: true,
+                    firstPresentableTracked: true,
+                    consistencyCheckedTraceCount: 8,
+                    consistencyCheckCoverageRate: 1.0,
+                    totalCacheEntries: 9,
+                    averageFirstPresentableMs: 420
+                ),
+                evaluation: BASReferenceEvaluationLayerInput(
+                    totalRequests: 8,
+                    traceCount: 8,
+                    brainTraceCount: 6,
+                    promptVariantCount: 4,
+                    calibrationKindCount: 2,
+                    driftingKinds: ["Mirror"],
+                    pendingReviewAverage: 2,
+                    overTargetBudgetRate: 0.28
+                ),
+                delivery: BASReferenceDeliveryLayerInput(
+                    registeredProviderCount: 2,
+                    registeredOpenModelProviderCount: 0,
+                    activeProviderIsTestingStub: true,
+                    hasFallbackProvider: false,
+                    fallbackTitle: nil,
+                    averageCheckpointCount: 2,
+                    rollbackReadyCount: 0
+                )
+            )
+        )
+
+        let evaluation = try #require(output.assessments.first(where: { $0.kind == .evaluation }))
+        let delivery = try #require(output.assessments.first(where: { $0.kind == .delivery }))
+
+        #expect(evaluation.score == 70)
+        #expect(evaluation.blockers.contains("Calibration is drifting for Mirror."))
+        #expect(evaluation.blockers.contains("Safe-evolution review debt is accumulating."))
+        #expect(delivery.score == 5)
+        #expect(delivery.blockers.contains("Provider catalog is too narrow for long-term runtime portability."))
+        #expect(delivery.blockers.contains("No open-model adapter path is registered."))
+        #expect(delivery.blockers.contains("Active runtime is still pinned to a testing stub."))
+        #expect(delivery.blockers.contains("No fallback provider is configured."))
+        #expect(delivery.blockers.contains("Evolution checkpoints are not marked rollback-ready."))
+    }
+
+    private func makeInspectionSummary(activeProviderID: String) -> BASRuntimeInspectionSummary {
+        let telemetry = BASTelemetrySummaryBuilder.build(
+            from: BASTelemetrySummaryInput(
+                requestCountByKind: ["primary": 2],
+                outcomeCount: [.providerSuccess: 1, .cacheHit: 1],
+                outcomeCountByKind: [
+                    .providerSuccess: ["primary": 1],
+                    .cacheHit: ["primary": 1]
+                ],
+                activeProviderCount: [activeProviderID: 1],
+                attemptedProviderCount: ["gemmaE4B": 1],
+                fallbackActivations: 1,
+                backendCount: ["cpu": 1],
+                slowRequestCountByKind: [:],
+                overTimeBudgetCountByKind: [:],
+                requestDurationTotalMsByKind: ["primary": 220],
+                firstPresentableTotalMsByKind: ["primary": 140],
+                promptAssemblyTotalMsByKind: ["primary": 40],
+                admissionEvaluationTotalMsByKind: ["primary": 20],
+                providerSelectionTotalMsByKind: ["primary": 10],
+                executionTotalMsByKind: ["primary": 70],
+                activeProviderDurationTotalMs: [activeProviderID: 220],
+                backendDurationTotalMs: ["cpu": 220],
+                admissionSkipCountByReason: [:],
+                admissionSkipCountByReasonAndKind: [:],
+                selectionNeedCount: [:],
+                promptCharactersTotalByKind: ["primary": 480],
+                prefixCharactersTotalByKind: ["primary": 180],
+                immutablePrefixCharactersTotalByKind: ["primary": 120],
+                adaptivePrefixCharactersTotalByKind: ["primary": 60],
+                suffixCharactersTotalByKind: ["primary": 300],
+                overTargetBudgetCountByKind: [:],
+                lowPressureModelCallCountByKind: ["primary": 1],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "knowledge",
+                selectionControlNeedRawValue: "control",
+                selectionRetrievalBypassReasonRawValues: ["retrievalNotNeeded"],
+                avoidableSkipReasonRawValues: ["templateAlreadySufficient"]
+            )
+        )
+        let lifecycle = BASLifecycleSummaryBuilder.build(
+            from: [
+                BASLifecycleTraceInput(
+                    kind: "primary",
+                    hasContextState: true,
+                    generation: 4,
+                    rebuiltSession: true,
+                    staleFieldCount: 0,
+                    anchorFieldCount: 1,
+                    hasFrontstageState: true,
+                    retainedEvidenceCount: 2,
+                    droppedEvidenceCount: 1,
+                    droppedInjectedEvidenceCount: 1,
+                    droppedDuplicateEvidenceCount: 0,
+                    droppedBudgetEvidenceCount: 0
+                )
+            ]
+        )
+        let neural = BASNeuralSummaryBuilder.build(
+            from: [
+                BASNeuralTraceInput(
+                    kind: "primary",
+                    suppressedBehaviorCount: 1,
+                    dominantActionRawValue: "waitBuffer",
+                    strongestSignalRawValue: "urgency"
+                )
+            ]
+        )
+        let brain = makeBrainSummary()
+
+        return BASRuntimeInspectionBuilder.build(
+            from: BASRuntimeInspectionInput(
+                activeProviderID: activeProviderID,
+                fallbackProviderID: BASReferenceProviderRuntime.gemmaE4BProviderID,
+                runtimeGear: .low,
+                environmentClass: .normal,
+                deviceClass: .balancedPhone,
+                languageMode: .english,
+                taskEntropyByKind: ["primary": .low],
+                preferredProviderRawValueByKind: ["primary": "gemmaE4B"],
+                strategyByKind: [
+                    "primary": BASAdaptiveTaskStrategy(
+                        kind: .primary,
+                        entropy: .low,
+                        runtimeGear: .low,
+                        contextBudget: 220,
+                        outputCharacterBudget: 180,
+                        timeBudgetMs: 500,
+                        toolCallBudget: 1,
+                        retrievalItemBudget: 0,
+                        retrievalMode: .off,
+                        thinkingMode: .off,
+                        outputMode: .guidedShort,
+                        tone: .briefWarm,
+                        actionSpace: ["encourage", "next_step", "fallback_to_template"],
+                        responseLanguage: .english,
+                        allowsModelInvocation: true
+                    )
+                ],
+                effectivePreferredProviderRawValueByKind: ["primary": "gemmaE4B"],
+                traceInputs: [
+                    BASRuntimeInspectionTraceInput(
+                        kind: "primary",
+                        attemptedProviderIDs: ["gemmaE4B"],
+                        runtimeStrategy: BASAdaptiveTaskStrategy(
+                            kind: .primary,
+                            entropy: .low,
+                            runtimeGear: .low,
+                            contextBudget: 220,
+                            outputCharacterBudget: 180,
+                            timeBudgetMs: 500,
+                            toolCallBudget: 1,
+                            retrievalItemBudget: 0,
+                            retrievalMode: .off,
+                            thinkingMode: .off,
+                            outputMode: .guidedShort,
+                            tone: .briefWarm,
+                            actionSpace: ["encourage", "next_step", "fallback_to_template"],
+                            responseLanguage: .english,
+                            allowsModelInvocation: true
+                        ),
+                        semanticPromptFingerprint: "semantic-q-1",
+                        stablePrefixFingerprint: "stable-q-1",
+                        consistencyChecked: true
+                    )
+                ],
+                telemetrySummary: telemetry,
+                lifecycleSummary: lifecycle,
+                neuralSummary: neural,
+                brainSummary: brain,
+                totalCacheEntries: 1,
+                totalCacheLookupCount: 1,
+                totalCacheRejectedStores: 0,
+                totalCacheQuarantinedHits: 0,
+                dominantBackendID: "cpu",
+                registeredProviderCount: 4,
+                registeredOpenModelProviderCount: 2,
+                activeCircuitProviderIDs: ["gemmaE4B"],
+                circuitTripCount: 1,
+                circuitTripCountByProvider: ["gemmaE4B": 1],
+                circuitTripCountByReason: ["repeatedProviderFailure": 1],
+                traceCount: 1,
+                replayCount: 1
+            )
+        )
+    }
+
+    private func makeBrainSummary() -> BASBrainSummary {
+        BASBrainSummaryBuilder.build(
+            from: [
+                BASBrainTraceInput(
+                    kind: "primary",
+                    dominantReactionWeight: .interruptiveActionBias,
+                    profileCoreCount: 1,
+                    activeGoalCount: 1,
+                    relevantMemoryCount: 1,
+                    loadedPromotedMemoryCount: 3,
+                    loadedPendingMemoryCount: 1,
+                    pendingCandidateCount: 1,
+                    promotedRecordCount: 6,
+                    screenedOutMemoryCount: 1,
+                    loadedEligibilityReasonCounts: [.goalOverride: 1],
+                    screenedOutEligibilityReasonCounts: [.confidenceNoOverlap: 1],
+                    snapshotFingerprint: "fp-q",
+                    lowTrustMemoryLoadRate: 0,
+                    riskFlags: [],
+                    identityRole: .pauseCompanion,
+                    boundaryMode: .localOnlyAdvisory,
+                    activeConstraints: [.lockSensitiveMemory],
+                    calibrationStatus: .stable,
+                    calibrationAlerts: [],
+                    evolutionCheckpointCount: 0,
+                    evolutionPendingReviewCount: 0,
+                    evolutionRollbackReady: false
+                )
+            ]
+        )
+    }
+}

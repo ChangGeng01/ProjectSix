@@ -1,0 +1,163 @@
+<style>
+  .v5 { --line:rgba(255,255,255,.13); --muted:rgba(255,255,255,.64); --blue:#78a9ff; --amber:#ffc36e; --green:#59d6a7; --red:#ff7d87; --violet:#c99cff; --cyan:#59d5dc; }
+  .thesis { border:1px solid rgba(89,214,167,.36); background:linear-gradient(115deg,rgba(89,214,167,.07),rgba(120,169,255,.035)); border-radius:15px; padding:14px; margin:15px 0 18px; }
+  .thesis b { color:var(--green); }
+  .thesis p { margin:5px 0 0; color:var(--muted); font-size:11px; line-height:1.52; }
+  .equation { display:grid; grid-template-columns:1fr auto 1fr auto 1fr; align-items:center; gap:7px; margin:12px 0 20px; }
+  .eq { border:1px solid var(--line); border-radius:11px; padding:10px; text-align:center; font-size:10px; line-height:1.35; }
+  .eq b { display:block; font-size:12px; margin-bottom:3px; }
+  .op { color:var(--muted); }
+  .plane { border:1px solid rgba(120,169,255,.32); border-radius:17px; padding:13px; background:rgba(120,169,255,.025); }
+  .plane-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  .plane-head h3 { margin:0; font-size:14px; }
+  .badge { border:1px solid rgba(120,169,255,.38); color:var(--blue); border-radius:999px; padding:3px 7px; font-size:8px; }
+  .silicon { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+  .unit { border:1px solid var(--line); border-radius:11px; padding:10px; min-height:113px; }
+  .unit h4 { margin:0 0 4px; font-size:11px; }
+  .unit p { margin:0; font-size:9px; line-height:1.43; color:var(--muted); }
+  .unit .yes { color:var(--green); }
+  .unit .no { color:var(--red); }
+  .kernels { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:10px; }
+  .kernel { border:1px solid var(--line); border-radius:11px; padding:10px; font-size:9px; line-height:1.42; }
+  .kernel b { display:block; font-size:11px; margin-bottom:4px; }
+  .kernel em { color:var(--muted); font-style:normal; }
+  .flow { display:flex; gap:6px; align-items:stretch; overflow-x:auto; padding-bottom:5px; }
+  .phase { min-width:110px; flex:1; border:1px solid var(--line); border-radius:10px; padding:8px; font-size:9px; line-height:1.38; }
+  .phase b { display:block; margin-bottom:3px; font-size:10px; }
+  .phase.cpu { border-color:rgba(89,213,220,.31); }
+  .phase.gpu { border-color:rgba(201,156,255,.38); background:rgba(201,156,255,.035); }
+  .phase.sec { border-color:rgba(255,195,110,.36); }
+  .arrow { align-self:center; color:var(--muted); }
+  .contracts { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .contract { border:1px solid var(--line); border-radius:11px; padding:10px; }
+  .contract h4 { margin:0 0 4px; font-size:11px; }
+  .contract p { margin:0; color:var(--muted); font-size:9px; line-height:1.45; }
+  .states { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .state { border:1px solid var(--line); border-radius:11px; padding:10px; }
+  .state h4 { margin:0 0 5px; font-size:11px; }
+  .state p { margin:0; font-size:9px; color:var(--muted); line-height:1.48; }
+  .nominal { border-color:rgba(89,214,167,.38); }
+  .fair { border-color:rgba(255,195,110,.38); }
+  .serious { border-color:rgba(255,125,135,.35); }
+  .critical { border-color:rgba(255,125,135,.52); background:rgba(255,125,135,.035); }
+  .audit { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+  .audit-col { border:1px solid var(--line); border-radius:12px; padding:11px; }
+  .audit-col h4 { margin:0 0 7px; font-size:11px; }
+  .audit-row { border-top:1px solid rgba(255,255,255,.08); padding:7px 0; font-size:9px; line-height:1.42; }
+  .audit-row:first-of-type { border-top:0; }
+  .keep { color:var(--green); }
+  .replace { color:var(--red); }
+  .full { border:1px solid rgba(255,195,110,.34); background:rgba(255,195,110,.035); border-radius:12px; padding:11px; margin-top:10px; }
+  .full b { color:var(--amber); }
+  .full p { margin:5px 0 0; font-size:10px; color:var(--muted); line-height:1.5; }
+  .section-title { margin-top:25px; }
+  .approaches { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-top:12px; }
+  .approach { border:1px solid var(--line); border-radius:13px; padding:11px; }
+  .approach.recommended { border-color:rgba(89,214,167,.42); background:rgba(89,214,167,.035); }
+  .approach h4 { margin:0 0 5px; font-size:11px; }
+  .approach p { margin:0; font-size:9px; color:var(--muted); line-height:1.47; }
+  @media(max-width:900px){ .silicon,.kernels,.contracts,.states,.approaches,.audit{grid-template-columns:1fr;} .equation{grid-template-columns:1fr;} .op{display:none;} }
+</style>
+
+<div class="v5">
+  <h2>v5 · Silicon Resource Plane</h2>
+  <p class="subtitle">让 A19 Pro 各单元做自己擅长的事，同时守住热、能耗、统一内存与“满血”质量。它是正交资源 fabric，不是第 15 个 LayerCore。</p>
+
+  <div class="thesis">
+    <b>Healthy full power ≠ CPU + GPU + ANE 同时 100%</b>
+    <p>Air 真机已证明 ANE draft ∥ GPU target 会让两边分别慢约 64% / 61%，并行 wall ratio ρ≈0.83。最健康、也通常最快的原则是：按 turn phase 交接重型执行权；允许 OS 在单个 backend 内利用硬件，但不让两个高带宽模型争抢统一内存。</p>
+  </div>
+
+  <div class="equation">
+    <div class="eq"><b>Full-blood invariant</b>同 weights · quant · verifier · sovereign policy</div><div class="op">×</div>
+    <div class="eq"><b>Verified goodput</b>task success / wall time，而非只看 raw tok/s</div><div class="op">÷</div>
+    <div class="eq"><b>Health cost</b>thermal · energy · peak bytes · recovery debt</div>
+  </div>
+
+  <div class="plane">
+    <div class="plane-head"><h3>Silicon Resource Plane · 观察 / 预留 / 计量</h3><span class="badge">ORTHOGONAL FABRIC · NOT L15</span></div>
+    <div class="silicon">
+      <div class="unit"><h4>CPU · 2P + 4E</h4><p><span class="yes">适合</span> tokenizer、Swift orchestration、SQLite/FTS、短小分类器、crypto glue。<br><span class="no">边界</span> iOS 无公开 P/E core pinning；QoS 只是给 OS 的提示。</p></div>
+      <div class="unit"><h4>GPU + Neural Accelerators</h4><p><span class="yes">适合</span> MLX Qwen target、prefill、decode、MTP、Metal TensorOps/NAX。A19 GPU 内 Neural Accelerators 与独立 ANE 不是一回事。<br><span class="no">边界</span> decode 仍受 bytes/token 限制。</p></div>
+      <div class="unit"><h4>Apple Neural Engine</h4><p><span class="yes">适合</span> 具体 model+shape 经真机证实的 Core ML / Core AI 替代 lane。<br><span class="no">边界</span> `.all` / preferred 不是强制；tiny heads 真机为 0 ANE，不能按 op 名猜 placement。</p></div>
+      <div class="unit"><h4>Unified Memory</h4><p><span class="yes">适合</span> 同进程单份 weights/KV、COW typed values、GPU-resident intermediates。<br><span class="no">边界</span> shared memory 仍有同步/带宽/jetsam；L2 大模型与 KV 不跨进程。</p></div>
+      <div class="unit"><h4>Secure Enclave</h4><p><span class="yes">适合</span> L14 对 canonical digest 做设备绑定签名、保护 root key。<br><span class="no">边界</span> 不跑 policy/model，不存 weights，不处理大 payload；不贡献 tok/s。</p></div>
+    </div>
+
+    <div class="kernels">
+      <div class="kernel"><b>K1 · Lease &amp; Life</b><em>L1 资源政策 + Silicon Broker 机制</em><br>raw thermal/power/memory snapshot；签 physical offer，不看 prompt。</div>
+      <div class="kernel"><b>K2 · Neural Organ</b><em>L2/L3 + model runtime</em><br>唯一拥有 weights、KV、MLX/Core AI session、token loop；执行 active lease。</div>
+      <div class="kernel"><b>K3 · State &amp; Evolution</b><em>L4–L13 的状态机制</em><br>CPU/Rust/SQLite；decode 时不抢 GPU，不并发 spill storm。</div>
+      <div class="kernel"><b>K4 · Sovereign</b><em>L14 + isolated helper</em><br>authorize exact offer digest / seal receipt；从不伪造硬件容量或做调度。</div>
+    </div>
+  </div>
+
+  <h3 class="section-title">一个 turn 的硬件所有权交接</h3>
+  <div class="flow">
+    <div class="phase cpu"><b>Input / L6</b>CPU<br>normalize + intent/risk hints</div><div class="arrow">→</div>
+    <div class="phase cpu"><b>L7 Retrieval</b>CPU/Rust/SQLite<br>最多 2 个真实 I/O lane</div><div class="arrow">→</div>
+    <div class="phase cpu"><b>L3 Compile</b>CPU<br>COW values → tokenize once</div><div class="arrow">→</div>
+    <div class="phase gpu"><b>L2 Prefill</b>MLX GPU + eligible NAX<br>prefix/KV restore first</div><div class="arrow">→</div>
+    <div class="phase gpu"><b>L2 Decode</b>GPU exclusive<br>MTP / plain by certified profile</div><div class="arrow">→</div>
+    <div class="phase cpu"><b>L9–L12</b>CPU first<br>verify, risk, render；GPU verifier 串行在后</div><div class="arrow">→</div>
+    <div class="phase sec"><b>L13 / L14</b>SQLite + Secure Enclave<br>prepare, authorize, real receipt, seal</div>
+  </div>
+
+  <h3 class="section-title">窄而真实的 4 个资源合约</h3>
+  <div class="contracts">
+    <div class="contract"><h4>ResourceSnapshot</h4><p>raw thermal、Low Power Mode、foreground、headroom、Metal bytes、active reservations、evidence age。绝不包含 runMode 或认知深度。</p></div>
+    <div class="contract"><h4>WorkloadDescriptor</h4><p>model digest、shape、bytes、latency class、determinism、allowed equivalent backends。没有 user text、candidate 或 risk verdict。</p></div>
+    <div class="contract"><h4>SiliconLease</h4><p>policyLeaseRef、backend/runtime、GPU/ANE exclusivity、bytes/concurrency cap、checkpoint/expiry、thermal exit rule。不可转让。</p></div>
+    <div class="contract"><h4>ExecutionReceipt</h4><p>实际 backend、placement evidence 或 honest unknown、queue/prefill/decode ms、peak bytes、thermal delta、fallback reason；每个 counter 标 measured/estimated。</p></div>
+  </div>
+
+  <h3 class="section-title">热状态：不牺牲质量，只改变机械路径</h3>
+  <div class="states">
+    <div class="state nominal"><h4>Nominal</h4><p>单一 GPU owner；MTP 与 NAX 依 device profile；允许 model warm residency。ANE 只可作为独立替代 lane，不与 target 并跑。</p></div>
+    <div class="state fair"><h4>Fair / Low Power</h4><p>停止后台 accelerator、并发收至 1、关闭 speculative prefetch；MTP 必须过 matched never-worse profile，否则 plain。</p></div>
+    <div class="state serious"><h4>Serious</h4><p>强制 plain；禁止新 model load/JIT、GPU embedding 与 spill fan-out。保留完整 verifier/sovereign，不把 4B 转 CPU继续烧。</p></div>
+    <div class="state critical"><h4>Critical</h4><p>round boundary checkpoint；defer/cancel 非必要 turn，释放非关键模型，只允许 durable reconciliation 与 L14 finalize。宁可慢/等，不偷偷降质。</p></div>
+  </div>
+
+  <h3 class="section-title">当前代码：保留正确机制，替换错误抽象</h3>
+  <div class="audit">
+    <div class="audit-col">
+      <h4 class="keep">保留并升格</h4>
+      <div class="audit-row">`BASThermalTwin` 的 live notification + freshness window</div>
+      <div class="audit-row">`BASPressureLadder` 的 turn 间 park → drop MTP → clear + hysteresis</div>
+      <div class="audit-row">Qwen MTP serious+→plain、KV restore、prefix/suffix fast paths</div>
+      <div class="audit-row">vendored MLX 的 A19 NAX kernels 与 iOS 27 MSL 4.1 rung；先加 actual-use receipt</div>
+      <div class="audit-row">MetricKit / signpost / StateReporting 作为日级证据，不当实时 governor</div>
+    </div>
+    <div class="audit-col">
+      <h4 class="replace">必须替换或降为 shadow-only</h4>
+      <div class="audit-row">`backing == accelerator`：MLMultiArray 并不等于 ANE，MLXArray 也不等于独立 ANE</div>
+      <div class="audit-row">ANE capability 的硬编码 2GB / op table / 0.5ms 不能签 resource lease</div>
+      <div class="audit-row">同一 thermal multiplier 乘所有 backend，排序不变却写成 thermalDowngrade</div>
+      <div class="audit-row">配置时 static thermal snapshot；必须按 lease epoch 现场采样</div>
+      <div class="audit-row">routed V2 输出丢弃后再跑 V1：必须保证每个 target model 一 turn 只执行一次</div>
+    </div>
+  </div>
+
+  <div class="full">
+    <b>“满血”的严格定义</b>
+    <p>热控可以选择等候、缓存、复用、换成已通过等价性认证的 backend、关闭负收益 speculative；不能暗中换小模型、降精度、跳过验证或放宽 L14。40 tok/s cold / 30 tok/s hot 仍作为性能目标分开验收，但持续 100% duty 的 hot-30 不能靠调度承诺；若物理上达不到，系统应诚实排队或降速，而不是牺牲答案质量。</p>
+  </div>
+
+  <h3 class="section-title">选择资源调度哲学</h3>
+  <div class="approaches">
+    <div class="approach recommended"><h4>A · Phase-owned heterogeneous</h4><p>每个 phase 一个重型 owner；CPU/GPU/ANE 交接而非抢跑。真实 profile + lease + receipt。最快、最冷、边界最清楚。</p></div>
+    <div class="approach"><h4>B · Parallel saturation</h4><p>CPU/GPU/ANE 尽量同时工作。看起来“满血”，但 Air 真机已有 ρ=0.83 的反证，热与统一内存争用最大。</p></div>
+    <div class="approach"><h4>C · GPU monolith</h4><p>所有 ML 都串在 GPU。简单，但 tiny heads、低功耗 reader、Secure Enclave 和背景维护无法各就其位。</p></div>
+  </div>
+
+  <div class="decision">
+    <h3>是否采用 A 作为 Silicon Plane 的正式方向？</h3>
+    <p class="subtitle">采用后，我下一步会把 error model、lease state machine、并发/背压、测试门和落地文件边界补全；仍不写实现，直到完整设计获批。</p>
+    <div class="options">
+      <div class="option" data-choice="phase-owned-silicon" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content"><h3>采用 Phase-owned（推荐）</h3><p>一个重型 owner、等价 backend、真实 lease/receipt、满血质量不降级。</p></div></div>
+      <div class="option" data-choice="parallel-saturation" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content"><h3>继续探索全并行</h3><p>即使当前真机数据不利，仍希望设计 ANE ∥ GPU 的实验性双流。</p></div></div>
+      <div class="option" data-choice="revise-silicon" onclick="toggleSelect(this)"><div class="letter">C</div><div class="content"><h3>先调整边界</h3><p>认可资源平面，但希望修改某个 owner、thermal policy 或满血定义。</p></div></div>
+    </div>
+  </div>
+</div>

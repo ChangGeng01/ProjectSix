@@ -1,0 +1,325 @@
+// MARK: - BASFoundationModelsToolBridge — chapter 四百 / M916
+//
+// G6 收尾 substrate-side typed surface for the FoundationModels
+// (iOS 26+) `Tool` protocol bridge。Pre-M916 the AFM organ
+// adapter dropped tools[] silently with M870's audit-trace
+// (`#afm-tools-dropped-no-sdk-bridge`),and there was NO typed
+// place for future SDK-bridge work to slot in。Post-M916 the
+// strategy taxonomy + audit-mode pin live here as a public
+// substrate primitive,so the moment iOS 26's `Tool` protocol
+// stabilizes,the bridge wire is a concrete swap-in,not a
+// design exercise。
+//
+// ## Why this is hard (the type-system gap)
+//
+// The iOS 26 `FoundationModels.Tool` protocol requires a
+// COMPILE-TIME associated `Arguments: Generable` type per
+// conformer:
+//
+//   protocol Tool {
+//       associatedtype Arguments: Generable
+//       func call(arguments: Arguments) async throws -> ToolOutput
+//   }
+//
+// The substrate's `BASTool` carries RUNTIME parameters
+// (`[BASToolParameter]`)。These don't compose without code
+// generation:there's no way to instantiate a single
+// "generic FoundationModels.Tool conformer" that takes
+// `BASTool.parameters` at runtime。Two strategies exist:
+//
+//   1. **runtimeSchema** (cloud-style) — pass JSON Schema to
+//      the LLM,parse JSON tool-call response。Works TODAY for
+//      `BASChatCompletionsOrganAdapter` + Anthropic / OpenAI
+//      cloud APIs。No iOS 26 SDK dependency。
+//
+//   2. **compiledGenerable** (AFM iOS 26 native) — generate
+//      one `FoundationModels.Tool` conformer per BASTool at
+//      compile time (via macro / codegen)。Hosts declare tools
+//      in source,not at runtime。Future work — needs SDK
+//      stabilization + macro infrastructure decision。
+//
+//   3. **audit** (M870 pre-bridge state) — drop tools[] at
+//      the SDK call site,emit typed audit trace
+//      `#afm-tools-dropped-no-sdk-bridge` so observers can
+//      detect the gap。Substrate-class observation,never
+//      silent。Used by AppleFoundationOrganAdapter today。
+//
+// ## What this ships (M916)
+//
+//   - `BASFoundationModelsToolBridgeStrategy` typed enum
+//     naming the 3 strategies above
+//   - `BASFoundationModelsToolBridgeStatus` typed enum naming
+//     the bridge's per-call resolution:
+//       `.audited(traceID:)` (no bridge,M870 audit trace)
+//       `.bridgedRuntimeSchema(toolCount:)` (cloud-style)
+//       `.bridgedCompiledGenerable(toolCount:)` (future AFM)
+//   - `BASFoundationModelsToolBridge` namespace with the
+//     `resolve(forStrategy:tools:)` typed factory that returns
+//     a status describing what the bridge will do for a
+//     given tools[] array
+//   - `auditTraceSuffix` + `runtimeSchemaTraceSuffix` constants
+//     pinning the exact trace-id markers for downstream parsers
+//
+// ## What this ships NOW (the emit↔parse PAIR, not the full loop)
+//
+//   - `.runtimeSchema` is WIRED in `AppleFoundationOrganAdapter`:
+//     `BASToolPromptRenderer.runtimeSchemaBlock` declares tools in
+//     the prompt + the adapter EXERCISES `resolve(.runtimeSchema, …)`
+//     per call (emits the `#afm-tools-runtime-schema` marker).
+//   - The MATCHED parser `BASToolPromptRenderer.parseToolCall`
+//     ships alongside the renderer (one contract, no drift).
+//   HONEST BOUND: this is the emit + parse PAIR, not an end-to-end
+//   loop. The HOST must opt `parseToolCall` into a
+//   `BASToolCallingPlanner` policy (the planner stays vendor-neutral
+//   by design) → only then is the parsed call gated
+//   (`BASToolInvocationGate`) + dispatched (`BASToolDispatcher`).
+//   The adapter runs NO tool (gate-before-execute preserved). The
+//   real-model round-trip is NOT yet exercised on-device.
+//
+// ## What this does NOT ship (DELIBERATELY)
+//
+//   - `.compiledGenerable` — native FoundationModels `Tool`
+//     auto-execution. NOT a maturity gap: FM auto-runs
+//     `tool.call(...)` mid-generation, which would execute
+//     ungated side-effects inside the organ, bypassing the
+//     gate-before-execute model. Use `.runtimeSchema` (above)
+//     so the host stays the executor + gatekeeper.
+//   - Tool-call response parsing for cloud adapters (already
+//     lives in `BASChatCompletionsOrganAdapter`)
+//
+// ## Doctrine pins held
+//
+// - 不变量 #1 / #2 / #3 全保 — bridge is observation-class:
+//   resolves a status,does NOT mutate permits or commit
+//   token
+// - 红线 7 hint-only — bridge status is a HINT to the host's
+//   observability stack,never a permit gate
+// - chapter 二百一一 single-source-of-truth — ONE typed
+//   strategy taxonomy for AFM tool bridging
+// - chapter 一百八十五 anti-magic-number — audit suffix
+//   string is a typed constant,grep-able + stable
+// - ADR-014 OPT-IN → PROD — the FM adapter now defaults to
+//   `.runtimeSchema` (host-executes, gated); `.audit` remains
+//   the fallback when a strategy can't bridge (e.g. unmapped
+//   schema). Native auto-exec (`.compiledGenerable`) stays OFF
+//   by governance choice, not by maturity.
+// - ADR-016 (M872) substrate completion doctrine — G6's
+//   `substrateClosedSDKBridgePending` status now points to
+//   THIS file as the typed surface where the bridge lands
+
+import Foundation
+import BASRuntimeCore
+
+// MARK: - Strategy
+
+/// Typed enum naming the three strategies for bridging
+/// `BASTool` runtime values to the LLM's tool-calling API。
+public enum BASFoundationModelsToolBridgeStrategy:
+    String, Sendable, Equatable, Hashable, CaseIterable,
+    Codable
+{
+    /// Pass tool definitions to the LLM as JSON Schema in the
+    /// prompt + parse the LLM's JSON tool-call response。Works
+    /// TODAY with cloud adapters (OpenAI / Anthropic / generic
+    /// HTTP function-calling)。Does NOT depend on iOS 26 SDK。
+    case runtimeSchema = "runtimeSchema"
+
+    /// Compile-time `FoundationModels.Tool` conformers per
+    /// BASTool。Hosts declare tools in Swift source。Future
+    /// work — needs SDK stabilization。Currently UNUSED;the
+    /// taxonomy is exposed so future code has a typed slot。
+    case compiledGenerable = "compiledGenerable"
+
+    /// Drop tools[] at the SDK call site,emit M870 audit
+    /// trace。Pre-bridge default for AppleFoundationOrganAdapter
+    /// — substrate-class observation,never silent。
+    case audit = "audit"
+}
+
+// MARK: - Status
+
+/// Typed result of resolving the bridge for a specific
+/// `BASOrganRequest`。Hosts emit this in observability for
+/// later analysis (e.g. detecting that a session ran with
+/// tools dropped before the SDK bridge activated)。
+public enum BASFoundationModelsToolBridgeStatus:
+    Sendable, Equatable, Hashable, Codable
+{
+    /// Bridge dropped tools[],M870 audit trace emitted。
+    /// `traceID` is the full trace ID with the audit suffix
+    /// appended,for grep correlation。
+    case audited(traceID: String)
+
+    /// Bridge resolved tools[] via runtime JSON Schema (cloud
+    /// adapters)。`toolCount` is the number of tools attached
+    /// to the request。
+    case bridgedRuntimeSchema(toolCount: Int)
+
+    /// Bridge resolved tools[] via compile-time Generable
+    /// conformers (future AFM iOS 26 path)。Currently never
+    /// emitted — primitive shipped for forward-compat。
+    case bridgedCompiledGenerable(toolCount: Int)
+
+    /// True iff the bridge actually attached tools[] to the
+    /// LLM call (vs. M870 audit-mode drop)。
+    public var didBridgeTools: Bool {
+        switch self {
+        case .audited:
+            return false
+        case .bridgedRuntimeSchema, .bridgedCompiledGenerable:
+            return true
+        }
+    }
+}
+
+// MARK: - Bridge
+
+/// Substrate-side typed namespace for resolving
+/// `BASFoundationModelsToolBridgeStatus` per request。Keeps
+/// the M870 audit-trace string in one place + provides the
+/// typed factory for future bridge wires。
+public enum BASFoundationModelsToolBridge {
+
+    /// chapter 三百八三 / M870 audit-trace suffix appended to
+    /// the trace ID when the AFM adapter drops tools[]。Pinned
+    /// here as a public substrate constant so:
+    ///   - downstream parsers can grep for this exact string
+    ///     without depending on the private adapter file
+    ///   - future code that introduces additional audit modes
+    ///     extends this taxonomy explicitly,not inline
+    public static let auditTraceSuffix: String =
+        "#afm-tools-dropped-no-sdk-bridge"
+
+    /// Grep-able marker appended when tools are bridged via the `.runtimeSchema` strategy (declared in the
+    /// prompt; the HOST parses + gates + executes — the adapter runs nothing). Distinct from
+    /// `auditTraceSuffix`: tools are NOT dropped here, they are prompt-declared. Observers use this to tell
+    /// "prompt-bridged (host-executed)" apart from "natively executed" and from "dropped".
+    public static let runtimeSchemaTraceSuffix: String =
+        "#afm-tools-runtime-schema"
+
+    /// Resolve the bridge status for a given strategy + tool
+    /// list + base trace ID。Pure function — caller composes
+    /// with their adapter's I/O pipeline。
+    ///
+    /// - Parameters:
+    ///   - strategy: caller's chosen bridge strategy
+    ///   - tools: the request's tools[] array (may be empty)
+    ///   - baseTraceID: the adapter's trace ID before any
+    ///     audit suffix is applied
+    /// - Returns: typed status describing what the bridge
+    ///   would do
+    public static func resolve(
+        strategy: BASFoundationModelsToolBridgeStrategy,
+        tools: [BASTool],
+        baseTraceID: String
+    ) -> BASFoundationModelsToolBridgeStatus {
+        // Empty tools[] always resolves as audited with the
+        // BASE trace ID (no audit suffix needed — there's
+        // nothing to drop)。
+        if tools.isEmpty {
+            return .audited(traceID: baseTraceID)
+        }
+        switch strategy {
+        case .audit:
+            return .audited(
+                traceID: baseTraceID + auditTraceSuffix)
+        case .runtimeSchema:
+            return .bridgedRuntimeSchema(
+                toolCount: tools.count)
+        case .compiledGenerable:
+            return .bridgedCompiledGenerable(
+                toolCount: tools.count)
+        }
+    }
+
+    /// Convenience:detect whether a trace ID was produced by
+    /// the audit-mode bridge by checking for the M870 suffix。
+    /// Useful for downstream observability stacks parsing trace
+    /// IDs from event logs。
+    public static func isAuditedTraceID(
+        _ traceID: String
+    ) -> Bool {
+        traceID.hasSuffix(auditTraceSuffix)
+    }
+
+    // MARK: - M924 typed audit event emission
+
+    /// chapter 四百 / M924:typed action prefix on the audit
+    /// event so cognitive OS observers can filter for it via
+    /// the existing event log pipeline。Pinned for downstream
+    /// parsers (M903 export consumers,M898 replay runners)。
+    public static let auditEventActionPrefix: String =
+        "afm:tools:dropped"
+
+    /// chapter 四百 / M924:typed source tag on the audit
+    /// event。Mirrors the M870 trace suffix for cross-reference
+    /// between trace-ID grep and event-log queries。
+    public static let auditEventSource: String =
+        "afm-bridge:audit"
+
+    /// M924 factory:given a bridge-resolution result,produce
+    /// a typed `BASEventLogEntry` describing the drop。Hosts /
+    /// adapters call this and append to their event log so the
+    /// drop signal lives in the cognitive OS event stream,not
+    /// just in the trace ID suffix。
+    ///
+    /// Returns nil when the status doesn't represent a drop
+    /// (`.bridgedRuntimeSchema` / `.bridgedCompiledGenerable`)
+    /// — only `.audited` produces an audit event。
+    ///
+    /// - Parameters:
+    ///   - status: result of `resolve(...)` for the request
+    ///   - request: the originating BASOrganRequest (for
+    ///     sessionID + project context)
+    ///   - timestampMs: wall-clock at the audit emit moment
+    ///     (caller-supplied for replay determinism)
+    public static func makeAuditEvent(
+        for status: BASFoundationModelsToolBridgeStatus,
+        request: BASOrganRequest,
+        timestampMs: Int64,
+        sessionID: String
+    ) -> BASEventLogEntry? {
+        // Only audit-mode resolutions emit an event;bridged
+        // resolutions DID attach the tools[],so there's
+        // nothing to audit。
+        let traceID: String
+        switch status {
+        case .audited(let id):
+            // Empty tools[] case: trace ID has no audit
+            // suffix → nothing was dropped → no event。
+            if !id.hasSuffix(auditTraceSuffix) {
+                return nil
+            }
+            traceID = id
+        case .bridgedRuntimeSchema, .bridgedCompiledGenerable:
+            return nil
+        }
+
+        // Encode the dropped tool count + names into the
+        // payload so consumers can correlate with the request。
+        let toolCount = request.tools.count
+        let toolNames = request.tools
+            .map(\.name)
+            .joined(separator: ",")
+        let payload = "{\"toolCount\":\(toolCount)," +
+            "\"toolNames\":\"\(toolNames)\"," +
+            "\"traceID\":\"\(traceID)\"}"
+
+        return BASEventLogEntry(
+            eventID: "afm-bridge-audit-" +
+                "\(request.requestID)",
+            timestampMs: timestampMs,
+            kind: .substrateAudit,
+            sessionID: sessionID,
+            sequenceNumber: 0,  // storage assigns
+            source: auditEventSource,
+            turnRef: request.requestID,
+            riskBand: .medium,  // tool-drop is non-trivial
+            actions: [
+                "\(auditEventActionPrefix):" +
+                "\(toolCount)"
+            ],
+            confidence: 1.0,
+            payloadJson: payload)
+    }
+}

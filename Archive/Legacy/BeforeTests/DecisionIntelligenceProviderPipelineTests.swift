@@ -1,0 +1,2066 @@
+import XCTest
+import BASHostKit
+// M86 — BASOrchestration and BASPolicy are @_exported from BASHostKit.
+@testable import Before
+
+final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
+    @MainActor
+    override func setUp() async throws {
+        try await super.setUp()
+        await DecisionIntelligenceResponseCache.shared.clear()
+        await DecisionIntelligenceTelemetryStore.shared.clear()
+        DecisionIntelligenceDebugStore.shared.clear()
+    }
+
+    func testOrderedKindsPreferGemmaFirst() {
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(for: .gemmaE4B),
+            [.gemmaE4B, .foundationModels]
+        )
+    }
+
+    func testOrderedKindsPreferFoundationFirst() {
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(for: .foundationModels),
+            [.foundationModels, .gemmaE4B]
+        )
+    }
+
+    func testOrderedKindsPreferOpenModelSlotFirst() {
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(for: .openModel),
+            [.openModel, .gemmaE4B, .foundationModels]
+        )
+    }
+
+    func testOrderedKindsCanPinTemplateOnly() {
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(for: .template),
+            [.template]
+        )
+    }
+
+    func testOrderedKindsCanDisableFallbacks() {
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(for: .foundationModels, allowFallbacks: false),
+            [.foundationModels]
+        )
+    }
+
+    func testOrderedKindsExcludeProvidersUnderRuntimeCooldown() {
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(
+                for: .gemmaE4B,
+                allowFallbacks: true,
+                excluding: [.gemmaE4B]
+            ),
+            [.foundationModels]
+        )
+    }
+
+    func testOrderedKindsHonorProvidedRuntimePolicyResolutionInsteadOfLiveOverride() throws {
+        let bundled = makeRuntimePolicyBundle(
+            bundleVersion: "bundled.v1",
+            providerRoutingPolicyID: "before.provider-routing.v1"
+        )
+        let bundledData = try JSONEncoder().encode(bundled)
+        let baselineResolution = BeforeRuntimePolicyStore.resolve(
+            bundledData: bundledData
+        )
+
+        let override = makeRuntimePolicyBundle(
+            bundleVersion: "override.v2",
+            providerRoutingPolicyID: "override.provider-routing.v2"
+        )
+        let overrideResolution = BeforeRuntimePolicyStore.resolve(
+            bundledData: try JSONEncoder().encode(override)
+        )
+
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(
+                for: .openModel,
+                runtimePolicyResolution: overrideResolution
+            ),
+            [.openModel, .gemmaE4B]
+        )
+
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(
+                for: .openModel,
+                runtimePolicyResolution: baselineResolution
+            ),
+            [.openModel, .foundationModels]
+        )
+    }
+
+    func testRuntimeStatusFallsBackToGemmaWhenFoundationPreferenceIsUnavailable() {
+        let preferences = BeforePreferences(
+            homePromptAction: .autoRoute,
+            quickBufferDuration: .ninetySeconds,
+            restoreInProgressWorkspaces: true,
+            showReviewInsights: true,
+            onDeviceIntelligenceMode: .assistive,
+            preferredIntelligenceProvider: .foundationModels,
+            allowModelFallbacks: true
+        )
+        let device = DeviceCapabilitySnapshot(
+            isSimulator: false,
+            supportsMetal: true,
+            supportsCoreMLAcceleration: true,
+            physicalMemoryBytes: 8 * 1_073_741_824,
+            isLowPowerModeEnabled: false
+        )
+
+        let status = DecisionIntelligenceProviderPipeline.runtimeStatus(
+            preferences: preferences,
+            statusesByKind: [
+                .foundationModels: DecisionModelProviderStatus(
+                    kind: .foundationModels,
+                    isAvailable: false,
+                    title: "Unavailable",
+                    detail: "Apple is unavailable."
+                ),
+                .gemmaE4B: DecisionModelProviderStatus(
+                    kind: .gemmaE4B,
+                    isAvailable: true,
+                    title: "Bundle detected",
+                    detail: "Gemma is ready."
+                )
+            ],
+            device: device
+        )
+
+        XCTAssertEqual(status.preferred, .foundationModels)
+        XCTAssertEqual(status.active, .gemmaE4B)
+        XCTAssertEqual(status.fallback, .gemmaE4B)
+    }
+
+    func testRuntimeStatusPinsDeterministicWhenTemplateIsSelected() {
+        let preferences = BeforePreferences(
+            homePromptAction: .autoRoute,
+            quickBufferDuration: .ninetySeconds,
+            restoreInProgressWorkspaces: true,
+            showReviewInsights: true,
+            onDeviceIntelligenceMode: .assistive,
+            preferredIntelligenceProvider: .template,
+            allowModelFallbacks: true
+        )
+
+        let status = DecisionIntelligenceProviderPipeline.runtimeStatus(
+            preferences: preferences,
+            statusesByKind: [:]
+        )
+
+        XCTAssertEqual(status.preferred, .template)
+        XCTAssertEqual(status.active, .template)
+        XCTAssertNil(status.fallback)
+    }
+
+    func testRuntimeStatusFallsStraightToTemplateWhenFallbacksAreOff() {
+        let preferences = BeforePreferences(
+            homePromptAction: .autoRoute,
+            quickBufferDuration: .ninetySeconds,
+            restoreInProgressWorkspaces: true,
+            showReviewInsights: true,
+            onDeviceIntelligenceMode: .assistive,
+            preferredIntelligenceProvider: .foundationModels,
+            allowModelFallbacks: false
+        )
+
+        let status = DecisionIntelligenceProviderPipeline.runtimeStatus(
+            preferences: preferences,
+            statusesByKind: [
+                .foundationModels: DecisionModelProviderStatus(
+                    kind: .foundationModels,
+                    isAvailable: false,
+                    title: "Unavailable",
+                    detail: "Apple is unavailable."
+                ),
+                .gemmaE4B: DecisionModelProviderStatus(
+                    kind: .gemmaE4B,
+                    isAvailable: true,
+                    title: "Bundle detected",
+                    detail: "Gemma is ready."
+                )
+            ]
+        )
+
+        XCTAssertEqual(status.preferred, .foundationModels)
+        XCTAssertEqual(status.active, .template)
+        XCTAssertEqual(status.fallback, .template)
+    }
+
+    func testRuntimeStatusUsesTestingStubWhenProfileIsInjected() {
+        let preferences = BeforePreferences(
+            homePromptAction: .autoRoute,
+            quickBufferDuration: .ninetySeconds,
+            restoreInProgressWorkspaces: true,
+            showReviewInsights: true,
+            onDeviceIntelligenceMode: .assistive,
+            preferredIntelligenceProvider: .gemmaE4B,
+            allowModelFallbacks: true
+        )
+
+        let status = DecisionIntelligenceProviderPipeline.runtimeStatus(
+            preferences: preferences,
+            statusesByKind: [
+                .gemmaE4B: DecisionModelProviderStatus(
+                    kind: .gemmaE4B,
+                    isAvailable: false,
+                    title: "Unavailable",
+                    detail: "Gemma is missing."
+                )
+            ],
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertEqual(status.preferred, .gemmaE4B)
+        XCTAssertEqual(status.active, .testingStub)
+        XCTAssertEqual(status.fallback, .testingStub)
+    }
+
+    func testRuntimeStatusMatchesSharedRuntimeCoordinationStatus() {
+        let preferences = BeforePreferences(
+            homePromptAction: .autoRoute,
+            quickBufferDuration: .ninetySeconds,
+            restoreInProgressWorkspaces: true,
+            showReviewInsights: true,
+            onDeviceIntelligenceMode: .assistive,
+            preferredIntelligenceProvider: .foundationModels,
+            allowModelFallbacks: true
+        )
+        let device = DeviceCapabilitySnapshot(
+            isSimulator: false,
+            supportsMetal: true,
+            supportsCoreMLAcceleration: true,
+            physicalMemoryBytes: 8 * 1_073_741_824,
+            isLowPowerModeEnabled: false
+        )
+        let statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus] = [
+            .foundationModels: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Apple is unavailable."
+            ),
+            .gemmaE4B: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: true,
+                title: "Bundle detected",
+                detail: "Gemma is ready."
+            ),
+            .openModel: DecisionModelProviderStatus(
+                kind: .openModel,
+                isAvailable: false,
+                title: "Reserved",
+                detail: "No open-model runtime is registered."
+            )
+        ]
+
+        let status = DecisionIntelligenceProviderPipeline.runtimeStatus(
+            preferences: preferences,
+            statusesByKind: statusesByKind,
+            device: device
+        )
+        let coordination = DecisionIntelligenceCoordinator.runtimeCoordination(
+            preferences: preferences,
+            device: device,
+            statusesByKind: statusesByKind
+        )
+
+        XCTAssertEqual(status, coordination.runtimeStatus)
+    }
+
+    @MainActor
+    func testTestingStubCanRefineQuickResultWithoutLiveProvider() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertEqual(refined?.verdict, base.verdict)
+        XCTAssertTrue(refined?.currentPerspective.contains("Stub current:") == true)
+        XCTAssertTrue(refined?.afterPerspective.contains("Stub after:") == true)
+    }
+
+    @MainActor
+    func testTemplatePinnedQuickRefinementRecordsTemplatePinnedTelemetryAndTrace() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .template,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(refined)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.templatePinned], 1)
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a template-pinned quick trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .quick)
+        XCTAssertEqual(latestTrace.activeProvider, nil)
+        XCTAssertEqual(latestTrace.attemptedProviders, [.template])
+        XCTAssertTrue(latestTrace.detail.contains("Template mode is pinned"))
+    }
+
+    @MainActor
+    func testRefinementTraceCarriesContextLifecycleState() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take this side project?",
+            desire: "Momentum",
+            concern: "Burn out",
+            constraint: "",
+            longTerm: ""
+        )
+        let contextState = DecisionContextPreparedState(
+            rebuiltSession: true,
+            generation: 3,
+            anchorFields: [.balancePrompt],
+            activeFields: [.balancePrompt, .balanceConcern],
+            staleFields: [.balanceDesire]
+        )
+        let neuralState = DecisionNeuralState(
+            mode: .balance,
+            dominantActivations: [
+                DecisionActivation(signal: .constraintPressure, strength: 0.82)
+            ],
+            candidateActions: [
+                DecisionActionCandidate(route: .setBoundary, score: 0.82)
+            ],
+            suppressedBehaviors: ["instant_verdict"],
+            detail: "Structured routing is active."
+        )
+
+        _ = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a recorded balance trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .balance)
+        XCTAssertEqual(latestTrace.frontstageState?.anchorHeadlines, ["Balance prompt"])
+        XCTAssertEqual(latestTrace.contextState, contextState)
+        XCTAssertEqual(latestTrace.neuralState, neuralState)
+        XCTAssertTrue(latestTrace.prompt.contains("CONTEXT_LIFECYCLE_JSON:"))
+        XCTAssertTrue(latestTrace.prompt.contains("NEURAL_STATE_JSON:"))
+    }
+
+    @MainActor
+    func testQuickRefinementTracePersistsEffectiveRuntimeStrategy() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let strategy = DecisionAdaptiveTaskStrategy(
+            kind: .quick,
+            entropy: .low,
+            runtimeGear: .low,
+            preferredProvider: .gemmaE4B,
+            contextBudget: 520,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: .guidedShort,
+            tone: .briefWarm,
+            actionSpace: ["encourage", "next_step", "fallback_to_template"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            strategy: strategy,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a recorded quick trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .quick)
+        XCTAssertEqual(latestTrace.runtimeStrategy, strategy)
+        XCTAssertEqual(latestTrace.promptBudget?.targetCharacters, 520)
+        XCTAssertEqual(latestTrace.runtimeStrategy?.runtimeGear, .low)
+        XCTAssertEqual(latestTrace.runtimeStrategy?.responseLanguage, .english)
+    }
+
+    @MainActor
+    func testTestingStubCanSelectReminderWithoutLiveProvider() async {
+        let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
+            from: [
+                ReminderSelectionCandidate(id: UUID(), content: "First"),
+                ReminderSelectionCandidate(id: UUID(), content: "Last")
+            ],
+            scenario: .buy,
+            prompt: "Rough day",
+            mode: .quick,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertEqual(selected?.content, "Last")
+    }
+
+    @MainActor
+    func testTemplatePinnedReminderSelectionRecordsTelemetryWithoutTrace() async {
+        let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
+            from: [
+                ReminderSelectionCandidate(id: UUID(), content: "First"),
+                ReminderSelectionCandidate(id: UUID(), content: "Last")
+            ],
+            scenario: .buy,
+            prompt: "Rough day",
+            mode: .quick,
+            preference: .template,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(selected)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.templatePinned], 1)
+        XCTAssertTrue(DecisionIntelligenceDebugStore.shared.traces.isEmpty)
+    }
+
+    @MainActor
+    func testSecondQuickRefinementCanBeServedFromResponseCache() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a recorded trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .quick)
+        XCTAssertTrue(latestTrace.detail.contains("structured prompt cache"))
+    }
+
+    @MainActor
+    func testQuickRefinementQuarantinesExistingCacheWhenHorizonRequiresExternalRefresh() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let brainState = horizonAwareBrainState(
+            mode: .quick,
+            retrievalTags: ["external_refresh", "volatile"],
+            sessionBiases: ["horizon-external-refresh"]
+        )
+        let cached = QuickCheckResult(
+            currentPerspective: "Cached current",
+            afterPerspective: "Cached after",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            brainState: brainState
+        )
+        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .testingStub,
+            envelope: envelope
+        )
+
+        await DecisionIntelligenceResponseCache.shared.storeQuickResult(cached, for: cacheKey)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: brainState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotNil(refined)
+        XCTAssertNotEqual(refined?.currentPerspective, cached.currentPerspective)
+        XCTAssertTrue(refined?.currentPerspective.hasPrefix("Stub current:") == true)
+        let cachedAfterQuarantine = await DecisionIntelligenceResponseCache.shared.quickResult(for: cacheKey)
+        XCTAssertNil(cachedAfterQuarantine)
+
+        let cacheSnapshot = await DecisionIntelligenceResponseCache.shared.telemetrySnapshot()
+        XCTAssertEqual(cacheSnapshot.totalQuarantinedHits, 1)
+        XCTAssertEqual(cacheSnapshot.hitCountByKind[.quick] ?? 0, 0)
+    }
+
+    @MainActor
+    func testQuickRefinementSkipsCacheStoreWhenHorizonRequiresToolQuarantine() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let brainState = horizonAwareBrainState(
+            mode: .quick,
+            retrievalTags: ["quarantine", "tool_observation"],
+            sessionBiases: ["horizon-tool-quarantine"]
+        )
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            brainState: brainState
+        )
+        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .testingStub,
+            envelope: envelope
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: brainState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotNil(refined)
+        XCTAssertTrue(refined?.currentPerspective.hasPrefix("Stub current:") == true)
+        let cachedAfterQuarantine = await DecisionIntelligenceResponseCache.shared.quickResult(for: cacheKey)
+        XCTAssertNil(cachedAfterQuarantine)
+
+        let cacheSnapshot = await DecisionIntelligenceResponseCache.shared.telemetrySnapshot()
+        XCTAssertEqual(cacheSnapshot.storeCountByKind[.quick] ?? 0, 0)
+    }
+
+    @MainActor
+    func testQuickRefinementKeepsExistingCacheAvailableWhenHorizonOnlyRequiresEvidenceCaveat() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let brainState = horizonAwareBrainState(
+            mode: .quick,
+            retrievalTags: ["evidence_caveat"],
+            sessionBiases: []
+        )
+        let cached = QuickCheckResult(
+            currentPerspective: "Cached current",
+            afterPerspective: "Cached after",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            brainState: brainState
+        )
+        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .testingStub,
+            envelope: envelope
+        )
+
+        await DecisionIntelligenceResponseCache.shared.storeQuickResult(cached, for: cacheKey)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: brainState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotNil(refined)
+        XCTAssertEqual(refined?.currentPerspective, cached.currentPerspective)
+        XCTAssertEqual(refined?.afterPerspective, cached.afterPerspective)
+        let cacheSnapshot = await DecisionIntelligenceResponseCache.shared.telemetrySnapshot()
+        let cachedAfterLookup = await DecisionIntelligenceResponseCache.shared.quickResult(for: cacheKey)
+        XCTAssertEqual(cachedAfterLookup, cached)
+
+        XCTAssertEqual(cacheSnapshot.totalQuarantinedHits, 0)
+        XCTAssertEqual(cacheSnapshot.hitCountByKind[.quick] ?? 0, 1)
+    }
+
+    @MainActor
+    func testQuickRefinementStillStoresCacheWhenHorizonOnlyRequiresEvidenceCaveat() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let brainState = horizonAwareBrainState(
+            mode: .quick,
+            retrievalTags: ["evidence_caveat"],
+            sessionBiases: []
+        )
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            brainState: brainState
+        )
+        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .testingStub,
+            envelope: envelope
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: brainState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotNil(refined)
+        XCTAssertTrue(refined?.currentPerspective.hasPrefix("Stub current:") == true)
+        let cachedAfterStore = await DecisionIntelligenceResponseCache.shared.quickResult(for: cacheKey)
+        XCTAssertEqual(cachedAfterStore, refined)
+
+        let cacheSnapshot = await DecisionIntelligenceResponseCache.shared.telemetrySnapshot()
+        XCTAssertEqual(cacheSnapshot.totalQuarantinedHits, 0)
+        XCTAssertEqual(cacheSnapshot.storeCountByKind[.quick] ?? 0, 1)
+    }
+
+    @MainActor
+    func testTelemetryCapturesProviderSuccessThenCacheHit() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+
+        XCTAssertEqual(snapshot.requestCountByKind[.quick], 2)
+        XCTAssertEqual(snapshot.outcomeCount[.providerSuccess], 1)
+        XCTAssertEqual(snapshot.outcomeCount[.cacheHit], 1)
+        XCTAssertEqual(snapshot.activeProviderCount[.testingStub], 2)
+        XCTAssertEqual(snapshot.attemptedProviderCount[.testingStub], 2)
+        XCTAssertEqual(snapshot.fallbackActivations, 2)
+    }
+
+    @MainActor
+    func testQuickAdmissionSkipsWhenStructuredTemplateAlreadyCoversTheTurn() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: []
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: ""
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(refined)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
+        XCTAssertEqual(snapshot.admissionSkipCountByReason[.templateAlreadySufficient], 1)
+        XCTAssertEqual(snapshot.avoidableModelCallRate, 1, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.avoidableModelCallRateByKind[.quick] ?? 0, 1, accuracy: 0.0001)
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected an admission-skip trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .quick)
+        XCTAssertEqual(latestTrace.admissionDecision?.skipReason, .templateAlreadySufficient)
+        XCTAssertTrue(latestTrace.detail.contains("Admission controller skipped primary refinement"))
+    }
+
+    @MainActor
+    func testQuickPromptCompactionCanAvoidAdmissionSkipWhenOptionalContextExplodes() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let neuralState = DecisionNeuralState(
+            mode: .quick,
+            dominantActivations: [
+                DecisionActivation(signal: .urgency, strength: 0.96)
+            ],
+            candidateActions: [
+                DecisionActionCandidate(route: .waitBuffer, score: 0.96)
+            ],
+            suppressedBehaviors: Array(repeating: "long_explanation", count: 120),
+            detail: String(repeating: "pressure-", count: 220)
+        )
+
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            neuralState: neuralState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertNil(snapshot.outcomeCount[.admissionSkipped])
+        XCTAssertNil(snapshot.admissionSkipCountByReason[.budgetExceeded])
+        XCTAssertEqual(snapshot.requestCountByKind[.quick], 1)
+        XCTAssertNil(snapshot.activeProviderCount[.testingStub])
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a recorded quick trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .quick)
+        XCTAssertNil(latestTrace.admissionDecision?.skipReason)
+        XCTAssertEqual(latestTrace.promptBudget?.isWithinTarget, true)
+        XCTAssertTrue(latestTrace.prompt.contains("[COMPACTION]"))
+        XCTAssertTrue(latestTrace.prompt.contains("Dropped blocks:"))
+    }
+
+    @MainActor
+    func testBalanceAdmissionSkipsWhenThereIsNotEnoughOpenTextSignal() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take the side project?",
+            desire: "",
+            concern: "",
+            constraint: "My week is already full.",
+            longTerm: ""
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(refined)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
+        XCTAssertEqual(snapshot.admissionSkipCountByReason[.insufficientSourceMaterial], 1)
+        XCTAssertEqual(snapshot.avoidableModelCallRate, 1, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.avoidableModelCallRateByKind[.balance] ?? 0, 1, accuracy: 0.0001)
+    }
+
+    @MainActor
+    func testBalanceRefinementUsesProtectiveEBrianTurnWithoutInvokingProvider() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take the side project?",
+            desire: "Momentum",
+            concern: "Burn out",
+            constraint: "My week is already full.",
+            longTerm: "I want steadier energy next month."
+        )
+        let turn = protectiveTurn(
+            mode: .block,
+            headline: "Hold the boundary",
+            body: "Pause and protect the boundary first.",
+            alternativeActions: ["Leave the stimulus", "Decide tomorrow"]
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.summary, turn.renderedOutput.body)
+        XCTAssertEqual(refined?.nextAction, "Leave the stimulus")
+        XCTAssertEqual(refined?.focusTitle, base.focusTitle)
+        XCTAssertEqual(refined?.focusDescription, base.focusDescription)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertNil(snapshot.requestCountByKind[.balance])
+        XCTAssertNil(snapshot.outcomeCount[.providerSuccess])
+    }
+
+    @MainActor
+    func testQuickRefinementUsesSurfaceGuideDelayWhenModeAloneLooksPermissive() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .goAhead,
+            primaryAction: .continueMindfully,
+            secondaryActions: [.continueMindfully]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "I want to act now."
+        )
+        let turn = protectiveTurn(
+            mode: .answer,
+            headline: "Pause the release",
+            body: "A fast answer is available, but the safer move is to cool this down first.",
+            alternativeActions: [],
+            surfaceGuide: protectiveSurfaceGuide(
+                delayReservation: BASDelayReservation(
+                    reservationID: "delay.quick",
+                    delayType: "cool_down",
+                    minDelay: 15,
+                    maxDelay: 120,
+                    allowedIntermediateActions: ["compare", "draft_only"]
+                ),
+                delayAvailable: true,
+                requiresSecondCheck: true
+            )
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertEqual(refined?.verdict, .pause)
+        XCTAssertEqual(refined?.primaryAction, .wait90s)
+        XCTAssertEqual(refined?.secondaryActions, [.decideTomorrow, .continueMindfully])
+        XCTAssertEqual(refined?.currentPerspective, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.afterPerspective, turn.renderedOutput.body)
+    }
+
+    @MainActor
+    func testBalanceRefinementUsesSurfaceGuideSubstituteWhenAlternativesAreEmpty() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I send it now?",
+            desire: "Relief",
+            concern: "Regret",
+            constraint: "The situation feels hot.",
+            longTerm: "I want cleaner boundaries."
+        )
+        let turn = protectiveTurn(
+            mode: .replace,
+            headline: "Use the safer step",
+            body: "The direct move is not the one to take tonight.",
+            alternativeActions: [],
+            surfaceGuide: protectiveSurfaceGuide(
+                protectiveSubstitute: BASProtectiveSubstitute(
+                    substituteID: "substitute.balance",
+                    sourceCandidateRef: "cand-1",
+                    substituteType: "local_only_action",
+                    description: "Keep the action local and reversible first.",
+                    safetyGain: 0.82
+                ),
+                chooseLaterAllowed: true,
+                prefersDraftOnly: false,
+                localOnlyPreferred: true
+            )
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.summary, turn.renderedOutput.body)
+        XCTAssertEqual(refined?.nextAction, "Keep the action local and reversible first.")
+    }
+
+    @MainActor
+    func testMirrorRefinementUsesProtectiveEBrianTurnWithoutInvokingProvider() async {
+        let base = MirrorResult(
+            headline: "Base headline",
+            coreTension: "Base tension",
+            nextActionTitle: "Base next action title",
+            nextAction: "Base next action"
+        )
+        let input = MirrorInput(
+            prompt: "Should I stay in this relationship?",
+            emotion: "I feel tired and sad.",
+            relationship: "We keep repeating the same argument.",
+            reality: "We live far apart and avoid hard conversations.",
+            longTerm: "I want steadier relationships.",
+            selfLens: "I feel pulled between hope and exhaustion."
+        )
+        let turn = protectiveTurn(
+            mode: .replace,
+            headline: "Take the safer step",
+            body: "Use the safer path instead of forcing the current one.",
+            alternativeActions: ["Use the safer step", "Continue mindfully"]
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineMirrorResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.coreTension, turn.renderedOutput.body)
+        XCTAssertEqual(refined?.nextActionTitle, "Use the safer step")
+        XCTAssertEqual(refined?.nextAction, "Use the safer step")
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertNil(snapshot.requestCountByKind[.mirror])
+        XCTAssertNil(snapshot.outcomeCount[.providerSuccess])
+    }
+
+    @MainActor
+    func testMirrorRefinementUsesSurfaceGuideAgencyTitleWhenAvailable() async {
+        let base = MirrorResult(
+            headline: "Base headline",
+            coreTension: "Base tension",
+            nextActionTitle: "Base next action title",
+            nextAction: "Base next action"
+        )
+        let input = MirrorInput(
+            prompt: "Should I respond tonight?",
+            emotion: "I feel flooded.",
+            relationship: "The conversation is already tense.",
+            reality: "Anything I send now will land hot.",
+            longTerm: "I want to keep dignity in the room.",
+            selfLens: "I know I am not settled enough yet."
+        )
+        let turn = protectiveTurn(
+            mode: .answer,
+            headline: "Keep the move in draft",
+            body: "The response can be shaped, but it should stay at draft pressure for now.",
+            alternativeActions: [],
+            surfaceGuide: protectiveSurfaceGuide(
+                chooseLaterAllowed: true,
+                prefersDraftOnly: true,
+                localOnlyPreferred: false,
+                requiresSecondCheck: true
+            )
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineMirrorResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.coreTension, turn.renderedOutput.body)
+        XCTAssertEqual(refined?.nextActionTitle, "Keep it in draft")
+        XCTAssertEqual(refined?.nextAction, "Keep the move in draft until the boundary is re-checked.")
+    }
+
+    @MainActor
+    func testTestingStubBypassesProtectiveOverlayInQuickRefinement() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let turn = protectiveTurn(
+            mode: .block,
+            headline: "Hold the boundary",
+            body: "Pause and protect the boundary first.",
+            alternativeActions: ["Leave the stimulus", "Decide tomorrow"]
+        )
+        XCTAssertTrue(turn.hasProtectiveSurfaceGuidance)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotEqual(refined?.currentPerspective, turn.renderedOutput.headline)
+        XCTAssertNotEqual(refined?.afterPerspective, turn.renderedOutput.body)
+        XCTAssertTrue(refined?.currentPerspective.contains("Stub current:") == true)
+        XCTAssertTrue(refined?.afterPerspective.contains("Stub after:") == true)
+    }
+
+    @MainActor
+    func testTestingStubBypassesProtectiveOverlayInBalanceRefinement() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take this side project?",
+            desire: "Momentum",
+            concern: "Burn out",
+            constraint: "My week is already full.",
+            longTerm: "I want steadier energy next month."
+        )
+        let turn = protectiveTurn(
+            mode: .block,
+            headline: "Hold the boundary",
+            body: "Pause and protect the boundary first.",
+            alternativeActions: ["Leave the stimulus", "Decide tomorrow"]
+        )
+        XCTAssertTrue(turn.hasProtectiveSurfaceGuidance)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            brainState: permissiveBrainState(mode: .balance),
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.headline, "Stub balance board")
+    }
+
+    @MainActor
+    func testTestingStubBypassesProtectiveOverlayInMirrorRefinement() async {
+        let base = MirrorResult(
+            headline: "Base headline",
+            coreTension: "Base tension",
+            nextActionTitle: "Base next action title",
+            nextAction: "Base next action"
+        )
+        let input = MirrorInput(
+            prompt: "Should I stay in this relationship?",
+            emotion: "I feel tired and sad.",
+            relationship: "We keep repeating the same argument.",
+            reality: "We live far apart and avoid hard conversations.",
+            longTerm: "I want steadier relationships.",
+            selfLens: "I feel pulled between hope and exhaustion."
+        )
+        let turn = protectiveTurn(
+            mode: .replace,
+            headline: "Take the safer step",
+            body: "Use the safer path instead of forcing the current one.",
+            alternativeActions: ["Use the safer step", "Continue mindfully"]
+        )
+        XCTAssertTrue(turn.hasProtectiveSurfaceGuidance)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineMirrorResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertTrue(refined?.headline.contains("Stub mirror") == true)
+    }
+
+    // MARK: - Protective overlay must still fire on `.template` preference
+
+    // The stub provider is only injected when `testingStubProfile != nil
+    // AND preference != .template` (see BehavioralAISubstrateBridge:753).
+    // So on `.template` preference the stub would NOT take over — and
+    // without the protective overlay gate also checking `preference ==
+    // .template`, a protective eBrainTurn would fall through to nil.
+    // These 3 tests pin the correct compound-gate semantic: apply the
+    // protective overlay whenever the stub provider would not fire.
+
+    @MainActor
+    func testProtectiveOverlayAppliesOnTemplatePreferenceEvenWithStubProfileQuick() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let turn = protectiveTurn(
+            mode: .block,
+            headline: "Hold the boundary",
+            body: "Pause and protect the boundary first.",
+            alternativeActions: ["Leave the stimulus", "Decide tomorrow"]
+        )
+        XCTAssertTrue(turn.hasProtectiveSurfaceGuidance)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .template,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        // Stub would not fire for `.template`; overlay must still apply.
+        XCTAssertEqual(refined?.currentPerspective, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.afterPerspective, turn.renderedOutput.body)
+    }
+
+    @MainActor
+    func testProtectiveOverlayAppliesOnTemplatePreferenceEvenWithStubProfileBalance() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take this side project?",
+            desire: "Momentum",
+            concern: "Burn out",
+            constraint: "My week is already full.",
+            longTerm: "I want steadier energy next month."
+        )
+        let turn = protectiveTurn(
+            mode: .block,
+            headline: "Hold the boundary",
+            body: "Pause and protect the boundary first.",
+            alternativeActions: ["Leave the stimulus", "Decide tomorrow"]
+        )
+        XCTAssertTrue(turn.hasProtectiveSurfaceGuidance)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            brainState: permissiveBrainState(mode: .balance),
+            eBrainTurn: turn,
+            preference: .template,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertNotEqual(refined?.headline, "Stub balance board")
+    }
+
+    @MainActor
+    func testProtectiveOverlayAppliesOnTemplatePreferenceEvenWithStubProfileMirror() async {
+        let base = MirrorResult(
+            headline: "Base headline",
+            coreTension: "Base tension",
+            nextActionTitle: "Base next action title",
+            nextAction: "Base next action"
+        )
+        let input = MirrorInput(
+            prompt: "Should I stay in this relationship?",
+            emotion: "I feel tired and sad.",
+            relationship: "We keep repeating the same argument.",
+            reality: "We live far apart and avoid hard conversations.",
+            longTerm: "I want steadier relationships.",
+            selfLens: "I feel pulled between hope and exhaustion."
+        )
+        let turn = protectiveTurn(
+            mode: .replace,
+            headline: "Take the safer step",
+            body: "Use the safer path instead of forcing the current one.",
+            alternativeActions: ["Use the safer step", "Continue mindfully"]
+        )
+        XCTAssertTrue(turn.hasProtectiveSurfaceGuidance)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineMirrorResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .template,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertFalse(refined?.headline.contains("Stub mirror") == true)
+    }
+
+    func testTurnProtectiveSurfaceModeFallsBackToRenderedDelayWhenPermitModeIsAnswer() {
+        var turn = protectiveTurn(
+            mode: .answer,
+            headline: "Pause the release",
+            body: "A fast answer exists, but the safer move is to cool this down first.",
+            alternativeActions: [],
+            surfaceGuide: protectiveSurfaceGuide(
+                delayReservation: BASDelayReservation(
+                    reservationID: "delay.answer.surface",
+                    delayType: "cool_down",
+                    minDelay: 15,
+                    maxDelay: 1_440,
+                    allowedIntermediateActions: ["draft_only"]
+                ),
+                delayAvailable: true
+            )
+        )
+        turn.actionPermit = BASActionPermit(
+            mode: .answer,
+            reasonCodes: ["risk.high"],
+            outputLengthCap: 120,
+            tonePolicy: "clear_firm",
+            templatePolicy: "protective_alternative"
+        )
+
+        XCTAssertEqual(turn.protectiveSurfaceMode, .delay)
+        XCTAssertTrue(turn.hasProtectiveSurfaceGuidance)
+    }
+
+    @MainActor
+    func testReminderAdmissionSkipsWhenOnlyOneCandidateExists() async {
+        let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
+            from: [
+                ReminderSelectionCandidate(id: UUID(), content: "Only candidate")
+            ],
+            scenario: .buy,
+            prompt: "I still want it.",
+            mode: .quick,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(selected)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
+        XCTAssertEqual(snapshot.admissionSkipCountByReason[.insufficientChoiceSpread], 1)
+    }
+
+    @MainActor
+    func testReminderAdmissionSkipsWhenDeterministicLeaderIsAlreadyClear() async {
+        let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
+            from: [
+                ReminderSelectionCandidate(id: UUID(), content: "This is stress shopping again."),
+                ReminderSelectionCandidate(id: UUID(), content: "You already knew this was a real replacement.", rank: 1)
+            ],
+            scenario: .buy,
+            prompt: "This is stress shopping again tonight.",
+            mode: .quick,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(selected)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
+        XCTAssertEqual(snapshot.admissionSkipCountByReason[.retrievalNotNeeded], 1)
+        XCTAssertEqual(snapshot.selectionControlOnlyRate, 1, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.selectionRetrievalBypassRate, 1, accuracy: 0.0001)
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected an admission-skip trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .reminder)
+        XCTAssertEqual(latestTrace.admissionDecision?.skipReason, .retrievalNotNeeded)
+        XCTAssertEqual(latestTrace.admissionDecision?.selectionNeed, .control)
+    }
+
+    @MainActor
+    func testTestingStubBypassesAdmissionSkipForBalanceRefinement() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take this side project?",
+            desire: "Momentum",
+            concern: "Burnout",
+            constraint: String(repeating: "constraint-", count: 80),
+            longTerm: String(repeating: "future-", count: 80)
+        )
+        let contextState = DecisionContextPreparedState(
+            rebuiltSession: false,
+            generation: 1,
+            anchorFields: [.balancePrompt],
+            activeFields: [.balancePrompt, .balanceDesire, .balanceConcern, .balanceConstraint, .balanceLongTerm],
+            staleFields: []
+        )
+        let neuralState = DecisionNeuralState(
+            mode: .balance,
+            dominantActivations: [
+                DecisionActivation(signal: .constraintPressure, strength: 0.95)
+            ],
+            candidateActions: [
+                DecisionActionCandidate(route: .setBoundary, score: 0.95)
+            ],
+            suppressedBehaviors: Array(repeating: "long_explanation", count: 80),
+            detail: String(repeating: "pressure-", count: 120)
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertEqual(refined?.headline, "Stub balance board")
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.providerSuccess], 1)
+        XCTAssertNil(snapshot.outcomeCount[.admissionSkipped])
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a balance trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .balance)
+        XCTAssertEqual(latestTrace.activeProvider, .testingStub)
+        XCTAssertTrue(latestTrace.admissionDecision?.isAllowed == true)
+    }
+
+    @MainActor
+    func testQuickConsistencyHarnessRejectsProviderResultOutsideBoundaryActionSpace() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: blockedGuidanceBrainState(mode: .quick),
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNil(refined)
+
+        guard let rejectionTrace = DecisionIntelligenceDebugStore.shared.traces.first(where: \.consistencyRejected) else {
+            return XCTFail("Expected a consistency rejection trace.")
+        }
+
+        XCTAssertEqual(rejectionTrace.kind, .quick)
+        XCTAssertEqual(rejectionTrace.activeProvider, .testingStub)
+        XCTAssertEqual(rejectionTrace.consistencyCheck?.violations.first?.kind, .forbiddenAction)
+        XCTAssertTrue(rejectionTrace.detail.contains("Consistency harness rejected"))
+    }
+
+    @MainActor
+    func testQuickConsistencyHarnessQuarantinesCachedResultBeforeServingIt() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let brainState = blockedGuidanceBrainState(mode: .quick)
+        let cached = QuickCheckResult(
+            currentPerspective: "Stub current: cached version",
+            afterPerspective: "Stub after: cached version",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            brainState: brainState
+        )
+        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .testingStub,
+            envelope: envelope
+        )
+        await DecisionIntelligenceResponseCache.shared.storeQuickResult(cached, for: cacheKey)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: brainState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNil(refined)
+
+        let cacheSnapshot = await DecisionIntelligenceResponseCache.shared.telemetrySnapshot()
+        XCTAssertEqual(cacheSnapshot.totalQuarantinedHits, 1)
+        XCTAssertTrue(
+            DecisionIntelligenceDebugStore.shared.traces.contains {
+                $0.consistencyRejected && $0.detail.contains("cached primary refinement")
+            }
+        )
+    }
+
+    @MainActor
+    func testBalanceTraceIncludesPassingConsistencyCheckWhenBrainStateIsAvailable() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take this side project?",
+            desire: "Momentum",
+            concern: "Burnout",
+            constraint: "My week is already full.",
+            longTerm: "I want steadier energy next month."
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            brainState: permissiveBrainState(mode: .balance),
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertEqual(refined?.headline, "Stub balance board")
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a recorded balance trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .balance)
+        XCTAssertFalse(latestTrace.consistencyRejected)
+        XCTAssertNotNil(latestTrace.consistencyCheck)
+        XCTAssertTrue(latestTrace.consistencyCheck?.isConsistent == true)
+    }
+
+    private func protectiveTurn(
+        mode: BASActionPermitMode,
+        headline: String,
+        body: String,
+        alternativeActions: [String],
+        surfaceGuide: BASRenderedSurfaceGuide? = nil
+    ) -> BASEBrainTurnResult {
+        let deviceState = BASDeviceState(
+            batteryLevel: 0.66,
+            thermalLevel: .warm,
+            memoryFreeMB: 2_048,
+            networkState: .online,
+            foregroundState: .foreground,
+            cpuLoad: 0.31,
+            gpuLoad: 0.12,
+            npuAvailable: true,
+            latencyBudgetMs: 1_400
+        )
+        let budgetFrame = BASBudgetFrame.guardedLocal(maxLoops: 2, maxCandidates: 2, maxDecodeTokens: 160, retrievalDepth: 2)
+        let hostContext = BASHostProfile(hostID: "host.primary", longTermGoals: ["Stay calm"], noGoZones: ["unsafe"])
+        let contextFrame = BASContextFrame(
+            utterance: body,
+            taskType: .highPressure,
+            emotionalLoad: 0.82,
+            timePressure: 0.74,
+            relationPattern: "self",
+            ambiguityScore: 0.63,
+            consequenceLevel: 0.81,
+            manipulationHints: ["time_pressure"],
+            hostRelevance: 0.91
+        )
+        let decomposeFrame = BASDecomposeFrame(
+            facts: [headline],
+            goals: ["Keep the boundary"],
+            emotions: ["alert"],
+            unknowns: ["best next step"],
+            contradictions: [],
+            pressureSignals: ["urgency"],
+            manipulationSignals: ["forced-now"],
+            mirrorText: body
+        )
+        let memoryAtom = BASMemoryAtom(
+            memoryID: "mem-1",
+            summary: "Protect the boundary first.",
+            contentType: .warm,
+            source: "session",
+            confidence: 0.86,
+            conflictFingerprint: "fp-1"
+        )
+        let memoryBundle = BASMemoryBundle(
+            atoms: [memoryAtom],
+            retrievalTags: ["boundary"],
+            conflictRefs: [],
+            activeHostVersion: hostContext.activeVersion
+        )
+        let candidate = BASCandidatePath(
+            candidateID: "cand-1",
+            title: "Pause and protect",
+            actionSummary: "Hold for a moment before acting.",
+            requiredEvidence: ["high pressure"],
+            expectedBenefit: 0.9,
+            expectedCost: 0.2,
+            reversibility: 0.8,
+            confidence: 0.87
+        )
+        let forecast = BASForecastItem(
+            candidateID: candidate.candidateID,
+            shortTermOutcome: "Less immediate pressure",
+            midTermOutcome: "Better boundary clarity",
+            worstCase: "Minor delay",
+            uncertainty: 0.2,
+            affectedRelations: ["self"]
+        )
+        let critique = BASCritiqueItem(
+            candidateID: candidate.candidateID,
+            critiqueType: .boundaryConflict,
+            critiqueText: "The safer route avoids forcing the choice too early.",
+            severity: 0.74
+        )
+        let triScore = BASTriSelfScore(
+            candidateID: candidate.candidateID,
+            idScore: 0.42,
+            egoScore: 0.81,
+            superegoScore: 0.91,
+            mergedScore: 0.83,
+            veto: false
+        )
+        let mergedChoice = BASMergedChoice(
+            candidateID: candidate.candidateID,
+            title: "Pause first",
+            actionSummary: "Use the safer next step."
+        )
+        let riskCard = BASRiskCard(
+            totalRisk: 0.88,
+            riskLevel: .high,
+            factors: ["pressure", "uncertainty"],
+            uncertainty: 0.56,
+            irreversibility: 0.79,
+            manipulationStrength: 0.73,
+            gsiScore: 0.68,
+            recommendedMode: mode
+        )
+        let actionPermit = BASActionPermit(
+            mode: mode,
+            reasonCodes: ["risk.high", "gsi.elevated"],
+            requireSecondCheck: true,
+            outputLengthCap: 120,
+            tonePolicy: "clear_firm",
+            templatePolicy: "protective_alternative"
+        )
+        let thoughtFrame = BASThoughtFrame(
+            stepIndex: 1,
+            decomposeRef: "decomp-1",
+            memoryRefs: [memoryAtom.memoryID],
+            candidates: [candidate],
+            forecasts: [forecast],
+            critiques: [critique],
+            triScores: [triScore],
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            stabilityScore: 0.91,
+            stopReason: .blocked
+        )
+        let thoughtFold = BASThoughtFold(
+            foldID: "fold-1",
+            compactSlots: ["headline": headline, "body": body],
+            candidateSignatures: [candidate.candidateID],
+            riskSnapshot: riskCard,
+            hostEffectSummary: "Host boundary remains primary.",
+            restorePointer: "restore-1",
+            checksum: "checksum-1"
+        )
+        let updateTicket = BASUpdateTicket(
+            ticketID: "ticket-1",
+            sessionRef: "session-1",
+            summary: "Record a protective turn.",
+            memoryWriteSuggestion: "Keep the boundary signal in warm memory.",
+            hostProfileChangeSuggestion: nil,
+            ruleCandidateRef: "rule-1",
+            confidence: 0.84,
+            conflictFlag: false,
+            requiresReview: true
+        )
+        let runtimeTrace = BASRuntimeTrace(
+            sessionID: "session-1",
+            layerEvents: [
+                BASRuntimeTraceEvent(layerID: "L11", event: "gate", detail: "Protective mode short-circuited refinement.")
+            ],
+            latencyBreakdownMs: ["guard": 3],
+            powerEstimate: 0.12,
+            thermalTrace: ["cool"],
+            modelRoute: "guarded",
+            loopCount: 1,
+            cacheHitRate: 0,
+            guardrailFindings: [
+                BASRuntimeAuditFinding(
+                    code: "budget.high_risk_fast_path",
+                    layerID: "L1",
+                    summary: "Protective short-circuit requested.",
+                    severity: .high,
+                    enforced: true
+                )
+            ],
+            recommendedKillSwitches: [.forceGuardMode]
+        )
+
+        return BASEBrainTurnResult(
+            deviceState: deviceState,
+            budgetFrame: budgetFrame,
+            wakeIntent: BASWakeIntent(
+                intentLevel: .guard,
+                estimatedValue: 0.72,
+                estimatedRisk: 0.91,
+                estimatedCost: 0.24,
+                preferredMode: budgetFrame.runMode
+            ),
+            vitalState: BASVitalState(
+                wakeState: budgetFrame.runMode,
+                survivalMargin: 0.76,
+                thermalMargin: 0.88,
+                powerMargin: 0.74,
+                continuityScore: 0.81,
+                stabilityScore: 0.86
+            ),
+            hostContext: hostContext,
+            contextFrame: contextFrame,
+            decomposeFrame: decomposeFrame,
+            memoryBundle: memoryBundle,
+            thoughtFrame: thoughtFrame,
+            thoughtFold: thoughtFold,
+            triScores: [triScore],
+            mergedChoice: mergedChoice,
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            hostGateValue: 0.37,
+            renderedOutput: BASRenderedOutput(
+                mode: mode,
+                headline: headline,
+                body: body,
+                alternativeActions: alternativeActions,
+                explanationCodes: ["risk.high", "gsi.elevated"],
+                surfaceGuide: surfaceGuide
+            ),
+            updateTickets: [updateTicket],
+            runtimeTrace: runtimeTrace
+        )
+    }
+
+    private func protectiveSurfaceGuide(
+        delayReservation: BASDelayReservation? = nil,
+        protectiveSubstitute: BASProtectiveSubstitute? = nil,
+        sovereignEscalationHint: BASSovereignEscalationHint? = nil,
+        delayAvailable: Bool = false,
+        chooseLaterAllowed: Bool = false,
+        prefersDraftOnly: Bool = false,
+        localOnlyPreferred: Bool = false,
+        requiresCompare: Bool = false,
+        requiresSecondCheck: Bool = false
+    ) -> BASRenderedSurfaceGuide {
+        BASRenderedSurfaceGuide(
+            stackedModes: [],
+            tonePolicy: "clear_firm",
+            templatePolicy: "protective_alternative",
+            outputLengthCap: 120,
+            boundary: BASRenderedBoundaryGuide(
+                allowedDomains: ["bounded_reply"],
+                blockedDomains: ["unsafe"],
+                toolScope: "none",
+                memoryScope: "review_only"
+            ),
+            agency: BASRenderedAgencyGuide(
+                requiresCompare: requiresCompare,
+                requiresSecondCheck: requiresSecondCheck,
+                delayAvailable: delayAvailable,
+                chooseLaterAllowed: chooseLaterAllowed,
+                prefersDraftOnly: prefersDraftOnly,
+                localOnlyPreferred: localOnlyPreferred
+            ),
+            disclosure: BASRenderedDisclosureGuide(
+                assertionCeiling: "guarded",
+                explanationCodes: ["risk.high", "gsi.elevated"],
+                uncertaintyVisible: true
+            ),
+            delayWindow: delayReservation?.delayType,
+            delayReservation: delayReservation,
+            protectiveSubstitute: protectiveSubstitute,
+            sovereignEscalationHint: sovereignEscalationHint
+        )
+    }
+
+    private func permissiveBrainState(mode: DecisionMode) -> DecisionBrainState {
+        let boundaryPolicy = DecisionBoundaryPolicyState(
+            mode: .localOnlyAdvisory,
+            riskLevel: .low,
+            allowedActionClasses: ["render_local_guidance", "load_governed_memory"],
+            blockedActionClasses: ["cloud_escalation"],
+            requiredConfirmations: [],
+            activeConstraints: [.noCloudEscalation],
+            auditHeadline: "Stay local."
+        )
+        return DecisionBrainState(
+            profileCore: ["Values clarity over speed."],
+            activeGoals: ["Protect tomorrow's judgment."],
+            relevantMemories: ["Waiting overnight usually helps."],
+            sessionBiases: ["句子短"],
+            retrievalTags: ["cooldown"],
+            reactionWeights: .defaults(for: mode),
+            boundaryPolicy: boundaryPolicy,
+            loadedAt: .now
+        )
+    }
+
+    private func blockedGuidanceBrainState(mode: DecisionMode) -> DecisionBrainState {
+        let boundaryPolicy = DecisionBoundaryPolicyState(
+            mode: .localOnlyProtective,
+            riskLevel: .high,
+            allowedActionClasses: ["load_governed_memory"],
+            blockedActionClasses: ["render_local_guidance", "cloud_escalation"],
+            requiredConfirmations: ["irreversible_decision"],
+            activeConstraints: [.noCloudEscalation, .lockSensitiveMemory],
+            auditHeadline: "Hold the line."
+        )
+        return DecisionBrainState(
+            profileCore: ["Protect the boundary first."],
+            activeGoals: ["Do not turn signal into action yet."],
+            relevantMemories: ["Fast guidance is not allowed here."],
+            sessionBiases: ["句子短"],
+            retrievalTags: ["protective"],
+            reactionWeights: .defaults(for: mode),
+            boundaryPolicy: boundaryPolicy,
+            loadedAt: .now
+        )
+    }
+
+    private func horizonAwareBrainState(
+        mode: DecisionMode,
+        retrievalTags: [String],
+        sessionBiases: [String]
+    ) -> DecisionBrainState {
+        var brainState = permissiveBrainState(mode: mode)
+        brainState.retrievalTags = retrievalTags
+        brainState.sessionBiases = sessionBiases
+        return brainState
+    }
+}
+
+private extension DecisionIntelligenceProviderPipelineTests {
+    func makeRuntimePolicyBundle(
+        bundleVersion: String,
+        providerRoutingPolicyID: String
+    ) -> BeforeRuntimePolicyBundle {
+        let baselineRuntimePolicy = BeforeProductCompatibility.resolvedRuntimePolicyBundle
+            .runtimeTuningRegistry
+            .policiesByID["before.host.runtime-synthesis.v1"]!
+        var overrideBudget = baselineRuntimePolicy.budget
+        overrideBudget.standardDecodeTokens = 180
+        overrideBudget.unstableDecodeTokens = 210
+        overrideBudget.guardedDecodeTokens = 240
+        overrideBudget.maintenanceBatteryFloor = 0.4
+        let providerRoutingRegistry = BASProviderRoutingPolicyRegistry(
+            schemaVersion: "before.provider-routing-registry.pipeline-tests.v1",
+            defaultPolicyID: "before.provider-routing.v1",
+            policiesByID: [
+                "before.provider-routing.v1": BASProviderRoutingPolicy(
+                    schemaVersion: "before.provider-routing.v1",
+                    deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
+                    testingOverrideProviderID: BASReferenceProviderRuntime.testingStubProviderID,
+                    preferenceOrderings: [
+                        BASProviderPreferenceOrdering(
+                            preferredProviderID: BASReferenceProviderRuntime.openModelProviderID,
+                            orderedProviderIDs: [
+                                BASReferenceProviderRuntime.openModelProviderID,
+                                BASReferenceProviderRuntime.foundationModelsProviderID
+                            ]
+                        )
+                    ]
+                ),
+                "override.provider-routing.v2": BASProviderRoutingPolicy(
+                    schemaVersion: "override.provider-routing.v2",
+                    deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
+                    testingOverrideProviderID: BASReferenceProviderRuntime.testingStubProviderID,
+                    preferenceOrderings: [
+                        BASProviderPreferenceOrdering(
+                            preferredProviderID: BASReferenceProviderRuntime.openModelProviderID,
+                            orderedProviderIDs: [
+                                BASReferenceProviderRuntime.openModelProviderID,
+                                BASReferenceProviderRuntime.gemmaE4BProviderID
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+        let runtimeTuningRegistry = BASEBrainRuntimeSynthesisPolicyRegistry(
+            schemaVersion: "before.runtime-tuning-registry.pipeline-tests.v1",
+            defaultPolicyID: "before.host.runtime-synthesis.v1",
+            policiesByID: [
+                "before.host.runtime-synthesis.v1": baselineRuntimePolicy,
+                "override.runtime-tuning.v2": BASEBrainRuntimeSynthesisPolicy(
+                    schemaVersion: "override.runtime-tuning.v2",
+                    guardrailPressure: .init(
+                        protectiveBoundaryIncrement: 0.21,
+                        calibrationWatchIncrement: 0.11,
+                        calibrationDriftingIncrement: 0.19,
+                        boundaryConstraintUnit: 0.04,
+                        boundaryConstraintCap: 0.20,
+                        calibrationAlertUnit: 0.04,
+                        calibrationAlertCap: 0.16,
+                        failureGuardUnit: 0.03,
+                        failureGuardCap: 0.13,
+                        riskFlagUnit: 0.04,
+                        riskFlagCap: 0.15,
+                        maximumPressure: 0.68
+                    ),
+                    budget: overrideBudget,
+                    wakeIntent: baselineRuntimePolicy.wakeIntent,
+                    stateTransitions: baselineRuntimePolicy.stateTransitions,
+                    lease: baselineRuntimePolicy.lease,
+                    maintenance: baselineRuntimePolicy.maintenance,
+                    sovereignExecution: baselineRuntimePolicy.sovereignExecution,
+                    hostThresholds: .init(
+                        caution: 0.48,
+                        protective: 0.75,
+                        block: 0.95
+                    ),
+                    context: baselineRuntimePolicy.context,
+                    triSelf: baselineRuntimePolicy.triSelf,
+                    risk: baselineRuntimePolicy.risk
+                )
+            ]
+        )
+
+        return BeforeRuntimePolicyBundle(
+            schemaVersion: "before.runtime-policy-bundle.v1",
+            bundleVersion: bundleVersion,
+            providerRoutingRegistry: providerRoutingRegistry,
+            providerRoutingPolicyID: providerRoutingPolicyID,
+            runtimeTuningRegistry: runtimeTuningRegistry,
+            runtimeTuningPolicyID: "before.host.runtime-synthesis.v1",
+            updatedAt: Date(timeIntervalSince1970: 1_713_715_200),
+            hostProfile: BeforeProductCompatibility.resolvedRuntimePolicyBundle.hostProfile,
+            brainBootstrapRecovery: BeforeProductCompatibility.resolvedRuntimePolicyBundle.brainBootstrapRecovery
+        )
+    }
+}

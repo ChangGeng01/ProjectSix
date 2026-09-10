@@ -1,0 +1,31 @@
+# rust-toolchain.toml
+# chapter 七百六 / M2187 第一刀 — pin the Rust toolchain
+#                                 for reproducible
+#                                 XCFramework builds。
+#
+# Stable 1.84+ supports `panic = "abort"` LTO interactions
+# the substrate relies on for tiny static libraries +
+# the deterministic codegen-units=1 flag combination
+# required for SOURCE_DATE_EPOCH-driven byte-equality
+# across clean rebuilds (per the chapter 七百一 plan's
+# RED FLAG #1 mitigation)。
+#
+# Bumping this version requires:
+#   1. Rebuilding Vendor/bas-rust-binaries/BASRust
+#      MemoryTracker.xcframework via scripts/
+#      build-rust-xcframework.sh
+#   2. Verifying shasum -a 256 matches across two
+#      clean rebuilds (reproducibility invariant)
+#   3. Updating BASRustCoreBridge.swift rustToolchain
+#      Version + corresponding test pin
+
+# deep-audit P2-23 (2026-07-13): PIN the exact version, not a floating "stable". A floating
+# channel contradicts the byte-reproducibility invariant this file exists to protect — a clean
+# rebuild on a machine whose "stable" has moved produces different codegen and breaks the
+# XCFramework SHA pin. 1.96.0 is the version the shipped BASRustMemoryTracker.xcframework was
+# built with (see BASRustCoreBridge.swift: "latest-languages" cut, rustup cargo 1.96.0). Bumping
+# it follows the 3-step checklist above (rebuild + two-clean-rebuild SHA match + update the pin).
+[toolchain]
+channel = "1.96.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

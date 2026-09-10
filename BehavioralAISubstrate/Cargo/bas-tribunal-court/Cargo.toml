@@ -1,0 +1,34 @@
+# Cargo manifest for bas-tribunal-court
+# chapter 七百四十 第一刀 / M2371 — LAYER-MIGRATION ARC
+#
+# Pure-function Rust port of the L10 full-body tribunal
+# derivation factories from
+# `Sources/BASOrchestration/BASTribunalFullBody.swift`。
+#
+# The 4 derivations are STRICTLY deterministic projections
+# from a thought-frame snapshot:
+#
+#   - derive_id_profile        (id impulse profile)
+#   - derive_ego_assessment    (ego reality assessment)
+#   - derive_superego_judgment (superego veto judgment)
+#   - aggregate_arbitration    (3-voice aggregator frame)
+#
+# Mirrors `bas-permit-policy` crate shape — value-type
+# returns,no shared state,Codable round-trip surface for
+# Swift FFI consumption。
+
+[package]
+name = "bas-tribunal-court"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_tribunal_court"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

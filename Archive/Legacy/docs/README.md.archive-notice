@@ -1,0 +1,36 @@
+# Archive/Legacy/docs/ — Before-host quality gate documentation
+
+Companion archive to `Archive/Legacy/scripts/`。 These 5 markdown files describe
+the Before-era quality gates (20/20 / 40/40 / EXTREME / X10 / 200-aspiration)
+that ran via `Before.xcodeproj`。 After Before severance (2026-05-20) the gates
+are dormant;the docs are preserved here for historical reference + revival
+template。
+
+## What lives here
+
+| Doc | What it describes |
+|---|---|
+| `QUALITY_GATE.md` | The 20/20 release-floor — 20 individual gates each scored 0-1,branch must total 20 to ship |
+| `QUALITY_GATE_200.md` | The 200/200 apex aspiration — operating-system-grade standard library for local-first cognition |
+| `QUALITY_GATE_DOUBLE.md` | 40/40 pressure gate — pushes 200+ test surface to meaningfully harder bar |
+| `QUALITY_GATE_EXTREME.md` | Extreme gate — treats non-determinism / drift / churn as first-class failure modes |
+| `QUALITY_GATE_X10.md` | X10 long-horizon — separates 「occasional pass」 from 「long-term-evolvable-stable」 |
+
+## Why archive instead of delete
+
+Per 「依旧 不删除 只 comment」 / 「不要 删除 创建个 文件夹 把 不需要的文件 都转移
+进 文件夹」 — preserve the doctrinal artifacts so future revival doesn't have to
+recreate the gate-shape thinking from scratch。 These docs encoded ~6 months of
+gate-design lessons (per-axis scoring,operator runbooks,extreme-mode
+detection)。
+
+## What the substrate uses now (post-severance)
+
+The substrate's gates moved to SPM-driven directly:
+- `swift build` — clean SPM build, no Xcode required
+- `swift test` — ~13k tests, ~85s sweep
+- `.github/workflows/test.yml` — bas-tests + qinao-tests + boundary-checks
+
+If a future host needs xcodebuild-driven gates again,copy from
+`Archive/Legacy/scripts/run_quality_gate*.sh` as templates + reference these
+docs for the gate-axis structure。

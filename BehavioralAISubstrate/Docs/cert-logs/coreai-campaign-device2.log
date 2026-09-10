@@ -1,0 +1,66 @@
+📍 coreai-e2e START
+📊 coreai-e2e available=true candidate_load_ms=7.8
+📊 coreai-e2e memory base_mb=13.5 incumbent_load_delta_mb=1.86 candidate_load_delta_mb=2.56 (in-process deltas — diagnostic only, NOT gate evidence)
+📊 coreai-e2e text=0 incumbent=chat candidate=chat agree=true mae=0.000001 latency_ms=2.30 inc_ms=0.38
+📊 coreai-e2e text=1 incumbent=chat candidate=chat agree=true mae=0.000000 latency_ms=0.93 inc_ms=0.21
+📊 coreai-e2e text=2 incumbent=task candidate=task agree=true mae=0.000000 latency_ms=1.04 inc_ms=0.17
+📊 coreai-e2e text=3 incumbent=chat candidate=chat agree=true mae=0.000000 latency_ms=0.72 inc_ms=0.14
+📊 coreai-e2e text=4 incumbent=chat candidate=chat agree=true mae=0.000001 latency_ms=1.41 inc_ms=0.15
+📊 coreai-e2e text=5 incumbent=chat candidate=chat agree=true mae=0.000001 latency_ms=1.98 inc_ms=0.16
+📊 coreai-e2e text=6 incumbent=chat candidate=chat agree=true mae=0.000000 latency_ms=1.36 inc_ms=0.13
+📊 coreai-e2e text=7 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000000 latency_ms=0.43 inc_ms=0.13
+📊 coreai-e2e text=8 incumbent=conflict candidate=conflict agree=true mae=0.000000 latency_ms=1.76 inc_ms=0.13
+📊 coreai-e2e text=9 incumbent=task candidate=task agree=true mae=0.000000 latency_ms=1.76 inc_ms=0.13
+📊 coreai-e2e text=10 incumbent=chat candidate=chat agree=true mae=0.000000 latency_ms=1.23 inc_ms=0.14
+📊 coreai-e2e text=11 incumbent=task candidate=task agree=true mae=0.000000 latency_ms=0.47 inc_ms=0.14
+📊 coreai-e2e text=12 incumbent=task candidate=task agree=true mae=0.000000 latency_ms=0.54 inc_ms=0.13
+📊 coreai-e2e text=13 incumbent=task candidate=task agree=true mae=0.000000 latency_ms=0.51 inc_ms=0.44
+📊 coreai-e2e text=14 incumbent=choice candidate=choice agree=true mae=0.000000 latency_ms=0.85 inc_ms=0.16
+📊 coreai-e2e text=15 incumbent=conflict candidate=conflict agree=true mae=0.000000 latency_ms=0.95 inc_ms=0.13
+📊 coreai-e2e text=16 incumbent=choice candidate=choice agree=true mae=0.000000 latency_ms=0.51 inc_ms=0.12
+📊 coreai-e2e text=17 incumbent=choice candidate=choice agree=true mae=0.000001 latency_ms=1.15 inc_ms=0.11
+📊 coreai-e2e text=18 incumbent=conflict candidate=conflict agree=true mae=0.000000 latency_ms=0.53 inc_ms=0.12
+📊 coreai-e2e text=19 incumbent=choice candidate=choice agree=true mae=0.000000 latency_ms=0.73 inc_ms=0.13
+📊 coreai-e2e text=20 incumbent=choice candidate=choice agree=true mae=0.000000 latency_ms=0.43 inc_ms=0.12
+📊 coreai-e2e text=21 incumbent=highConsequence candidate=highConsequence agree=true mae=0.000001 latency_ms=0.32 inc_ms=0.12
+📊 coreai-e2e text=22 incumbent=choice candidate=choice agree=true mae=0.000000 latency_ms=0.38 inc_ms=0.12
+📊 coreai-e2e text=23 incumbent=choice candidate=choice agree=true mae=0.000000 latency_ms=1.40 inc_ms=0.11
+📊 coreai-e2e text=24 incumbent=conflict candidate=conflict agree=true mae=0.000000 latency_ms=1.46 inc_ms=0.14
+📊 coreai-e2e text=25 incumbent=conflict candidate=conflict agree=true mae=0.000000 latency_ms=1.28 inc_ms=0.12
+📊 coreai-e2e text=26 incumbent=task candidate=task agree=true mae=0.000000 latency_ms=0.61 inc_ms=0.11
+📊 coreai-e2e text=27 incumbent=highConsequence candidate=highConsequence agree=true mae=0.000000 latency_ms=0.37 inc_ms=0.24
+📊 coreai-e2e text=28 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000000 latency_ms=0.71 inc_ms=0.13
+📊 coreai-e2e text=29 incumbent=conflict candidate=conflict agree=true mae=0.000000 latency_ms=0.38 inc_ms=0.12
+📊 coreai-e2e text=30 incumbent=highPressure candidate=highPressure agree=true mae=0.000000 latency_ms=0.34 inc_ms=0.11
+📊 coreai-e2e text=31 incumbent=task candidate=task agree=true mae=0.000000 latency_ms=0.39 inc_ms=0.11
+📊 coreai-e2e text=32 incumbent=highPressure candidate=highPressure agree=true mae=0.000000 latency_ms=1.29 inc_ms=0.11
+📊 coreai-e2e text=33 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000000 latency_ms=1.04 inc_ms=0.11
+📊 coreai-e2e text=34 incumbent=highPressure candidate=highPressure agree=true mae=0.000000 latency_ms=0.70 inc_ms=0.11
+📊 coreai-e2e text=35 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000000 latency_ms=1.07 inc_ms=0.11
+📊 coreai-e2e text=36 incumbent=conflict candidate=conflict agree=true mae=0.000000 latency_ms=0.37 inc_ms=0.12
+📊 coreai-e2e text=37 incumbent=task candidate=task agree=true mae=0.000001 latency_ms=0.49 inc_ms=0.11
+📊 coreai-e2e text=38 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000000 latency_ms=0.40 inc_ms=0.12
+📊 coreai-e2e text=39 incumbent=conflict candidate=conflict agree=true mae=0.000001 latency_ms=0.54 inc_ms=0.11
+📊 coreai-e2e text=40 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000001 latency_ms=0.34 inc_ms=0.11
+📊 coreai-e2e text=41 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000000 latency_ms=0.35 inc_ms=0.11
+📊 coreai-e2e text=42 incumbent=chat candidate=chat agree=true mae=0.000000 latency_ms=0.32 inc_ms=0.12
+📊 coreai-e2e text=43 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000000 latency_ms=1.08 inc_ms=0.11
+📊 coreai-e2e text=44 incumbent=conflict candidate=conflict agree=true mae=0.000000 latency_ms=1.14 inc_ms=0.10
+📊 coreai-e2e text=45 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000001 latency_ms=0.51 inc_ms=0.11
+📊 coreai-e2e text=46 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000001 latency_ms=1.26 inc_ms=0.11
+📊 coreai-e2e text=47 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000001 latency_ms=0.31 inc_ms=0.11
+📊 coreai-e2e text=48 incumbent=highConsequence candidate=highConsequence agree=true mae=0.000000 latency_ms=0.28 inc_ms=0.11
+📊 coreai-e2e text=49 incumbent=manipulationRisk candidate=manipulationRisk agree=true mae=0.000000 latency_ms=0.40 inc_ms=0.12
+📊 coreai-e2e text=50 incumbent=task candidate=task agree=true mae=0.000000 latency_ms=0.53 inc_ms=0.11
+📊 coreai-e2e text=51 incumbent=task candidate=task agree=true mae=0.000000 latency_ms=0.35 inc_ms=0.12
+📊 coreai-e2e text=52 incumbent=task candidate=task agree=true mae=0.000001 latency_ms=0.35 inc_ms=0.11
+📊 coreai-e2e text=53 incumbent=task candidate=task agree=true mae=0.000001 latency_ms=0.34 inc_ms=0.12
+📊 coreai-e2e text=54 incumbent=task candidate=task agree=true mae=0.000000 latency_ms=0.98 inc_ms=0.10
+📊 coreai-e2e text=55 incumbent=task candidate=task agree=true mae=0.000000 latency_ms=1.30 inc_ms=0.12
+📊 coreai-e2e verdict agree=56/56 trials_recorded=56 tier=experimental
+📊 coreai-migration-gate recommendation=doNotMigrate
+  reasons=DEVICES_BELOW_MIN,LATENCY_LOSS,MEMORY_LOSS,PARITY_MET
+  parity: samples=56 agree=56 rate=1.000 max_mae=0.000001
+  latency(paired n=56): candidate_ms=0.80 incumbent_ms=0.14
+  devices=1 parsed=56 skipped=0
+  (observation-only — a human decides; the gate never auto-promotes)

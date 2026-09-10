@@ -1,0 +1,172 @@
+# 10-Hour Dual-Model Endurance Run-Book — iPhone Air (max data for future development)
+
+**Goal:** one unattended 10-hour sitting that yields the most data per device-hour — two contrasting
+models × a knob sweep that gives clean A/B device evidence for the levers built this session
+(`kvBits`, `maxKVSize`, the U1 speculation memory governor, the U3 liveness monitor, the ADR-018
+shadow-trial carrier), on top of long-run stability / thermal / memory / sovereign-chain data.
+
+## TWO PHONES (recommended) — parallel, cooling relaxed
+
+With two iPhone Air devices the thermal constraint loosens (a hot device has a sibling; throttling is
+itself the sustained-load envelope), so run **both phones at once with a low cooldown**. One command:
+
+```bash
+DEVICE_B=<second-udid> BUILD=1 bash scripts/run-dual-device-parallel.sh
+```
+
+- **`MODE=split` (default):** device A runs the FULL Llama sweep, device B runs the FULL Gemma sweep —
+  each model gets the whole ~10h window (vs 5h each on one phone), so 2× the time per model → denser
+  KV/maxKV/governor A/B + longer baselines. Best for **breadth** (future-dev exploration).
+- **`MODE=parity`:** both phones run the SAME dual-model sweep → 2-device parity for every config
+  (cross-device variance, cert-grade). Best for **confidence**.
+- **Cooling relaxed hard** (operator "烫一点没关系"): `COOLDOWN_BASE=0` — NO cooldown in the cool/fair
+  band (max inferences when not hot). `ADAPTIVE=1` (default) keeps the MEASURED thermal recovery floors
+  (serious ≥180s / critical ≥300s, ch1025.11) — below them the device gets ZERO recovery and just
+  throttles, so dropping the floors yields THROTTLED data, not MORE. `STALL_SEC` auto-derives to **480s**
+  = max(base×3+120, 300) + 180 margin, so even a legitimate 300s critical-thermal cooldown is never a
+  false wedge. For true **full-send** (flat base, no floors — to characterize the throttle envelope on
+  purpose), pass `ADAPTIVE=0` (then `STALL_SEC` drops to base+180). The single-phone fallback keeps the
+  conservative `COOLDOWN_BASE=60` (one device can't shed heat to a sibling).
+- Get the two UDIDs: `xcrun devicectl list devices`. Dry-run both first:
+  `DEVICE_B=<udid> SCALE=0.1 bash scripts/run-dual-device-parallel.sh` (~1h).
+
+## ONE PHONE (fallback) — sequential
+
+```bash
+BUILD=1 bash scripts/run-iphone-air-dual-model-sweep.sh
+```
+(omit `BUILD=1` if installed). `SCALE=0.1` runs a ~1h dry-run of the full sweep shape first — **do this
+once before the real run** to confirm the device path end-to-end. One phone does both models sequentially
+(5h each); `COOLDOWN_BASE=60` (conservative, single device can't shed heat to a sibling).
+
+---
+
+## Why this design
+
+- **Decode is 99% of a turn** (`CONCURRENCY_MEASUREMENT_FINDINGS.md`), so the data that matters is
+  decode-side: latency distribution, KV memory, throughput, wedge/thermal behavior. The sweep targets
+  exactly the decode levers that lack device evidence.
+- **Wedge survival is the #1 threat over 10h.** The MLX wedge is an uncancellable Metal-eval hang
+  (ADR-038 §9-10) — it cannot be fixed in-process; the proven mitigation is external kill+relaunch.
+  This run-book wraps the validated `run-endurance-watchdog.sh` (11/11 wedges auto-recovered, 0 reboots)
+  so the 10h window survives any number of wedges.
+- **A/B cleanliness:** every knob phase differs from its model's baseline by ONE lever, so the pulled
+  data is directly comparable. The two models are deliberately different architectures.
+
+## The two models
+
+| | Model | `BAS_MLX_MODEL` | Arch | Spec-decode | Why |
+|---|---|---|---|---|
+| **A** | Llama-3.2-3B | `llama` | standard / dense (no wedge, 1723MB active) | CERTIFIED 3B↔1B, 2542MB FITS | stable workhorse for the KV sweep + governor + spec-decode |
+| **B** | Gemma-4-E2B | `e2b` | Gemma-3n nested (memory-hostile, 2512MB active) | single-model | architecture contrast — BUT see the memory caveat below |
+
+> **MEMORY CAVEAT (2026-06-12, `DEVICE_B_JETSAM_ROOT_CAUSE_2026-06-12.md`):** Gemma-3n's "E2B/E4B" names
+> are the EFFECTIVE param count, NOT the loaded weight size. **E2B loads 2512 MB active — MORE than
+> dense Llama-3B (1723 MB)**; E4B (~4 GB) exceeds the 3376 MB per-process jetsam cap outright. On the
+> live run, device B (E4B) died on first load; switched to E2B which still jetsams on the load spike
+> (271 MB headroom) ~355× — the fixed watchdog recovered every one, but the data is fragmented. **For
+> CLEAN endurance data prefer a DENSE model (Llama / Qwen) on device B too** (e.g. `qwen` or `llama1b`
+> for an arch contrast that actually fits). Gemma-3n endurance needs a lower `BAS_MLX_CACHE_LIMIT_MB`
+> (256) + bounded self-populate growth — a follow-up, not yet wired by default.
+
+## Phase table (600 min = 10h)
+
+| Phase | Model | Min | Delta vs baseline | Yields |
+|---|---|---|---|---|
+| A1 | Llama | 90 | — (spec-decode ON, governor armed) | baseline latency/thermal/memory; spec-decode; sovereign chain; field metrics; shadow-trial |
+| A2 | Llama | 75 | `+BAS_KV_BITS=4` | KV-quant A/B vs A1 (throughput + KV memory + quality-by-hand) |
+| A3 | Llama | 60 | `+BAS_KV_BITS=8` | 3-point KV-quant sweep (off / 4 / 8) |
+| A4 | Llama | 75 | `+BAS_MAX_KV_SIZE=512` | rotating-KV cap A/B vs A1 |
+| B1 | Gemma | 120 | — (single-model default) | architecture contrast: Gemma-3n wedge/thermal/memory under the 512MB cache cap; liveness + watchdog recovery stats |
+| B2 | Gemma | 90 | `+BAS_KV_BITS=4` | KV-quant A/B on Gemma-3n |
+| B3 | Gemma | 90 | `+BAS_MAX_KV_SIZE=512` | rotating-KV cap A/B on Gemma-3n |
+
+**Every phase also carries** (byte-safe, pure observation): `BAS_LIVENESS_MONITOR=1`,
+`BAS_SHADOW_TRIAL_LOOP=1`, `BAS_SHADOW_PARITY=enabled`. Always-on in the runner: the sovereign
+per-turn signed ledger, A3 MetricKit field metrics, the P0 phase-split verdict. Cooldown is adaptive
+(base 60s); the governor is armed on the Llama phases (byte-safe — greedy spec-decode is token-identical,
+so a draft drop/restore changes latency only).
+
+**Wedge-vs-cooldown safety:** `STALL_SEC=420` is set ABOVE the adaptive cooldown ceiling
+(`base*3+120 = 300s`) + a slow decode, so a legitimate cooldown is never mistaken for a wedge. A real
+wedge during active decode is still caught within ~7 min.
+
+## Pre-flight (operator, one-time)
+
+1. iPhone Air plugged into the Mac, **charging**.
+2. iPhone **unlocked**, Settings → Display & Brightness → **Auto-Lock → Never**.
+3. Developer cert trusted; the app installed (`BUILD=1` does this).
+4. Confirm the device ID: `xcrun devicectl list devices` → set `DEVICE_ID=...` if it differs from the
+   default in the script.
+5. **Dry-run:** `SCALE=0.1 bash scripts/run-iphone-air-dual-model-sweep.sh` (~1h) — confirms every phase
+   launches, logs, and archives. Inspect one `phase-*/` dir for the expected files before committing 10h.
+
+## Data: what lands where
+
+Each phase archives the **whole app Documents container** into
+`Docs/cert-logs/dual-model-sweep-<stamp>/phase-<id>/`:
+
+| File | Content | Survives kill |
+|---|---|---|
+| `ch1025-endurance-*.log` | full emitBoth stream (📊 metrics, 🧠 mlx per-decode, 🔐 sovereign, 🧮 governor, 🛡 liveness, 🔁 shadow-trial, P0 phase-split, FINAL summary) | YES (append-only file) |
+| `field-metrics.jsonl` | OS-attested MetricKit rows: peak/suspended memory, termination diagnostics, P7 phase attribution | YES |
+| `bas-sovereign-ledger.sqlite` (+ `.key`) | per-turn Ed25519-signed + chained audit entries | YES (WAL, per-turn append) |
+| `bas-memory-atoms.sqlite` | durable L8 atoms (cross-restart cognitive state) | YES (WAL, per-iter flush) |
+| `bas-vector-index.sqlite` | persisted embeddings | YES |
+
+**Lost on a mid-phase kill:** only the in-memory `FINAL` summary line — recomputable from the raw
+`🧠 ch1025 mlx` / `📊` log lines. Everything else is append-only and durable.
+
+## Analysis (after the run)
+
+Per phase dir:
+
+- **Latency distribution:** `grep '🧠 ch1025 mlx ' phase-A1/ch1025-endurance-*.log` → per-decode ms;
+  compare A1 vs A2 vs A3 (kvBits off/4/8) and A1 vs A4 (maxKVSize). The `FINAL` line gives p50/p99 if the
+  phase completed cleanly.
+- **KV memory:** `grep '📊 ch1025 mlx-mem' …` → active_mb / cache_mb / peak_mb trajectory; the kvBits /
+  maxKVSize phases should show lower KV footprint.
+- **Governor:** `grep '🧮 spec-governor' …` → ARM line + any DROP/RESTORE events (Llama phases). If it
+  never fires at the default watermark (2542MB < 2700MB), that itself validates the watermark is
+  conservative — a watermark-override knob is follow-on work.
+- **Liveness / wedge:** `grep '🛡 decode-stall' …` (verdict lines) + the watchdog stdout (wedges
+  survived / recovered). Gemma phases (B1-B3) exercise this most.
+- **Shadow-trial loop:** `grep '🔁 shadow-trial' …` → FINAL `evaluated`/`advanced` (advanced expected 0 —
+  the carrier is carry+visibility, never a learner; a non-zero is a doctrine-violation signal).
+- **Sovereign chain:** open `bas-sovereign-ledger.sqlite`; the run logs `🔐 sovereign-loop FINAL
+  signed_entries=N head=… chain_verified=true`. Cross-check entry count vs decode count.
+- **Thermal/memory long-run:** `grep '📊 ch1025 FINAL' …` → thermal_trajectory, rss trajectory,
+  endpoint_delta (negative = no leak, per CH_1025_8).
+- **Cross-model contrast:** A1 vs B1 — standard vs Gemma-3n arch on latency, thermal onset, wedge rate,
+  memory profile under the same cache cap.
+
+## Knobs reference (set per phase by the driver)
+
+Model select `BAS_MLX_MODEL`; decode levers `BAS_KV_BITS` (4/8) / `BAS_MAX_KV_SIZE`; speculation
+`BAS_SPEC_GOVERNOR`; observation `BAS_LIVENESS_MONITOR` (+`_THRESHOLD_SEC`) / `BAS_SHADOW_TRIAL_LOOP` /
+`BAS_SHADOW_PARITY`; sizing `BAS_INTERNAL_*` (iter count / mlx prompts / cooldown / max-decode-tokens);
+stability `BAS_MLX_CACHE_LIMIT_MB` (default 512, the decisive wedge cap). Full inventory in
+`DeviceTestApp/Sources/App/BASEnduranceAppRunner.swift` (`EnduranceEnv` enum + the `env[...]` reads).
+
+## Scripts
+
+- `scripts/run-dual-device-parallel.sh` — **two-phone orchestrator** (the recommended command). Runs the
+  per-device sweep on both phones concurrently; `MODE=split` (model-per-device, breadth) or `MODE=parity`
+  (same sweep both, cross-device confidence); relaxed `COOLDOWN_BASE=20`.
+- `scripts/run-iphone-air-dual-model-sweep.sh` — the single-device phase driver. `SWEEP_MODELS` selects
+  `both` / `llama` / `e4b` (the parallel orchestrator pins one model per device); `STALL_SEC` auto-derives
+  from `COOLDOWN_BASE` (`base*3+240`).
+- `scripts/run-endurance-watchdog.sh` — the per-phase wedge-surviving watchdog (parameterized 2026-06-12
+  with `MODEL` / `MLX_PROMPTS` / `COOLDOWN_SEC` / `ENV_EXTRA` / `ARCHIVE_DIR`; defaults unchanged, so prior
+  callers are byte-identical).
+
+## Honest bounds (R1)
+
+- The two-phone path defaults to `MODE=split` (one model per device — maximizes breadth, NOT parity);
+  for cross-device parity (same model on both, cert-grade) use `MODE=parity`. The single-phone fallback
+  drives one device sequentially.
+- The KV levers (`kvBits`/`maxKVSize`) CHANGE decode numerics — this run gathers the throughput/memory
+  data; the **quality** judgment is by-hand on the logged outputs, and any DEFAULT flip remains a
+  separate reviewed commit with its own evidence (ADR-014). This run does not promote anything.
+- The governor may not trigger at its conservative watermark on the FITS Llama pair; that is recorded as
+  a finding, not a failure.

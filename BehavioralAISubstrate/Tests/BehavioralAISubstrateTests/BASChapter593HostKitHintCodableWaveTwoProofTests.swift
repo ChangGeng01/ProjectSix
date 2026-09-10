@@ -1,0 +1,44 @@
+// MARK: - BASChapter593HostKitHintCodableWaveTwoProofTests
+// chapter 五百九十三 / M1750 — PROOF tests for the 2
+//                          newly-Codable BASHostKit
+//                          hint types shipped at
+//                          M1749 (non-projection
+//                          wave 2)
+//
+// ## Coverage (2 compile-time conformance tests)
+//
+// BASHostKit non-projection wave 2 Codable extension。
+// Continues chapter 592 wave 1 pattern。
+//
+// ## Doctrine pins
+//
+//   - 不变量 #1/#2/#3:V1 byte-equality preserved
+//   - 红线 7:test-only additions
+//   - chapter 三百九二:replay-determinism extends to
+//     these 2 newly-Codable types
+//   - ADR-014 OPT-IN preserved
+//   - ADR-016 advances M1749 → M1750
+
+import XCTest
+@testable import BASHostKit
+
+final class BASChapter593HostKitHintCodableWaveTwoProofTests:
+    XCTestCase
+{
+
+    func testChengluLengthHintConformsToCodable() {
+        // #18: real round-trip
+        let value = BASChengluLengthHint(
+            predictedLengthChars: 0,
+            confidence: .high)
+        assertCodableRoundTrips(value)
+    }
+
+    func testChengluLatencyHintConformsToCodable() {
+        // #18: real round-trip
+        let value = BASChengluLatencyHint(
+            predictedDurationMs: 0,
+            confidence: .high)
+        assertCodableRoundTrips(value)
+    }
+}

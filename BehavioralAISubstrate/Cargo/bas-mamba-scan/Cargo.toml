@@ -1,0 +1,66 @@
+# Cargo manifest for bas-mamba-scan
+# chapter 八百五十二 第一刀 / M2911 — Phase A of the Mamba +
+# Rayon + Metal-activation arc。 User directive 「全面 开发
+# mamba 多线程」 — extend the existing chapter 六百七十七-
+# 六百八十二 SSM scan kernel infrastructure with a Rust
+# CPU mirror that can later be rayon-parallelized。
+#
+# ## Why a new crate
+#
+# The chapter 六百七十七 Metal kernel (SSMScan.metal) handles
+# the GPU path。 The chapter 六百七十八 Swift CPU reference
+# (BASSSMScanCPUReference.swift) handles fallback +
+# cross-validation。 Both are SEQUENTIAL on CPU。 This Rust
+# crate is the third leg:a CPU implementation that mirrors
+# the Swift reference EXACTLY (byte-equality within IEEE
+# Float32 FMA-reorder tolerance per chapter 392),then
+# parallelizes across (batch, channel) in knife 2。
+#
+# ## Why Rust + rayon (vs Swift + DispatchQueue)
+#
+# Swift's DispatchQueue.concurrentPerform has higher
+# per-task overhead than rayon's work-stealing pool。 For
+# the L_inner-sequential-but-(B,D)-outer-parallel shape of
+# the SSM scan,rayon is the cleanest fit。
+#
+# ## Math (mirrors Swift BASSSMScanCPUReference)
+#
+# Inputs:
+#   x:     (B, L, D) row-major Float32 input
+#   delta: (B, L, D) row-major Float32 time step
+#   A:     (D,)      Float32 per-channel decay
+#   B:     (B, L, D) row-major Float32 input proj
+#   C:     (B, L, D) row-major Float32 output proj
+#
+# Output:
+#   y:     (B, L, D) row-major Float32
+#
+# Recurrence (per b in 0..B, per d in 0..D, sequential over t):
+#   for t in 0..L:
+#     A_bar = exp(delta_t * A_d)
+#     B_bar = delta_t * B_t
+#     h     = A_bar * h + B_bar * x_t
+#     y_t   = C_t * h
+#
+# Each (b, d) thread has its own h state。 Cross-thread:
+# embarrassingly parallel。 Mirrors the Metal kernel
+# dispatch grid `(B, D, 1)` exactly。
+
+[package]
+name = "bas-mamba-scan"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_mamba_scan"
+path = "src/lib.rs"
+
+# chapter 八百五十二 第二刀 / M2912 — rayon for outer (b, d)
+# parallelism。 Mirrors the Metal GPU dispatch grid (B, D, 1)
+# where each thread independently handles one (batch, channel)
+# pair。 The inner L-recurrence stays sequential per thread。
+[dependencies]
+rayon = "1.10"

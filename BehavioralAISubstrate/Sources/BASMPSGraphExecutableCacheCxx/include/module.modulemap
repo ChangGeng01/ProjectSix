@@ -1,0 +1,6 @@
+module BASMPSGraphExecutableCacheCxx {
+    header "bas_mps_cache.h"
+    header "bas_flat_vector_index.h"
+    header "bas_lsh_index.h"
+    export *
+}

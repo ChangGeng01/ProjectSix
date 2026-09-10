@@ -1,0 +1,135 @@
+# Cargo manifest for bas-memory-usage-tracker
+# chapter 七百六 / M2187 第一刀
+
+[package]
+name = "bas-memory-usage-tracker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+# `staticlib` so xcodebuild can wrap the `.a` into an
+# XCFramework via -create-xcframework -library。
+crate-type = ["staticlib"]
+name = "bas_memory_usage_tracker"
+path = "src/lib.rs"
+
+[dependencies]
+# 主线 Integrity 抽取 — well-trusted no_std SHA256
+# implementation。 Used by the chain-hash FFI to compute
+# a deterministic rolling SHA256 over canonically-ordered
+# records。 default-features=false keeps the std-dep
+# surface minimal and reproducible。
+sha2 = { version = "0.10", default-features = false }
+
+# chapter 七百四 第一刀 — depend on the 6 workspace
+# crates from chapter 七百三 so they all link into the
+# single staticlib that the XCFramework wraps。 Each
+# dependency contributes its #[no_mangle] extern "C"
+# ABI surface to the output .a。 force_link.rs holds
+# references that prevent the rust linker from stripping
+# the symbols。
+bas-substrate-core    = { path = "../bas-substrate-core" }
+bas-memory-atom-store = { path = "../bas-memory-atom-store" }
+bas-retrieval-ranker  = { path = "../bas-retrieval-ranker" }
+bas-canonical-bytes   = { path = "../bas-canonical-bytes" }
+bas-permit-policy     = { path = "../bas-permit-policy" }
+bas-event-log-codec   = { path = "../bas-event-log-codec" }
+bas-runtime-frame     = { path = "../bas-runtime-frame" }
+# chapter 七百二十二 第二刀 / M2282 — bundle the BPE tokenizer
+# crate into the same staticlib so Swift hosts can call
+# bas_tokenizer_* symbols via `import BASRustMemoryTrackerBinary`。
+bas-tokenizer         = { path = "../bas-tokenizer" }
+# chapter 七百四十 第二刀 / M2372 — bundle the L10 tribunal-court
+# crate so Swift can call bas_tribunal_court_derive_* via the
+# XCFramework。 Pairs with the chapter 七百三十九 layer-migration
+# arc Rust-port idiom。
+bas-tribunal-court    = { path = "../bas-tribunal-court" }
+# chapter 七百四十七 第一刀 / M2406 — bundle the L2 organ-
+# router crate so Swift can call bas_organ_router_select via
+# the XCFramework。 Per user directive 「Metal/C++ 管 模型 内核,
+# Rust 管 routing/adapter policy。」 The policy lives here;
+# kernels stay Metal + Swift。
+bas-organ-router      = { path = "../bas-organ-router" }
+# chapter 七百四十八 第一刀 / M2411 — bundle the L9 dream-
+# loop batch-scoring kernel。 Per user L9 sub-directive
+# 「candidate simulation、future projection、batch scoring
+# 适合 Rust/Metal。」
+bas-dream-loop        = { path = "../bas-dream-loop" }
+# chapter 七百五十八 第一刀 / M2441 — bundle the L14
+# sovereign-c-abi public wrapper crate so Swift host
+# (via XCFramework) + watchOS / 3rd-party C consumers
+# (via the hand-curated header) both see the same symbol
+# table for halt_signal_encode / integrity_scan /
+# tamper_proof_audit。 Per user 严苛 table 「L14 极值得」
+# DEEPER LAYER-MIGRATION ARC。
+bas-sovereign-c-abi   = { path = "../bas-sovereign-c-abi" }
+# chapter 七百五十九 第三刀 / M2448 — bundle the L11
+# red-team-bench crate so Swift host (via XCFramework) +
+# 3rd-party C consumers see the batch adversarial-prompt
+# classifier symbols (bas_red_team_classify_batch,
+# bas_red_team_bench_abi_version)。 Per user 严苛 table
+# 「L11 极值得 (DEEPER)」 — 50-100× batch throughput vs
+# Swift single-threaded .contains() per planning audit。
+bas-red-team-bench    = { path = "../bas-red-team-bench" }
+# chapter 七百六十 第三刀 / M2453 — bundle the L11
+# typed integrity-sentinel crate so Swift host + 3rd-party
+# C consumers see the structured ScanReport surface
+# (bas_integrity_sentinel_scan,
+# bas_integrity_sentinel_abi_version)。 Distinct from
+# bas-sovereign-c-abi thin wrapper which only returns
+# 4-bit hard_bits — this exposes full structured report。
+bas-integrity-sentinel = { path = "../bas-integrity-sentinel" }
+# chapter 七百六十二 第三刀 / M2463 — bundle the L1
+# lease-life crate so Swift host (via XCFramework) sees
+# the pure-fn surface (lung_state_decay,
+# lung_state_record_turn,breath_validate,
+# breath_should_cancel_on_reconcile)。 Per user 严苛 table
+# 「L1 部分值得」 — Apple thermal pipe stays Swift,Rust
+# owns the deterministic decay + validation pure fns。
+bas-lease-life        = { path = "../bas-lease-life" }
+# chapter 七百六十四 / M2471 — bundle the L7 mirror-blade
+# crate so Swift host sees the decomposition state
+# classifier (bas_mirror_blade_classify,abi_version)。
+# Per user 严苛 table 「L7 很值得」 — pure threshold
+# decision tree maps cleanly to Rust enum + match。
+bas-mirror-blade      = { path = "../bas-mirror-blade" }
+# chapter 七百六十六 / M2481 — bundle the L6 presence-eye
+# crate so Swift host sees the signal-fusion classifier
+# (bas_presence_eye_fuse,abi_version)。 Per user 严苛
+# table 「L6 部分值得」 — Apple sensor pipe stays Swift,
+# Rust owns the deterministic fusion math。
+bas-presence-eye      = { path = "../bas-presence-eye" }
+# chapter 七百六十八 / M2491 — bundle the L5 host-constitution
+# crate so Swift host sees the merge-decision pure fns
+# (bas_host_constitution_resolve_field,default_strategy,
+# abi_version)。 Per user 严苛 table 「L5 很值得」 — SQLite
+# stays Swift,Rust owns deterministic per-field merge。
+bas-host-constitution = { path = "../bas-host-constitution" }
+# chapter 七百七十一 / M2506 — bundle the L4 world-prior
+# crate so Swift host sees the typed surface + evidence
+# propagation pure fns (bas_world_prior_propagate_evidence,
+# aggregate_latency,worst_reversibility,abi_version)。
+# Per user 严苛 table 「L4 值得」 — SQLite stays Swift,
+# Rust owns the deterministic typed surface。
+bas-world-prior       = { path = "../bas-world-prior" }
+# chapter 七百七十四 / M2521 — bundle the L13 shadow-trial
+# crate (Phase 2 Rust port of the state machine extracted at
+# Phase 1, chapter 七百七十二)。 Mirrors
+# BASShadowTrialStateMachineCore byte-for-byte。
+bas-shadow-trial      = { path = "../bas-shadow-trial" }
+# chapter 七百八十二 / M2561 — bundle the L8 atom-lifecycle
+# crate (memory-atom 5-phase state machine)。
+bas-atom-lifecycle    = { path = "../bas-atom-lifecycle" }
+# chapter 八百五十二 / M2913 — bundle the Mamba SSM scan
+# crate (sequential + rayon parallel CPU paths)。
+bas-mamba-scan        = { path = "../bas-mamba-scan" }
+# chapter 八百九十四 / M3160 — bundle the L8 Rust unification
+# engine (SQL source-of-truth + Rust hot paths, owns rusqlite)。
+bas-l8-engine         = { path = "../bas-l8-engine" }
+# chapter 九百五十六.9 / M3485.9 — bundle the Agent Fabric merge
+# engine kernels (FNV-1a hash + topo sort + pick_winner) so Swift
+# host can call bas_agent_fabric_* symbols via the XCFramework。
+# Per user directive「继续 提高 ... rust ... 比例」。
+bas-agent-fabric      = { path = "../bas-agent-fabric" }

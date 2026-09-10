@@ -1,0 +1,48 @@
+// MARK: - BASChapter598OrganCodableWaveOneProofTests
+// chapter 五百九十八 / M1770 — PROOF tests for the 2
+//                          newly-Codable BASOrgan types
+//                          shipped at M1769 (FRESH
+//                          MODULE TERRITORY wave 1)
+//
+// ## Coverage (2 compile-time conformance tests)
+//
+// BASOrgan first-ever Codable extension wave 1。
+// Fresh module territory beyond the chapter 597 octa-
+// milestone snapshot (which covered 6 modules:BAS
+// HostKit + BASRuntimeCore + BASMemory + BAS
+// Orchestration + BASLeaseLife + BASObservability)。
+//
+// ## Doctrine pins
+//
+//   - 不变量 #1/#2/#3:V1 byte-equality preserved
+//   - 红线 7:test-only additions
+//   - chapter 三百九二:replay-determinism extends to
+//     these 2 newly-Codable types
+//   - ADR-014 OPT-IN preserved
+//   - ADR-016 advances M1769 → M1770
+
+import XCTest
+@testable import BASOrgan
+
+final class BASChapter598OrganCodableWaveOneProofTests:
+    XCTestCase
+{
+
+    func testOrganDraftChunkConformsToCodable() {
+        // #18: real round-trip
+        let value = BASOrganDraftChunk(
+            requestID: "",
+            providerID: "",
+            role: .scout,
+            bodyDelta: "",
+            cumulativeBody: "",
+            producedAt: Date(timeIntervalSince1970: 0))
+        assertCodableRoundTrips(value)
+    }
+
+    func testOrganRegistryObservationSnapshotConformsToCodable() {
+        // #18: real round-trip (minimal: no descriptors)
+        assertCodableRoundTrips(
+            BASOrganRegistryObservationSnapshot(descriptors: []))
+    }
+}

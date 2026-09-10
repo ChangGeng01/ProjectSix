@@ -1,0 +1,65 @@
+# Cargo workspace for BehavioralAISubstrate Rust crates
+# chapter 七百六 / M2187 第一刀 — MULTI-LANGUAGE
+#                                  AUGMENTATION ARC Rust
+#                                  pilot opens here。
+#
+# All Rust code shipped by the substrate lives under
+# this workspace。 Each crate produces a `staticlib` (.a)
+# that the maintainer-side `scripts/build-rust-xcframework
+# .sh` packages into an XCFramework committed to
+# `Vendor/bas-rust-binaries/`。
+#
+# Substrate consumers see only the XCFramework — they
+# never invoke cargo directly。 Reproducibility flags
+# (SOURCE_DATE_EPOCH + codegen-units=1 + panic=abort +
+# strip=symbols) live in the build script so the
+# committed binary stays byte-identical across clean
+# rebuilds。
+
+[workspace]
+members = [
+    "bas-memory-usage-tracker",
+    "bas-substrate-core",          # chapter 七百三 第一刀 / M2171
+    "bas-memory-atom-store",       # chapter 七百三 第二刀 / M2172
+    "bas-retrieval-ranker",        # chapter 七百三 第三刀 / M2173
+    "bas-canonical-bytes",         # chapter 七百三 第四刀 / M2174
+    "bas-permit-policy",           # chapter 七百三 第四刀 / M2174
+    "bas-event-log-codec",         # chapter 七百三 第四刀 / M2174
+    "bas-runtime-frame",           # chapter 七百三 第四刀 / M2174
+    "bas-tokenizer",               # chapter 七百二十二 第一刀 / M2281
+    "bas-tribunal-court",          # chapter 七百四十 第一刀 / M2371
+    "bas-organ-router",            # chapter 七百四十七 第一刀 / M2406
+    "bas-dream-loop",              # chapter 七百四十八 第一刀 / M2411
+    "bas-sovereign-c-abi",         # chapter 七百五十八 第一刀 / M2441 — public C ABI wrapper for watchOS + 3rd-party C consumers
+    "bas-red-team-bench",          # chapter 七百五十九 第一刀 / M2446 — batch adversarial-prompt classifier (24 red lines)
+    "bas-integrity-sentinel",      # chapter 七百六十 第一刀 / M2451 — typed Rust port of BASSovereignIntegritySentinel
+    "bas-lease-life",              # chapter 七百六十二 第一刀 / M2461 — L1 lung-state + breath-scheduler pure-fn port
+    "bas-mirror-blade",            # chapter 七百六十四 / M2471 — L7 decomposition state classifier
+    "bas-presence-eye",            # chapter 七百六十六 / M2481 — L6 signal-fusion classifier
+    "bas-host-constitution",       # chapter 七百六十八 / M2491 — L5 host constitution merge logic
+    "bas-world-prior",             # chapter 七百七十一 / M2506 — L4 world prior typed surface + pure fns
+    "bas-shadow-trial",            # chapter 七百七十四 / M2521 — L13 Phase 2 state machine port
+    "bas-atom-lifecycle",          # chapter 七百八十二 / M2561 — L8 memory atom lifecycle state machine
+    "bas-mamba-scan",              # chapter 八百五十二 / M2911 — Mamba SSM selective-scan CPU mirror + rayon parallelism setup
+    "bas-l8-engine",               # chapter 八百九十四 / M3160 — L8 Rust unification: SQL source-of-truth + Rust hot paths
+    "bas-agent-fabric",            # chapter 九百五十六.8 / M3485.8 — Agent Fabric merge engine kernels (FNV1a / topo sort / pick_winner) per "提高 rust 比例"
+]
+resolver = "2"
+
+[workspace.package]
+# Workspace-level version pin。 Bumping requires
+# updating BASRustCoreBridge.swift cargoCrateVersion +
+# corresponding tests simultaneously。
+version = "0.1.0"
+edition = "2021"
+license = "internal"
+rust-version = "1.84"
+
+[profile.release]
+# Reproducibility-friendly defaults (also pinned per-
+# invocation via RUSTFLAGS in build-rust-xcframework.sh
+# for explicit-ness)。
+codegen-units = 1
+panic = "abort"
+lto = false
+strip = "symbols"

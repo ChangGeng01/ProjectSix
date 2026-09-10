@@ -1,0 +1,446 @@
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXLMCommon/Evaluate.swift b/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXLMCommon/Evaluate.swift
+index c59b03e71..218615f1a 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXLMCommon/Evaluate.swift
++++ b/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXLMCommon/Evaluate.swift
+@@ -4,6 +4,35 @@ import Foundation
+ import MLX
+ import MLXNN
+ 
++// BAS/ADR-038 §11.4 — token-loop phase beacons (env BAS_WEDGE_BEACON=1). Writes ordered checkpoints to
++// Documents/wedge.log so that, when a turn wedges and never returns, the LAST surviving line names the exact
++// boundary it stuck at (prefill-submit vs first step() vs item() drain vs which token). Uses an unbuffered
++// `FileHandle.write` (a write() syscall — the bytes reach the kernel page cache immediately and survive the
++// watchdog SIGKILL, so no per-token fsync stall is needed). O(1) no-op when the env flag is unset → the normal
++// path is byte/behavior-identical.
++//
++// LIFECYCLE (honest, audit LOW #10): this log is APPEND-ONLY and UNROTATED — it is opened with seekToEnd and
++// grows for the life of the file, accumulating across relaunches (append, not truncate, is deliberate: the
++// watchdog kill→relaunch loop wants the prior run's last-surviving line to persist). It is a short-session
++// diagnostic gated behind BAS_WEDGE_BEACON; it is NOT meant to be left on in a long-lived/production process.
++// If a multi-hour diagnostic is needed, delete Documents/wedge.log between sessions (no in-process rotation).
++private let _basWedgeBeaconFH: FileHandle? = {
++    guard ProcessInfo.processInfo.environment["BAS_WEDGE_BEACON"] == "1" else { return nil }
++    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
++    guard let url = docs?.appendingPathComponent("wedge.log") else { return nil }
++    if !FileManager.default.fileExists(atPath: url.path) {
++        FileManager.default.createFile(atPath: url.path, contents: nil)
++    }
++    let fh = try? FileHandle(forWritingTo: url)
++    try? fh?.seekToEnd()
++    return fh
++}()
++@inline(__always) public func basWedgeBeacon(_ tag: @autoclosure () -> String) {
++    guard let fh = _basWedgeBeaconFH else { return }
++    let line = tag() + " mono=\(DispatchTime.now().uptimeNanoseconds)\n"
++    if let d = line.data(using: .utf8) { try? fh.write(contentsOf: d) }
++}
++
+ /// A `LogitSampler` is responsible for sampling `logits` produced by
+ /// a ``LanguageModel`` to produce a token.
+ ///
+@@ -650,10 +679,13 @@ public struct TokenIterator: TokenIteratorProtocol {
+ 
+         case .logits(let result):
+             y = .init(tokens: convertToToken(logits: result.logits))
++            basWedgeBeacon("P1-prefill-logits-before-asyncEval")
+             asyncEval(y.tokens)
++            basWedgeBeacon("P2-prefill-asyncEval-returned")
+ 
+             break
+         }
++        basWedgeBeacon("P2.5-prepare-returned")
+     }
+ 
+     mutating func convertToToken(logits: MLXArray) -> MLXArray {
+@@ -671,6 +703,7 @@ public struct TokenIterator: TokenIteratorProtocol {
+ 
+     /// Evaluate the next token and return the new token (y), updating cache state
+     mutating func step(previous: LMInput.Text) -> MLXArray {
++        basWedgeBeacon("P4-enter-step")
+         let result = model(
+             previous[text: .newAxis], cache: cache.isEmpty ? nil : cache, state: state)
+         self.state = result.state
+@@ -691,6 +724,7 @@ public struct TokenIterator: TokenIteratorProtocol {
+             return nil
+         }
+ 
++        basWedgeBeacon("P3-enter-next tc=\(tokenCount)")
+         // save current value -- this will be returned
+         let previousY = y
+ 
+@@ -701,7 +735,10 @@ public struct TokenIterator: TokenIteratorProtocol {
+ 
+         tokenCount += 1
+ 
+-        return previousY.tokens.item(Int.self)
++        basWedgeBeacon("P5-before-item tc=\(tokenCount)")
++        let out = previousY.tokens.item(Int.self)
++        basWedgeBeacon("P6-after-item tc=\(tokenCount)")
++        return out
+     }
+ }
+ 
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXVLM/Models/Gemma4.swift b/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXVLM/Models/Gemma4.swift
+index cac757f98..5889cf092 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXVLM/Models/Gemma4.swift
++++ b/BehavioralAISubstrate/Vendor/mlx-swift-lm/Libraries/MLXVLM/Models/Gemma4.swift
+@@ -4,6 +4,11 @@ import MLX
+ import MLXLMCommon
+ import MLXNN
+ 
++// BAS/ADR-038 §11.6 — opt-in per-layer eval+beacon for localizing the Gemma-3n forward wedge. Default off
++// → byte/behavior-identical to upstream.
++private let _basGemmaLayerEval: Bool =
++    ProcessInfo.processInfo.environment["BAS_GEMMA_LAYER_EVAL"] == "1"
++
+ // Based on https://github.com/Blaizzy/mlx-vlm/tree/main/mlx_vlm/models/gemma4
+ 
+ private enum Gemma4Error: LocalizedError {
+@@ -1049,6 +1054,14 @@ private final class Gemma4TextBackbone: Module {
+             )
+             h = output
+             intermediates[idx] = (kvState, attentionOffset)
++            // BAS/ADR-038 §11.6 — per-layer eval+beacon (BAS_GEMMA_LAYER_EVAL=1, default off). Forces each
++            // Gemma-3n layer's graph to drain + logs the layer idx to wedge.log. Localizes WHICH layer's op
++            // explodes (last beacon = stuck layer) AND tests a candidate fix: if bounding the graph per layer
++            // breaks the wedge, the cause was an un-evaled accumulating forward graph (fixable by eval-ing).
++            if _basGemmaLayerEval {
++                eval(h)
++                basWedgeBeacon("GL-layer idx=\(idx)")
++            }
+         }
+         return norm(h)
+     }
+@@ -1736,6 +1749,30 @@ public final class Gemma4: Module, VLMModel, KVCacheDimensionProvider {
+             )
+             return .logits(result)
+         } else {
++            // BAS/ADR-038 §11.3 — ROOT-CAUSE FIX for the on-device decode wedge. This VLM `prepare`
++            // override bypassed the chunked prefill that `LLMModel.prepare` does (LLMModel.swift:24-35):
++            // it built the ENTIRE text prompt as ONE un-chunked forward graph, which `asyncEval` then
++            // drains inline kernel-by-kernel (thousands of ~20-op command buffers) → the 5754-`wait_for_one`
++            // spin, zero tokens, stuck in `TokenIterator.init`'s prepare(). Mirror the LLMModel chunked
++            // pattern: process the prompt in `windowSize` chunks, `eval(cache)` to drain+free between
++            // chunks, hand the small remainder to the TokenIterator. Env-gated (BAS_MLX_CHUNK_PREFILL=1)
++            // for an A/B; default OFF = byte-identical to upstream until proven on-device.
++            if ProcessInfo.processInfo.environment["BAS_MLX_CHUNK_PREFILL"] == "1" {
++                // BAS_MLX_PREFILL_CHUNK overrides the chunk size — the feed-forward prompts are only ~35-134
++                // tokens, so the default 512 never chunks; a small value (e.g. 32) actually splits the prefill.
++                let envChunk = Int(ProcessInfo.processInfo.environment["BAS_MLX_PREFILL_CHUNK"] ?? "")
++                // ADR-038 audit fix — floor at 1: a 0 chunk size makes `while tokens.size > 0` loop forever on
++                // a zero-width slice (self-inflicted wedge from a one-char env typo). Mirror the runner's max(1,…).
++                let prefillStepSize = max(1, envChunk ?? (windowSize ?? 512))
++                var y = input.text
++                while y.tokens.size > prefillStepSize {
++                    let chunk = y[.newAxis, ..<prefillStepSize]
++                    _ = self(chunk, cache: convertedCache.isEmpty ? nil : convertedCache, state: nil)
++                    eval(convertedCache)
++                    y = y[prefillStepSize...]
++                }
++                return .tokens(y)
++            }
+             let result = languageModel(input.text.tokens, cache: convertedCache)
+             return .logits(result)
+         }
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/backend/metal/eval.cpp b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/backend/metal/eval.cpp
+index bd58a691a..6dd8b635e 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/backend/metal/eval.cpp
++++ b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/backend/metal/eval.cpp
+@@ -89,7 +89,9 @@ void synchronize(Stream s) {
+   cb->retain();
+   d.end_encoding(s.index);
+   d.commit_command_buffer(s.index);
++  if (bas_wedge_trace_sched()) { std::fprintf(stderr, "[BAS]>sync\n"); std::fflush(stderr); }
+   cb->waitUntilCompleted();
++  if (bas_wedge_trace_sched()) { std::fprintf(stderr, "[BAS]<sync st=%d\n", (int)cb->status()); std::fflush(stderr); }
+   check_error(cb);
+   cb->release();
+ }
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/backend/metal/event.cpp b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/backend/metal/event.cpp
+index 39a49230d..d99987b97 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/backend/metal/event.cpp
++++ b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/backend/metal/event.cpp
+@@ -4,8 +4,52 @@
+ #include "mlx/backend/metal/device.h"
+ #include "mlx/scheduler.h"
+ 
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++
+ namespace mlx::core {
+ 
++namespace {
++// ── BAS / ADR-038 §10.2 + task A (Metal-vs-MLX root cause) ──────────────────────────────────────
++// The on-device decode wedge is MLX-process-local: the CPU parks in Event::wait() ->
++// waitUntilSignaledValue(value(), -1) forever, while the GPU is provably healthy (a sibling Metal
++// queue keeps completing during the wedge — ADR-038 §10.2). The `-1` fills the uint64 milliseconds
++// timeout slot with UINT64_MAX, so the throw below is unreachable: an uncancellable infinite hang.
++//
++// This opt-in knob makes that wait FINITE so we can (a) localize the cause — log the event's target
++// vs signaled value at the hang — and (b) convert the uncancellable hang into a CATCHABLE timeout
++// (the throw becomes reachable -> propagates as an error -> the Swift evalLock.withLock releases ->
++// a chance at in-process recovery instead of a permanent process-wide freeze).
++//
++// DEFAULT: env unset -> timeout = UINT64_MAX, i.e. EXACTLY the upstream `-1` behavior (byte- and
++// behavior-identical; this is a synchronization primitive, no computed value crosses it). Set
++// MLX_EVENT_WAIT_TIMEOUT_MS=<ms> (e.g. 30000) to opt into the bounded+diagnosed path.
++inline uint64_t bas_event_wait_timeout_ms() {
++  static const uint64_t cached = []() -> uint64_t {
++    const char* e = std::getenv("MLX_EVENT_WAIT_TIMEOUT_MS");
++    if (e != nullptr && *e != '\0') {
++      long long n = std::atoll(e);
++      if (n >= 0) {
++        return static_cast<uint64_t>(n);
++      }
++    }
++    return ~static_cast<uint64_t>(0); // UINT64_MAX == upstream `-1`
++  }();
++  return cached;
++}
++
++// BAS/ADR-038 §10.3 — opt-in wedge-localization trace (MLX_WEDGE_TRACE=1). Prints enter/exit at each
++// candidate blocking wait so the LAST unmatched "[BAS]>tag" in the console stream is the stuck wait.
++inline bool bas_wedge_trace() {
++  static const bool on = []() {
++    const char* e = std::getenv("MLX_WEDGE_TRACE");
++    return e != nullptr && *e == '1';
++  }();
++  return on;
++}
++} // namespace
++
+ Event::Event(Stream stream) : stream_(stream) {
+   auto dtor = [](void* ptr) {
+     auto p = metal::new_scoped_memory_pool();
+@@ -21,8 +65,26 @@ Event::Event(Stream stream) : stream_(stream) {
+ }
+ 
+ void Event::wait() {
+-  if (!static_cast<MTL::SharedEvent*>(event_.get())
+-           ->waitUntilSignaledValue(value(), -1)) {
++  auto* ev = static_cast<MTL::SharedEvent*>(event_.get());
++  const uint64_t timeout = bas_event_wait_timeout_ms();
++  if (bas_wedge_trace()) {
++    std::fprintf(stderr, "[BAS]>ev v=%llu sig=%llu\n",
++                 static_cast<unsigned long long>(value()),
++                 static_cast<unsigned long long>(ev->signaledValue()));
++    std::fflush(stderr);
++  }
++  const bool ok = ev->waitUntilSignaledValue(value(), timeout);
++  if (bas_wedge_trace()) { std::fprintf(stderr, "[BAS]<ev ok=%d\n", (int)ok); std::fflush(stderr); }
++  if (!ok) {
++    // Reachable only when MLX_EVENT_WAIT_TIMEOUT_MS is set to a finite value. Log the event state at
++    // the hang (BAS/ADR-038 §10.2 A): signaled < target ⇒ the GPU never reached the encoded signal
++    // (MLX submission/scheduling/dependency issue); signaled >= target ⇒ a wait/API race.
++    std::fprintf(stderr,
++                 "[BAS][Event::wait] TIMEOUT after %llums target=%llu signaled=%llu\n",
++                 static_cast<unsigned long long>(timeout),
++                 static_cast<unsigned long long>(value()),
++                 static_cast<unsigned long long>(ev->signaledValue()));
++    std::fflush(stderr);
+     throw std::runtime_error("[Event::wait] Timed out");
+   }
+ }
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/scheduler.h b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/scheduler.h
+index c94044a79..a16eabbd0 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/scheduler.h
++++ b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/scheduler.h
+@@ -3,6 +3,8 @@
+ #pragma once
+ 
+ #include <atomic>
++#include <cstdio>
++#include <cstdlib>
+ #include <future>
+ #include <queue>
+ #include <thread>
+@@ -13,6 +15,15 @@
+ #include "mlx/device.h"
+ #include "mlx/stream.h"
+ 
++// BAS/ADR-038 §10.3 — opt-in wedge-localization trace (MLX_WEDGE_TRACE=1).
++static inline bool bas_wedge_trace_sched() {
++  static const bool on = []() {
++    const char* e = std::getenv("MLX_WEDGE_TRACE");
++    return e != nullptr && *e == '1';
++  }();
++  return on;
++}
++
+ namespace mlx::core::scheduler {
+ 
+ struct StreamThread {
+@@ -108,17 +119,32 @@ class Scheduler {
+   }
+ 
+   void notify_new_task(const Stream& stream) {
++    unsigned long long c = 0, d = 0;
++    int n = 0;
+     {
+       std::lock_guard<std::mutex> lk(mtx);
+       n_active_tasks_++;
++      bas_created_++;
++      c = bas_created_;
++      d = bas_completed_;
++      n = n_active_tasks_;
+     }
+     completion_cv.notify_all();
++    // BAS/ADR-038 §11.4 — task create/complete BALANCE. Prints created vs completed periodically so we
++    // can settle the n==11 pin: created≫completed (growing gap) ⇒ a genuine notify_task_completion LEAK;
++    // created≈completed (both climb, gap stable) ⇒ a self-refilling LIVELOCK. Gated on MLX_WEDGE_TRACE.
++    if (bas_wedge_trace_sched() && (c % 500ULL == 0ULL)) {
++      std::fprintf(stderr, "[BAS]task-balance created=%llu completed=%llu n=%d gap=%lld\n",
++                   c, d, n, (long long)(c - d));
++      std::fflush(stderr);
++    }
+   }
+ 
+   void notify_task_completion(const Stream& stream) {
+     {
+       std::lock_guard<std::mutex> lk(mtx);
+       n_active_tasks_--;
++      bas_completed_++;
+     }
+     completion_cv.notify_all();
+   }
+@@ -131,9 +157,13 @@ class Scheduler {
+     std::unique_lock<std::mutex> lk(mtx);
+     int n_tasks_old = n_active_tasks();
+     if (n_tasks_old > 1) {
++      if (bas_wedge_trace_sched()) {
++        std::fprintf(stderr, "[BAS]>wfo n=%d\n", n_tasks_old); std::fflush(stderr);
++      }
+       completion_cv.wait(lk, [this, n_tasks_old] {
+         return this->n_active_tasks() < n_tasks_old;
+       });
++      if (bas_wedge_trace_sched()) { std::fprintf(stderr, "[BAS]<wfo\n"); std::fflush(stderr); }
+     }
+   }
+ 
+@@ -154,6 +184,8 @@ class Scheduler {
+ 
+  private:
+   int n_active_tasks_;
++  unsigned long long bas_created_ = 0;    // BAS/ADR-038 §11.4 — task create/complete balance
++  unsigned long long bas_completed_ = 0;
+   std::vector<StreamThread*> threads_;
+   std::vector<Stream> streams_;
+   std::unordered_map<Device::DeviceType, Stream> default_streams_;
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/transforms.cpp b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/transforms.cpp
+index 4967c50a8..dd90e788f 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/transforms.cpp
++++ b/BehavioralAISubstrate/Vendor/mlx-swift/Source/Cmlx/mlx/mlx/transforms.cpp
+@@ -22,7 +22,25 @@
+ 
+ namespace mlx::core {
+ 
+-static constexpr int MAX_ACTIVE_TASKS = 10;
++// BAS/ADR-038 §11 — the on-device decode wedge is a scheduler-throttle livelock: n_active_tasks leaks
++// (a notify_task_completion that never fires) and pins at MAX_ACTIVE_TASKS+1, so every subsequent eval
++// trips the `n_active_tasks() > MAX_ACTIVE_TASKS` drain throttle and the generate loop livelocks while
++// the GPU stays healthy (each wait_for_one returns). Make the throttle ceiling env-configurable
++// (BAS_MLX_MAX_ACTIVE_TASKS) so we can raise it above the leaked floor and confirm/mitigate the wedge.
++// Default 10 == upstream (byte/behavior-identical when unset).
++static int bas_max_active_tasks() {
++  static const int v = []() {
++    const char* e = std::getenv("BAS_MLX_MAX_ACTIVE_TASKS");
++    if (e != nullptr && *e != '\0') {
++      int n = std::atoi(e);
++      if (n > 0) {
++        return n;
++      }
++    }
++    return 10; // upstream default
++  }();
++  return v;
++}
+ 
+ /* This class is only meant to be used in eval
+  * for synchronizing with the main thread. */
+@@ -239,9 +257,19 @@ array eval_impl(std::vector<array> outputs, bool async) {
+       cpu::eval(arr);
+     }
+ 
+-    if (scheduler::n_active_tasks() > MAX_ACTIVE_TASKS ||
++    if (scheduler::n_active_tasks() > bas_max_active_tasks() ||
+         (get_active_memory() > get_memory_limit() &&
+          scheduler::n_active_tasks() > 0)) {
++      // BAS/ADR-038 §11.3 — drain-trip diagnostic (MLX_WEDGE_TRACE=1). Settles WHICH clause trips the
++      // throttle: TASK (n > MAX) vs MEMORY (active_memory > memory_limit). Prints the live values so we
++      // can see if the wedge is a task-count livelock or a memory-pressure drain that never clears.
++      if (bas_wedge_trace_sched()) {
++        bool mem_trip = get_active_memory() > get_memory_limit();
++        std::fprintf(stderr, "[BAS]drain-trip n=%d mem_trip=%d active_mb=%zu limit_mb=%zu\n",
++                     scheduler::n_active_tasks(), mem_trip ? 1 : 0,
++                     get_active_memory() >> 20, get_memory_limit() >> 20);
++        std::fflush(stderr);
++      }
+       // Commit any open streams
+       for (auto i : open_streams) {
+         auto s = get_stream(i);
+diff --git a/BehavioralAISubstrate/Vendor/mlx-swift/Source/MLX/Transforms+Eval.swift b/BehavioralAISubstrate/Vendor/mlx-swift/Source/MLX/Transforms+Eval.swift
+index 46fe9c593..b6eb933b7 100644
+--- a/BehavioralAISubstrate/Vendor/mlx-swift/Source/MLX/Transforms+Eval.swift
++++ b/BehavioralAISubstrate/Vendor/mlx-swift/Source/MLX/Transforms+Eval.swift
+@@ -8,16 +8,33 @@ import Foundation
+ /// call back into eval.
+ let evalLock = NSRecursiveLock()
+ 
++/// BAS/ADR-038 §11.4 — the binding previously DISCARDED `mlx_eval`/`mlx_async_eval`'s `int` return code
++/// (`_ = ... mlx_eval(...)`). This surfaces a non-zero code to stderr instead of dropping it. SCOPE (honest):
++/// MLX's C++ wrapper catches the exception and routes the message to the *installed* mlx error handler before
++/// returning non-zero — and mlx-swift's default handler trampoline calls `fatalError`, which aborts the process
++/// FIRST, so on the default path this stderr line is effectively unreachable (the abort wins). It becomes the
++/// actual surfacing point only when a NON-aborting error handler is installed (e.g. for diagnostics). So this is
++/// a belt-and-suspenders guard against a *future* silent-drop regression, not protection on the default config.
++/// No-op on the success path (ret == 0) → the normal path is byte/behavior-identical. (A fuller fix — making
++/// `eval` throwing — is an API change left as a follow-up.)
++@inline(__always)
++private func basSurfaceEvalError(_ ret: Int32, _ op: String) {
++    if ret != 0 {
++        FileHandle.standardError.write(Data("[BAS][\(op)] non-zero return=\(ret)\n".utf8))
++    }
++}
++
+ /// Evaluate one or more `MLXArray`
+ ///
+ /// ### See Also
+ /// - <doc:lazy-evaluation>
+ public func eval(_ arrays: MLXArray...) {
+     let vector_array = new_mlx_vector_array(arrays)
+-    _ = evalLock.withLock {
++    let ret = evalLock.withLock {
+         mlx_eval(vector_array)
+     }
+     mlx_vector_array_free(vector_array)
++    basSurfaceEvalError(ret, "mlx_eval")
+ }
+ 
+ /// Evaluate one or more `MLXArray`
+@@ -26,10 +43,11 @@ public func eval(_ arrays: MLXArray...) {
+ /// - <doc:lazy-evaluation>
+ public func eval(_ arrays: some Collection<MLXArray>) {
+     let vector_array = new_mlx_vector_array(arrays)
+-    _ = evalLock.withLock {
++    let ret = evalLock.withLock {
+         mlx_eval(vector_array)
+     }
+     mlx_vector_array_free(vector_array)
++    basSurfaceEvalError(ret, "mlx_eval")
+ }
+ 
+ /// Evaluate one or more `MLXArray` asynchronously.
+@@ -39,10 +57,11 @@ public func eval(_ arrays: some Collection<MLXArray>) {
+ /// - ``asyncEval(_:)-(Collection<MLXArray>)``
+ public func asyncEval(_ arrays: some Collection<MLXArray>) {
+     let vector_array = new_mlx_vector_array(arrays)
+-    _ = evalLock.withLock {
++    let ret = evalLock.withLock {
+         mlx_async_eval(vector_array)
+     }
+     mlx_vector_array_free(vector_array)
++    basSurfaceEvalError(ret, "mlx_async_eval")
+ }
+ 
+ /// Evaluate one or more `MLXArray`.

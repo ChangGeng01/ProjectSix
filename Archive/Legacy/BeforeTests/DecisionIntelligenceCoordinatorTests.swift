@@ -1,0 +1,403 @@
+import XCTest
+@testable import Before
+
+final class DecisionIntelligenceCoordinatorTests: XCTestCase {
+    func testRuntimeCoordinationKeepsSystemManagedCapabilityPathAligned() {
+        let coordination = DecisionIntelligenceCoordinator.runtimeCoordination(
+            preferences: assistivePreferences,
+            testingStubProfile: nil,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Gemma is missing."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: true,
+                title: "Available",
+                detail: "Apple is ready."
+            )
+        )
+
+        XCTAssertEqual(coordination.executionProfile.tier, .systemManaged)
+        XCTAssertEqual(coordination.executionProfile.effectiveProviderPreference, .foundationModels)
+        XCTAssertEqual(coordination.runtimeStatus.active, .foundationModels)
+        XCTAssertEqual(coordination.runtimeStatus.fallback, .foundationModels)
+    }
+
+    func testRuntimeCoordinationKeepsDeterministicDowngradeAlignedOnSixGigDevice() {
+        let coordination = DecisionIntelligenceCoordinator.runtimeCoordination(
+            preferences: assistivePreferences,
+            testingStubProfile: nil,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 6 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: true,
+                title: "Ready",
+                detail: "Gemma is ready."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Apple is off."
+            )
+        )
+
+        XCTAssertEqual(coordination.executionProfile.tier, .conservativeDeterministic)
+        XCTAssertEqual(coordination.executionProfile.effectiveProviderPreference, .template)
+        XCTAssertEqual(coordination.runtimeStatus.active, .template)
+        XCTAssertEqual(coordination.runtimeStatus.fallback, .template)
+    }
+
+    func testRuntimeCoordinationPublishesSharedRetrievalModesByModeID() {
+        let coordination = DecisionIntelligenceCoordinator.runtimeCoordination(
+            preferences: assistivePreferences,
+            testingStubProfile: nil,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: true,
+                title: "Ready",
+                detail: "Gemma is ready."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: true,
+                title: "Available",
+                detail: "Apple is ready."
+            )
+        )
+
+        XCTAssertEqual(
+            coordination.retrievalMode(for: .quick),
+            coordination.executionProfile.strategy(for: .quick).retrievalMode
+        )
+        XCTAssertEqual(
+            coordination.retrievalMode(for: .balance),
+            coordination.executionProfile.strategy(for: .balance).retrievalMode
+        )
+        XCTAssertEqual(
+            coordination.retrievalMode(for: .mirror),
+            coordination.executionProfile.strategy(for: .mirror).retrievalMode
+        )
+        XCTAssertEqual(
+            coordination.retrievalModesByModeID,
+            [
+                DecisionMode.quick.substrateModeID: coordination.retrievalMode(for: .quick).rawValue,
+                DecisionMode.balance.substrateModeID: coordination.retrievalMode(for: .balance).rawValue,
+                DecisionMode.mirror.substrateModeID: coordination.retrievalMode(for: .mirror).rawValue
+            ]
+        )
+    }
+
+    func testRuntimeCoordinationPublishesSharedStrategiesAndFallbackPolicy() {
+        let coordination = DecisionIntelligenceCoordinator.runtimeCoordination(
+            preferences: assistivePreferences,
+            testingStubProfile: nil,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: true,
+                title: "Ready",
+                detail: "Gemma is ready."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: true,
+                title: "Available",
+                detail: "Apple is ready."
+            )
+        )
+
+        XCTAssertEqual(
+            coordination.strategy(for: .reminder),
+            coordination.executionProfile.strategy(for: .reminder)
+        )
+        XCTAssertEqual(
+            coordination.allowFallbacks,
+            coordination.executionProfile.allowFallbacks
+        )
+    }
+
+    func testAssistiveQuickResultKeepsVerdictAndActionsWhileTighteningCopy() {
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .stressed,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "today was rough after work"
+        )
+
+        let deterministic = CheckRuleEngine.evaluate(input)
+        let assistive = DecisionIntelligenceCoordinator.quickResult(
+            for: input,
+            preferences: assistivePreferences
+        )
+
+        XCTAssertEqual(assistive.verdict, deterministic.verdict)
+        XCTAssertEqual(assistive.primaryAction, deterministic.primaryAction)
+        XCTAssertEqual(assistive.secondaryActions, deterministic.secondaryActions)
+        XCTAssertNotEqual(assistive.currentPerspective, deterministic.currentPerspective)
+    }
+
+    func testOffModeFallsBackToDeterministicRouting() {
+        let prompt = "Should I leave this relationship or keep trying?"
+
+        let assistive = DecisionIntelligenceCoordinator.route(
+            prompt: prompt,
+            preferences: assistivePreferences
+        )
+        let deterministic = DecisionIntelligenceCoordinator.route(
+            prompt: prompt,
+            preferences: offPreferences
+        )
+
+        XCTAssertEqual(deterministic, DecisionModeRouter.route(prompt: prompt))
+        XCTAssertEqual(assistive.mode, .mirror)
+    }
+
+    func testRoutePromotesQuickPathWhenFastPathKillSwitchIsActive() {
+        let routed = DecisionIntelligenceCoordinator.route(
+            prompt: "Should I buy this tonight?",
+            preferences: assistivePreferences,
+            activeKillSwitches: [.disableFastPath]
+        )
+
+        XCTAssertEqual(routed.mode, DecisionMode.balance)
+        XCTAssertTrue(routed.reason.contains("disabled the quick path"))
+    }
+
+    func testRouteEscalatesIntoMirrorWhenGuardModeKillSwitchIsActive() {
+        let routed = DecisionIntelligenceCoordinator.route(
+            prompt: "Should I order this now?",
+            preferences: offPreferences,
+            activeKillSwitches: [.forceGuardMode]
+        )
+
+        XCTAssertEqual(routed.mode, DecisionMode.mirror)
+        XCTAssertTrue(routed.reason.contains("forced guarded routing"))
+    }
+
+    func testAssistiveReminderSelectionCanPreferPromptMatchInsideRankedCandidates() {
+        let reminders = [
+            SelfReminder(
+                content: "This is just stress shopping again.",
+                scenario: .buy,
+                source: .userWritten,
+                createdAt: .now.addingTimeInterval(-20),
+                lastUsedAt: .now.addingTimeInterval(-20)
+            ),
+            SelfReminder(
+                content: "You actually needed the charger.",
+                scenario: .buy,
+                source: .userWritten,
+                createdAt: .now.addingTimeInterval(-10),
+                lastUsedAt: .now.addingTimeInterval(-10)
+            )
+        ]
+
+        let selected = DecisionIntelligenceCoordinator.bestReminder(
+            from: reminders,
+            scenario: .buy,
+            prompt: "I want to buy these shoes because today was rough",
+            mode: .quick,
+            preferences: assistivePreferences
+        )
+
+        XCTAssertEqual(selected?.content, "This is just stress shopping again.")
+    }
+
+    @MainActor
+    func testAsyncReminderSelectionFallsBackToDeterministicChoiceWhenProvidersCannotHelp() async {
+        let reminders = [
+            SelfReminder(
+                content: "This is just stress shopping again.",
+                scenario: .buy,
+                source: .userWritten,
+                createdAt: .now.addingTimeInterval(-20),
+                lastUsedAt: .now.addingTimeInterval(-20)
+            ),
+            SelfReminder(
+                content: "You actually needed the charger.",
+                scenario: .buy,
+                source: .userWritten,
+                createdAt: .now.addingTimeInterval(-10),
+                lastUsedAt: .now.addingTimeInterval(-10)
+            )
+        ]
+
+        let selected = await DecisionIntelligenceCoordinator.bestReminderWithIntelligence(
+            from: reminders,
+            scenario: .buy,
+            prompt: "I want to buy these shoes because today was rough",
+            mode: .quick,
+            preferences: assistivePreferences
+        )
+
+        XCTAssertEqual(selected?.content, "This is just stress shopping again.")
+    }
+
+    private var assistivePreferences: BeforePreferences {
+        BeforePreferences(
+            homePromptAction: .autoRoute,
+            quickBufferDuration: .ninetySeconds,
+            restoreInProgressWorkspaces: true,
+            showReviewInsights: true,
+            onDeviceIntelligenceMode: .assistive,
+            preferredIntelligenceProvider: .gemmaE4B,
+            allowModelFallbacks: true
+        )
+    }
+
+    private var offPreferences: BeforePreferences {
+        BeforePreferences(
+            homePromptAction: .autoRoute,
+            quickBufferDuration: .ninetySeconds,
+            restoreInProgressWorkspaces: true,
+            showReviewInsights: true,
+            onDeviceIntelligenceMode: .off,
+            preferredIntelligenceProvider: .gemmaE4B,
+            allowModelFallbacks: true
+        )
+    }
+
+    func testRuntimeStatusFallsBackToFoundationWhenGemmaIsUnavailable() {
+        let status = DecisionIntelligenceCoordinator.runtimeStatus(
+            preferences: assistivePreferences,
+            testingStubProfile: nil,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Gemma is missing."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: true,
+                title: "Available",
+                detail: "Apple is ready."
+            )
+        )
+
+        XCTAssertEqual(status.preferred, .gemmaE4B)
+        XCTAssertEqual(status.active, .foundationModels)
+        XCTAssertEqual(status.fallback, .foundationModels)
+    }
+
+    func testRuntimeStatusFallsBackToTemplateWhenNoAssistiveProviderIsAvailable() {
+        let status = DecisionIntelligenceCoordinator.runtimeStatus(
+            preferences: assistivePreferences,
+            testingStubProfile: nil,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Gemma is missing."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Apple is off."
+            )
+        )
+
+        XCTAssertEqual(status.preferred, .gemmaE4B)
+        XCTAssertEqual(status.active, .template)
+        XCTAssertEqual(status.fallback, .template)
+    }
+
+    func testRuntimeStatusCanBeForcedIntoTestingStub() {
+        let status = DecisionIntelligenceCoordinator.runtimeStatus(
+            preferences: assistivePreferences,
+            testingStubProfile: .smoke,
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Gemma is missing."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Apple is off."
+            )
+        )
+
+        XCTAssertEqual(status.active, .testingStub)
+        XCTAssertEqual(status.fallback, .testingStub)
+    }
+
+    func testRuntimeStatusUsesConservativeTemplateOnSixGigDevice() {
+        let status = DecisionIntelligenceCoordinator.runtimeStatus(
+            preferences: assistivePreferences,
+            testingStubProfile: nil,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 6 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: true,
+                title: "Ready",
+                detail: "Gemma is ready."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Apple is off."
+            )
+        )
+
+        XCTAssertEqual(status.preferred, .gemmaE4B)
+        XCTAssertEqual(status.active, .template)
+        XCTAssertEqual(status.fallback, .template)
+        XCTAssertTrue(status.detail.contains("iPhone 14"))
+    }
+}

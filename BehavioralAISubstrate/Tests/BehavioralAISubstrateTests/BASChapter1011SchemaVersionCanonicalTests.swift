@@ -1,0 +1,191 @@
+// MARK: - BASChapter1011SchemaVersionCanonicalTests
+// chapter 一千零十一 / M3770 — Round-21 HIGH-1 fix:
+// `schemaVersion: "1.1.0"` literal canonicalization
+//
+// Round-21 audit identified 9 production sites hardcoding the
+// `"1.1.0"` literal as the `schemaVersion` argument when
+// constructing `BASSovereignAuditEntry`。 Bumping the schema
+// to a future `"1.2.0"` would require updating all 9 in
+// lockstep — textbook drift trap per ch 1000.5 single-canonical
+// doctrine。
+//
+// Ch 1011 ships:
+//   1. New `BASSovereignAuditEntry.hardenedSchemaVersion`
+//      static constant
+//   2. All 9 sites migrated to reference the constant
+//   3. Structural pin test (this file) that catches future
+//      regressions — any new `schemaVersion: "1.1.0"` literal
+//      in Sources/ fails this test
+//
+// Tests pin:
+//   1. Constant exists + has value "1.1.0"
+//   2. Constant differs from `currentSchemaVersion` (1.0.0)
+//      so refactor cannot collapse them
+//   3. NO production source contains the literal
+//      `schemaVersion: "1.1.0"` anymore (grep test)
+//   4. Audit entries built via shared constant produce same
+//      schemaVersion value as if literal were used
+
+import XCTest
+import Foundation
+@testable import BASRuntimeCore
+@testable import BASMemory
+
+#if !os(iOS)  // ch 1022 source-gate: file-tree audit only meaningful on Mac dev box
+final class BASChapter1011SchemaVersionCanonicalTests: XCTestCase {
+
+    // MARK: - 1. Constant exists + value correct
+
+    func testCRITICAL_HardenedSchemaVersion_ExistsAndCorrect() {
+        XCTAssertEqual(
+            BASSovereignAuditEntry.hardenedSchemaVersion,
+            "1.2.0",
+            "ch1044 D2 step-2: hardenedSchemaVersion bumped to \"1.2.0\" — the hardened " +
+            "canonical is now the INJECTIVE length-prefixed form (the U+001F/U+001E " +
+            "delimiter-join of 1.1.0 was ambiguous for the substrate's composite refs)")
+    }
+
+    // MARK: - 2. Distinct from currentSchemaVersion
+
+    func test_HardenedSchemaVersion_DistinctFromCurrent() {
+        XCTAssertNotEqual(
+            BASSovereignAuditEntry.hardenedSchemaVersion,
+            BASSovereignAuditEntry.currentSchemaVersion,
+            "ch 1011: hardenedSchemaVersion (1.1.0) MUST be " +
+            "distinct from currentSchemaVersion (1.0.0)。 " +
+            "These represent different separator-class " +
+            "formats and MUST NOT collapse into a single " +
+            "value — refactoring failure would break the " +
+            "opt-in discipline")
+    }
+
+    // MARK: - 3. CRITICAL — no production literal remains
+
+    func testCRITICAL_NoProductionLiteral_ForSchemaVersion()
+        throws
+    {
+        let projectRoot =
+            BASSourceTreeAudit.repoRoot
+        let sourcesDir = "\(projectRoot)/Sources"
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(
+            atPath: sourcesDir)
+        else {
+            return  // skip silently if path missing
+        }
+        // Forbidden inlined hardened-version literals。 The "1.1.0"
+        // check is explicit (the historical hardened form);the
+        // CURRENT hardened version is derived from the constant so a
+        // FUTURE bump (1.3.0, …) is covered automatically the moment
+        // `hardenedSchemaVersion` advances — closing the gap the
+        // ch1044 D2 bump to "1.2.0" opened (a new producer inlining
+        // `schemaVersion: "1.2.0"` would have evaded the 1.1.0-only
+        // grep)。 Deduped so an identical pair never double-reports。
+        let forbiddenVersions: [String] = Array(Set([
+            "1.1.0",
+            BASSovereignAuditEntry.hardenedSchemaVersion,
+        ])).sorted()
+        var offenders: [(file: String, line: Int, version: String)] = []
+        for case let p as String in enumerator {
+            guard p.hasSuffix(".swift") else { continue }
+            let full = "\(sourcesDir)/\(p)"
+            guard let content = try? String(
+                contentsOfFile: full, encoding: .utf8)
+            else { continue }
+            let lines = content.split(
+                separator: "\n", omittingEmptySubsequences: false)
+            for (idx, line) in lines.enumerated() {
+                let s = String(line)
+                // Catch `schemaVersion: "X.Y.Z"` in code (not in
+                // comments or doc strings)。 Skip lines that begin
+                // with `//` or `*` for doc-comment heuristic。
+                let trimmed = s.trimmingCharacters(
+                    in: .whitespaces)
+                if trimmed.hasPrefix("//") ||
+                    trimmed.hasPrefix("*") ||
+                    trimmed.hasPrefix("///")
+                {
+                    continue
+                }
+                for v in forbiddenVersions
+                where s.contains("schemaVersion: \"\(v)\"") ||
+                      s.contains("schemaVersion:\"\(v)\"") {
+                    offenders.append(
+                        (file: p, line: idx + 1, version: v))
+                }
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty,
+            "ch 1011 CRITICAL: production Sources/ MUST NOT " +
+            "contain raw `schemaVersion: \"<hardened>\"` literals " +
+            "(forbidden: \(forbiddenVersions))。 " +
+            "Use `BASSovereignAuditEntry.hardenedSchemaVersion` " +
+            "instead。 Offenders: \(offenders)")
+    }
+
+    // MARK: - 4. Behavioral equivalence
+
+    func test_EntriesBuiltViaConstant_HaveCorrectSchemaVersion() {
+        let entry = BASSovereignAuditEntry(
+            schemaVersion: BASSovereignAuditEntry
+                .hardenedSchemaVersion,
+            auditID: "test.1",
+            sessionID: "s",
+            turnID: "t",
+            verdictRef: "v",
+            snapshotRef: "",
+            signature: "",
+            appendedAt: Date())
+        XCTAssertEqual(entry.schemaVersion, "1.2.0",
+            "ch1044 D2 step-2: entries built via the shared constant carry the new " +
+            "injective hardened version \"1.2.0\"")
+    }
+
+    // MARK: - 5. Pin migration completeness
+
+    /// Verify each of the 9 originally-identified files
+    /// references the constant。 If a future refactor
+    /// reintroduces the literal at one of these sites,this
+    /// test catches it。
+    func testCRITICAL_AllNineSites_ReferenceConstant() throws {
+        let projectRoot =
+            BASSourceTreeAudit.repoRoot
+        let pathsAndExpected: [String] = [
+            "Sources/BASHostKit/" +
+                "EBrainRuntimeCoordinator+SovereignCommit.swift",
+            "Sources/BASSovereign/BASSovereignAuditLedger.swift",
+            "Sources/BASSovereign/" +
+                "BASSovereignCleanRebootCoordinator.swift",
+            "Sources/BASSovereign/BASSovereignVerdictEngine.swift",
+            "Sources/BASOrchestration/ShadowTrialLedgerBridge.swift",
+            "Sources/BASOrchestration/" +
+                "BASMCPInvocationAuditBridge.swift",
+            "Sources/BASOrchestration/" +
+                "BASAgentFabricModeAuditEmitter.swift",
+            "Sources/BASOrchestration/" +
+                "BASSovereignWarrantAuditBridge.swift",
+            "Sources/BASObservability/" +
+                "BASUpdateTicketLifecycle.swift",
+        ]
+        for relPath in pathsAndExpected {
+            let full = "\(projectRoot)/\(relPath)"
+            guard let content = try? String(
+                contentsOfFile: full, encoding: .utf8)
+            else {
+                XCTFail("ch 1011: cannot read \(relPath)")
+                continue
+            }
+            XCTAssertTrue(
+                content.contains(
+                    "BASSovereignAuditEntry") &&
+                content.contains(
+                    ".hardenedSchemaVersion"),
+                "ch 1011 CRITICAL: \(relPath) MUST reference " +
+                "BASSovereignAuditEntry.hardenedSchemaVersion " +
+                "— the canonical shared constant。 If this " +
+                "test fires, a refactor reintroduced the " +
+                "literal at this site")
+        }
+    }
+}
+#endif

@@ -1,0 +1,6 @@
+📊 spec-sweep START lane=sampling decode_cap=48 n_prompts=10
+📊 spec-sweep n=1 mean_ms=821
+📊 spec-sweep n=2 mean_ms=1031
+📊 spec-sweep n=3 mean_ms=1244
+📊 spec-sweep baseline mean_ms=1413
+📊 spec-sweep FINAL best_n=1 best_ms=821 baseline_ms=1413 verdict=WIN (n=1 device, 10 prompts/config — directional, not a cert)

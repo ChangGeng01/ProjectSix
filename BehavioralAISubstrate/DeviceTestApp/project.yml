@@ -1,0 +1,207 @@
+# project.yml — xcodegen spec for BAS iPhone Air device test host
+# chapter 九百四十九 / M3450
+#
+# User directive (option 2 from ch 948 follow-up): set up Xcode iOS
+# host app target so xcodebuild test can run on real iPhone Air
+# device. SwiftPM-generated tests can't host on device — they need
+# an iOS app target wrapper.
+#
+# # Generate
+#
+#   cd DeviceTestApp && xcodegen generate
+#
+# # Run on device
+#
+#   xcodebuild test \
+#       -project DeviceTestApp/BASDeviceTest.xcodeproj \
+#       -scheme BASDeviceTestApp \
+#       -destination "platform=iOS,id=9E9E3DEB-E9F5-5C2D-A6B1-9B31A70659D6" \
+#       -only-testing:BASDeviceTests/BASChapter946FourteenLayerFuzzSmokeTests
+
+name: BASDeviceTest
+
+options:
+  bundleIdPrefix: dev.changgeng.bas
+  deploymentTarget:
+    iOS: "27.0"
+  developmentLanguage: "en"
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: U4ZLQM8399
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "27.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    ENABLE_PREVIEWS: YES
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+
+# The BehavioralAISubstrate package is the local SwiftPM package
+# we're testing — wired as a local package dependency。
+packages:
+  BehavioralAISubstrate:
+    path: ..
+
+targets:
+  # Minimal SwiftUI app — empty UI is fine,we only need a host
+  # for the test bundle。 App launches,test bundle gets injected
+  # by XCTest at runtime,tests run,app exits。
+  BASDeviceTestApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/App
+    # 结构大重构 Phase 6 — increased-memory-limit entitlement so the dual-residency speculative cert
+    # (Gemma4 E4B+E2B ≈ 4.2GB) can exceed the default ~3.4GB iOS per-process cap on the 8GB iPhone Air.
+    entitlements:
+      path: Resources/BASDeviceTestApp.entitlements
+      properties:
+        com.apple.developer.kernel.increased-memory-limit: true
+    info:
+      path: Resources/Info.plist
+      properties:
+        UILaunchScreen:
+          UIColorName: ""
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        CFBundleDisplayName: BAS Test
+        # Headless test host — it requires full screen, which waives the
+        # "all interface orientations must be supported" iPad validation.
+        UIRequiresFullScreen: true
+        UIRequiredDeviceCapabilities:
+          - armv7
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        BGTaskSchedulerPermittedIdentifiers:
+          - bas.sleep.consolidation
+    dependencies:
+      - package: BehavioralAISubstrate
+        product: BASHostKit
+      - package: BehavioralAISubstrate
+        product: BASMemory
+      - package: BehavioralAISubstrate
+        product: BASRuntimeCore
+      # ch 1025.4 — `BASEnduranceAppRunner` needs MLX + Organ to
+      # execute the endurance loop inside the app process (autostart
+      # mode via BAS_ENDURANCE_AUTOSTART=1)。 Adding these to the
+      # App target also pulls them into the build product so
+      # `devicectl device process launch` can find the symbols。
+      - package: BehavioralAISubstrate
+        product: BASMLXAdapter
+      - package: BehavioralAISubstrate
+        product: BASOrgan
+      # ch 1034 — `BASMPSGraphProbe` needs the MPSGraph kernel actors
+      # (BASMPSGraph*Kernel) + BASCanonicalKernelInputBuilders。
+      # Transitively pulled via BASHostKit,but the app target needs
+      # an explicit dep so the devicectl-launched product links the
+      # MPSGraph symbols directly(same reason as MLX/Organ above)。
+      - package: BehavioralAISubstrate
+        product: BASMetalSubstrate
+      # Step-2 flip — BASMiniLMEmbeddingProvider (on-device semantic memory embedder).
+      - package: BehavioralAISubstrate
+        product: BASAppleAdapters
+    settings:
+      base:
+        # Bundle ID matches the existing wildcard provisioning profile
+        # for team U4ZLQM8399 (which has wildcard appid pattern)
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.basdevicetest
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        GENERATE_INFOPLIST_FILE: NO
+
+  # Test bundle hosted by the app target。 Tests are pulled from
+  # the existing Tests/BehavioralAISubstrateTests directory via
+  # symbolic references in sources。 Per-test imports work because
+  # the bundle re-uses BehavioralAISubstrate package targets via
+  # @testable imports。
+  #
+  # Subset chosen for device run (matches BAS_FUZZ_RUNTIME_ITER
+  # convention):L8 substance + 14-layer fuzz + Mamba/retrieval
+  # stress tests。 Tests using Foundation.Process are excluded
+  # because they're gated #if os(macOS) in source。
+  BASDeviceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      # Pull in the test files we want device-validated。
+      # Adding directly to sources makes xcodegen produce a
+      # test target with these as members。
+      - path: ../Tests/BehavioralAISubstrateTests
+        excludes:
+          # macOS-only Process-using tests (already #if os(macOS)
+          # gated but excluded here for cleaner build output)
+          - "BASBrainCLIIntegrationTests.swift"
+          - "BASDoctrineStateAndGrowthTests.swift"
+          - "BASEventSourcedMemoryAtomStoreTests.swift"
+          # @testable-imports BASSQLSchemaGenCore — an INTERNAL
+          # build-plugin target with no package product, so this
+          # xcodegen target cannot resolve it ("Unable to resolve
+          # module dependency" under Xcode 27's build system; 26.5
+          # tolerated it). The schema-gen core is a macOS build-time
+          # tool — on-device testing adds nothing; SwiftPM host runs
+          # keep covering it (13 tests).
+          - "BASSQLSchemaGenCoreTests.swift"
+    dependencies:
+      - target: BASDeviceTestApp
+      - package: BehavioralAISubstrate
+        product: BASHostKit
+      - package: BehavioralAISubstrate
+        product: BASMemory
+      - package: BehavioralAISubstrate
+        product: BASRuntimeCore
+      - package: BehavioralAISubstrate
+        product: BASOrchestration
+      - package: BehavioralAISubstrate
+        product: BASAdmin
+      - package: BehavioralAISubstrate
+        product: BASAppleAdapters
+      - package: BehavioralAISubstrate
+        product: BASAppleEdgeWiring
+      - package: BehavioralAISubstrate
+        product: BASChatCompletionsAdapter
+      - package: BehavioralAISubstrate
+        product: BASEvaluation
+      - package: BehavioralAISubstrate
+        product: BASLeaseLife
+      - package: BehavioralAISubstrate
+        product: BASMLXAdapter
+      - package: BehavioralAISubstrate
+        product: BASMetalSubstrate
+      - package: BehavioralAISubstrate
+        product: BASObservability
+      - package: BehavioralAISubstrate
+        product: BASOrgan
+      - package: BehavioralAISubstrate
+        product: BASPolicy
+      - package: BehavioralAISubstrate
+        product: BASSovereign
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.basdevicetests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/BASDeviceTestApp.app/BASDeviceTestApp
+        BUNDLE_LOADER: $(TEST_HOST)
+        # Allow @testable imports of BAS package targets
+        ENABLE_TESTABILITY: YES
+        # Auto-generate Info.plist for the test bundle (xcodebuild
+        # signs unit-test bundles which need an Info.plist)
+        GENERATE_INFOPLIST_FILE: YES
+
+# chapter 九百五十二 / M3465 — explicit scheme declaration with test
+# plan reference。 The Device2HrFuzz.xctestplan sets env vars for
+# extended on-device fuzz iter counts (BAS_FUZZ_ITER etc) that
+# can't be passed via xcodebuild CLI on iOS device runs。
+schemes:
+  BASDeviceTestApp:
+    build:
+      targets:
+        BASDeviceTestApp: all
+        BASDeviceTests: [test]
+    test:
+      gatherCoverageData: false
+      targets:
+        - BASDeviceTests
+      testPlans:
+        - path: Device2HrFuzz.xctestplan
+          defaultPlan: false
+        - path: KeychainRegression.xctestplan
+          defaultPlan: false

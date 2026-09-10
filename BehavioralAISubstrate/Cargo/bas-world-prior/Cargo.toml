@@ -1,0 +1,26 @@
+# Cargo manifest for bas-world-prior
+# chapter 七百七十一 / M2506-M2510 — DEEPER LAYER-MIGRATION ARC
+#
+# L4 World Prior Rust types + reversibility/latency query。
+# Companion to the 4 SQL schemas landed at chapter 七百七十
+# (016 axioms / 017 templates / 018 bridges / 019 domains)。
+#
+# The SQLite I/O stays Swift (per chapter 392 replay-determinism +
+# substrate's existing SQLite-via-actor pattern)。 Rust owns:
+#   - Typed Axiom / Template / Bridge / Domain structs
+#   - EvidenceLevel + Reversibility enums
+#   - Pure-fn evidence propagation + reversibility lookup
+
+[package]
+name = "bas-world-prior"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_world_prior"
+path = "src/lib.rs"
+
+[dependencies]

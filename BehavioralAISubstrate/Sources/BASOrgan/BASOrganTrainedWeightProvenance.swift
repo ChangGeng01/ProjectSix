@@ -1,0 +1,468 @@
+import Foundation
+import BASRuntimeCore
+
+/// M343 — typed provenance envelope for trained adapter weights.
+/// Fills the **typed pin** leg of the v5 doctrine triple
+/// (typed pin → measurement → regression gate) for the
+/// `Adapter-trained L2` candidate parked in
+/// `docs/QINAO_MANIFESTO_V5_DOCTRINE.md` appendix.
+///
+/// ## Why this exists
+///
+/// M67.4 / M295.2 ship `BASWorldPriorTrainingPipelineFilter` to gate
+/// **curriculum content** at the training pipeline boundary —
+/// only `.domainExpertReviewed` envelopes may flow into L2 training.
+/// That gate protects what goes *in* to training.
+///
+/// Pre-M343 there was no mirrored gate for what comes *out* of
+/// training: a third-party adapter, or a future in-house adapter,
+/// could be plugged into `BASOrganRegistry` without any audit of
+/// its training provenance. The runtime would happily route
+/// requests to weights of unknown lineage.
+///
+/// M343 ships `BASOrganTrainedWeightProvenance` (the typed envelope
+/// per adapter) plus `BASOrganTrainedWeightFilter` (the gate that
+/// rejects weights below `.domainExpertReviewed`). The pair mirrors
+/// the M295.2 shape so the curriculum-gate doctrine and the
+/// trained-weight-gate doctrine compose cleanly.
+///
+/// ## Doctrine role
+///
+/// This is the **typed pin** for the v5 v6/v7 candidate "Adapter-
+/// trained L2 doctrine". The candidate cannot be authored as v6
+/// without this pin (per v5 §4: a doctrine claim with no typed
+/// pin is forbidden). With this primitive in place, a future v6
+/// authoring decision is unblocked.
+///
+/// What this primitive does NOT do:
+///
+/// - It does **not** verify the cryptographic signature on
+///   `expertAttestationSignatureRef`. That's a downstream
+///   verification step using existing `BASSovereignSignatureVerifier`
+///   primitives.
+/// - It does **not** measure the adapter's behavioural quality.
+///   Quality is the AFM persona panel (M326) territory.
+/// - It does **not** train anything. Training itself is EB-1
+///   territory (`docs/QINAO_EXTERNAL_BOTTLENECKS_BACKLOG.md`).
+public struct BASOrganTrainedWeightProvenance:
+    Sendable, Equatable, Hashable, Codable
+{
+
+    // MARK: - Provenance tier (mirrors curriculum tier)
+
+    /// Provenance tier ladder. Order matches
+    /// `BASWorldPriorTemplateProvenance` so the two doctrines
+    /// compose: only `.domainExpertReviewed` curriculum may train
+    /// adapter weights, and only `.domainExpertReviewed` adapter
+    /// weights may serve runtime requests.
+    public enum Tier:
+        String, Sendable, Equatable, Hashable, Codable,
+        CaseIterable, Comparable
+    {
+        /// Adapter trained on illustrative content (e.g., M295.1
+        /// Path A starter curriculum). Useful for scaffolding;
+        /// MUST NOT serve production requests.
+        case illustrative
+
+        /// Adapter trained on AI-advisory content (e.g., M327
+        /// 5-persona panel review output). Useful for review
+        /// preparation; MUST NOT serve production requests.
+        case aiAdvisory
+
+        /// Adapter trained on peer-reviewed content (one human
+        /// expert reviewed). Improvement over advisory; still
+        /// below the production bar.
+        case peerReviewed
+
+        /// Adapter trained on content that passed full domain
+        /// expert review with signed attestation. The only tier
+        /// permitted to serve production runtime requests.
+        case domainExpertReviewed
+
+        public static func < (
+            lhs: Tier, rhs: Tier
+        ) -> Bool {
+            lhs.ordinal < rhs.ordinal
+        }
+
+        private var ordinal: Int {
+            switch self {
+            case .illustrative: return 0
+            case .aiAdvisory: return 1
+            case .peerReviewed: return 2
+            case .domainExpertReviewed: return 3
+            }
+        }
+    }
+
+    // MARK: - Fields
+
+    /// Stable identifier of the trained adapter. Typically a
+    /// SHA-256 prefix of the adapter weights file or a vendor
+    /// product identifier (e.g., `"apple.foundation-models.v1.adapter.therapy.v1"`).
+    public let adapterID: String
+
+    /// Identifier of the base model these weights extend.
+    /// Pattern: `"{vendor}.{model-family}.{version}"`.
+    public let baseModelID: String
+
+    /// Provenance tier per the ladder above.
+    public let tier: Tier
+
+    /// Reference to the curriculum corpus used for training.
+    /// Typically a `BASWorldPriorTemplate` curriculum manifest hash
+    /// or a `BASSovereignAuditEntry.auditID`.
+    public let trainingCurriculumRef: String
+
+    /// SHA-256 hex of the curriculum corpus bytes. 64 chars.
+    /// Pin so a curriculum swap forces a provenance update.
+    public let trainingCorpusHashHex: String
+
+    /// SHA-256 hex of the trained weight bytes. 64 chars.
+    /// Pin so a weight swap forces a provenance update.
+    public let trainedWeightsHashHex: String
+
+    /// Reference to the domain-expert attestation signature.
+    /// Required when `tier == .domainExpertReviewed`; nil
+    /// otherwise. Typically points to a `BASSovereignAuditEntry`
+    /// carrying the expert's Ed25519 signature over
+    /// `adapterID + trainedWeightsHashHex`.
+    public let expertAttestationSignatureRef: String?
+
+    /// Wall-clock timestamp the attestation was issued. Nil for
+    /// non-attested tiers.
+    public let attestationIssuedAt: Date?
+
+    public init(
+        adapterID: String,
+        baseModelID: String,
+        tier: Tier,
+        trainingCurriculumRef: String,
+        trainingCorpusHashHex: String,
+        trainedWeightsHashHex: String,
+        expertAttestationSignatureRef: String? = nil,
+        attestationIssuedAt: Date? = nil
+    ) {
+        self.adapterID = adapterID
+        self.baseModelID = baseModelID
+        self.tier = tier
+        self.trainingCurriculumRef = trainingCurriculumRef
+        self.trainingCorpusHashHex = trainingCorpusHashHex
+        self.trainedWeightsHashHex = trainedWeightsHashHex
+        self.expertAttestationSignatureRef =
+            expertAttestationSignatureRef
+        self.attestationIssuedAt = attestationIssuedAt
+    }
+
+    // MARK: - Self-consistency
+
+    /// Whether this envelope's fields are internally consistent.
+    /// Production tier requires a non-nil attestation reference;
+    /// non-production tiers must NOT carry one (otherwise it
+    /// looks like a forged uplift).
+    ///
+    /// **Relationship to `BASOrganTrainedWeightFilter.rejectionReason`**
+    /// (per chapter 八十一 deep-review note, M353):
+    ///
+    /// `isStructurallyConsistent` and `rejectionReason` check
+    /// overlapping but slightly different concerns. `rejectionReason`
+    /// is the production gate (returns the typed `Rejection`
+    /// case for telemetry/audit); `isStructurallyConsistent` is
+    /// a fast-path diagnostic Boolean. They agree on:
+    ///
+    /// - Hash field length must be exactly 64
+    /// - Production tier requires non-nil attestation ref + issued-at
+    /// - Non-production tier must NOT carry attestation
+    ///
+    /// They diverge on:
+    ///
+    /// - `rejectionReason` ALSO checks hex content (M352) and
+    ///   surfaces `nonProductionTierCarriesAttestation` as the
+    ///   forged-uplift signal taking precedence over plain tier
+    ///   rejection.
+    /// - `isStructurallyConsistent` does NOT check hex content
+    ///   (it's a structural check, not a content-validity check).
+    ///
+    /// Use `rejectionReason` for production gating; use
+    /// `isStructurallyConsistent` for fast-path well-formedness
+    /// diagnostics.
+    public var isStructurallyConsistent: Bool {
+        let hashesAreCorrectLength =
+            trainingCorpusHashHex.count == 64
+            && trainedWeightsHashHex.count == 64
+        let attestationConsistent: Bool
+        switch tier {
+        case .domainExpertReviewed:
+            attestationConsistent =
+                expertAttestationSignatureRef != nil
+                && attestationIssuedAt != nil
+        case .illustrative, .aiAdvisory, .peerReviewed:
+            attestationConsistent =
+                expertAttestationSignatureRef == nil
+                && attestationIssuedAt == nil
+        }
+        return hashesAreCorrectLength
+            && attestationConsistent
+    }
+}
+
+/// M343 — typed gate analogous to `BASWorldPriorTrainingPipelineFilter`
+/// but for trained adapter weights at the runtime registry boundary.
+///
+/// Doctrine: only `.domainExpertReviewed` adapter weights may be
+/// loaded into a production `BASOrganRegistry`. Lower tiers may be
+/// useful for in-development testing but MUST NOT be returned by
+/// `adapter(providerID:)` in a production session.
+///
+/// A future v6 doctrine candidate "Adapter-trained L2 doctrine"
+/// would use this gate as its enforcement primitive. v5 does not
+/// yet author it; M343 ships the typed pin so the candidate becomes
+/// authoring-ready.
+public enum BASOrganTrainedWeightFilter {
+
+    /// chapter 七百十七 第三刀 — opt-in feature flag。 When ON,
+    /// `rejectionReason(for:)` routes the decision tree through
+    /// `BASAutoRouteRanker.provenanceFilter` (Rust C ABI from
+    /// chapter 七百十三 第二刀)。
+    ///
+    /// **DEFAULT FLIPPED ON at chapter 七百十七 第五刀** (M2260)
+    /// per measurement-grounded decision:Rust route is 4.91×
+    /// faster than Swift inline (chapter 七百十七 第四刀
+    /// BASChapter717ProvenancePerfTests)。 Swift String's
+    /// Unicode-aware `.count` + `Character.isHexDigit` adds
+    /// ~3µs of grapheme-cluster overhead per envelope;Rust's
+    /// byte-level `is_ascii_hexdigit` runs in ~600 ns。
+    ///
+    /// Byte-equality verified by BASChapter717ProvenanceByteEqualityTests
+    /// (10/10 variants produce identical Rejection? values)。
+    /// `.invalidInput` defensive case falls back to the Swift
+    /// decision tree,so the routed path can NEVER produce
+    /// a bogus result。
+    ///
+    /// Hosts that want the legacy Swift path (e.g。 for
+    /// replay-byte-pinned compat across an existing audit
+    /// archive) can flip this to `false` at startup。
+    public nonisolated(unsafe) static var useRoutedFilter:
+        Bool = true
+
+
+    /// Typed rejection reasons. Calling sites switch on case for
+    /// stable telemetry / audit reasons.
+    public enum Rejection:
+        Sendable, Equatable, Hashable, Codable
+    {
+        /// Provenance tier is below the runtime bar.
+        case belowProductionTier(
+            BASOrganTrainedWeightProvenance.Tier)
+
+        /// Tier claims production but signature reference is
+        /// missing or malformed (structurally inconsistent).
+        case missingAttestationForProductionTier
+
+        /// Hash field length is wrong (not 64 hex chars). The
+        /// SHA-256 invariant is part of the typed pin.
+        case malformedHash(field: String, length: Int)
+
+        /// Hash field has correct length (64) but contains
+        /// non-hex characters. SHA-256 hex output is exactly
+        /// `[0-9a-f]{64}` (lowercase) or `[0-9A-F]{64}`
+        /// (uppercase); any other character indicates a
+        /// malformed envelope. M352 chapter 八十一 fix — pre-M352
+        /// only length was checked, so `"zzzz...zzzz"` (64 z's)
+        /// would pass the length gate while being invalid hex.
+        /// `firstInvalidChar` is a String (length 1) rather than
+        /// Character so the enum stays `Codable` via synthesis.
+        case malformedHashContent(
+            field: String, firstInvalidChar: String)
+
+        /// Non-production tier carries an attestation reference.
+        /// This indicates a forged uplift attempt — the envelope
+        /// is rejected even though the runtime would never have
+        /// promoted it.
+        case nonProductionTierCarriesAttestation
+    }
+
+    /// Minimum tier permitted to serve production runtime requests.
+    /// Mirrors `BASWorldPriorTrainingPipelineFilter
+    /// .trainingProvenanceFloor` so the curriculum-gate doctrine
+    /// and the trained-weight-gate doctrine compose.
+    public static let productionTierFloor:
+        BASOrganTrainedWeightProvenance.Tier =
+        .domainExpertReviewed
+
+    /// Returns nil if the envelope is permitted into production
+    /// runtime; otherwise returns the typed rejection reason.
+    public static func rejectionReason(
+        for provenance: BASOrganTrainedWeightProvenance
+    ) -> Rejection? {
+        // chapter 七百十七 第三刀 / M2258 — opt-in routing。
+        // When the feature flag is on,delegate the decision
+        // tree to BASAutoRouteRanker.provenanceFilter (Rust)
+        // and map its typed decision back to this enum。
+        // DEFAULT ON since chapter 七百十七 第五刀 / M2260
+        // (commit da2d5a168) — the routed path is byte-equal to
+        // the Swift tree (10/10 variants,BASChapter717Provenance
+        // ByteEqualityTests) at a ~4.9× perf win,so the flip was a
+        // reviewed default per ADR-014。 See the `:228` doc above。
+        if useRoutedFilter {
+            return rejectionReasonViaAutoRouter(
+                for: provenance)
+        }
+        return rejectionReasonViaSwiftTree(for: provenance)
+    }
+
+    /// audit M-l MED-6: the pure Swift decision tree, extracted so the routed-path `.invalidInput`
+    /// fallback can invoke it DIRECTLY. Previously that fallback flipped the process-global
+    /// `useRoutedFilter = false` (with a `defer` restore) and re-entered `rejectionReason` — a data
+    /// race: a CONCURRENT caller reading the global during that window silently took the Swift path
+    /// instead of the routed one (routing crosstalk + a write race on the shared static). Nothing
+    /// mutates the global now; `useRoutedFilter` is read once at the public entry as pure config.
+    internal static func rejectionReasonViaSwiftTree(
+        for provenance: BASOrganTrainedWeightProvenance
+    ) -> Rejection? {
+        // Hash length pin first — structural invariant.
+        if provenance.trainingCorpusHashHex.count != 64 {
+            return .malformedHash(
+                field: "trainingCorpusHashHex",
+                length: provenance.trainingCorpusHashHex.count)
+        }
+        if provenance.trainedWeightsHashHex.count != 64 {
+            return .malformedHash(
+                field: "trainedWeightsHashHex",
+                length: provenance.trainedWeightsHashHex.count)
+        }
+        // M352 chapter 八十一 fix — hash content must be hex.
+        // Length check alone allowed e.g. 64 z's to pass.
+        if let invalid = firstNonHexCharacter(
+            provenance.trainingCorpusHashHex)
+        {
+            return .malformedHashContent(
+                field: "trainingCorpusHashHex",
+                firstInvalidChar: String(invalid))
+        }
+        if let invalid = firstNonHexCharacter(
+            provenance.trainedWeightsHashHex)
+        {
+            return .malformedHashContent(
+                field: "trainedWeightsHashHex",
+                firstInvalidChar: String(invalid))
+        }
+        // Tier check.
+        if provenance.tier < productionTierFloor {
+            // If it claims a non-production tier but carries an
+            // attestation, surface the forged-uplift signal
+            // explicitly rather than the plain tier rejection.
+            if provenance.expertAttestationSignatureRef != nil {
+                return .nonProductionTierCarriesAttestation
+            }
+            return .belowProductionTier(provenance.tier)
+        }
+        // Production tier missing attestation.
+        if provenance.expertAttestationSignatureRef == nil
+            || provenance.attestationIssuedAt == nil
+        {
+            return .missingAttestationForProductionTier
+        }
+        return nil
+    }
+
+    /// Convenience — does this provenance envelope pass the
+    /// production gate?
+    public static func isPermittedForProduction(
+        _ provenance: BASOrganTrainedWeightProvenance
+    ) -> Bool {
+        rejectionReason(for: provenance) == nil
+    }
+
+    /// Filter a batch of envelopes, returning only those permitted
+    /// for production. Order preserved.
+    public static func acceptedForProduction(
+        _ provenances: [BASOrganTrainedWeightProvenance]
+    ) -> [BASOrganTrainedWeightProvenance] {
+        provenances.filter { isPermittedForProduction($0) }
+    }
+
+    /// M352 helper — return the first non-hex character if any,
+    /// else nil. Hex = `[0-9a-fA-F]`. Used by `rejectionReason`
+    /// to enforce the SHA-256 content invariant beyond length.
+    internal static func firstNonHexCharacter(
+        _ s: String
+    ) -> Character? {
+        for ch in s where !ch.isHexDigit {
+            return ch
+        }
+        return nil
+    }
+
+    /// chapter 七百十七 第三刀 / M2258 — routed-path helper。
+    /// Maps Swift `Rejection` enum onto Rust's compact i32
+    /// decision codes via BASAutoRouteRanker.provenanceFilter。
+    ///
+    /// Note:Rust path loses the detailed `length` /
+    /// `firstInvalidChar` payload (compact codes are
+    /// structural-only)。 The detailed payload is reconstructed
+    /// Swift-side from the input provenance — same data,same
+    /// shape,no information loss。
+    internal static func rejectionReasonViaAutoRouter(
+        for provenance: BASOrganTrainedWeightProvenance
+    ) -> Rejection? {
+        let tier: BASProvenanceTier
+        switch provenance.tier {
+        case .illustrative: tier = .illustrative
+        case .aiAdvisory: tier = .aiAdvisory
+        case .peerReviewed: tier = .peerReviewed
+        case .domainExpertReviewed:
+            tier = .domainExpertReviewed
+        }
+        let r = BASAutoRouteRanker.provenanceFilter(
+            trainingCorpusHashHex:
+                provenance.trainingCorpusHashHex,
+            trainedWeightsHashHex:
+                provenance.trainedWeightsHashHex,
+            tier: tier,
+            hasAttestationSignatureRef:
+                provenance.expertAttestationSignatureRef
+                    != nil,
+            hasAttestationIssuedAt:
+                provenance.attestationIssuedAt != nil)
+        switch r.value {
+        case .permitted:
+            return nil
+        case .malformedHashLengthTrainingCorpus:
+            return .malformedHash(
+                field: "trainingCorpusHashHex",
+                length:
+                    provenance.trainingCorpusHashHex.count)
+        case .malformedHashLengthTrainedWeights:
+            return .malformedHash(
+                field: "trainedWeightsHashHex",
+                length:
+                    provenance.trainedWeightsHashHex.count)
+        case .malformedHashContentTrainingCorpus:
+            let bad = firstNonHexCharacter(
+                provenance.trainingCorpusHashHex)
+                ?? "?"
+            return .malformedHashContent(
+                field: "trainingCorpusHashHex",
+                firstInvalidChar: String(bad))
+        case .malformedHashContentTrainedWeights:
+            let bad = firstNonHexCharacter(
+                provenance.trainedWeightsHashHex)
+                ?? "?"
+            return .malformedHashContent(
+                field: "trainedWeightsHashHex",
+                firstInvalidChar: String(bad))
+        case .belowProductionTier:
+            return .belowProductionTier(provenance.tier)
+        case .nonProductionTierCarriesAttestation:
+            return .nonProductionTierCarriesAttestation
+        case .missingAttestationForProductionTier:
+            return .missingAttestationForProductionTier
+        case .invalidInput:
+            // Defensive — Rust ABI returned a bogus code。 Fall back to the Swift decision tree
+            // DIRECTLY (audit M-l MED-6: no longer flips the process-global `useRoutedFilter`, which
+            // raced concurrent callers into the Swift path + wrote a shared static mid-call)。
+            return rejectionReasonViaSwiftTree(for: provenance)
+        }
+    }
+}
