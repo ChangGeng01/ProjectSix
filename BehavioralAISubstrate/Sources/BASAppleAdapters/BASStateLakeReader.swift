@@ -9,7 +9,6 @@ import Foundation
 
 #if canImport(CoreAI)
 import CoreAI
-import CryptoKit
 
 @available(iOS 27, macOS 27, *)
 public enum BASStateLakeReader {
@@ -25,53 +24,41 @@ public enum BASStateLakeReader {
         public let promptLen: Int
     }
 
-    /// FAIL-CLOSED load: verify binding-key then sha256(payload), then dequantize each tensor (int8·scale | fp16) into NDArrays.
+    /// FAIL-CLOSED load for the retained `statelake-device/1` experiment.
+    ///
+    /// Reader policy caps header bytes at 1 MiB, payload bytes at 64 MiB,
+    /// decoded Float16 storage at 128 MiB, records at 1024 and rank at 16.
+    /// Larger artifacts are rejected, never truncated. These are local input
+    /// limits and make no claim about whole-process memory use.
     public static func load(_ dir: URL, expectedBindingKey: String, stateOrder: [String]) throws -> Loaded {
-        let hdr = try Data(contentsOf: dir.appendingPathComponent("header.json"))
-        guard let h = try JSONSerialization.jsonObject(with: hdr) as? [String: Any],
-              let bkey = h["binding_key"] as? String,
-              let recs = h["tensors"] as? [[String: Any]],
-              let promptLen = h["prompt_len"] as? Int,
-              let checksum = h["checksum"] as? String else {
-            throw Error.header("malformed header.json")
-        }
-        guard bkey == expectedBindingKey else {
-            throw Error.bindingKey("artifact \(bkey.prefix(12)) != expected \(expectedBindingKey.prefix(12)) — refusing stale state")
-        }
-        let payload = try Data(contentsOf: dir.appendingPathComponent("payload.bin"))
-        let got = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
-        guard got == checksum else {
-            throw Error.checksum("payload sha256 mismatch — corrupt .statelake")
+        let artifact: BASStateLakeDecodedArtifact
+        do {
+            artifact = try BASStateLakeArtifactDecoder.load(
+                dir,
+                expectedBindingKey: expectedBindingKey,
+                stateOrder: stateOrder
+            )
+        } catch let error as BASStateLakeDecodeError {
+            switch error {
+            case .header(let message): throw Error.header(message)
+            case .bindingKey(let message): throw Error.bindingKey(message)
+            case .checksum(let message): throw Error.checksum(message)
+            case .missing(let message): throw Error.missing(message)
+            }
         }
 
         var byName: [String: NDArray] = [:]
-        for r in recs {
-            guard let name = r["name"] as? String, let shape = r["shape"] as? [Int],
-                  let dtype = r["dtype"] as? String, let start = r["start"] as? Int, let nbytes = r["nbytes"] as? Int else {
-                throw Error.header("bad tensor record")
-            }
-            let scale = Float((r["scale"] as? NSNumber)?.doubleValue ?? 1.0)
-            let n = shape.reduce(1, *)
-            var f16 = [Float16](repeating: 0, count: n)
-            let sub = payload.subdata(in: start..<(start + nbytes))
-            if dtype == "int8" {
-                sub.withUnsafeBytes { raw in
-                    let q = raw.bindMemory(to: Int8.self)
-                    for i in 0..<n { f16[i] = Float16(Float(q[i]) * scale) }
-                }
-            } else {                                                  // fp16 (mla_fill — the offset, stored exact)
-                sub.withUnsafeBytes { raw in
-                    let q = raw.bindMemory(to: Float16.self)
-                    for i in 0..<n { f16[i] = q[i] }
-                }
-            }
-            byName[name] = NDArray(scalars: f16, shape: shape)
+        byName.reserveCapacity(artifact.tensors.count)
+        for tensor in artifact.tensors {
+            byName[tensor.name] = NDArray(scalars: tensor.scalars, shape: tensor.shape)
         }
-        let ordered = try stateOrder.map { name -> NDArray in
-            guard let nd = byName[name] else { throw Error.missing("tensor \(name) absent from .statelake") }
-            return nd
+        let ordered = try stateOrder.map { name in
+            guard let array = byName[name] else {
+                throw Error.missing("tensor \(name) absent from .statelake")
+            }
+            return array
         }
-        return Loaded(states: ordered, promptLen: promptLen)
+        return Loaded(states: ordered, promptLen: artifact.promptLen)
     }
 }
 
