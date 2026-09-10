@@ -40,18 +40,26 @@ def _xcode27_selection(sdks: str = "macosx") -> dict[str, str]:
             f"bash scripts/check_ci_xcode27.sh {sdks}\n"}
 
 
+def _metal_preparation(sdks: str = "macosx") -> dict[str, str]:
+    return {"name": "Prepare Metal compiler",
+            "run": f"bash scripts/ensure_ci_metal_toolchain.sh {sdks}"}
+
+
 # These are the product commands CI must actually execute, not admission inputs.
 PRODUCT_STEPS = {
     "bas-tests": [
         _xcode27_selection(),
+        _metal_preparation(),
         {"name": "BAS test", "run": "swift test --package-path BehavioralAISubstrate"},
     ],
     "qinao-tests": [
         _xcode27_selection(),
+        _metal_preparation(),
         {"name": "Qinao test", "working-directory": "QinaoRuntimeSDK", "run": "swift test"},
     ],
     "samplehost-tests": [
         _xcode27_selection("macosx iphonesimulator"),
+        _metal_preparation("macosx iphonesimulator"),
         {
             "name": "Build SampleHost for iOS Simulator",
             "working-directory": "SampleHost",
@@ -71,6 +79,7 @@ PRODUCT_STEPS = {
     ],
     "boundary-checks": [
         _xcode27_selection(),
+        _metal_preparation(),
         {"name": "Qinao import boundaries", "run": "bash scripts/check_qinao_import_boundaries.sh"},
         {"name": "Sovereign redaction", "run": "bash scripts/check_sovereign_redaction.sh"},
         {"name": "SDK import boundaries", "run": "bash scripts/check_sdk_import_boundaries.sh"},
@@ -82,7 +91,7 @@ PRODUCT_STEPS = {
             "run": "set -e\ncommand -v rg\n"
                    "python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger "
                    "BehavioralAISubstrate.scripts.test_check_ios27_floor "
-                   "scripts.test_boundary_tool_errors\n",
+                   "scripts.test_boundary_tool_errors scripts.test_ci_metal_toolchain\n",
         },
     ],
     "python-fuzz": [
@@ -540,6 +549,19 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
         self.assertIn("scripts.test_boundary_tool_errors", helper["run"].split())
         self.assertIn("command -v rg", helper["run"])
 
+    def test_apple_jobs_prepare_metal_before_product_commands(self) -> None:
+        document = _parse_yaml(_read(ORDINARY_WORKFLOW))
+        for name in ("bas-tests", "qinao-tests", "samplehost-tests", "boundary-checks"):
+            with self.subTest(job=name):
+                steps = document["jobs"][name]["steps"]
+                self.assertEqual(steps[2]["name"], "Prepare Metal compiler")
+                sdks = "macosx iphonesimulator" if name == "samplehost-tests" else "macosx"
+                self.assertEqual(steps[2]["run"],
+                                 f"bash scripts/ensure_ci_metal_toolchain.sh {sdks}")
+        helper = _named_step(document["jobs"]["boundary-checks"],
+                             "CI contract and iOS floor helper tests")
+        self.assertIn("scripts.test_ci_metal_toolchain", helper["run"].split())
+
     def test_apple_alignment_and_boundary_consumer_mutations_are_rejected(self) -> None:
         document = _parse_yaml(_read(ORDINARY_WORKFLOW))
         self.assertNoContractErrors(validate_ordinary_workflow(json.dumps(document)))
@@ -565,6 +587,7 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
         step["run"] = step["run"].replace(" iphonesimulator", "")
         self.assertTrue(validate_ordinary_workflow(json.dumps(changed)))
         for old, new in ((" scripts.test_boundary_tool_errors", ""),
+                         (" scripts.test_ci_metal_toolchain", ""),
                          ("command -v rg", "command -v rg || true"),
                          ("command -v rg\n", "")):
             changed = json.loads(json.dumps(document))
@@ -681,7 +704,8 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
                     self.assertEqual(calls.read_text().split(), ["-B", "-m", "unittest", "-v",
                         "scripts.test_test_workflow_owner_ledger",
                         "BehavioralAISubstrate.scripts.test_check_ios27_floor",
-                        "scripts.test_boundary_tool_errors"])
+                        "scripts.test_boundary_tool_errors",
+                        "scripts.test_ci_metal_toolchain"])
                 else:
                     self.assertNotEqual(result.returncode, 0)
                     self.assertFalse(calls.exists())
@@ -1154,7 +1178,7 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
             document = _parse_yaml(_read(path))
             for job_name, step in _run_steps(document):
                 bodies.append((path.name, job_name, str(step.get("run"))))
-        self.assertEqual(len(bodies), 17)
+        self.assertEqual(len(bodies), 21)
         for workflow, job, body in bodies:
             with self.subTest(workflow=workflow, job=job):
                 result = subprocess.run(

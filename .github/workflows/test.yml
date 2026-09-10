@@ -36,6 +36,8 @@ jobs:
           set -e
           sudo xcode-select -s /Applications/Xcode.app
           bash scripts/check_ci_xcode27.sh macosx
+      - name: Prepare Metal compiler
+        run: bash scripts/ensure_ci_metal_toolchain.sh macosx
       - name: BAS test
         run: swift test --package-path BehavioralAISubstrate
 
@@ -58,6 +60,8 @@ jobs:
           set -e
           sudo xcode-select -s /Applications/Xcode.app
           bash scripts/check_ci_xcode27.sh macosx
+      - name: Prepare Metal compiler
+        run: bash scripts/ensure_ci_metal_toolchain.sh macosx
       - name: Qinao test
         working-directory: QinaoRuntimeSDK
         run: swift test
@@ -88,6 +92,8 @@ jobs:
           set -e
           sudo xcode-select -s /Applications/Xcode.app
           bash scripts/check_ci_xcode27.sh macosx iphonesimulator
+      - name: Prepare Metal compiler
+        run: bash scripts/ensure_ci_metal_toolchain.sh macosx iphonesimulator
       - name: Build SampleHost for iOS Simulator
         working-directory: SampleHost
         run: |
@@ -122,6 +128,8 @@ jobs:
           set -e
           sudo xcode-select -s /Applications/Xcode.app
           bash scripts/check_ci_xcode27.sh macosx
+      - name: Prepare Metal compiler
+        run: bash scripts/ensure_ci_metal_toolchain.sh macosx
       - name: Qinao import boundaries
         run: bash scripts/check_qinao_import_boundaries.sh
       - name: Sovereign redaction
@@ -138,7 +146,7 @@ jobs:
         run: |
           set -e
           command -v rg
-          python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger BehavioralAISubstrate.scripts.test_check_ios27_floor scripts.test_boundary_tool_errors
+          python3 -B -m unittest -v scripts.test_test_workflow_owner_ledger BehavioralAISubstrate.scripts.test_check_ios27_floor scripts.test_boundary_tool_errors scripts.test_ci_metal_toolchain
 
   python-fuzz:
     name: Python pytest fuzz tests
