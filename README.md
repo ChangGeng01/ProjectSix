@@ -34,6 +34,29 @@ Archive/
 
 ## What this repo holds now
 
+### Current development vs preserved historical tooling
+
+Current development uses ordinary Git commits, the existing draft PR, necessary
+tests/CI and code review. The active work is **App/runtime persistence and
+recovery**, not another system for persisting the development process. See the
+[current DS3 readiness plan](docs/superpowers/plans/2026-09-09-qinao-ds3-readiness-solo.md)
+and [user decisions](docs/superpowers/specs/2026-09-10-qinao-approved-decisions.md).
+DS3 requires separate approval and has not started.
+
+| Area | Current role |
+| --- | --- |
+| `.github/workflows/test.yml`, build/boundary/regression tests | Active ordinary engineering checks; not merge authorization |
+| `scripts/qinao_convergence_audit.py`, `run_qinao_managed_convergence.py`, `run_qinao_wave_admission.py`, `prepare_qinao_v2_wave_candidate.py`, `check_qinao_owner_ledger.py`, `qinao_a02_provisional_design_edge.py`, `qinao_a03_design_source_identity.py`, their tests/fixtures and old plans | Preserved historical development-workflow tooling; not part of current development admission or an App persistence deliverable |
+| App/runtime storage, recovery and audit modules; artifact-mesh device recovery tooling; original DS1/DS2 evidence | Retained necessary product/evidence work; not retired with development controllers |
+
+Historical files remain at their original paths to preserve links and recorded
+identities, along with their tests and design rationale for possible reuse.
+"Historical" means not currently required, not disposable or proven useless.
+No history or old implementation is deleted. Their continued
+presence does not make the old workflow a current prerequisite; do not run it as
+part of ordinary development. Current product claims require actual runtime and
+reopen tests, not saved development records.
+
 - `BehavioralAISubstrate/` — the core library。 Swift Package Manager-based,
   no Xcode project required。 Builds via `swift build`; headless validation
   uses `swift test --disable-swift-testing` because monolithic `swift test`

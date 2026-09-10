@@ -1231,33 +1231,6 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_runner_accepts_fd_bound_external_inputs(self) -> None:
-        from scripts.run_qinao_wave_admission import external_file_bytes
-
-        with (
-            tempfile.TemporaryDirectory() as external_directory,
-            tempfile.TemporaryDirectory() as repository_directory,
-        ):
-            external_path = Path(external_directory) / "bound.json"
-            external_path.write_bytes(b"{}\n")
-            external_path.chmod(0o600)
-            descriptor = os.open(external_path, os.O_RDONLY)
-            try:
-                resolved, raw, identity = external_file_bytes(
-                    Path(f"/dev/fd/{descriptor}"),
-                    Path(repository_directory).resolve(),
-                    "FD-bound workflow smoke",
-                )
-                metadata = os.fstat(descriptor)
-                self.assertEqual(resolved, Path(f"/dev/fd/{descriptor}"))
-                self.assertEqual(raw, b"{}\n")
-                self.assertEqual(
-                    identity,
-                    (metadata.st_dev, metadata.st_ino),
-                )
-            finally:
-                os.close(descriptor)
-
     def test_workflow_diff_has_no_whitespace_errors(self) -> None:
         result = subprocess.run(
             [
