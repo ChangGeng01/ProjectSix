@@ -202,6 +202,8 @@ final class BASArtifactStoreTests: XCTestCase {
 
         XCTAssertEqual(first.body.artifactID, second.body.artifactID)
         XCTAssertEqual(first.body.storage, second.body.storage)
+        XCTAssertNil(first.body.head)
+        XCTAssertNil(second.body.head)
         XCTAssertEqual(reopened.identityCore, core)
     }
 

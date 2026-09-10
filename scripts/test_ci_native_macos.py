@@ -201,6 +201,7 @@ class NativeMacOSHelperTests(unittest.TestCase):
                     f"cmake -S {vendor}/mlx -B {scratch}/build "
                     "-DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 "
                     "-DMLX_BUILD_METAL=ON -DMLX_METAL_JIT=OFF "
+                    "-DMLX_BUILD_GGUF=OFF "
                     "-DMLX_BUILD_TESTS=OFF -DMLX_BUILD_EXAMPLES=OFF "
                     "-DMLX_BUILD_BENCHMARKS=OFF -DMLX_BUILD_PYTHON_BINDINGS=OFF "
                     "-DMLX_BUILD_PYTHON_STUBS=OFF -DFETCHCONTENT_FULLY_DISCONNECTED=ON "

@@ -81,7 +81,7 @@ PRODUCT_STEPS = {
     ],
     "samplehost-tests": [
         _xcode27_selection("macosx iphonesimulator"),
-        _metal_preparation("macosx iphonesimulator"),
+        _metal_preparation("macosx iphonesimulator", resolver="xcrun"),
         {
             "name": "Build SampleHost for iOS Simulator",
             "working-directory": "SampleHost",
@@ -587,7 +587,10 @@ class WorkflowOwnerLedgerTests(unittest.TestCase):
                 self.assertEqual(steps[3], _metal_preparation(resolver="xcrun"))
                 self.assertEqual(steps[4], _mlx_metallib_preparation())
         sample_steps = document["jobs"]["samplehost-tests"]["steps"]
-        self.assertEqual(sample_steps[2], _metal_preparation("macosx iphonesimulator"))
+        self.assertEqual(
+            sample_steps[2],
+            _metal_preparation("macosx iphonesimulator", resolver="xcrun"),
+        )
         boundary_steps = document["jobs"]["boundary-checks"]["steps"]
         self.assertNotIn("Prepare Metal compiler", {step.get("name") for step in boundary_steps})
         self.assertEqual(

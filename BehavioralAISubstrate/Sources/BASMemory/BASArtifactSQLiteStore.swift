@@ -240,11 +240,14 @@ public actor BASArtifactSQLiteStore: BASArtifactStorePort {
                     targetArtifactID: attestation.targetArtifactID)
             }
 
-            let updatedHead = try headUpdate.map {
-                try applyHeadCAS(
+            let updatedHead: BASArtifactHead?
+            if let headUpdate {
+                updatedHead = try applyHeadCAS(
                     db: db,
-                    cas: $0,
+                    cas: headUpdate,
                     replacementIdentity: identityCore)
+            } else {
+                updatedHead = nil
             }
             try Self.runExec(db: db, sql: "COMMIT;")
             return BASResult(

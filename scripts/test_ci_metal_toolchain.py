@@ -377,11 +377,33 @@ echo "fixture direct Metal compiler"
                         "xcrun --sdk iphonesimulator metal --version" in calls,
                         job == "samplehost-tests",
                     )
-                    if job != "samplehost-tests":
-                        self.assertNotIn("metal --version", calls)
+                    self.assertNotIn("metal --version", calls)
                     self.assertEqual(
                         calls.count("xcodebuild -downloadComponent MetalToolchain"), 1
                     )
+
+        sample_step = next(
+            step
+            for step in jobs["samplehost-tests"]["steps"]
+            if step.get("name") == "Prepare Metal compiler"
+        )
+        for missing_after in ("macosx", "iphonesimulator"):
+            with self.subTest(samplehost_post_install_failure=missing_after):
+                result, calls = self.run_fixture(
+                    sample_step["run"],
+                    {
+                        "MISSING_BEFORE": "macosx",
+                        "MISSING_AFTER": missing_after,
+                    },
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("product", calls)
+                self.assertEqual(
+                    calls.count(
+                        f"xcrun --sdk {missing_after} metal --version"
+                    ),
+                    2,
+                )
 
         boundary_names = {
             step.get("name") for step in jobs["boundary-checks"]["steps"]
