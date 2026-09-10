@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import Testing
 @testable import BASAppleAdapters
+@testable import BASAppleLifecycleKit
 @testable import BASMemory
 @testable import BASPolicy
 
@@ -99,7 +100,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )
 
         let first: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: stableInput,
                 in: context,
                 createdAt: baseDate,
@@ -107,7 +108,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
                 retentionInterval: 60 * 60
             )
         let deduplicated: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: stableInput,
                 in: context,
                 createdAt: baseDate.addingTimeInterval(60),
@@ -115,7 +116,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
                 retentionInterval: 60 * 60
             )
         let drifting: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "reflective",
                     sourceID: "scene_active",
@@ -130,7 +131,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
                 retentionInterval: BASEvolutionCheckpointPlanner.defaultRetentionInterval
             )
         let later: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "primary",
                     sourceID: "session_prime",
@@ -167,7 +168,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
 
         for index in 0..<3 {
             let result: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-                BASAppleEvolutionCheckpointWriter.record(
+                try BASAppleEvolutionCheckpointWriter.record(
                     input: BASEvolutionCheckpointInput(
                         modeName: "primary",
                         sourceID: "fresh-\(index)",
@@ -255,9 +256,8 @@ struct BASAppleEvolutionCheckpointWriterTests {
             )))
             try context.save()
 
-            var saveError: Error?
             let result: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-                BASAppleEvolutionCheckpointWriter.record(
+                try BASAppleEvolutionCheckpointWriter.record(
                     input: BASEvolutionCheckpointInput(
                         modeName: "reflective",
                         sourceID: "task-7-disk",
@@ -267,22 +267,18 @@ struct BASAppleEvolutionCheckpointWriterTests {
                         calibrationStatus: .drifting
                     ),
                     in: context,
-                    createdAt: now,
-                    onSaveError: { saveError = $0 }
+                    createdAt: now
                 )
 
-            if let saveError {
-                Issue.record("Checkpoint writer save failed: \(saveError)")
-            }
             #expect(result.wroteCheckpoint)
             #expect(result.orderedCheckpoints.count == 41)
-            let written = try #require(result.orderedCheckpoints.first?.basSnapshot)
+            let written = try #require(result.orderedCheckpoints.first)
             newCheckpointID = written.id
             expectedFreshIDs.insert(written.id)
             #expect(written.fingerprint == "fingerprint-41")
             #expect(written.previousCheckpointID == "checkpoint-01")
-            #expect(Set(result.orderedCheckpoints.map { $0.basSnapshot.id }) == expectedFreshIDs)
-            #expect(!result.orderedCheckpoints.contains { $0.basSnapshot.id == staleID })
+            #expect(Set(result.orderedCheckpoints.map(\.id)) == expectedFreshIDs)
+            #expect(!result.orderedCheckpoints.contains { $0.id == staleID })
         }
 
         let reopenedConfiguration = ModelConfiguration(
@@ -322,7 +318,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
 
         let initial: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "reflective",
                     sourceID: "scene_active",
@@ -336,7 +332,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
             )
 
         let updated: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.setApprovalState(
+            try BASAppleEvolutionCheckpointWriter.setApprovalState(
                 .automatic,
                 for: initial.currentState.latestCheckpoint?.id ?? "",
                 in: context
@@ -360,7 +356,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
 
         let initial: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "primary",
                     sourceID: "launch",
@@ -388,13 +384,13 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )
 
         let attached: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.setLineageSummary(
+            try BASAppleEvolutionCheckpointWriter.setLineageSummary(
                 lineage,
                 for: checkpointID,
                 in: context
             )
         let cleared: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.setLineageSummary(
+            try BASAppleEvolutionCheckpointWriter.setLineageSummary(
                 nil,
                 for: checkpointID,
                 in: context
@@ -418,7 +414,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
 
         let older: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "primary",
                     sourceID: "launch",
@@ -441,7 +437,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
                 createdAt: baseDate
             )
         let newer: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "primary",
                     sourceID: "scene_active",
@@ -476,7 +472,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )
 
         let attached: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.attachLineageSummary(
+            try BASAppleEvolutionCheckpointWriter.attachLineageSummary(
                 lineage,
                 for: olderID,
                 in: context
@@ -530,7 +526,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )
 
         let targeted: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "reflective",
                     sourceID: "scene_active",
@@ -545,7 +541,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
             )
 
         let stable: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "primary",
                     sourceID: "launch",
@@ -570,7 +566,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )
 
         let revoked: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.revokeCheckpoints(
+            try BASAppleEvolutionCheckpointWriter.revokeCheckpoints(
                 for: forgetRequest,
                 in: context
             )
@@ -610,7 +606,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )
 
         let result: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointPlanner.checkpointInput(
                     modeName: "reflective",
                     sourceID: "scene_active",
@@ -621,8 +617,8 @@ struct BASAppleEvolutionCheckpointWriterTests {
             )
 
         let checkpoint = try #require(result.orderedCheckpoints.first)
-        #expect(checkpoint.basSnapshot.brainStateSnapshot == brainState)
-        #expect(checkpoint.basSnapshot.brainStateSnapshot?.boundaryPolicy.riskLevel == .high)
+        #expect(checkpoint.brainStateSnapshot == brainState)
+        #expect(checkpoint.brainStateSnapshot?.boundaryPolicy.riskLevel == .high)
     }
 
     @Test("writer revokes checkpoint recovery entries when a forget gate targets recovery anchors")
@@ -665,7 +661,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )
 
         let targeted: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "reflective",
                     sourceID: "scene_active",
@@ -680,7 +676,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
             )
 
         let stable: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "primary",
                     sourceID: "launch",
@@ -702,7 +698,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )
 
         let revoked: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.revokeCheckpoints(
+            try BASAppleEvolutionCheckpointWriter.revokeCheckpoints(
                 for: forgetRequest,
                 in: context
             )
@@ -778,7 +774,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )
 
         let targeted: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "reflective",
                     sourceID: "scene_active",
@@ -793,7 +789,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
             )
 
         let stable: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.record(
+            try BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "primary",
                     sourceID: "launch",
@@ -819,7 +815,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )
 
         let revoked: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
-            BASAppleEvolutionCheckpointWriter.revokeCheckpoints(
+            try BASAppleEvolutionCheckpointWriter.revokeCheckpoints(
                 for: forgetRequest,
                 in: context
             )
@@ -837,5 +833,235 @@ struct BASAppleEvolutionCheckpointWriterTests {
         #expect(!checkpoints.contains(where: { $0.id == targetedID }))
         #expect(revoked.currentState.checkpointCount == 1)
         #expect(revoked.currentState.latestCheckpoint?.id == stableID)
+    }
+
+    @Test("checkpoint writer propagates read failure on a would-be no-target mutation")
+    func writerPropagatesReadFailureBeforeNoTargetResult() throws {
+        let container = try ModelContainer(
+            for: EvolutionCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let caller = ModelContext(container)
+        let io = CurrentBrainPersistenceFaultIO()
+        io.failFetch = { _ in true }
+
+        #expect(throws: CurrentBrainPersistenceFixtureFault.fetch) {
+            let _: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+                try BASAppleEvolutionCheckpointWriter.setApprovalState(
+                    .automatic,
+                    for: "missing-checkpoint",
+                    in: caller,
+                    using: io
+                )
+        }
+
+        #expect(io.saveCallCount == 0)
+        #expect(io.contexts.count == 1)
+        #expect(io.contexts.first !== caller)
+    }
+
+    @Test("checkpoint writer propagates read failure before a would-be deduplication")
+    func writerPropagatesReadFailureBeforeDeduplication() throws {
+        let container = try ModelContainer(
+            for: EvolutionCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let input = checkpointInput("dedup-read-failure")
+        let seed = ModelContext(container)
+        seed.insert(EvolutionCheckpointFixture(fields:
+            BASEvolutionCheckpointPlanner.checkpointFields(
+                createdAt: Date(timeIntervalSince1970: 1_744_100_000),
+                latest: nil,
+                input: input
+            )
+        ))
+        try seed.save()
+        let caller = ModelContext(container)
+        let io = CurrentBrainPersistenceFaultIO()
+        io.failFetch = { _ in true }
+
+        #expect(throws: CurrentBrainPersistenceFixtureFault.fetch) {
+            let _: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+                try BASAppleEvolutionCheckpointWriter.record(
+                    input: input,
+                    in: caller,
+                    using: io
+                )
+        }
+
+        #expect(io.saveCallCount == 0)
+        #expect(io.contexts.count == 1)
+        #expect(io.contexts.first !== caller)
+    }
+
+    @Test("checkpoint deduplication does not save caller pending insert")
+    func writerDeduplicationDoesNotSaveCallerPendingInsert() throws {
+        let container = try ModelContainer(
+            for: EvolutionCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let input = checkpointInput("dedup-no-save")
+        let seed = ModelContext(container)
+        seed.insert(EvolutionCheckpointFixture(fields:
+            BASEvolutionCheckpointPlanner.checkpointFields(
+                createdAt: Date(timeIntervalSince1970: 1_744_100_000),
+                latest: nil,
+                input: input
+            )
+        ))
+        try seed.save()
+        let caller = ModelContext(container)
+        caller.autosaveEnabled = false
+        let pending = EvolutionCheckpointFixture(fields: checkpointFields(
+            id: "caller-pending",
+            sourceID: "caller-pending"
+        ))
+        caller.insert(pending)
+        let io = CurrentBrainPersistenceFaultIO()
+
+        let result: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+            try BASAppleEvolutionCheckpointWriter.record(
+                input: input,
+                in: caller,
+                using: io
+            )
+
+        #expect(!result.wroteCheckpoint)
+        #expect(io.saveCallCount == 0)
+        #expect(caller.insertedModelsArray.contains { $0 === pending })
+        let independent = ModelContext(container)
+        #expect(try independent.fetch(FetchDescriptor<EvolutionCheckpointFixture>()).count == 1)
+    }
+
+    @Test("checkpoint record save failure publishes no receipt or record")
+    func writerPropagatesRecordSaveFailure() throws {
+        let container = try ModelContainer(
+            for: EvolutionCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let caller = ModelContext(container)
+        let io = CurrentBrainPersistenceFaultIO()
+        io.failSave = true
+
+        #expect(throws: CurrentBrainPersistenceFixtureFault.save) {
+            let _: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+                try BASAppleEvolutionCheckpointWriter.record(
+                    input: checkpointInput("record-save-failure"),
+                    in: caller,
+                    using: io
+                )
+        }
+
+        #expect(io.saveCallCount == 1)
+        #expect(io.contexts.allSatisfy { $0 !== caller })
+        let independent = ModelContext(container)
+        #expect(try independent.fetch(FetchDescriptor<EvolutionCheckpointFixture>()).isEmpty)
+    }
+
+    @Test("checkpoint mutation save failure preserves committed state")
+    func writerPropagatesMutationSaveFailure() throws {
+        let container = try ModelContainer(
+            for: EvolutionCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let seed = ModelContext(container)
+        seed.insert(EvolutionCheckpointFixture(fields: checkpointFields(
+            id: "checkpoint-mutation",
+            sourceID: "mutation-source",
+            approvalState: .reviewSuggested
+        )))
+        try seed.save()
+        let caller = ModelContext(container)
+        let io = CurrentBrainPersistenceFaultIO()
+        io.failSave = true
+
+        #expect(throws: CurrentBrainPersistenceFixtureFault.save) {
+            let _: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+                try BASAppleEvolutionCheckpointWriter.setApprovalState(
+                    .automatic,
+                    for: "checkpoint-mutation",
+                    in: caller,
+                    using: io
+                )
+        }
+
+        #expect(io.saveCallCount == 1)
+        #expect(io.contexts.allSatisfy { $0 !== caller })
+        let independent = ModelContext(container)
+        let stored = try #require(
+            try independent.fetch(FetchDescriptor<EvolutionCheckpointFixture>()).first
+        )
+        #expect(stored.basSnapshot.approvalState == .reviewSuggested)
+    }
+
+    @Test("checkpoint revocation save failure preserves committed chain")
+    func writerPropagatesRevocationSaveFailure() throws {
+        let container = try ModelContainer(
+            for: EvolutionCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let seed = ModelContext(container)
+        seed.insert(EvolutionCheckpointFixture(fields: checkpointFields(
+            id: "checkpoint-revoke",
+            sourceID: "revocation-target"
+        )))
+        try seed.save()
+        let caller = ModelContext(container)
+        let io = CurrentBrainPersistenceFaultIO()
+        io.failSave = true
+        let request = BASForgetRequest(
+            requestID: "forget.revocation-target",
+            targetRefs: ["revocation-target"],
+            cascadeScope: ["checkpoints"],
+            executedSteps: ["checkpoint_exports_revoked"],
+            verified: false
+        )
+
+        #expect(throws: CurrentBrainPersistenceFixtureFault.save) {
+            let _: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+                try BASAppleEvolutionCheckpointWriter.revokeCheckpoints(
+                    for: request,
+                    in: caller,
+                    using: io
+                )
+        }
+
+        #expect(io.saveCallCount == 1)
+        #expect(io.contexts.allSatisfy { $0 !== caller })
+        let independent = ModelContext(container)
+        let stored = try independent.fetch(FetchDescriptor<EvolutionCheckpointFixture>())
+        #expect(stored.map(\.id) == ["checkpoint-revoke"])
+    }
+
+    private func checkpointInput(_ label: String) -> BASEvolutionCheckpointInput {
+        BASEvolutionCheckpointInput(
+            modeName: "primary",
+            sourceID: label,
+            fingerprint: label,
+            identityRole: .pauseCompanion,
+            boundaryMode: .localOnlyAdvisory,
+            calibrationStatus: .stable
+        )
+    }
+
+    private func checkpointFields(
+        id: String,
+        sourceID: String,
+        approvalState: BASEvolutionApprovalState = .automatic
+    ) -> BASEvolutionCheckpointStoredFields {
+        BASEvolutionCheckpointStoredFields(
+            id: id,
+            createdAt: Date(timeIntervalSince1970: 1_744_100_000),
+            fingerprint: "fingerprint-\(id)",
+            previousCheckpointID: nil,
+            modeName: "primary",
+            sourceID: sourceID,
+            identityRole: .pauseCompanion,
+            boundaryMode: .localOnlyAdvisory,
+            calibrationStatus: .stable,
+            diffSummary: [],
+            approvalState: approvalState,
+            rollbackReady: true
+        )
     }
 }

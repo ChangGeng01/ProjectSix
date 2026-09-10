@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import Testing
 @testable import BASAppleAdapters
+@testable import BASAppleLifecycleKit
 @testable import BASMemory
 
 @Suite("BASApple Current Brain Update Writer")
@@ -52,6 +53,42 @@ struct BASAppleCurrentBrainUpdateWriterTests {
         }
     }
 
+    @Test("writer does not commit an unrelated caller insert")
+    func writerDoesNotCommitCallerInsert() throws {
+        func fields(_ label: String) -> BASCurrentBrainUpdateStoredFields {
+            BASCurrentBrainUpdateStoredFields(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 1_744_000_000),
+                source: label,
+                mode: "primary",
+                dominantGoal: label,
+                dominantReactionWeight: "brief_language",
+                fingerprint: label,
+                activeConstraints: [],
+                activeTemplateIDs: [],
+                failureGuardIDs: []
+            )
+        }
+
+        let container = try ModelContainer(
+            for: UpdateWriterFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let caller = ModelContext(container)
+        caller.autosaveEnabled = false
+        let pending = UpdateWriterFixture(fields: fields("pending"))
+        let committedFields = fields("committed")
+        caller.insert(pending)
+
+        let _: BASAppleCurrentBrainUpdateWriteResult<UpdateWriterFixture> =
+            try BASAppleCurrentBrainUpdateWriter.persist(committedFields, in: caller)
+
+        let independent = ModelContext(container)
+        let stored = try independent.fetch(FetchDescriptor<UpdateWriterFixture>())
+        #expect(stored.map(\.id) == [committedFields.id])
+        #expect(caller.insertedModelsArray.contains { $0 === pending })
+    }
+
     @Test("writer inserts updates and trims to the retention cap")
     func writerInsertsUpdatesAndTrimsToCap() throws {
         let container = try ModelContainer(
@@ -74,7 +111,7 @@ struct BASAppleCurrentBrainUpdateWriterTests {
                 activeTemplateIDs: [],
                 failureGuardIDs: []
             )
-            _ = BASAppleCurrentBrainUpdateWriter.persist(
+            _ = try BASAppleCurrentBrainUpdateWriter.persist(
                 fields,
                 in: context,
                 maxEntries: 3,
@@ -117,7 +154,7 @@ struct BASAppleCurrentBrainUpdateWriterTests {
                 activeTemplateIDs: [],
                 failureGuardIDs: []
             )
-            _ = BASAppleCurrentBrainUpdateWriter.persist(
+            _ = try BASAppleCurrentBrainUpdateWriter.persist(
                 fields,
                 in: context,
                 maxEntries: 3,
@@ -203,20 +240,15 @@ struct BASAppleCurrentBrainUpdateWriterTests {
                 activeTemplateIDs: ["template-61"],
                 failureGuardIDs: ["guard-61"]
             )
-            var saveError: Error?
             let result: BASAppleCurrentBrainUpdateWriteResult<UpdateWriterFixture> =
-                BASAppleCurrentBrainUpdateWriter.persist(
+                try BASAppleCurrentBrainUpdateWriter.persist(
                     newestFields,
-                    in: context,
-                    onSaveError: { saveError = $0 }
+                    in: context
                 )
 
-            if let saveError {
-                Issue.record("Update writer save failed: \(saveError)")
-            }
             #expect(result.orderedUpdates.count == 61)
-            #expect(Set(result.orderedUpdates.map { $0.basSnapshot.id }) == expectedFreshIDs)
-            #expect(!result.orderedUpdates.contains { $0.basSnapshot.id == staleID })
+            #expect(Set(result.orderedUpdates.map(\.id)) == expectedFreshIDs)
+            #expect(!result.orderedUpdates.contains { $0.id == staleID })
         }
 
         let reopenedConfiguration = ModelConfiguration(
@@ -242,5 +274,209 @@ struct BASAppleCurrentBrainUpdateWriterTests {
         #expect(newest.activeConstraints == ["minimum-recovery-age"])
         #expect(newest.activeTemplateIDs == ["template-61"])
         #expect(newest.failureGuardIDs == ["guard-61"])
+    }
+
+    @Test("writer propagates authoritative read failure without saving")
+    func writerPropagatesReadFailureWithoutSaving() throws {
+        let container = try ModelContainer(
+            for: UpdateWriterFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let caller = ModelContext(container)
+        let io = CurrentBrainPersistenceFaultIO()
+        io.failFetch = { _ in true }
+
+        #expect(throws: CurrentBrainPersistenceFixtureFault.fetch) {
+            let _: BASAppleCurrentBrainUpdateWriteResult<UpdateWriterFixture> =
+                try BASAppleCurrentBrainUpdateWriter.persist(
+                    updateFields("read-failure"),
+                    in: caller,
+                    using: io
+                )
+        }
+
+        #expect(io.saveCallCount == 0)
+        #expect(io.contexts.count == 1)
+        #expect(io.contexts.first !== caller)
+        let independent = ModelContext(container)
+        #expect(try independent.fetch(FetchDescriptor<UpdateWriterFixture>()).isEmpty)
+    }
+
+    @Test("writer save failure rolls back only its private context")
+    func writerSaveFailureLeavesCallerPendingChangesUntouched() throws {
+        let container = try ModelContainer(
+            for: UpdateWriterFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let seed = ModelContext(container)
+        let changed = UpdateWriterFixture(fields: updateFields("stored-change"))
+        let deleted = UpdateWriterFixture(fields: updateFields("stored-delete"))
+        seed.insert(changed)
+        seed.insert(deleted)
+        try seed.save()
+
+        let caller = ModelContext(container)
+        caller.autosaveEnabled = false
+        let callerRows = try caller.fetch(FetchDescriptor<UpdateWriterFixture>())
+        let pendingChange = try #require(callerRows.first { $0.id == changed.id })
+        let pendingDelete = try #require(callerRows.first { $0.id == deleted.id })
+        pendingChange.source = "caller-only-change"
+        caller.delete(pendingDelete)
+        let pendingInsert = UpdateWriterFixture(fields: updateFields("caller-only-insert"))
+        caller.insert(pendingInsert)
+
+        let io = CurrentBrainPersistenceFaultIO()
+        io.failSave = true
+        #expect(throws: CurrentBrainPersistenceFixtureFault.save) {
+            let _: BASAppleCurrentBrainUpdateWriteResult<UpdateWriterFixture> =
+                try BASAppleCurrentBrainUpdateWriter.persist(
+                    updateFields("private-write"),
+                    in: caller,
+                    using: io
+                )
+        }
+
+        #expect(io.saveCallCount == 1)
+        #expect(caller.insertedModelsArray.contains { $0 === pendingInsert })
+        #expect(caller.changedModelsArray.contains { $0 === pendingChange })
+        #expect(caller.deletedModelsArray.contains { $0 === pendingDelete })
+        let independent = ModelContext(container)
+        let stored = try independent.fetch(FetchDescriptor<UpdateWriterFixture>())
+        #expect(stored.count == 2)
+        #expect(stored.first { $0.id == changed.id }?.source == "stored-change")
+        #expect(stored.contains { $0.id == deleted.id })
+    }
+
+    @Test("writer success leaves caller pending update and delete untouched")
+    func writerSuccessLeavesCallerPendingUpdateAndDeleteUntouched() throws {
+        let container = try ModelContainer(
+            for: UpdateWriterFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let seed = ModelContext(container)
+        let changed = UpdateWriterFixture(fields: updateFields("stored-success-change"))
+        let deleted = UpdateWriterFixture(fields: updateFields("stored-success-delete"))
+        seed.insert(changed)
+        seed.insert(deleted)
+        try seed.save()
+
+        let caller = ModelContext(container)
+        caller.autosaveEnabled = false
+        let callerRows = try caller.fetch(FetchDescriptor<UpdateWriterFixture>())
+        let pendingChange = try #require(callerRows.first { $0.id == changed.id })
+        let pendingDelete = try #require(callerRows.first { $0.id == deleted.id })
+        pendingChange.source = "caller-only-success-change"
+        caller.delete(pendingDelete)
+
+        let _: BASAppleCurrentBrainUpdateWriteResult<UpdateWriterFixture> =
+            try BASAppleCurrentBrainUpdateWriter.persist(
+                updateFields("private-success-write"),
+                in: caller
+            )
+
+        #expect(caller.changedModelsArray.contains { $0 === pendingChange })
+        #expect(caller.deletedModelsArray.contains { $0 === pendingDelete })
+        let independent = ModelContext(container)
+        let stored = try independent.fetch(FetchDescriptor<UpdateWriterFixture>())
+        #expect(stored.count == 3)
+        #expect(stored.first { $0.id == changed.id }?.source == "stored-success-change")
+        #expect(stored.contains { $0.id == deleted.id })
+    }
+
+    @Test("writer receipt remains immutable after same-ID replacement")
+    func writerReceiptRemainsImmutableAfterReplacement() throws {
+        let container = try ModelContainer(
+            for: UpdateWriterFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let caller = ModelContext(container)
+        let id = UUID()
+        var original = updateFields("original")
+        original.id = id
+        var replacement = updateFields("replacement")
+        replacement.id = id
+
+        let first: BASAppleCurrentBrainUpdateWriteResult<UpdateWriterFixture> =
+            try BASAppleCurrentBrainUpdateWriter.persist(original, in: caller)
+        let second: BASAppleCurrentBrainUpdateWriteResult<UpdateWriterFixture> =
+            try BASAppleCurrentBrainUpdateWriter.persist(replacement, in: caller)
+
+        #expect(first.orderedUpdates.first?.source == "original")
+        #expect(second.orderedUpdates.first?.source == "replacement")
+    }
+
+    @Test("read-only SwiftData store returns a catchable save error")
+    func readOnlyStoreReturnsCatchableSaveError() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bas-update-read-only-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            do {
+                try FileManager.default.removeItem(at: directory)
+            } catch {
+                Issue.record("Failed to remove read-only writer fixture directory: \(error)")
+            }
+        }
+
+        let storeURL = directory.appendingPathComponent("updates.store")
+        let schema = Schema([UpdateWriterFixture.self])
+        let seedFields = updateFields("seed")
+        do {
+            let writable = ModelConfiguration(
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(for: schema, configurations: [writable])
+            let context = ModelContext(container)
+            context.insert(UpdateWriterFixture(fields: seedFields))
+            try context.save()
+        }
+
+        var caughtError: Error?
+        do {
+            let readOnly = ModelConfiguration(
+                schema: schema,
+                url: storeURL,
+                allowsSave: false,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(for: schema, configurations: [readOnly])
+            let caller = ModelContext(container)
+            do {
+                let _: BASAppleCurrentBrainUpdateWriteResult<UpdateWriterFixture> =
+                    try BASAppleCurrentBrainUpdateWriter.persist(
+                        updateFields("must-not-persist"),
+                        in: caller
+                    )
+            } catch {
+                caughtError = error
+            }
+        }
+
+        #expect(caughtError != nil)
+        let writable = ModelConfiguration(
+            schema: schema,
+            url: storeURL,
+            cloudKitDatabase: .none
+        )
+        let reopened = try ModelContainer(for: schema, configurations: [writable])
+        let stored = try ModelContext(reopened).fetch(FetchDescriptor<UpdateWriterFixture>())
+        #expect(stored.map(\.id) == [seedFields.id])
+    }
+
+    private func updateFields(_ label: String) -> BASCurrentBrainUpdateStoredFields {
+        BASCurrentBrainUpdateStoredFields(
+            id: UUID(),
+            createdAt: Date(timeIntervalSince1970: 1_744_000_000),
+            source: label,
+            mode: "primary",
+            dominantGoal: label,
+            dominantReactionWeight: "brief_language",
+            fingerprint: label,
+            activeConstraints: [],
+            activeTemplateIDs: [],
+            failureGuardIDs: []
+        )
     }
 }

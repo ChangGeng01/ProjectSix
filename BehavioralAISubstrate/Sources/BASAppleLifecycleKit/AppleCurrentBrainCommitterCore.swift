@@ -8,15 +8,15 @@ public struct BASAppleCurrentBrainCommitWriteResult<
 > {
     public let brainState: BASDecisionBrainState
     public let evolutionState: BASEvolutionState
-    public let orderedUpdates: [Update]
-    public let orderedCheckpoints: [Checkpoint]
+    public let orderedUpdates: [BASCurrentBrainUpdateStoredFields]
+    public let orderedCheckpoints: [BASEvolutionCheckpointStoredFields]
     public let wroteCheckpoint: Bool
 
     public init(
         brainState: BASDecisionBrainState,
         evolutionState: BASEvolutionState,
-        orderedUpdates: [Update],
-        orderedCheckpoints: [Checkpoint],
+        orderedUpdates: [BASCurrentBrainUpdateStoredFields],
+        orderedCheckpoints: [BASEvolutionCheckpointStoredFields],
         wroteCheckpoint: Bool
     ) {
         self.brainState = brainState
@@ -28,6 +28,9 @@ public struct BASAppleCurrentBrainCommitWriteResult<
 }
 
 public enum BASAppleCurrentBrainCommitter {
+    /// Commits checkpoint and update staging through one save in a package-owned
+    /// context. The supplied context selects the committed store only; its
+    /// pending changes do not participate.
     public static func commit<
         Update: BASAppleCurrentBrainUpdateEntity,
         Checkpoint: BASAppleEvolutionCheckpointEntity
@@ -41,49 +44,84 @@ public enum BASAppleCurrentBrainCommitter {
         checkpointLimit: Int = BASEvolutionCheckpointPlanner.defaultCheckpointLimit,
         checkpointRetentionInterval: TimeInterval = BASEvolutionCheckpointPlanner.defaultRetentionInterval,
         updateLimit: Int = BASCurrentBrainPersistenceApplier.defaultUpdateLimit,
+        updateRetentionInterval: TimeInterval = BASCurrentBrainPersistenceApplier.defaultRetentionInterval
+    ) throws -> BASAppleCurrentBrainCommitWriteResult<Update, Checkpoint> {
+        try commit(
+            modeName: modeName,
+            sourceID: sourceID,
+            brainState: brainState,
+            persistenceInput: persistenceInput,
+            in: context,
+            createdAt: createdAt,
+            checkpointLimit: checkpointLimit,
+            checkpointRetentionInterval: checkpointRetentionInterval,
+            updateLimit: updateLimit,
+            updateRetentionInterval: updateRetentionInterval,
+            using: BASAppleCurrentBrainLivePersistenceIO()
+        )
+    }
+
+    static func commit<
+        Update: BASAppleCurrentBrainUpdateEntity,
+        Checkpoint: BASAppleEvolutionCheckpointEntity,
+        IO: BASAppleCurrentBrainPersistenceIO
+    >(
+        modeName: String,
+        sourceID: String,
+        brainState: BASDecisionBrainState,
+        persistenceInput: BASCurrentBrainUpdatePersistenceInput,
+        in context: ModelContext,
+        createdAt: Date = .now,
+        checkpointLimit: Int = BASEvolutionCheckpointPlanner.defaultCheckpointLimit,
+        checkpointRetentionInterval: TimeInterval = BASEvolutionCheckpointPlanner.defaultRetentionInterval,
+        updateLimit: Int = BASCurrentBrainPersistenceApplier.defaultUpdateLimit,
         updateRetentionInterval: TimeInterval = BASCurrentBrainPersistenceApplier.defaultRetentionInterval,
-        onCheckpointSaveError: ((Error) -> Void)? = nil,
-        onUpdateSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleCurrentBrainCommitWriteResult<Update, Checkpoint> {
+        using io: IO
+    ) throws -> BASAppleCurrentBrainCommitWriteResult<Update, Checkpoint> {
         let checkpointInput = BASEvolutionCheckpointPlanner.checkpointInput(
             modeName: modeName,
             sourceID: sourceID,
             brainState: brainState
         )
 
-        let checkpointResult: BASAppleEvolutionCheckpointWriteResult<Checkpoint> =
-            BASAppleEvolutionCheckpointWriter.record(
-                input: checkpointInput,
-                in: context,
+        return try BASAppleCurrentBrainPersistenceTransaction.perform(
+            selectedBy: context,
+            using: io
+        ) { owned in
+            let checkpointResult: BASAppleEvolutionCheckpointWriteResult<Checkpoint> =
+                try BASAppleEvolutionCheckpointWriter.stageRecord(
+                    input: checkpointInput,
+                    in: owned,
+                    createdAt: createdAt,
+                    maxEntries: checkpointLimit,
+                    retentionInterval: checkpointRetentionInterval,
+                    using: io
+                )
+
+            var committedBrainState = brainState
+            committedBrainState.evolutionState = checkpointResult.currentState
+
+            let updateFields = BASCurrentBrainPersistenceApplier.updateFields(
                 createdAt: createdAt,
-                maxEntries: checkpointLimit,
-                retentionInterval: checkpointRetentionInterval,
-                onSaveError: onCheckpointSaveError
+                source: sourceID,
+                input: persistenceInput
             )
+            let updateResult: BASAppleCurrentBrainUpdateWriteResult<Update> =
+                try BASAppleCurrentBrainUpdateWriter.stage(
+                    updateFields,
+                    in: owned,
+                    maxEntries: updateLimit,
+                    retentionInterval: updateRetentionInterval,
+                    using: io
+                )
 
-        var committedBrainState = brainState
-        committedBrainState.evolutionState = checkpointResult.currentState
-
-        let updateFields = BASCurrentBrainPersistenceApplier.updateFields(
-            createdAt: createdAt,
-            source: sourceID,
-            input: persistenceInput
-        )
-        let updateResult: BASAppleCurrentBrainUpdateWriteResult<Update> =
-            BASAppleCurrentBrainUpdateWriter.persist(
-                updateFields,
-                in: context,
-                maxEntries: updateLimit,
-                retentionInterval: updateRetentionInterval,
-                onSaveError: onUpdateSaveError
+            return BASAppleCurrentBrainCommitWriteResult(
+                brainState: committedBrainState,
+                evolutionState: checkpointResult.currentState,
+                orderedUpdates: updateResult.orderedUpdates,
+                orderedCheckpoints: checkpointResult.orderedCheckpoints,
+                wroteCheckpoint: checkpointResult.wroteCheckpoint
             )
-
-        return BASAppleCurrentBrainCommitWriteResult(
-            brainState: committedBrainState,
-            evolutionState: checkpointResult.currentState,
-            orderedUpdates: updateResult.orderedUpdates,
-            orderedCheckpoints: checkpointResult.orderedCheckpoints,
-            wroteCheckpoint: checkpointResult.wroteCheckpoint
-        )
+        }
     }
 }

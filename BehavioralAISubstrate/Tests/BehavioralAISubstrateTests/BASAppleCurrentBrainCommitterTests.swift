@@ -2,8 +2,43 @@ import Foundation
 import SwiftData
 import Testing
 @testable import BASAppleAdapters
+@testable import BASAppleLifecycleKit
 @testable import BASMemory
 @testable import BASPolicy
+
+enum CurrentBrainPersistenceFixtureFault: Error, Equatable {
+    case fetch
+    case save
+}
+
+final class CurrentBrainPersistenceFaultIO: BASAppleCurrentBrainPersistenceIO {
+    var failFetch: ((Any.Type) -> Bool)?
+    var failSave = false
+    var saveCallCount = 0
+    var contexts: [ModelContext] = []
+    var fetchedTypes: [Any.Type] = []
+
+    func fetch<Model: PersistentModel>(
+        _ type: Model.Type,
+        in context: ModelContext
+    ) throws -> [Model] {
+        contexts.append(context)
+        fetchedTypes.append(type)
+        if failFetch?(type) == true {
+            throw CurrentBrainPersistenceFixtureFault.fetch
+        }
+        return try context.fetch(FetchDescriptor<Model>())
+    }
+
+    func save(_ context: ModelContext) throws {
+        contexts.append(context)
+        saveCallCount += 1
+        if failSave {
+            throw CurrentBrainPersistenceFixtureFault.save
+        }
+        try context.save()
+    }
+}
 
 @Suite("BASApple Current Brain Committer")
 struct BASAppleCurrentBrainCommitterTests {
@@ -149,8 +184,9 @@ struct BASAppleCurrentBrainCommitterTests {
             )
         )
 
+        let io = CurrentBrainPersistenceFaultIO()
         let result: BASAppleCurrentBrainCommitWriteResult<CommitterUpdateFixture, CommitterCheckpointFixture> =
-            BASAppleCurrentBrainCommitter.commit(
+            try BASAppleCurrentBrainCommitter.commit(
                 modeName: "primary",
                 sourceID: "notification",
                 brainState: brainState,
@@ -160,7 +196,8 @@ struct BASAppleCurrentBrainCommitterTests {
                 checkpointLimit: 4,
                 checkpointRetentionInterval: 60 * 60,
                 updateLimit: 4,
-                updateRetentionInterval: 60 * 60
+                updateRetentionInterval: 60 * 60,
+                using: io
             )
 
         #expect(result.wroteCheckpoint)
@@ -171,5 +208,183 @@ struct BASAppleCurrentBrainCommitterTests {
         #expect(result.orderedUpdates.first?.dominantGoal == "Wait until morning")
         #expect(result.orderedUpdates.first?.activeTemplateIDs == ["night_message_cooling"])
         #expect(result.orderedCheckpoints.first?.sourceID == "notification")
+        #expect(io.saveCallCount == 1)
+        #expect(io.contexts.count == 3)
+        #expect(io.contexts.allSatisfy { $0 === io.contexts.first })
+        #expect(io.contexts.allSatisfy { $0 !== context })
+    }
+
+    @Test("committer rolls back staged checkpoint when update read fails")
+    func committerRollsBackCheckpointWhenUpdateReadFails() throws {
+        let container = try ModelContainer(
+            for: CommitterUpdateFixture.self,
+            CommitterCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let caller = ModelContext(container)
+        let io = CurrentBrainPersistenceFaultIO()
+        io.failFetch = {
+            ObjectIdentifier($0) == ObjectIdentifier(CommitterUpdateFixture.self)
+        }
+        let now = Date(timeIntervalSince1970: 1_744_322_201)
+        let brainState = makeBrainState(now: now)
+
+        #expect(throws: CurrentBrainPersistenceFixtureFault.fetch) {
+            let _: BASAppleCurrentBrainCommitWriteResult<CommitterUpdateFixture, CommitterCheckpointFixture> =
+                try BASAppleCurrentBrainCommitter.commit(
+                    modeName: "primary",
+                    sourceID: "notification",
+                    brainState: brainState,
+                    persistenceInput: makePersistenceInput(brainState: brainState),
+                    in: caller,
+                    createdAt: now,
+                    using: io
+                )
+        }
+
+        #expect(io.saveCallCount == 0)
+        #expect(io.fetchedTypes.count == 2)
+        #expect(io.contexts.count == 2)
+        #expect(io.contexts.allSatisfy { $0 === io.contexts.first })
+        #expect(io.contexts.allSatisfy { $0 !== caller })
+        let independent = ModelContext(container)
+        #expect(try independent.fetch(FetchDescriptor<CommitterCheckpointFixture>()).isEmpty)
+        #expect(try independent.fetch(FetchDescriptor<CommitterUpdateFixture>()).isEmpty)
+    }
+
+    @Test("committer rolls back both staged records when its sole save fails")
+    func committerRollsBackBothRecordsWhenSaveFails() throws {
+        let container = try ModelContainer(
+            for: CommitterUpdateFixture.self,
+            CommitterCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let caller = ModelContext(container)
+        let io = CurrentBrainPersistenceFaultIO()
+        io.failSave = true
+        let now = Date(timeIntervalSince1970: 1_744_322_202)
+        let brainState = makeBrainState(now: now)
+
+        #expect(throws: CurrentBrainPersistenceFixtureFault.save) {
+            let _: BASAppleCurrentBrainCommitWriteResult<CommitterUpdateFixture, CommitterCheckpointFixture> =
+                try BASAppleCurrentBrainCommitter.commit(
+                    modeName: "primary",
+                    sourceID: "notification",
+                    brainState: brainState,
+                    persistenceInput: makePersistenceInput(brainState: brainState),
+                    in: caller,
+                    createdAt: now,
+                    using: io
+                )
+        }
+
+        #expect(io.saveCallCount == 1)
+        #expect(io.contexts.count == 3)
+        #expect(io.contexts.allSatisfy { $0 === io.contexts.first })
+        #expect(io.contexts.allSatisfy { $0 !== caller })
+        let independent = ModelContext(container)
+        #expect(try independent.fetch(FetchDescriptor<CommitterCheckpointFixture>()).isEmpty)
+        #expect(try independent.fetch(FetchDescriptor<CommitterUpdateFixture>()).isEmpty)
+    }
+
+    @Test("committer persists both records across a file-store reopen")
+    func committerPersistsBothRecordsAcrossFileStoreReopen() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bas-current-brain-commit-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            do {
+                try FileManager.default.removeItem(at: directory)
+            } catch {
+                Issue.record("Failed to remove committer fixture directory: \(error)")
+            }
+        }
+
+        let storeURL = directory.appendingPathComponent("current-brain.store")
+        let schema = Schema([CommitterUpdateFixture.self, CommitterCheckpointFixture.self])
+        let now = Date(timeIntervalSince1970: 1_744_322_203)
+        let brainState = makeBrainState(now: now)
+        var expectedUpdateID: UUID?
+        var expectedCheckpointID: String?
+
+        do {
+            let configuration = ModelConfiguration(
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(for: schema, configurations: [configuration])
+            let caller = ModelContext(container)
+            let result: BASAppleCurrentBrainCommitWriteResult<CommitterUpdateFixture, CommitterCheckpointFixture> =
+                try BASAppleCurrentBrainCommitter.commit(
+                    modeName: "primary",
+                    sourceID: "file-reopen",
+                    brainState: brainState,
+                    persistenceInput: makePersistenceInput(brainState: brainState),
+                    in: caller,
+                    createdAt: now
+                )
+            expectedUpdateID = result.orderedUpdates.first?.id
+            expectedCheckpointID = result.orderedCheckpoints.first?.id
+        }
+
+        let configuration = ModelConfiguration(
+            schema: schema,
+            url: storeURL,
+            cloudKitDatabase: .none
+        )
+        let reopened = try ModelContainer(for: schema, configurations: [configuration])
+        let context = ModelContext(reopened)
+        let updates = try context.fetch(FetchDescriptor<CommitterUpdateFixture>())
+        let checkpoints = try context.fetch(FetchDescriptor<CommitterCheckpointFixture>())
+
+        #expect(updates.count == 1)
+        #expect(checkpoints.count == 1)
+        #expect(updates.first?.id == expectedUpdateID)
+        #expect(checkpoints.first?.id == expectedCheckpointID)
+        #expect(updates.first?.source == "file-reopen")
+        #expect(checkpoints.first?.sourceID == "file-reopen")
+    }
+
+    private func makeBrainState(now: Date) -> BASDecisionBrainState {
+        BASDecisionBrainState(
+            profileCore: ["Protect sleep"],
+            activeGoals: ["Wait until morning"],
+            relevantMemories: [],
+            sessionBiases: [],
+            retrievalTags: [],
+            reactionWeights: BASReactionWeights(
+                warmth: 0.72,
+                directness: 0.61,
+                brevity: 0.83,
+                actionBias: 0.48
+            ),
+            identityProfile: BASIdentityProfile.default(modeName: "primary"),
+            boundaryPolicy: BASBoundaryPolicyState.default(riskLevel: .high),
+            calibrationState: BASCalibrationState(
+                status: .drifting,
+                alerts: [.highPendingInfluence],
+                suggestedAdjustments: [],
+                driftScore: 0.72,
+                generatedAt: now
+            ),
+            loadedAt: now
+        )
+    }
+
+    private func makePersistenceInput(
+        brainState: BASDecisionBrainState
+    ) -> BASCurrentBrainUpdatePersistenceInput {
+        BASCurrentBrainPersistenceApplier.updateInput(
+            mode: "primary",
+            bootstrapped: BASBootstrappedBrainState(
+                brainState: brainState,
+                dominantGoal: "Wait until morning",
+                activeConstraints: ["no_send_tonight"],
+                activeTemplateIDs: ["night_message_cooling"],
+                failureGuardIDs: ["night_fast_path_failure"],
+                taskGraphHint: nil
+            )
+        )
     }
 }

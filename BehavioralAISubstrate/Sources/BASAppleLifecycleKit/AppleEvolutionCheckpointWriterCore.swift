@@ -10,12 +10,12 @@ public protocol BASAppleEvolutionCheckpointEntity: PersistentModel {
 public struct BASAppleEvolutionCheckpointWriteResult<
     Checkpoint: BASAppleEvolutionCheckpointEntity
 > {
-    public let orderedCheckpoints: [Checkpoint]
+    public let orderedCheckpoints: [BASEvolutionCheckpointStoredFields]
     public let currentState: BASEvolutionState
     public let wroteCheckpoint: Bool
 
     public init(
-        orderedCheckpoints: [Checkpoint],
+        orderedCheckpoints: [BASEvolutionCheckpointStoredFields],
         currentState: BASEvolutionState,
         wroteCheckpoint: Bool
     ) {
@@ -25,25 +25,75 @@ public struct BASAppleEvolutionCheckpointWriteResult<
     }
 }
 
+/// Every public operation uses a package-owned context selected by the supplied
+/// `ModelContext.container`. Pending caller changes are never included, saved,
+/// or rolled back.
 public enum BASAppleEvolutionCheckpointWriter {
     public static func record<Checkpoint: BASAppleEvolutionCheckpointEntity>(
         input: BASEvolutionCheckpointInput,
         in context: ModelContext,
         createdAt: Date = .now,
         maxEntries: Int = BASEvolutionCheckpointPlanner.defaultCheckpointLimit,
+        retentionInterval: TimeInterval = BASEvolutionCheckpointPlanner.defaultRetentionInterval
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try record(
+            input: input,
+            in: context,
+            createdAt: createdAt,
+            maxEntries: maxEntries,
+            retentionInterval: retentionInterval,
+            using: BASAppleCurrentBrainLivePersistenceIO()
+        )
+    }
+
+    static func record<
+        Checkpoint: BASAppleEvolutionCheckpointEntity,
+        IO: BASAppleCurrentBrainPersistenceIO
+    >(
+        input: BASEvolutionCheckpointInput,
+        in context: ModelContext,
+        createdAt: Date = .now,
+        maxEntries: Int = BASEvolutionCheckpointPlanner.defaultCheckpointLimit,
         retentionInterval: TimeInterval = BASEvolutionCheckpointPlanner.defaultRetentionInterval,
-        onSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
-        let existing = fetchCheckpoints(in: context) as [Checkpoint]
+        using io: IO
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try BASAppleCurrentBrainPersistenceTransaction.perform(
+            selectedBy: context,
+            using: io
+        ) { owned in
+            try stageRecord(
+                input: input,
+                in: owned,
+                createdAt: createdAt,
+                maxEntries: maxEntries,
+                retentionInterval: retentionInterval,
+                using: io
+            )
+        }
+    }
+
+    static func stageRecord<
+        Checkpoint: BASAppleEvolutionCheckpointEntity,
+        IO: BASAppleCurrentBrainPersistenceIO
+    >(
+        input: BASEvolutionCheckpointInput,
+        in context: ModelContext,
+        createdAt: Date,
+        maxEntries: Int,
+        retentionInterval: TimeInterval,
+        using io: IO
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        let existing: [Checkpoint] = try io.fetch(Checkpoint.self, in: context)
         // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         var checkpointsByID = Dictionary(existing.map { ($0.basSnapshot.id, $0) }, uniquingKeysWith: { _, last in last })
-        let latest = canonicalOrder(existing).first?.basSnapshot
+        let orderedExisting = canonicalEntityOrder(existing).map(\.basSnapshot)
+        let latest = orderedExisting.first
 
         if BASEvolutionCheckpointPlanner.shouldDeduplicate(latest: latest, input: input) {
             return BASAppleEvolutionCheckpointWriteResult(
-                orderedCheckpoints: canonicalOrder(existing),
+                orderedCheckpoints: orderedExisting,
                 currentState: BASEvolutionCheckpointPlanner.currentState(
-                    from: existing.map(\.basSnapshot)
+                    from: orderedExisting
                 ),
                 wroteCheckpoint: false
             )
@@ -75,18 +125,10 @@ public enum BASAppleEvolutionCheckpointWriter {
             checkpointsByID[stale.basSnapshot.id] = nil
         }
 
-        do {
-            try context.save()
-        } catch {
-            onSaveError?(error)
-        }
-
-        let ordered = canonicalOrder(Array(checkpointsByID.values))
+        let ordered = canonicalEntityOrder(Array(checkpointsByID.values)).map(\.basSnapshot)
         return BASAppleEvolutionCheckpointWriteResult(
             orderedCheckpoints: ordered,
-            currentState: BASEvolutionCheckpointPlanner.currentState(
-                from: ordered.map(\.basSnapshot)
-            ),
+            currentState: BASEvolutionCheckpointPlanner.currentState(from: ordered),
             wroteCheckpoint: true
         )
     }
@@ -94,51 +136,106 @@ public enum BASAppleEvolutionCheckpointWriter {
     public static func attachLineageSummary<Checkpoint: BASAppleEvolutionCheckpointEntity>(
         _ lineageSummary: BASEvolutionLineageSummary,
         for checkpointID: String,
-        in context: ModelContext,
-        onSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
-        setLineageSummary(
+        in context: ModelContext
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try attachLineageSummary(
             lineageSummary,
             for: checkpointID,
             in: context,
-            onSaveError: onSaveError
+            using: BASAppleCurrentBrainLivePersistenceIO()
+        )
+    }
+
+    static func attachLineageSummary<
+        Checkpoint: BASAppleEvolutionCheckpointEntity,
+        IO: BASAppleCurrentBrainPersistenceIO
+    >(
+        _ lineageSummary: BASEvolutionLineageSummary,
+        for checkpointID: String,
+        in context: ModelContext,
+        using io: IO
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try setLineageSummary(
+            lineageSummary,
+            for: checkpointID,
+            in: context,
+            using: io
         )
     }
 
     public static func attachLineageSummary<Checkpoint: BASAppleEvolutionCheckpointEntity>(
         _ lineageSummary: BASEvolutionLineageSummary,
-        in context: ModelContext,
-        onSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
-        let existing = fetchCheckpoints(in: context) as [Checkpoint]
-        let ordered = canonicalOrder(existing)
-
-        guard let latestID = ordered.first?.basSnapshot.id else {
-            return BASAppleEvolutionCheckpointWriteResult(
-                orderedCheckpoints: [],
-                currentState: .empty,
-                wroteCheckpoint: false
-            )
-        }
-
-        return setLineageSummary(
+        in context: ModelContext
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try attachLineageSummary(
             lineageSummary,
-            for: latestID,
             in: context,
-            onSaveError: onSaveError
+            using: BASAppleCurrentBrainLivePersistenceIO()
         )
+    }
+
+    static func attachLineageSummary<
+        Checkpoint: BASAppleEvolutionCheckpointEntity,
+        IO: BASAppleCurrentBrainPersistenceIO
+    >(
+        _ lineageSummary: BASEvolutionLineageSummary,
+        in context: ModelContext,
+        using io: IO
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try BASAppleCurrentBrainPersistenceTransaction.perform(
+            selectedBy: context,
+            using: io
+        ) { owned in
+            let existing: [Checkpoint] = try io.fetch(Checkpoint.self, in: owned)
+            let ordered = canonicalEntityOrder(existing)
+
+            guard let latestID = ordered.first?.basSnapshot.id else {
+                return BASAppleEvolutionCheckpointWriteResult(
+                    orderedCheckpoints: [],
+                    currentState: .empty,
+                    wroteCheckpoint: false
+                )
+            }
+
+            return stageUpdateCheckpoint(
+                checkpointID: latestID,
+                existing: existing,
+                in: owned
+            ) { checkpoint in
+                BASEvolutionCheckpointPlanner.withLineageSummary(
+                    lineageSummary,
+                    appliedTo: checkpoint
+                )
+            }
+        }
     }
 
     public static func setLineageSummary<Checkpoint: BASAppleEvolutionCheckpointEntity>(
         _ lineageSummary: BASEvolutionLineageSummary?,
         for checkpointID: String,
+        in context: ModelContext
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try setLineageSummary(
+            lineageSummary,
+            for: checkpointID,
+            in: context,
+            using: BASAppleCurrentBrainLivePersistenceIO()
+        )
+    }
+
+    static func setLineageSummary<
+        Checkpoint: BASAppleEvolutionCheckpointEntity,
+        IO: BASAppleCurrentBrainPersistenceIO
+    >(
+        _ lineageSummary: BASEvolutionLineageSummary?,
+        for checkpointID: String,
         in context: ModelContext,
-        onSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
-        updateCheckpoint(
+        using io: IO
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try updateCheckpoint(
             checkpointID: checkpointID,
             in: context,
-            onSaveError: onSaveError
+            using: io
         ) { checkpoint in
             BASEvolutionCheckpointPlanner.withLineageSummary(
                 lineageSummary,
@@ -150,13 +247,29 @@ public enum BASAppleEvolutionCheckpointWriter {
     public static func setApprovalState<Checkpoint: BASAppleEvolutionCheckpointEntity>(
         _ approvalState: BASEvolutionApprovalState,
         for checkpointID: String,
+        in context: ModelContext
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try setApprovalState(
+            approvalState,
+            for: checkpointID,
+            in: context,
+            using: BASAppleCurrentBrainLivePersistenceIO()
+        )
+    }
+
+    static func setApprovalState<
+        Checkpoint: BASAppleEvolutionCheckpointEntity,
+        IO: BASAppleCurrentBrainPersistenceIO
+    >(
+        _ approvalState: BASEvolutionApprovalState,
+        for checkpointID: String,
         in context: ModelContext,
-        onSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
-        updateCheckpoint(
+        using io: IO
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try updateCheckpoint(
             checkpointID: checkpointID,
             in: context,
-            onSaveError: onSaveError
+            using: io
         ) { checkpoint in
             BASEvolutionCheckpointPlanner.withApprovalState(
                 approvalState,
@@ -167,25 +280,53 @@ public enum BASAppleEvolutionCheckpointWriter {
 
     public static func revokeCheckpoints<Checkpoint: BASAppleEvolutionCheckpointEntity>(
         for request: BASForgetRequest,
+        in context: ModelContext
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try revokeCheckpoints(
+            for: request,
+            in: context,
+            using: BASAppleCurrentBrainLivePersistenceIO()
+        )
+    }
+
+    static func revokeCheckpoints<
+        Checkpoint: BASAppleEvolutionCheckpointEntity,
+        IO: BASAppleCurrentBrainPersistenceIO
+    >(
+        for request: BASForgetRequest,
         in context: ModelContext,
-        onSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
-        let existing = fetchCheckpoints(in: context) as [Checkpoint]
-        let ordered = canonicalOrder(existing)
+        using io: IO
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try BASAppleCurrentBrainPersistenceTransaction.perform(
+            selectedBy: context,
+            using: io
+        ) { owned in
+            try stageRevocation(for: request, in: owned, using: io)
+        }
+    }
+
+    private static func stageRevocation<
+        Checkpoint: BASAppleEvolutionCheckpointEntity,
+        IO: BASAppleCurrentBrainPersistenceIO
+    >(
+        for request: BASForgetRequest,
+        in context: ModelContext,
+        using io: IO
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        let existing: [Checkpoint] = try io.fetch(Checkpoint.self, in: context)
+        let orderedEntities = canonicalEntityOrder(existing)
+        let ordered = orderedEntities.map(\.basSnapshot)
 
         guard forgetRequestTargetsCheckpoints(request) else {
             return BASAppleEvolutionCheckpointWriteResult(
                 orderedCheckpoints: ordered,
-                currentState: BASEvolutionCheckpointPlanner.currentState(
-                    from: ordered.map(\.basSnapshot)
-                ),
+                currentState: BASEvolutionCheckpointPlanner.currentState(from: ordered),
                 wroteCheckpoint: false
             )
         }
 
         let revokedIDs = Set(
             ordered
-                .map(\.basSnapshot)
                 .filter { matchesForgetRequest(request, checkpoint: $0) }
                 .map(\.id)
         )
@@ -193,15 +334,13 @@ public enum BASAppleEvolutionCheckpointWriter {
         guard revokedIDs.isEmpty == false else {
             return BASAppleEvolutionCheckpointWriteResult(
                 orderedCheckpoints: ordered,
-                currentState: BASEvolutionCheckpointPlanner.currentState(
-                    from: ordered.map(\.basSnapshot)
-                ),
+                currentState: BASEvolutionCheckpointPlanner.currentState(from: ordered),
                 wroteCheckpoint: false
             )
         }
 
         let survivingSnapshots = relinkedSnapshots(
-            from: ordered.map(\.basSnapshot).filter { !revokedIDs.contains($0.id) }
+            from: ordered.filter { !revokedIDs.contains($0.id) }
         )
 
         for checkpoint in existing {
@@ -212,29 +351,15 @@ public enum BASAppleEvolutionCheckpointWriter {
             context.insert(checkpoint)
         }
 
-        do {
-            try context.save()
-        } catch {
-            onSaveError?(error)
-        }
-
-        let updatedOrder = canonicalOrder(replacements)
+        let updatedOrder = canonicalEntityOrder(replacements).map(\.basSnapshot)
         return BASAppleEvolutionCheckpointWriteResult(
             orderedCheckpoints: updatedOrder,
-            currentState: BASEvolutionCheckpointPlanner.currentState(
-                from: updatedOrder.map(\.basSnapshot)
-            ),
+            currentState: BASEvolutionCheckpointPlanner.currentState(from: updatedOrder),
             wroteCheckpoint: false
         )
     }
 
-    private static func fetchCheckpoints<Checkpoint: BASAppleEvolutionCheckpointEntity>(
-        in context: ModelContext
-    ) -> [Checkpoint] {
-        (try? context.fetch(FetchDescriptor<Checkpoint>())) ?? []
-    }
-
-    private static func canonicalOrder<Checkpoint: BASAppleEvolutionCheckpointEntity>(
+    private static func canonicalEntityOrder<Checkpoint: BASAppleEvolutionCheckpointEntity>(
         _ checkpoints: [Checkpoint]
     ) -> [Checkpoint] {
         checkpoints.sorted { lhs, rhs in
@@ -247,21 +372,42 @@ public enum BASAppleEvolutionCheckpointWriter {
         }
     }
 
-    private static func updateCheckpoint<Checkpoint: BASAppleEvolutionCheckpointEntity>(
+    private static func updateCheckpoint<
+        Checkpoint: BASAppleEvolutionCheckpointEntity,
+        IO: BASAppleCurrentBrainPersistenceIO
+    >(
         checkpointID: String,
         in context: ModelContext,
-        onSaveError: ((Error) -> Void)? = nil,
+        using io: IO,
+        transform: (BASEvolutionCheckpointStoredFields) -> BASEvolutionCheckpointStoredFields
+    ) throws -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        try BASAppleCurrentBrainPersistenceTransaction.perform(
+            selectedBy: context,
+            using: io
+        ) { owned in
+            let existing: [Checkpoint] = try io.fetch(Checkpoint.self, in: owned)
+            return stageUpdateCheckpoint(
+                checkpointID: checkpointID,
+                existing: existing,
+                in: owned,
+                transform: transform
+            )
+        }
+    }
+
+    private static func stageUpdateCheckpoint<Checkpoint: BASAppleEvolutionCheckpointEntity>(
+        checkpointID: String,
+        existing: [Checkpoint],
+        in context: ModelContext,
         transform: (BASEvolutionCheckpointStoredFields) -> BASEvolutionCheckpointStoredFields
     ) -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
-        let existing = fetchCheckpoints(in: context) as [Checkpoint]
-        let ordered = canonicalOrder(existing)
+        let orderedEntities = canonicalEntityOrder(existing)
+        let ordered = orderedEntities.map(\.basSnapshot)
 
-        guard let target = ordered.first(where: { $0.basSnapshot.id == checkpointID }) else {
+        guard let target = orderedEntities.first(where: { $0.basSnapshot.id == checkpointID }) else {
             return BASAppleEvolutionCheckpointWriteResult(
                 orderedCheckpoints: ordered,
-                currentState: BASEvolutionCheckpointPlanner.currentState(
-                    from: ordered.map(\.basSnapshot)
-                ),
+                currentState: BASEvolutionCheckpointPlanner.currentState(from: ordered),
                 wroteCheckpoint: false
             )
         }
@@ -270,9 +416,7 @@ public enum BASAppleEvolutionCheckpointWriter {
         guard updatedFields != target.basSnapshot else {
             return BASAppleEvolutionCheckpointWriteResult(
                 orderedCheckpoints: ordered,
-                currentState: BASEvolutionCheckpointPlanner.currentState(
-                    from: ordered.map(\.basSnapshot)
-                ),
+                currentState: BASEvolutionCheckpointPlanner.currentState(from: ordered),
                 wroteCheckpoint: false
             )
         }
@@ -285,18 +429,10 @@ public enum BASAppleEvolutionCheckpointWriter {
         context.insert(replacement)
         checkpointsByID[updatedFields.id] = replacement
 
-        do {
-            try context.save()
-        } catch {
-            onSaveError?(error)
-        }
-
-        let updatedOrder = canonicalOrder(Array(checkpointsByID.values))
+        let updatedOrder = canonicalEntityOrder(Array(checkpointsByID.values)).map(\.basSnapshot)
         return BASAppleEvolutionCheckpointWriteResult(
             orderedCheckpoints: updatedOrder,
-            currentState: BASEvolutionCheckpointPlanner.currentState(
-                from: updatedOrder.map(\.basSnapshot)
-            ),
+            currentState: BASEvolutionCheckpointPlanner.currentState(from: updatedOrder),
             wroteCheckpoint: false
         )
     }

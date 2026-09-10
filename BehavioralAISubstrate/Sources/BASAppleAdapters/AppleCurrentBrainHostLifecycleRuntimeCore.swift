@@ -34,8 +34,6 @@ public enum BASAppleCurrentBrainHostLifecycleRuntimeExecutor {
         selectFailurePatterns: (BASCurrentBrainBootstrapPreparation) -> [FailurePattern],
         mapTemplate: (Template) -> BASAppleCurrentBrainBootstrapHostTemplateInput,
         mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput,
-        onCheckpointSaveError: ((Error) -> Void)? = nil,
-        onUpdateSaveError: ((Error) -> Void)? = nil,
         buildCurrentBrain: (BASAppleCurrentBrainLifecycleResult<Update, Checkpoint>) -> CurrentBrain
     ) throws -> CurrentBrain {
         let lifecycleResult: BASAppleCurrentBrainLifecycleResult<Update, Checkpoint> =
@@ -50,9 +48,7 @@ public enum BASAppleCurrentBrainHostLifecycleRuntimeExecutor {
                 selectTemplates: selectTemplates,
                 selectFailurePatterns: selectFailurePatterns,
                 mapTemplate: mapTemplate,
-                mapFailurePattern: mapFailurePattern,
-                onCheckpointSaveError: onCheckpointSaveError,
-                onUpdateSaveError: onUpdateSaveError
+                mapFailurePattern: mapFailurePattern
             )
 
         return buildCurrentBrain(lifecycleResult)

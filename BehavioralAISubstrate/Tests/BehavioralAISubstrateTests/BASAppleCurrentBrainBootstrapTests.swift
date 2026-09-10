@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import Testing
 @testable import BASAppleAdapters
+@testable import BASAppleLifecycleKit
 @testable import BASMemory
 @testable import BASPolicy
 @testable import BASRuntimeCore
@@ -1539,5 +1540,56 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(sawPreparation)
         #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
         #expect(artifact.execution.orderedFailurePatternIDs == ["night_fast_path_failure"])
+    }
+
+    @Test("bootstrap bridge propagates transaction configuration refusal")
+    func bootstrapBridgePropagatesTransactionConfigurationRefusal() throws {
+        let now = Date(timeIntervalSince1970: 1_744_322_710)
+        let schema = Schema([BootstrapUpdateFixture.self, BootstrapCheckpointFixture.self])
+        let container = try ModelContainer(
+            for: schema,
+            configurations: [
+                ModelConfiguration(
+                    "updates",
+                    schema: Schema([BootstrapUpdateFixture.self]),
+                    isStoredInMemoryOnly: true
+                ),
+                ModelConfiguration(
+                    "checkpoints",
+                    schema: Schema([BootstrapCheckpointFixture.self]),
+                    isStoredInMemoryOnly: true
+                )
+            ]
+        )
+
+        do {
+            let _: BASAppleCurrentBrainBootstrapBridgeResult<BootstrapUpdateFixture, BootstrapCheckpointFixture> =
+                try BASAppleCurrentBrainBootstrapBridgeBuilder.bootstrapAndCommit(
+                    input: BASAppleCurrentBrainBootstrapBridgeInput(
+                        modeID: BASDecisionMode.primary.rawValue,
+                        prompt: "Preserve the commit boundary.",
+                        triggerID: BASCurrentBrainBootstrapTrigger.sceneActive.rawValue,
+                        preferredLanguages: ["en-AU"],
+                        now: now,
+                        projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+                        embeddingScores: [],
+                        retrievalMode: "filtered",
+                        bootstrapBehavior: .generic,
+                        cognitionBehavior: .generic
+                    ),
+                    in: ModelContext(container),
+                    recommendTemplateIDs: { _ in [] },
+                    selectTemplates: { _, _ in [BASAppleCurrentBrainBootstrapHostTemplateInput]() },
+                    selectFailurePatterns: { _ in [BASAppleCurrentBrainBootstrapHostFailurePatternInput]() },
+                    mapTemplate: { $0 },
+                    mapFailurePattern: { $0 }
+                )
+            Issue.record("Expected the multiple configuration set to be rejected")
+        } catch {
+            #expect(
+                error as? BASAppleCurrentBrainPersistenceTransactionError
+                    == .requiresSingleConfiguration(actual: 2)
+            )
+        }
     }
 }

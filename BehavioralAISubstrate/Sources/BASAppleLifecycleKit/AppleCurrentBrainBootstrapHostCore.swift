@@ -656,9 +656,7 @@ public enum BASAppleCurrentBrainBootstrapBridgeBuilder {
         selectTemplates: (BASCurrentBrainBootstrapPreparation, [String]) -> [Template],
         selectFailurePatterns: (BASCurrentBrainBootstrapPreparation) -> [FailurePattern],
         mapTemplate: (Template) -> BASAppleCurrentBrainBootstrapHostTemplateInput,
-        mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput,
-        onCheckpointSaveError: ((Error) -> Void)? = nil,
-        onUpdateSaveError: ((Error) -> Void)? = nil
+        mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput
     ) throws -> BASAppleCurrentBrainBootstrapBridgeResult<Update, Checkpoint> {
         let context = BASAppleCurrentBrainBootstrapHostBuildContext(
             modeID: input.modeID,
@@ -689,9 +687,7 @@ public enum BASAppleCurrentBrainBootstrapBridgeBuilder {
                 selectTemplates: selectTemplates,
                 selectFailurePatterns: selectFailurePatterns,
                 mapTemplate: mapTemplate,
-                mapFailurePattern: mapFailurePattern,
-                onCheckpointSaveError: onCheckpointSaveError,
-                onUpdateSaveError: onUpdateSaveError
+                mapFailurePattern: mapFailurePattern
             )
 
         return BASAppleCurrentBrainBootstrapBridgeResult(
@@ -747,9 +743,7 @@ public enum BASAppleCurrentBrainRuntimeCoordinator {
         selectTemplates: (BASCurrentBrainBootstrapPreparation, [String]) -> [Template],
         selectFailurePatterns: (BASCurrentBrainBootstrapPreparation) -> [FailurePattern],
         mapTemplate: (Template) -> BASAppleCurrentBrainBootstrapHostTemplateInput,
-        mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput,
-        onCheckpointSaveError: ((Error) -> Void)? = nil,
-        onUpdateSaveError: ((Error) -> Void)? = nil
+        mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput
     ) throws -> BASAppleCurrentBrainBootstrapCommitResult<Update, Checkpoint> {
         let artifact = try BASAppleCurrentBrainBootstrapCoordinator.artifact(
             context: context,
@@ -761,7 +755,7 @@ public enum BASAppleCurrentBrainRuntimeCoordinator {
         )
 
         let commit: BASAppleCurrentBrainCommitWriteResult<Update, Checkpoint> =
-            BASAppleCurrentBrainCommitter.commit(
+            try BASAppleCurrentBrainCommitter.commit(
                 modeName: artifact.execution.preparation.mode.identifier,
                 sourceID: artifact.execution.preparation.trigger.rawValue,
                 brainState: artifact.execution.bootstrapped.brainState,
@@ -769,9 +763,7 @@ public enum BASAppleCurrentBrainRuntimeCoordinator {
                 in: modelContext,
                 createdAt: createdAt,
                 checkpointLimit: checkpointLimit,
-                checkpointRetentionInterval: checkpointRetentionInterval,
-                onCheckpointSaveError: onCheckpointSaveError,
-                onUpdateSaveError: onUpdateSaveError
+                checkpointRetentionInterval: checkpointRetentionInterval
             )
 
         return BASAppleCurrentBrainBootstrapCommitResult(

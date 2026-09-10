@@ -108,8 +108,6 @@ public enum BASAppleCurrentBrainHostSupportRuntimeExecutor {
         input: BASAppleCurrentBrainHostLifecycleRuntimeInput,
         in modelContext: ModelContext,
         support: BASAppleCurrentBrainHostSupportDescriptor<Template, FailurePattern>,
-        onCheckpointSaveError: ((Error) -> Void)? = nil,
-        onUpdateSaveError: ((Error) -> Void)? = nil,
         buildCurrentBrain: (BASAppleCurrentBrainLifecycleResult<Update, Checkpoint>) -> CurrentBrain
     ) throws -> CurrentBrain {
         try BASAppleCurrentBrainHostLifecycleRuntimeExecutor.bootstrapAndBuildCurrentBrain(
@@ -121,8 +119,6 @@ public enum BASAppleCurrentBrainHostSupportRuntimeExecutor {
             selectFailurePatterns: support.selectFailurePatterns,
             mapTemplate: support.templateMapper.map,
             mapFailurePattern: support.failurePatternMapper.map,
-            onCheckpointSaveError: onCheckpointSaveError,
-            onUpdateSaveError: onUpdateSaveError,
             buildCurrentBrain: buildCurrentBrain
         )
     }
